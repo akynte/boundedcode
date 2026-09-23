@@ -17,6 +17,13 @@ context_tokens: 32768
 max_packet_tokens: 12000
 reserved_output_tokens: 8192
 max_tools_exposed: 12
+# EDIT steps per attempt. The engine default is 20. On the evals/tasks dev
+# set Bonsai finished EDIT in 5-14 steps when it succeeded, and the one task
+# that used all 20 was still editing and verifying when it was stopped. A step
+# costs Bonsai seconds, not minutes, and the task's wall-clock budget bounds
+# the attempt regardless, so the cap is set where it stops a runaway loop
+# rather than a working one.
+max_steps: 40
 measured_peak_vram_mb: 0
 measured_peak_ram_mb: 0
 max_concurrent_tasks: 1
@@ -34,7 +41,13 @@ runtime:
   slots: 1
   # No --n-cpu-moe: Bonsai is a dense model, and the flag that makes a sparse
   # 35B viable on this card does nothing for it.
-  extra_args: []
+  # Bonsai's hybrid attention can resume a prompt only from a saved context
+  # checkpoint, and the server's default spacing of 8192 tokens left none
+  # inside the ~2K-token prefix every structured call shares, so each LOCALIZE,
+  # PLAN and REVIEW call re-read it (314-505 of ~2K tokens reused). At 512 the
+  # replayed calls reused 1852, about 4.5 s saved per call, with no change in
+  # VRAM; the checkpoints are held in host RAM.
+  extra_args: ["--checkpoint-min-step", "512"]
 # The model card's thinking-mode values, which are also what the GGUF metadata
 # carries. They are deliberately not the sharper settings the MoE profile uses:
 # these were the settings the published benchmarks were measured under, and

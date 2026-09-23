@@ -162,6 +162,7 @@ In a dedicated terminal, with `BC_PRISM_DIR` and `BC_DATA` set:
   --flash-attn on --cache-type-k q8_0 --cache-type-v q8_0 \
   --batch-size 2048 --ubatch-size 512 --threads 8 --threads-batch 16 \
   --temp 1.0 --top-p 0.95 --top-k 20 --min-p 0.0 --jinja \
+  --checkpoint-min-step 512 \
   --host 127.0.0.1 --port 8080
 ```
 
