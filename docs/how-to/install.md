@@ -70,14 +70,23 @@ are prepared to execute. [Trust boundaries](../explanation/trust-boundaries.md).
 git clone https://github.com/akynte/boundedcode.git
 cd boundedcode
 make build
-export PATH="$PWD/bin:$PATH"
-export BC_DATA="$HOME/.local/share/boundedcode"
+if ! grep -Fq '# >>> boundedcode environment >>>' "$HOME/.bashrc"; then
+  {
+    printf '\n# >>> boundedcode environment >>>\n'
+    printf 'export PATH="%s/bin:$PATH"\n' "$PWD"
+    printf 'export BC_DATA="%s/.local/share/boundedcode"\n' "$HOME"
+    printf 'export BC_PRISM_DIR="%s/.local/share/boundedcode-runtime"\n' "$HOME"
+    printf '# <<< boundedcode environment <<<\n'
+  } >> "$HOME/.bashrc"
+fi
+source "$HOME/.bashrc"
 bcode config init
 ```
 
-Keep that `PATH` and `BC_DATA` in subsequent terminals. Alternatively,
-`make install` installs the command under `GOBIN` (normally `$HOME/go/bin`).
-The binary requires cgo; do not build with `CGO_ENABLED=0`.
+This adds the checkout's `bin` directory and the data/runtime paths to Bash's
+startup file once, so they are available from new terminals and other project
+directories. If you move the checkout later, update its `PATH` entry in
+`~/.bashrc`. The binary requires cgo; do not build with `CGO_ENABLED=0`.
 
 `config init` creates `$BC_DATA/config/bcode.yaml` and `providers.yaml`; it
 refuses to overwrite existing configuration. Existing installations should edit
@@ -152,9 +161,19 @@ revision with any results you report. The reference run used revision
 
 ## 5. Start inference
 
-In a dedicated terminal, with `BC_PRISM_DIR` and `BC_DATA` set:
+In a dedicated terminal, the paths from Step 2 are already set. Confirm the
+model and server binary exist before launching:
 
 ```bash
+test -f "$BC_DATA/models/Ternary-Bonsai-2-27B-PTQ1_0.gguf" || {
+  echo "Model not found under $BC_DATA/models; check BC_DATA and complete step 4" >&2
+  exit 1
+}
+test -x "$BC_PRISM_DIR/build/bin/llama-server" || {
+  echo "llama-server not found under $BC_PRISM_DIR/build/bin; check BC_PRISM_DIR and complete step 3" >&2
+  exit 1
+}
+
 "$BC_PRISM_DIR/build/bin/llama-server" \
   --model "$BC_DATA/models/Ternary-Bonsai-2-27B-PTQ1_0.gguf" \
   --alias boundedcode-bonsai \
