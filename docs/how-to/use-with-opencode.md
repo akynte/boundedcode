@@ -3,20 +3,29 @@
 The reference task runner is the native Go engine. OpenCode is an optional
 editor/MCP integration, not a required second agent or the default runtime.
 
-## Setup
+## Start OpenCode
 
-Install OpenCode separately and put `bcode` on PATH. In the repository to inspect:
+Install OpenCode separately, build BoundedCode, and add the build directory to
+your shell's `PATH` as shown in the [installation guide](install.md). Then move
+to a project directory and run:
 
 ```bash
-bcode workspace init
-bcode index
-bcode opencode setup
+bcode opencode
 ```
 
-Setup merges the BoundedCode MCP entry into `opencode.json` and replaces
-only its managed block in `AGENTS.md`. Review those changes before committing.
-It does not download a model, launch a sandbox or disable the editor's own
-tools. Re-run setup to refresh the managed index/notes context.
+On the first run, this creates a workspace marker if the current directory is
+not already in a workspace, registers BoundedCode's MCP server, and writes its
+managed context into `AGENTS.md`. It then launches OpenCode. Later runs check
+that generated setup and update it only when something changed. The command
+also makes the `bcode` executable that launched OpenCode available to its MCP
+process, so a stale binary elsewhere on `PATH` is not used.
+
+The workspace marker, `opencode.json`, and managed `AGENTS.md` block are local
+project setup; review them before committing. `bcode opencode` does not build
+the source index. Run `bcode index` when you want graph-backed retrieval, and
+run `bcode opencode` again to refresh the generated context.
+
+For manual setup without launching the editor, use `bcode opencode setup`.
 
 ## Tool surface
 
@@ -53,10 +62,10 @@ kernel availability and the deployment still determine OS protection.
 
 ## Troubleshooting
 
-If tools do not appear, check `bcode version` in the editor's environment and run
-`bcode mcp`: it serves JSON-RPC over stdio, logging to stderr, until stopped.
-Open the initialized repository root. Refresh stale graph evidence with
-`bc_reindex` or `bcode index`.
+If tools do not appear, run OpenCode with `bcode opencode` from the project
+directory so its MCP process uses the same binary. Check `bcode version`, and
+confirm the workspace marker exists at `.bc/workspace.yaml`. Refresh stale
+graph evidence with `bc_reindex` or `bcode index`.
 
 Tool paths are confined to the opened repository, including symlink resolution.
 This does not confine unrelated tools supplied by another MCP server or an

@@ -95,6 +95,13 @@ terminals and other project directories. If you move the checkout later, update
 its `PATH` entry in `~/.bashrc`. The binary requires cgo; do not build with
 `CGO_ENABLED=0`.
 
+After installing OpenCode, run `bcode opencode` from any project directory to
+initialize BoundedCode there and launch OpenCode with its MCP tools ready. The
+first run creates the workspace marker and editor configuration; later runs
+check and refresh generated setup only when needed. The command makes the exact
+`bcode` executable it launched available to OpenCode's MCP process, including
+when the checkout is built locally with `make build`.
+
 `config init` creates `$BC_DATA/config/bcode.yaml` and `providers.yaml`; it
 refuses to overwrite existing configuration. Existing installations should edit
 the relevant fields below, not use `--force` indiscriminately.

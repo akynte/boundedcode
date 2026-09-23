@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -17,12 +18,28 @@ import (
 	"github.com/akynte/boundedcode/internal/sandbox"
 	"github.com/akynte/boundedcode/internal/store"
 	"github.com/akynte/boundedcode/internal/supervisor"
+	"github.com/akynte/boundedcode/internal/workspace"
 )
 
 func newOpenCodeCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "opencode",
-		Short: "Wire this repository into OpenCode",
+		Short: "Set up and start OpenCode for this project",
+		Long: "Run `bcode opencode` from a project directory to initialize its workspace " +
+			"if needed, register BoundedCode's MCP tools, and start OpenCode. Setup is " +
+			"idempotent: later runs refresh generated context only when it has changed.\n\n" +
+			"This starts a regular OpenCode session. Use `bcode opencode run` for the " +
+			"confined session.",
+		Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if err := initWorkspaceIfNeeded(cmd); err != nil {
+				return err
+			}
+			if err := setupOpenCode(cmd, "", false); err != nil {
+				return err
+			}
+			return startOpenCode(cmd)
+		},
 	}
 	cmd.AddCommand(newOpenCodeSetupCmd())
 	cmd.AddCommand(newOpenCodeRunCmd())
@@ -32,9 +49,8 @@ func newOpenCodeCmd() *cobra.Command {
 // newOpenCodeSetupCmd registers the MCP server and writes the project context
 // OpenCode reads on its own.
 //
-// One command, run once, and afterwards a developer opens OpenCode in the
-// directory and works normally. That is the whole point: a tool the user has to
-// remember to invoke before asking a question is a tool they will stop using.
+// The setup is also used by the default `bcode opencode` entry point. Its
+// writes are idempotent, so normal launches refresh generated context safely.
 func newOpenCodeSetupCmd() *cobra.Command {
 	var dataDir string
 	cmd := &cobra.Command{
@@ -52,69 +68,141 @@ func newOpenCodeSetupCmd() *cobra.Command {
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			ctx := cmd.Context()
-			ws, root, st, err := openWorkspace(ctx)
-			if err != nil {
-				return err
-			}
-			defer closeRoot(cmd, root)
-			out := cmd.OutOrStdout()
-
-			command := []string{"bcode", "mcp"}
-			if dataDir != "" {
-				command = append(command, "--data", dataDir)
-			}
-			cfgPath, cfgChanged, err := opencode.RegisterMCP(ws.Root, command)
-			if err != nil {
-				return err
-			}
-			fmt.Fprintf(out, "%s %s\n", verb(cfgChanged), cfgPath)
-
-			// The editor needs a model of its own, and the operator already
-			// configured one for the supervisor. Copying it across is the
-			// difference between "the tools are registered" and "you can type
-			// a sentence and something happens".
-			if cfg, err := loadConfig(root); err == nil {
-				base, model := inferenceEndpoint(cfg, root)
-				if _, modelChanged, err := opencode.RegisterModel(ws.Root, base, model); err != nil {
-					return err
-				} else if modelChanged {
-					fmt.Fprintf(out, "wired the editor to %s (%s)\n", base, shortName(model))
-				} else if base == "" {
-					fmt.Fprintf(out, "no local endpoint configured yet — set inference.base_url "+
-						"in bcode.yaml, or choose a model inside OpenCode\n")
-				}
-			}
-
-			// The restricted agent, so `bcode opencode run` has one to select.
-			if _, _, err := opencode.RegisterAgent(ws.Root); err != nil {
-				return err
-			}
-
-			facts := opencode.Facts{WorkspaceName: ws.Name()}
-			if stats, err := graph.New(st).Stats(ctx); err == nil {
-				facts.Nodes, facts.Edges = stats.Nodes, stats.Edges
-			}
-			if notes, err := memory.Open(ws.Root, memory.DefaultCaps()).All(); err == nil {
-				facts.Notes = notes
-			}
-			agentsPath, agentsChanged, err := opencode.Apply(ws.Root, opencode.Render(facts))
-			if err != nil {
-				return err
-			}
-			fmt.Fprintf(out, "%s %s\n", verb(agentsChanged), agentsPath)
-
-			if facts.Nodes == 0 {
-				fmt.Fprintf(out, "\nThis repository is not indexed yet. Run `bcode index` once, "+
-					"then `bcode opencode setup` again so AGENTS.md reports the real graph.\n")
-			}
-			fmt.Fprintf(out, "\nOpen this directory in OpenCode and work normally.\n")
-			return nil
+			return setupOpenCode(cmd, dataDir, true)
 		},
 	}
 	cmd.Flags().StringVar(&dataDir, "data-dir", "",
 		"pass an explicit --data to the registered `bcode mcp` command")
 	return cmd
+}
+
+func setupOpenCode(cmd *cobra.Command, dataDir string, printNext bool) error {
+	ctx := cmd.Context()
+	ws, root, st, err := openWorkspace(ctx)
+	if err != nil {
+		return err
+	}
+	defer closeRoot(cmd, root)
+	out := cmd.OutOrStdout()
+
+	command := []string{"bcode", "mcp"}
+	if dataDir != "" {
+		command = append(command, "--data", dataDir)
+	}
+	cfgPath, cfgChanged, err := opencode.RegisterMCP(ws.Root, command)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(out, "%s %s\n", verb(cfgChanged), cfgPath)
+
+	// The editor needs a model of its own, and the operator already configured
+	// one for the supervisor. Copying it across lets the user start chatting
+	// immediately when that endpoint is configured.
+	if cfg, err := loadConfig(root); err == nil {
+		base, model := inferenceEndpoint(cfg, root)
+		if _, modelChanged, err := opencode.RegisterModel(ws.Root, base, model); err != nil {
+			return err
+		} else if modelChanged {
+			fmt.Fprintf(out, "wired the editor to %s (%s)\n", base, shortName(model))
+		} else if base == "" {
+			fmt.Fprintf(out, "no local endpoint configured yet — set inference.base_url "+
+				"in bcode.yaml, or choose a model inside OpenCode\n")
+		}
+	}
+
+	// The restricted agent, so `bcode opencode run` has one to select.
+	if _, _, err := opencode.RegisterAgent(ws.Root); err != nil {
+		return err
+	}
+
+	facts := opencode.Facts{WorkspaceName: ws.Name()}
+	if stats, err := graph.New(st).Stats(ctx); err == nil {
+		facts.Nodes, facts.Edges = stats.Nodes, stats.Edges
+	}
+	if notes, err := memory.Open(ws.Root, memory.DefaultCaps()).All(); err == nil {
+		facts.Notes = notes
+	}
+	agentsPath, agentsChanged, err := opencode.Apply(ws.Root, opencode.Render(facts))
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(out, "%s %s\n", verb(agentsChanged), agentsPath)
+
+	if facts.Nodes == 0 {
+		fmt.Fprintf(out, "\nThis repository is not indexed yet. Run `bcode index` to build its source graph.\n")
+	}
+	if printNext {
+		fmt.Fprintf(out, "\nOpen this directory in OpenCode and work normally.\n")
+	}
+	return nil
+}
+
+// initWorkspaceIfNeeded makes the short `bcode opencode` path work in a
+// previously uninitialized project. Existing workspace markers, including one
+// found in a parent directory, are left intact.
+func initWorkspaceIfNeeded(cmd *cobra.Command) error {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	if _, err := workspace.Open(cwd); err == nil {
+		return nil
+	} else if !errors.Is(err, workspace.ErrNotAWorkspace) {
+		return err
+	}
+	ws, err := workspace.Init(cwd, workspace.InitOptions{})
+	if err != nil {
+		// Another invocation may have initialized this directory between the
+		// lookup and creation.
+		if _, openErr := workspace.Open(cwd); openErr == nil {
+			return nil
+		} else {
+			return err
+		}
+	}
+	fmt.Fprintf(cmd.OutOrStdout(), "initialized workspace %s in %s\n", ws.ID(), ws.Root)
+	return nil
+}
+
+// startOpenCode starts the regular OpenCode UI, with the exact bcode binary
+// that launched this command available to its MCP subprocesses. This avoids
+// accidentally starting an older bcode elsewhere on PATH after a local build.
+func startOpenCode(cmd *cobra.Command) error {
+	binary, err := exec.LookPath("opencode")
+	if err != nil {
+		return fmt.Errorf("opencode is not on PATH: %w", err)
+	}
+	bcodePath, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("locating bcode executable: %w", err)
+	}
+	bcodePath, err = filepath.Abs(bcodePath)
+	if err != nil {
+		return fmt.Errorf("resolving bcode executable: %w", err)
+	}
+	path := filepath.Dir(bcodePath) + string(os.PathListSeparator) + os.Getenv("PATH")
+	child := exec.CommandContext(cmd.Context(), binary)
+	child.Env = setEnv(os.Environ(), "PATH", path)
+	child.Stdin, child.Stdout, child.Stderr = cmd.InOrStdin(), cmd.OutOrStdout(), cmd.ErrOrStderr()
+	if err := child.Run(); err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			return nil
+		}
+		return fmt.Errorf("starting opencode: %w", err)
+	}
+	return nil
+}
+
+func setEnv(env []string, key, value string) []string {
+	prefix := key + "="
+	out := make([]string, 0, len(env)+1)
+	for _, item := range env {
+		if !strings.HasPrefix(item, prefix) {
+			out = append(out, item)
+		}
+	}
+	return append(out, prefix+value)
 }
 
 func verb(changed bool) string {

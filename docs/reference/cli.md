@@ -688,14 +688,22 @@ $ bcode eval runtime --prepare --task SWEBENCH-CADDY-4943
 
 | Command | |
 |---|---|
+| *(no subcommand)* | Initialize this directory as a workspace if needed, refresh OpenCode setup, and launch OpenCode |
 | `setup` | Register the MCP server and write AGENTS.md for this repository |
 | `run` | Start OpenCode confined to this workspace |
 
-Run once per repository. It registers `bcode mcp` in `opencode.json`, merging
-rather than replacing so an existing model choice or another MCP server
-survives, and writes a block into `AGENTS.md` — which OpenCode reads into every
-session — naming the tools, saying which questions they answer better than
-search, and carrying what this repository has recorded about itself.
+Running `bcode opencode` from a project directory initializes its workspace
+marker if one is not already present, applies the setup below, and launches
+OpenCode. The setup is idempotent: later runs update generated files only when
+their contents need refreshing. The launched editor inherits the directory of
+the invoking `bcode` binary first on `PATH`, so its MCP process uses that same
+build rather than another installation elsewhere on the machine.
+
+Setup registers `bcode mcp` in `opencode.json`, merging rather than replacing
+so an existing model choice or another MCP server survives, and writes a block
+into `AGENTS.md` — which OpenCode reads into every session — naming the tools,
+saying which questions they answer better than search, and carrying what this
+repository has recorded about itself.
 
 Only the block between its markers is replaced, so anything you write in
 `AGENTS.md` yourself is left alone. An existing `opencode.jsonc` is refused
