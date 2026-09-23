@@ -1,0 +1,460 @@
+diff --git a/internal/inventory/inventory.go b/internal/inventory/inventory.go
+index 9b3c746..2faa683 100644
+--- a/internal/inventory/inventory.go
++++ b/internal/inventory/inventory.go
+@@ -39,26 +39,70 @@ func (s *Service) Available(ctx context.Context, sku domain.SKU) (int, error) {
+ 	return st.Available(), nil
+ }
+ 
+-// Reserve holds stock for an order. It is called once per line.
+-func (s *Service) Reserve(ctx context.Context, sku domain.SKU, quantity int) error {
++// reserveAttempts bounds how often Reserve re-reads a row after losing a
++// version race. A repeat racing its original loses once and then sees the hold.
++const reserveAttempts = 3
++
++// Reserve holds stock for a SKU under key, which names the reservation (an
++// order places one per SKU, keyed by its order ID). Reserve is safe to repeat:
++// if key already holds stock for this SKU, nothing more is taken and nil is
++// returned. Repeating a key with a different quantity is an error, because the
++// two requests cannot both be the same reservation.
++func (s *Service) Reserve(ctx context.Context, key string, sku domain.SKU, quantity int) error {
++	if key == "" {
++		return errors.New("inventory: reservation key must not be empty")
++	}
+ 	if quantity <= 0 {
+ 		return fmt.Errorf("inventory: quantity must be positive, got %d", quantity)
+ 	}
++	var err error
++	for range reserveAttempts {
++		err = s.reserveOnce(ctx, key, sku, quantity)
++		if !errors.Is(err, store.ErrConflict) {
++			return err
++		}
++	}
++	return err
++}
++
++func (s *Service) reserveOnce(ctx context.Context, key string, sku domain.SKU, quantity int) error {
+ 	st, err := s.stock.GetStock(ctx, sku)
+ 	if err != nil {
+ 		return err
+ 	}
++	if held, ok := st.Holds[key]; ok {
++		if held != quantity {
++			return fmt.Errorf("inventory: reservation %q already holds %d of %s, %d requested",
++				key, held, sku, quantity)
++		}
++		return nil
++	}
+ 	if st.Available() < quantity {
+ 		return fmt.Errorf("%w: %s has %d available, %d requested",
+ 			ErrInsufficientStock, sku, st.Available(), quantity)
+ 	}
+ 	st.Reserved += quantity
++	if st.Holds == nil {
++		st.Holds = map[string]int{}
++	}
++	st.Holds[key] = quantity
+ 	return s.stock.PutStock(ctx, st)
+ }
+ 
+-// Release returns reserved stock to the available pool, used when an order is
+-// cancelled before it ships.
++// Release returns reserved stock to the available pool. It is the reconciler's
++// correction and does not touch any reservation's record; an order being
++// cancelled uses ReleaseReservation.
+ func (s *Service) Release(ctx context.Context, sku domain.SKU, quantity int) error {
++	return s.release(ctx, "", sku, quantity)
++}
++
++// ReleaseReservation returns the stock reserved under key to the available
++// pool, used when an order is cancelled before it ships, and forgets the key.
++func (s *Service) ReleaseReservation(ctx context.Context, key string, sku domain.SKU, quantity int) error {
++	return s.release(ctx, key, sku, quantity)
++}
++
++func (s *Service) release(ctx context.Context, key string, sku domain.SKU, quantity int) error {
+ 	st, err := s.stock.GetStock(ctx, sku)
+ 	if err != nil {
+ 		return err
+@@ -67,12 +111,16 @@ func (s *Service) Release(ctx context.Context, sku domain.SKU, quantity int) err
+ 	if st.Reserved < 0 {
+ 		st.Reserved = 0
+ 	}
++	if key != "" {
++		delete(st.Holds, key)
++	}
+ 	return s.stock.PutStock(ctx, st)
+ }
+ 
+-// Consume converts a reservation into a despatch: the units leave the building,
+-// so both the on-hand and the reserved counts fall.
+-func (s *Service) Consume(ctx context.Context, sku domain.SKU, quantity int) error {
++// Consume converts the reservation made under key into a despatch: the units
++// leave the building, so both the on-hand and the reserved counts fall, and the
++// key is forgotten.
++func (s *Service) Consume(ctx context.Context, key string, sku domain.SKU, quantity int) error {
+ 	st, err := s.stock.GetStock(ctx, sku)
+ 	if err != nil {
+ 		return err
+@@ -82,6 +130,7 @@ func (s *Service) Consume(ctx context.Context, sku domain.SKU, quantity int) err
+ 	if st.Reserved < 0 {
+ 		st.Reserved = 0
+ 	}
++	delete(st.Holds, key)
+ 	return s.stock.PutStock(ctx, st)
+ }
+ 
+diff --git a/internal/inventory/inventory_test.go b/internal/inventory/inventory_test.go
+index bf4dfc7..2cb76d7 100644
+--- a/internal/inventory/inventory_test.go
++++ b/internal/inventory/inventory_test.go
+@@ -3,6 +3,7 @@ package inventory
+ import (
+ 	"context"
+ 	"errors"
++	"sync"
+ 	"testing"
+ 
+ 	"example.com/warehouse/internal/domain"
+@@ -29,7 +30,7 @@ func setup(t *testing.T) (*Service, *store.Memory) {
+ func TestReserveReducesAvailable(t *testing.T) {
+ 	svc, _ := setup(t)
+ 	ctx := context.Background()
+-	if err := svc.Reserve(ctx, "AB-1234", 3); err != nil {
++	if err := svc.Reserve(ctx, "o1", "AB-1234", 3); err != nil {
+ 		t.Fatal(err)
+ 	}
+ 	got, err := svc.Available(ctx, "AB-1234")
+@@ -43,7 +44,7 @@ func TestReserveReducesAvailable(t *testing.T) {
+ 
+ func TestReserveRefusesWhenShort(t *testing.T) {
+ 	svc, _ := setup(t)
+-	err := svc.Reserve(context.Background(), "AB-1234", 99)
++	err := svc.Reserve(context.Background(), "o1", "AB-1234", 99)
+ 	if !errors.Is(err, ErrInsufficientStock) {
+ 		t.Fatalf("got %v, want ErrInsufficientStock", err)
+ 	}
+@@ -52,10 +53,10 @@ func TestReserveRefusesWhenShort(t *testing.T) {
+ func TestConsumeDropsOnHand(t *testing.T) {
+ 	svc, mem := setup(t)
+ 	ctx := context.Background()
+-	if err := svc.Reserve(ctx, "AB-1234", 4); err != nil {
++	if err := svc.Reserve(ctx, "o1", "AB-1234", 4); err != nil {
+ 		t.Fatal(err)
+ 	}
+-	if err := svc.Consume(ctx, "AB-1234", 4); err != nil {
++	if err := svc.Consume(ctx, "o1", "AB-1234", 4); err != nil {
+ 		t.Fatal(err)
+ 	}
+ 	st, err := mem.GetStock(ctx, "AB-1234")
+@@ -65,4 +66,126 @@ func TestConsumeDropsOnHand(t *testing.T) {
+ 	if st.OnHand != 6 || st.Reserved != 0 {
+ 		t.Fatalf("on hand %d reserved %d, want 6 and 0", st.OnHand, st.Reserved)
+ 	}
++	if _, ok := st.Holds["o1"]; ok {
++		t.Fatal("hold for o1 kept after consume")
++	}
++}
++
++func TestReserveRepeatTakesNoMore(t *testing.T) {
++	svc, _ := setup(t)
++	ctx := context.Background()
++	for range 3 {
++		if err := svc.Reserve(ctx, "o1", "AB-1234", 3); err != nil {
++			t.Fatal(err)
++		}
++	}
++	got, err := svc.Available(ctx, "AB-1234")
++	if err != nil {
++		t.Fatal(err)
++	}
++	if got != 7 {
++		t.Fatalf("available = %d after repeats, want 7", got)
++	}
++}
++
++func TestReserveRepeatSucceedsWhenStockIsGone(t *testing.T) {
++	svc, _ := setup(t)
++	ctx := context.Background()
++	if err := svc.Reserve(ctx, "o1", "AB-1234", 6); err != nil {
++		t.Fatal(err)
++	}
++	if err := svc.Reserve(ctx, "o1", "AB-1234", 6); err != nil {
++		t.Fatalf("repeat of a met reservation: %v", err)
++	}
++	if err := svc.Reserve(ctx, "o2", "AB-1234", 4); err != nil {
++		t.Fatalf("another order was refused the stock left over: %v", err)
++	}
++}
++
++func TestReserveDistinctKeysTakeSeparately(t *testing.T) {
++	svc, _ := setup(t)
++	ctx := context.Background()
++	if err := svc.Reserve(ctx, "o1", "AB-1234", 3); err != nil {
++		t.Fatal(err)
++	}
++	if err := svc.Reserve(ctx, "o2", "AB-1234", 3); err != nil {
++		t.Fatal(err)
++	}
++	got, err := svc.Available(ctx, "AB-1234")
++	if err != nil {
++		t.Fatal(err)
++	}
++	if got != 4 {
++		t.Fatalf("available = %d, want 4", got)
++	}
++}
++
++func TestReserveRepeatWithDifferentQuantityFails(t *testing.T) {
++	svc, _ := setup(t)
++	ctx := context.Background()
++	if err := svc.Reserve(ctx, "o1", "AB-1234", 3); err != nil {
++		t.Fatal(err)
++	}
++	if err := svc.Reserve(ctx, "o1", "AB-1234", 5); err == nil {
++		t.Fatal("reusing a key for a different quantity succeeded")
++	}
++	got, err := svc.Available(ctx, "AB-1234")
++	if err != nil {
++		t.Fatal(err)
++	}
++	if got != 7 {
++		t.Fatalf("available = %d, want 7", got)
++	}
++}
++
++func TestReserveRequiresKey(t *testing.T) {
++	svc, _ := setup(t)
++	if err := svc.Reserve(context.Background(), "", "AB-1234", 1); err == nil {
++		t.Fatal("reserve with an empty key succeeded")
++	}
++}
++
++func TestReserveConcurrentRepeatsTakeOnce(t *testing.T) {
++	svc, _ := setup(t)
++	ctx := context.Background()
++	var wg sync.WaitGroup
++	errs := make(chan error, 2)
++	for range 2 {
++		wg.Go(func() { errs <- svc.Reserve(ctx, "o1", "AB-1234", 3) })
++	}
++	wg.Wait()
++	close(errs)
++	for err := range errs {
++		if err != nil {
++			t.Fatal(err)
++		}
++	}
++	got, err := svc.Available(ctx, "AB-1234")
++	if err != nil {
++		t.Fatal(err)
++	}
++	if got != 7 {
++		t.Fatalf("available = %d, want 7", got)
++	}
++}
++
++func TestReleaseReservationForgetsKey(t *testing.T) {
++	svc, _ := setup(t)
++	ctx := context.Background()
++	if err := svc.Reserve(ctx, "o1", "AB-1234", 3); err != nil {
++		t.Fatal(err)
++	}
++	if err := svc.ReleaseReservation(ctx, "o1", "AB-1234", 3); err != nil {
++		t.Fatal(err)
++	}
++	if err := svc.Reserve(ctx, "o1", "AB-1234", 3); err != nil {
++		t.Fatal(err)
++	}
++	got, err := svc.Available(ctx, "AB-1234")
++	if err != nil {
++		t.Fatal(err)
++	}
++	if got != 7 {
++		t.Fatalf("available = %d, want 7", got)
++	}
+ }
+diff --git a/internal/orders/orders.go b/internal/orders/orders.go
+index b874b62..09a7985 100644
+--- a/internal/orders/orders.go
++++ b/internal/orders/orders.go
+@@ -91,8 +91,10 @@ func (s *Service) Place(ctx context.Context, req PlaceRequest) (domain.Order, pr
+ 		})
+ 	}
+ 
+-	for _, line := range order.Lines {
+-		if err := s.inventory.Reserve(ctx, line.SKU, line.Quantity); err != nil {
++	// The gateway retries a slow Place, so reservations are keyed by order ID:
++	// a retry finds its own holds and takes no more stock.
++	for _, line := range quantitiesBySKU(order.Lines) {
++		if err := s.inventory.Reserve(ctx, string(order.ID), line.SKU, line.Quantity); err != nil {
+ 			return domain.Order{}, pricing.Breakdown{}, err
+ 		}
+ 	}
+@@ -128,8 +130,8 @@ func (s *Service) Cancel(ctx context.Context, id domain.OrderID, reason string)
+ 	if err := order.Transition(domain.StateCancelled); err != nil {
+ 		return err
+ 	}
+-	for _, line := range order.Lines {
+-		if err := s.inventory.Release(ctx, line.SKU, line.Quantity); err != nil {
++	for _, line := range quantitiesBySKU(order.Lines) {
++		if err := s.inventory.ReleaseReservation(ctx, string(order.ID), line.SKU, line.Quantity); err != nil {
+ 			return err
+ 		}
+ 	}
+@@ -162,8 +164,8 @@ func (s *Service) Ship(ctx context.Context, id domain.OrderID, tracking string)
+ 	if err := order.Transition(domain.StateShipped); err != nil {
+ 		return err
+ 	}
+-	for _, line := range order.Lines {
+-		if err := s.inventory.Consume(ctx, line.SKU, line.Quantity); err != nil {
++	for _, line := range quantitiesBySKU(order.Lines) {
++		if err := s.inventory.Consume(ctx, string(order.ID), line.SKU, line.Quantity); err != nil {
+ 			return err
+ 		}
+ 	}
+@@ -177,6 +179,23 @@ func (s *Service) Ship(ctx context.Context, id domain.OrderID, tracking string)
+ 	return nil
+ }
+ 
++// quantitiesBySKU totals an order's lines per SKU, in first-seen order. An
++// order holds one reservation per SKU, so two lines for the same SKU must be
++// reserved, released and consumed together rather than mistaken for a repeat.
++func quantitiesBySKU(lines []domain.OrderLine) []RequestLine {
++	var out []RequestLine
++	index := map[domain.SKU]int{}
++	for _, l := range lines {
++		if i, ok := index[l.SKU]; ok {
++			out[i].Quantity += l.Quantity
++			continue
++		}
++		index[l.SKU] = len(out)
++		out = append(out, RequestLine{SKU: l.SKU, Quantity: l.Quantity})
++	}
++	return out
++}
++
+ func (s *Service) move(ctx context.Context, id domain.OrderID, to domain.OrderState,
+ 	action string, detail map[string]string) error {
+ 	order, err := s.orders.GetOrder(ctx, id)
+diff --git a/internal/orders/orders_test.go b/internal/orders/orders_test.go
+index 0c1ee78..bfe3517 100644
+--- a/internal/orders/orders_test.go
++++ b/internal/orders/orders_test.go
+@@ -63,6 +63,50 @@ func TestPlaceReservesStock(t *testing.T) {
+ 	}
+ }
+ 
++func TestPlaceRetryDoesNotReserveTwice(t *testing.T) {
++	svc, mem := newService(t)
++	ctx := context.Background()
++	for range 2 {
++		if _, _, err := svc.Place(ctx, request()); err != nil {
++			t.Fatal(err)
++		}
++	}
++	st, err := mem.GetStock(ctx, "AB-1234")
++	if err != nil {
++		t.Fatal(err)
++	}
++	if st.Reserved != 2 {
++		t.Fatalf("reserved = %d after a retried place, want 2", st.Reserved)
++	}
++}
++
++func TestPlaceReservesRepeatedSKULines(t *testing.T) {
++	svc, mem := newService(t)
++	ctx := context.Background()
++	req := request()
++	req.Lines = []RequestLine{{SKU: "AB-1234", Quantity: 2}, {SKU: "AB-1234", Quantity: 3}}
++	if _, _, err := svc.Place(ctx, req); err != nil {
++		t.Fatal(err)
++	}
++	st, err := mem.GetStock(ctx, "AB-1234")
++	if err != nil {
++		t.Fatal(err)
++	}
++	if st.Reserved != 5 {
++		t.Fatalf("reserved = %d, want 5", st.Reserved)
++	}
++	if err := svc.Cancel(ctx, "o1", "test"); err != nil {
++		t.Fatal(err)
++	}
++	st, err = mem.GetStock(ctx, "AB-1234")
++	if err != nil {
++		t.Fatal(err)
++	}
++	if st.Reserved != 0 || len(st.Holds) != 0 {
++		t.Fatalf("reserved %d holds %v after cancel, want 0 and none", st.Reserved, st.Holds)
++	}
++}
++
+ func TestPlaceRejectsEmptyOrder(t *testing.T) {
+ 	svc, _ := newService(t)
+ 	req := request()
+diff --git a/internal/store/memory.go b/internal/store/memory.go
+index eace1f7..a7df418 100644
+--- a/internal/store/memory.go
++++ b/internal/store/memory.go
+@@ -2,6 +2,7 @@ package store
+ 
+ import (
+ 	"context"
++	"maps"
+ 	"sort"
+ 	"sync"
+ 
+@@ -91,7 +92,7 @@ func (m *Memory) GetStock(_ context.Context, sku domain.SKU) (Stock, error) {
+ 	if !ok {
+ 		return Stock{}, ErrNotFound
+ 	}
+-	return s, nil
++	return cloneStock(s), nil
+ }
+ 
+ func (m *Memory) PutStock(_ context.Context, stock Stock) error {
+@@ -101,17 +102,27 @@ func (m *Memory) PutStock(_ context.Context, stock Stock) error {
+ 	if exists && stock.Version != current.Version {
+ 		return ErrConflict
+ 	}
++	stock = cloneStock(stock)
+ 	stock.Version++
+ 	m.stock[stock.SKU] = stock
+ 	return nil
+ }
+ 
++// cloneStock copies the Holds map so a caller editing a row it has read cannot
++// change the stored row without going through PutStock's version check.
++func cloneStock(s Stock) Stock {
++	if s.Holds != nil {
++		s.Holds = maps.Clone(s.Holds)
++	}
++	return s
++}
++
+ func (m *Memory) ListStock(_ context.Context) ([]Stock, error) {
+ 	m.mu.RLock()
+ 	defer m.mu.RUnlock()
+ 	out := make([]Stock, 0, len(m.stock))
+ 	for _, s := range m.stock {
+-		out = append(out, s)
++		out = append(out, cloneStock(s))
+ 	}
+ 	sort.Slice(out, func(a, b int) bool { return out[a].SKU < out[b].SKU })
+ 	return out, nil
+diff --git a/internal/store/store.go b/internal/store/store.go
+index 2abbd8b..8a66e0c 100644
+--- a/internal/store/store.go
++++ b/internal/store/store.go
+@@ -43,6 +43,10 @@ type Stock struct {
+ 	SKU      domain.SKU
+ 	OnHand   int
+ 	Reserved int
++	// Holds records the quantity each reservation key has taken, so a repeated
++	// reservation can be recognised. It lives on the row so that it changes in
++	// the same versioned write as Reserved.
++	Holds map[string]int
+ 	// Version guards against a lost update when two reservations race.
+ 	Version int
+ }

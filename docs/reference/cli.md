@@ -458,6 +458,18 @@ retry rather than ignored or restarted as a fresh attempt.
 | `readiness` | Report which benchmark stage this dataset has reached |
 | `stability` | Measure whether a Jev score is stable under irrelevant request structure |
 | `calibrate` | Measure whether Jev scores have useful probability semantics here |
+| `judges` | Measure how often each acceptance judge accepts a change that does not solve its task |
+
+`judges` puts a corpus of candidate changes before two judges and scores each
+against the task's hidden acceptance command. `ci` runs the visible build, vet,
+test and format checks on the patched tree. `bcode` runs the completion contract
+on an indexed repository: the same checks in a snapshot, plus the tests that
+reach the change. Candidates are edit scripts in `<corpus>/*.yaml` or unified
+diffs at `<corpus>/<task-id>/<name>.patch`, which is how another agent's patch
+is judged. Flags: `--tasks`, `--corpus` (default `evals/judges`), `--json`, and
+`--oracles <dir>`, which adds a `bcode+oracle` judge using one hidden acceptance
+suite per task from `<dir>/<task-id>/` and reports whether each suite fails on
+the unfixed code.
 
 `run` flags: `--arms`, `--set` (`dev` or `heldout`), `--tasks` (the task set
 directory), `--task` (run only these ids), `--repeat`, `--raw` (write every run,

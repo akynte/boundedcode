@@ -1,0 +1,100 @@
+diff --git a/internal/shipping/shipping.go b/internal/shipping/shipping.go
+index a2d545b..5e1182e 100644
+--- a/internal/shipping/shipping.go
++++ b/internal/shipping/shipping.go
+@@ -17,9 +17,14 @@ import (
+ var ErrNoZone = errors.New("shipping: no zone covers that destination")
+ 
+ // ErrNoCarrier is returned when nothing can carry the parcel, which happens
+-// for hazardous goods outside the domestic zone.
++// for hazardous or perishable goods outside the domestic zone.
+ var ErrNoCarrier = errors.New("shipping: no carrier will take this parcel")
+ 
++// ErrNoColdChain is returned for perishable goods bound for a zone without a
++// refrigerated network. It wraps ErrNoCarrier so every caller that already
++// refuses an uncarriable parcel refuses this one the same way.
++var ErrNoColdChain = fmt.Errorf("%w: perishable goods need a refrigerated network", ErrNoCarrier)
++
+ // Zone is a shipping region.
+ type Zone struct {
+ 	Name          string
+@@ -29,6 +34,9 @@ type Zone struct {
+ 	// SpecialHandling reports whether carriers in this zone accept parcels
+ 	// needing special handling.
+ 	SpecialHandling bool
++	// Refrigerated reports whether the zone's network keeps goods chilled end
++	// to end. Perishable parcels are refused anywhere it does not.
++	Refrigerated bool
+ }
+ 
+ // Covers reports whether a country is in the zone.
+@@ -113,6 +121,9 @@ func (s *Service) Rate(zone Zone, p Parcel, currency domain.Currency) (domain.Mo
+ 	if p.RequiresSpecial && !zone.SpecialHandling {
+ 		return domain.Money{}, fmt.Errorf("%w: zone %s", ErrNoCarrier, zone.Name)
+ 	}
++	if p.ContainsPerishable && !zone.Refrigerated {
++		return domain.Money{}, fmt.Errorf("%w: zone %s", ErrNoColdChain, zone.Name)
++	}
+ 	kg := (p.WeightGram + 999) / 1000
+ 	minor := zone.BaseRateMinor + zone.PerKgMinor*int64(kg)
+ 	return domain.Money{Minor: minor, Currency: currency}, nil
+@@ -135,7 +146,7 @@ func (s *Service) Quote(ctx context.Context, order domain.Order) (domain.Money,
+ // DefaultZones are the zones the service ships with.
+ func DefaultZones() []Zone {
+ 	return []Zone{
+-		{Name: "domestic", CountryCodes: []string{"GB"}, BaseRateMinor: 395, PerKgMinor: 100, SpecialHandling: true},
++		{Name: "domestic", CountryCodes: []string{"GB"}, BaseRateMinor: 395, PerKgMinor: 100, SpecialHandling: true, Refrigerated: true},
+ 		{Name: "eu", CountryCodes: []string{"IE", "FR", "DE", "NL", "ES", "IT"}, BaseRateMinor: 995, PerKgMinor: 250},
+ 		{Name: "world", CountryCodes: []string{"US", "CA", "AU", "NZ", "JP"}, BaseRateMinor: 1995, PerKgMinor: 600},
+ 	}
+diff --git a/internal/shipping/shipping_test.go b/internal/shipping/shipping_test.go
+index 115d8fa..d614d5f 100644
+--- a/internal/shipping/shipping_test.go
++++ b/internal/shipping/shipping_test.go
+@@ -49,6 +49,46 @@ func TestRateRefusesSpecialHandlingWhereUnsupported(t *testing.T) {
+ 	}
+ }
+ 
++func TestRateRefusesPerishableOutsideRefrigeratedZone(t *testing.T) {
++	s := New(store.NewMemory(), DefaultZones()...)
++	for _, country := range []string{"FR", "US"} {
++		z, _ := s.ZoneFor(country)
++		_, err := s.Rate(z, Parcel{WeightGram: 500, ContainsPerishable: true}, domain.GBP)
++		if !errors.Is(err, ErrNoColdChain) {
++			t.Fatalf("%s: got %v, want ErrNoColdChain", country, err)
++		}
++		// Callers that map ErrNoCarrier to a refusal must see this one too.
++		if !errors.Is(err, ErrNoCarrier) {
++			t.Fatalf("%s: got %v, want it to wrap ErrNoCarrier", country, err)
++		}
++	}
++}
++
++func TestRateAcceptsPerishableDomestically(t *testing.T) {
++	s := New(store.NewMemory(), DefaultZones()...)
++	z, _ := s.ZoneFor("GB")
++	if _, err := s.Rate(z, Parcel{WeightGram: 500, ContainsPerishable: true}, domain.GBP); err != nil {
++		t.Fatal(err)
++	}
++}
++
++func TestQuoteRefusesPerishableAbroad(t *testing.T) {
++	mem := store.NewMemory()
++	ctx := context.Background()
++	_ = mem.PutItem(ctx, domain.Item{
++		SKU: "FD-1234", Category: domain.CategoryPerishable, WeightGram: 300,
++		UnitPrice: domain.NewMoney(100, domain.GBP),
++	})
++	s := New(mem, DefaultZones()...)
++	_, err := s.Quote(ctx, domain.Order{
++		Currency: domain.GBP, ShippingZone: "eu",
++		Lines: []domain.OrderLine{{SKU: "FD-1234", Quantity: 1, UnitPrice: domain.NewMoney(100, domain.GBP)}},
++	})
++	if !errors.Is(err, ErrNoCarrier) {
++		t.Fatalf("got %v, want ErrNoCarrier", err)
++	}
++}
++
+ func TestParcelForSumsWeights(t *testing.T) {
+ 	mem := store.NewMemory()
+ 	ctx := context.Background()

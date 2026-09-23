@@ -1,0 +1,158 @@
+diff --git a/internal/pricing/pricing.go b/internal/pricing/pricing.go
+index 7cb1cb5..7de4106 100644
+--- a/internal/pricing/pricing.go
++++ b/internal/pricing/pricing.go
+@@ -5,6 +5,7 @@ package pricing
+ 
+ import (
+ 	"context"
++	"errors"
+ 	"fmt"
+ 
+ 	"example.com/warehouse/internal/domain"
+@@ -34,6 +35,10 @@ type LineDiscount struct {
+ 	Amount domain.Money
+ }
+ 
++// ErrNegativeTotal is returned rather than a breakdown that would ask the
++// customer to pay less than nothing, which no payment provider will accept.
++var ErrNegativeTotal = errors.New("pricing: total is negative")
++
+ // TaxRate is basis points, so 2000 is 20%.
+ type TaxRate int
+ 
+@@ -64,6 +69,18 @@ func (c *Calculator) Price(ctx context.Context, order domain.Order, shipping dom
+ 		if err != nil {
+ 			return Breakdown{}, fmt.Errorf("pricing: rule %s: %w", rule.Name(), err)
+ 		}
++		if amount.Currency != running.Currency {
++			return Breakdown{}, fmt.Errorf("pricing: rule %s: %w", rule.Name(), domain.ErrCurrencyMismatch)
++		}
++		if amount.Minor < 0 {
++			return Breakdown{}, fmt.Errorf("pricing: rule %s: negative discount %s", rule.Name(), amount)
++		}
++		// Rules each see the undiscounted subtotal, so together they can ask
++		// for more than is left. Take off only what remains, and record that
++		// reduced amount so the breakdown still adds up to the total.
++		if amount.Minor > running.Minor {
++			amount.Minor = max(running.Minor, 0)
++		}
+ 		if amount.IsZero() {
+ 			continue
+ 		}
+@@ -84,6 +101,9 @@ func (c *Calculator) Price(ctx context.Context, order domain.Order, shipping dom
+ 	if err != nil {
+ 		return Breakdown{}, err
+ 	}
++	if total.Minor < 0 {
++		return Breakdown{}, fmt.Errorf("%w: %s", ErrNegativeTotal, total)
++	}
+ 	b.Total = total
+ 	return b, nil
+ }
+diff --git a/internal/pricing/pricing_test.go b/internal/pricing/pricing_test.go
+index 783cd05..ab00f60 100644
+--- a/internal/pricing/pricing_test.go
++++ b/internal/pricing/pricing_test.go
+@@ -2,6 +2,7 @@ package pricing
+ 
+ import (
+ 	"context"
++	"errors"
+ 	"testing"
+ 
+ 	"example.com/warehouse/internal/domain"
+@@ -39,3 +40,93 @@ func TestBulkDiscountAppliesOverThreshold(t *testing.T) {
+ 		t.Fatalf("discounts = %+v, want one of 1000", b.Discounts)
+ 	}
+ }
++
++// fixedDiscount always asks for the same amount, whatever the order.
++type fixedDiscount struct {
++	name   string
++	amount domain.Money
++}
++
++func (r fixedDiscount) Name() string { return r.name }
++
++func (r fixedDiscount) Discount(context.Context, domain.Order, domain.Money) (domain.Money, error) {
++	return r.amount, nil
++}
++
++// checkAddsUp asserts the breakdown is internally consistent: subtotal less
++// the discounts shown, plus shipping and tax, is exactly the total.
++func checkAddsUp(t *testing.T, b Breakdown) {
++	t.Helper()
++	sum := b.Subtotal.Minor
++	for _, d := range b.Discounts {
++		if d.Amount.Minor <= 0 {
++			t.Errorf("discount %s shown as %d", d.Rule, d.Amount.Minor)
++		}
++		sum -= d.Amount.Minor
++	}
++	if sum < 0 {
++		t.Errorf("discounts exceed subtotal: %+v", b)
++	}
++	sum += b.Shipping.Minor + b.Tax.Minor
++	if sum != b.Total.Minor {
++		t.Errorf("breakdown sums to %d, total is %d: %+v", sum, b.Total.Minor, b)
++	}
++	if b.Total.Minor < 0 {
++		t.Errorf("total = %d, want >= 0", b.Total.Minor)
++	}
++}
++
++func TestLoyaltyAfterBulkNeverGoesBelowZero(t *testing.T) {
++	// Bulk takes 10% of 1000; loyalty is capped at the undiscounted subtotal,
++	// so between them they ask for 1100 off a 1000 order.
++	c := New(store.NewMemory(), 2000,
++		BulkDiscount{MinUnits: 1, PercentOffBase: 10},
++		LoyaltyDiscount{Members: map[string]bool{"c1": true}, Amount: domain.NewMoney(5000, domain.GBP)},
++	)
++	b, err := c.Price(context.Background(), order(1), domain.Money{Currency: domain.GBP})
++	if err != nil {
++		t.Fatal(err)
++	}
++	checkAddsUp(t, b)
++	if b.Total.Minor != 0 {
++		t.Fatalf("total = %d, want 0", b.Total.Minor)
++	}
++	if len(b.Discounts) != 2 || b.Discounts[0].Amount.Minor != 100 || b.Discounts[1].Amount.Minor != 900 {
++		t.Fatalf("discounts = %+v, want bulk 100 then loyalty 900", b.Discounts)
++	}
++}
++
++func TestDiscountsDoNotEatIntoShipping(t *testing.T) {
++	c := New(store.NewMemory(), 2000,
++		fixedDiscount{name: "a", amount: domain.NewMoney(800, domain.GBP)},
++		fixedDiscount{name: "b", amount: domain.NewMoney(800, domain.GBP)},
++		fixedDiscount{name: "c", amount: domain.NewMoney(800, domain.GBP)},
++	)
++	b, err := c.Price(context.Background(), order(1), domain.NewMoney(500, domain.GBP))
++	if err != nil {
++		t.Fatal(err)
++	}
++	checkAddsUp(t, b)
++	// Goods are free; shipping 500 plus 20% tax is still charged.
++	if b.Total.Minor != 600 {
++		t.Fatalf("total = %d, want 600", b.Total.Minor)
++	}
++	if len(b.Discounts) != 2 {
++		t.Fatalf("discounts = %+v, want the third dropped as nothing was left", b.Discounts)
++	}
++}
++
++func TestNegativeDiscountIsRefused(t *testing.T) {
++	c := New(store.NewMemory(), 0, fixedDiscount{name: "bad", amount: domain.NewMoney(-100, domain.GBP)})
++	if _, err := c.Price(context.Background(), order(1), domain.Money{Currency: domain.GBP}); err == nil {
++		t.Fatal("negative discount was accepted")
++	}
++}
++
++func TestNegativeTotalIsRefused(t *testing.T) {
++	c := New(store.NewMemory(), 0)
++	_, err := c.Price(context.Background(), order(1), domain.NewMoney(-2000, domain.GBP))
++	if !errors.Is(err, ErrNegativeTotal) {
++		t.Fatalf("got %v, want ErrNegativeTotal", err)
++	}
++}

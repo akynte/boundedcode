@@ -32,7 +32,8 @@ func newEvalCmd() *cobra.Command {
 	cmd.AddCommand(newEvalRunCmd(), newEvalTasksCmd(), newEvalArmsCmd(), newEvalReportCmd(),
 		newEvalQualifyCmd(), newEvalResultsCmd(), newEvalAnnotateCmd(), newEvalAnnotationsCmd(),
 		newEvalRubricCmd(), newEvalAdjudicateCmd(), newEvalPreflightCmd(), newEvalAdmitCmd(), newEvalIntegrityCmd(), newEvalRuntimeCmd(),
-		newEvalAuditCmd(), newEvalReliabilityCmd(), newEvalParityCmd(), newEvalReadinessCmd(), newEvalStabilityCmd(), newEvalCalibrateCmd())
+		newEvalAuditCmd(), newEvalReliabilityCmd(), newEvalParityCmd(), newEvalReadinessCmd(), newEvalStabilityCmd(), newEvalCalibrateCmd(),
+		newEvalJudgesCmd())
 	return cmd
 }
 

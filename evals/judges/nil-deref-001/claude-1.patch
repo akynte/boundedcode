@@ -1,0 +1,50 @@
+diff --git a/internal/service/user.go b/internal/service/user.go
+index 2201f77..2b15d22 100644
+--- a/internal/service/user.go
++++ b/internal/service/user.go
+@@ -25,9 +25,11 @@ func NewUserService(store Store) *UserService { return &UserService{store: store
+ 
+ // Email returns the user's email address.
+ //
+-// It panics when the user does not exist, because Find returns nil and this
+-// dereferences it without checking.
++// It returns ErrNotFound when the user does not exist.
+ func (s *UserService) Email(id string) (string, error) {
+ 	u := s.store.Find(id)
++	if u == nil {
++		return "", ErrNotFound
++	}
+ 	return u.Email, nil
+ }
+diff --git a/internal/service/user_test.go b/internal/service/user_test.go
+index 4c7f550..d23caf3 100644
+--- a/internal/service/user_test.go
++++ b/internal/service/user_test.go
+@@ -1,8 +1,10 @@
+ package service
+ 
+-import "testing"
++import (
++	"errors"
++	"testing"
++)
+ 
+-// The visible test only covers the happy path, which is why the bug survived.
+ func TestEmailFound(t *testing.T) {
+ 	store := NewMemoryStore()
+ 	store.Add(&User{ID: "u1", Email: "a@example.com"})
+@@ -16,3 +18,14 @@ func TestEmailFound(t *testing.T) {
+ 		t.Fatalf("got %q", got)
+ 	}
+ }
++
++func TestEmailNotFound(t *testing.T) {
++	svc := NewUserService(NewMemoryStore())
++	got, err := svc.Email("missing")
++	if !errors.Is(err, ErrNotFound) {
++		t.Fatalf("err = %v, want ErrNotFound", err)
++	}
++	if got != "" {
++		t.Fatalf("got %q, want empty", got)
++	}
++}

@@ -11,6 +11,7 @@ the model manifest disclosed.
 | [`2026-09-14-tasks.md`](2026-09-14-tasks.md) | Task success across four arms, 60 runs, local 35B MoE |
 | [`2026-09-15-packet-cap.md`](2026-09-15-packet-cap.md) | The needle test (§8.3): no retrieval ceiling at any size this hardware can serve |
 | [`2026-09-18-phase-cache.json`](2026-09-18-phase-cache.json) | Raw append-only versus rewritten-prefix cache measurements, 12 requests |
+| [`2026-09-23-judges.md`](2026-09-23-judges.md) | False acceptance of CI, the completion contract, and the contract with an independently drafted oracle: 13 hand-written candidates and 10 Claude Code patches |
 
 ## Phase cache baseline, 2026-09-18
 

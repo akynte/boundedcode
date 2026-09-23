@@ -1,0 +1,34 @@
+{
+ "checks": [
+  {
+   "id": "authored-internal-handler",
+   "files": {
+    "internal/handler/oracle_user_test.go": "package handler\n\nimport (\n\t\"net/http\"\n\t\"net/http/httptest\"\n\t\"strings\"\n\t\"testing\"\n\n\t\"example.com/shop/internal/service\"\n)\n\n// oracleServe routes GET /users/{id}/email to UserHandler.Email and converts a\n// panic into a test failure so the remaining tests still run.\nfunc oracleServe(t *testing.T, path string, users ...*service.User) *httptest.ResponseRecorder {\n\tt.Helper()\n\tstore := service.NewMemoryStore()\n\tfor _, u := range users {\n\t\tstore.Add(u)\n\t}\n\th := New(service.NewUserService(store))\n\n\tmux := http.NewServeMux()\n\tmux.HandleFunc(\"GET /users/{id}/email\", h.Email)\n\n\trec := httptest.NewRecorder()\n\treq := httptest.NewRequest(http.MethodGet, path, nil)\n\tdefer func() {\n\t\tif r := recover(); r != nil {\n\t\t\tt.Fatalf(\"GET %s panicked: %v\", path, r)\n\t\t}\n\t}()\n\tmux.ServeHTTP(rec, req)\n\treturn rec\n}\n\nfunc TestOracleHandlerEmailMissingUserIs404(t *testing.T) {\n\trec := oracleServe(t, \"/users/missing/email\", &service.User{ID: \"u1\", Email: \"a@example.com\"})\n\n\tif rec.Code != http.StatusNotFound {\n\t\tt.Fatalf(\"status = %d, want %d\", rec.Code, http.StatusNotFound)\n\t}\n\tif body := rec.Body.String(); !strings.Contains(body, service.ErrNotFound.Error()) {\n\t\tt.Fatalf(\"body = %q, want it to contain %q\", body, service.ErrNotFound.Error())\n\t}\n\tif strings.Contains(rec.Body.String(), \"a@example.com\") {\n\t\tt.Fatalf(\"body %q leaks another user's email\", rec.Body.String())\n\t}\n}\n\nfunc TestOracleHandlerEmailFoundIs200(t *testing.T) {\n\trec := oracleServe(t, \"/users/u1/email\", &service.User{ID: \"u1\", Email: \"a@example.com\"})\n\n\tif rec.Code != http.StatusOK {\n\t\tt.Fatalf(\"status = %d, want %d\", rec.Code, http.StatusOK)\n\t}\n\tif got := rec.Body.String(); got != \"a@example.com\" {\n\t\tt.Fatalf(\"body = %q, want %q\", got, \"a@example.com\")\n\t}\n}\n"
+   },
+   "argv": [
+    "go",
+    "test",
+    "-count=1",
+    "-run",
+    "^TestOracle",
+    "./internal/handler"
+   ],
+   "timeout_seconds": 300
+  },
+  {
+   "id": "authored-internal-service",
+   "files": {
+    "internal/service/oracle_email_test.go": "package service\n\nimport (\n\t\"errors\"\n\t\"testing\"\n)\n\n// oracleEmail calls svc.Email and converts a panic into a test failure so the\n// remaining tests still run.\nfunc oracleEmail(t *testing.T, svc *UserService, id string) (email string, err error) {\n\tt.Helper()\n\tdefer func() {\n\t\tif r := recover(); r != nil {\n\t\t\tt.Fatalf(\"Email(%q) panicked: %v\", id, r)\n\t\t}\n\t}()\n\treturn svc.Email(id)\n}\n\nfunc oracleServiceWith(users ...*User) *UserService {\n\tstore := NewMemoryStore()\n\tfor _, u := range users {\n\t\tstore.Add(u)\n\t}\n\treturn NewUserService(store)\n}\n\nfunc TestOracleEmailMissingUserReturnsErrNotFound(t *testing.T) {\n\tsvc := oracleServiceWith(&User{ID: \"u1\", Email: \"a@example.com\"})\n\n\tgot, err := oracleEmail(t, svc, \"missing\")\n\tif err == nil {\n\t\tt.Fatalf(\"Email(missing) error = nil, want ErrNotFound (email %q)\", got)\n\t}\n\tif !errors.Is(err, ErrNotFound) {\n\t\tt.Fatalf(\"Email(missing) error = %v, want errors.Is(err, ErrNotFound)\", err)\n\t}\n\tif got != \"\" {\n\t\tt.Fatalf(\"Email(missing) email = %q, want empty string alongside error\", got)\n\t}\n}\n\nfunc TestOracleEmailEmptyStoreReturnsErrNotFound(t *testing.T) {\n\tsvc := oracleServiceWith()\n\n\tfor _, id := range []string{\"u1\", \"\", \"anything\"} {\n\t\tgot, err := oracleEmail(t, svc, id)\n\t\tif !errors.Is(err, ErrNotFound) {\n\t\t\tt.Fatalf(\"Email(%q) error = %v, want ErrNotFound\", id, err)\n\t\t}\n\t\tif got != \"\" {\n\t\t\tt.Fatalf(\"Email(%q) email = %q, want empty\", id, got)\n\t\t}\n\t}\n}\n\nfunc TestOracleEmailFoundReturnsEmailAndNilError(t *testing.T) {\n\tsvc := oracleServiceWith(\n\t\t&User{ID: \"u1\", Email: \"a@example.com\"},\n\t\t&User{ID: \"u2\", Email: \"b@example.com\"},\n\t)\n\n\tfor id, want := range map[string]string{\"u1\": \"a@example.com\", \"u2\": \"b@example.com\"} {\n\t\tgot, err := oracleEmail(t, svc, id)\n\t\tif err != nil {\n\t\t\tt.Fatalf(\"Email(%q) error = %v, want nil\", id, err)\n\t\t}\n\t\tif got != want {\n\t\t\tt.Fatalf(\"Email(%q) = %q, want %q\", id, got, want)\n\t\t}\n\t}\n}\n\n// A user that exists but has an empty email is not \"not found\".\nfunc TestOracleEmailExistingUserWithEmptyEmailIsNotAnError(t *testing.T) {\n\tsvc := oracleServiceWith(&User{ID: \"u1\", Email: \"\"})\n\n\tgot, err := oracleEmail(t, svc, \"u1\")\n\tif err != nil {\n\t\tt.Fatalf(\"Email(u1) error = %v, want nil for an existing user\", err)\n\t}\n\tif got != \"\" {\n\t\tt.Fatalf(\"Email(u1) = %q, want empty\", got)\n\t}\n}\n\n// Looking up a missing user must not affect later lookups, and a user added\n// after a miss must then be found.\nfunc TestOracleEmailMissThenFound(t *testing.T) {\n\tstore := NewMemoryStore()\n\tstore.Add(&User{ID: \"u1\", Email: \"a@example.com\"})\n\tsvc := NewUserService(store)\n\n\tif _, err := oracleEmail(t, svc, \"u2\"); !errors.Is(err, ErrNotFound) {\n\t\tt.Fatalf(\"Email(u2) error = %v, want ErrNotFound\", err)\n\t}\n\tif got, err := oracleEmail(t, svc, \"u1\"); err != nil || got != \"a@example.com\" {\n\t\tt.Fatalf(\"Email(u1) = %q, %v; want a@example.com, nil\", got, err)\n\t}\n\n\tstore.Add(&User{ID: \"u2\", Email: \"b@example.com\"})\n\tif got, err := oracleEmail(t, svc, \"u2\"); err != nil || got != \"b@example.com\" {\n\t\tt.Fatalf(\"Email(u2) after Add = %q, %v; want b@example.com, nil\", got, err)\n\t}\n}\n\n// Existing behaviour: MemoryStore.Find returns nil for absent users.\nfunc TestOracleMemoryStoreFind(t *testing.T) {\n\tstore := NewMemoryStore()\n\tu := &User{ID: \"u1\", Email: \"a@example.com\"}\n\tstore.Add(u)\n\n\tif got := store.Find(\"u1\"); got != u {\n\t\tt.Fatalf(\"Find(u1) = %v, want %v\", got, u)\n\t}\n\tif got := store.Find(\"missing\"); got != nil {\n\t\tt.Fatalf(\"Find(missing) = %v, want nil\", got)\n\t}\n}\n\n// Existing behaviour: the sentinel's message is what the handler shows users.\nfunc TestOracleErrNotFoundMessage(t *testing.T) {\n\tif ErrNotFound == nil {\n\t\tt.Fatal(\"ErrNotFound is nil\")\n\t}\n\tif got := ErrNotFound.Error(); got != \"user not found\" {\n\t\tt.Fatalf(\"ErrNotFound.Error() = %q, want %q\", got, \"user not found\")\n\t}\n}\n"
+   },
+   "argv": [
+    "go",
+    "test",
+    "-count=1",
+    "-run",
+    "^TestOracle",
+    "./internal/service"
+   ],
+   "timeout_seconds": 300
+  }
+ ]
+}

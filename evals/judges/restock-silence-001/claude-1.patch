@@ -1,0 +1,329 @@
+diff --git a/internal/inventory/inventory.go b/internal/inventory/inventory.go
+index 9b3c746..cc2f5e4 100644
+--- a/internal/inventory/inventory.go
++++ b/internal/inventory/inventory.go
+@@ -7,6 +7,7 @@ import (
+ 	"context"
+ 	"errors"
+ 	"fmt"
++	"strings"
+ 
+ 	"example.com/warehouse/internal/domain"
+ 	"example.com/warehouse/internal/store"
+@@ -105,20 +106,61 @@ func (s *Service) Receive(ctx context.Context, sku domain.SKU, quantity int) err
+ 	return s.stock.PutStock(ctx, st)
+ }
+ 
++// Undetermined is a SKU below the reorder threshold whose catalogue entry could
++// not be read, so the report cannot say whether it is still orderable.
++type Undetermined struct {
++	SKU domain.SKU
++	Err error
++}
++
++// UndeterminedError is returned by ReorderReport when some low SKUs could not
++// be classified. It is not the same as those SKUs being fine: each of them may
++// need reordering, and somebody has to look.
++type UndeterminedError struct {
++	SKUs []Undetermined
++}
++
++func (e *UndeterminedError) Error() string {
++	parts := make([]string, len(e.SKUs))
++	for i, u := range e.SKUs {
++		parts[i] = fmt.Sprintf("%s: %v", u.SKU, u.Err)
++	}
++	return fmt.Sprintf("inventory: cannot tell whether %d SKU(s) need reordering: %s",
++		len(e.SKUs), strings.Join(parts, "; "))
++}
++
++func (e *UndeterminedError) Unwrap() []error {
++	out := make([]error, len(e.SKUs))
++	for i, u := range e.SKUs {
++		out[i] = u.Err
++	}
++	return out
++}
++
+ // ReorderReport lists SKUs whose available count has fallen below a threshold
+ // and which are still orderable.
++//
++// A low SKU whose catalogue entry cannot be read is not silently dropped: the
++// SKUs that were classified are still returned, together with an
++// *UndeterminedError naming the ones that were not. Any other error means the
++// report could not be produced at all and the returned slice is nil.
+ func (s *Service) ReorderReport(ctx context.Context, threshold int) ([]domain.SKU, error) {
+ 	rows, err := s.stock.ListStock(ctx)
+ 	if err != nil {
+ 		return nil, err
+ 	}
+ 	var out []domain.SKU
++	var undetermined []Undetermined
+ 	for _, row := range rows {
+ 		if row.Available() >= threshold {
+ 			continue
+ 		}
+ 		item, err := s.items.GetItem(ctx, row.SKU)
+ 		if err != nil {
++			if errors.Is(err, store.ErrNotFound) {
++				err = fmt.Errorf("stocked but not in the catalogue: %w", err)
++			}
++			undetermined = append(undetermined, Undetermined{SKU: row.SKU, Err: err})
+ 			continue
+ 		}
+ 		if item.Discontinued {
+@@ -126,5 +168,8 @@ func (s *Service) ReorderReport(ctx context.Context, threshold int) ([]domain.SK
+ 		}
+ 		out = append(out, row.SKU)
+ 	}
++	if len(undetermined) > 0 {
++		return out, &UndeterminedError{SKUs: undetermined}
++	}
+ 	return out, nil
+ }
+diff --git a/internal/inventory/inventory_test.go b/internal/inventory/inventory_test.go
+index bf4dfc7..8313849 100644
+--- a/internal/inventory/inventory_test.go
++++ b/internal/inventory/inventory_test.go
+@@ -49,6 +49,69 @@ func TestReserveRefusesWhenShort(t *testing.T) {
+ 	}
+ }
+ 
++// flakyItems fails GetItem for chosen SKUs, standing in for a catalogue that
++// is partly unreachable.
++type flakyItems struct {
++	store.ItemStore
++	fail map[domain.SKU]error
++}
++
++func (f flakyItems) GetItem(ctx context.Context, sku domain.SKU) (domain.Item, error) {
++	if err, ok := f.fail[sku]; ok {
++		return domain.Item{}, err
++	}
++	return f.ItemStore.GetItem(ctx, sku)
++}
++
++func TestReorderReportFlagsUnclassifiableSKUs(t *testing.T) {
++	_, mem := setup(t)
++	ctx := context.Background()
++	// CD-5678 is low and the catalogue lookup fails; EF-9012 is low and has no
++	// catalogue entry at all. Neither may be treated as "no reorder needed".
++	for _, sku := range []domain.SKU{"CD-5678", "EF-9012"} {
++		if err := mem.PutStock(ctx, store.Stock{SKU: sku, OnHand: 1}); err != nil {
++			t.Fatal(err)
++		}
++	}
++	if err := mem.PutItem(ctx, domain.Item{SKU: "CD-5678", Name: "Gadget"}); err != nil {
++		t.Fatal(err)
++	}
++	outage := errors.New("catalogue unavailable")
++	svc := New(mem, flakyItems{ItemStore: mem, fail: map[domain.SKU]error{"CD-5678": outage}})
++
++	skus, err := svc.ReorderReport(ctx, 20)
++	if len(skus) != 1 || skus[0] != "AB-1234" {
++		t.Fatalf("skus = %v, want [AB-1234]", skus)
++	}
++	var undet *UndeterminedError
++	if !errors.As(err, &undet) {
++		t.Fatalf("got %v, want *UndeterminedError", err)
++	}
++	if len(undet.SKUs) != 2 {
++		t.Fatalf("undetermined = %v, want CD-5678 and EF-9012", undet.SKUs)
++	}
++	if !errors.Is(err, outage) || !errors.Is(err, store.ErrNotFound) {
++		t.Fatalf("error %v does not wrap the underlying causes", err)
++	}
++}
++
++func TestReorderReportSkipsDiscontinued(t *testing.T) {
++	svc, mem := setup(t)
++	ctx := context.Background()
++	item, err := mem.GetItem(ctx, "AB-1234")
++	if err != nil {
++		t.Fatal(err)
++	}
++	item.Discontinued = true
++	if err := mem.PutItem(ctx, item); err != nil {
++		t.Fatal(err)
++	}
++	skus, err := svc.ReorderReport(ctx, 20)
++	if err != nil || len(skus) != 0 {
++		t.Fatalf("got %v, %v; want nothing and no error", skus, err)
++	}
++}
++
+ func TestConsumeDropsOnHand(t *testing.T) {
+ 	svc, mem := setup(t)
+ 	ctx := context.Background()
+diff --git a/internal/worker/restock.go b/internal/worker/restock.go
+index 48e20c4..06b422d 100644
+--- a/internal/worker/restock.go
++++ b/internal/worker/restock.go
+@@ -2,6 +2,7 @@ package worker
+ 
+ import (
+ 	"context"
++	"errors"
+ 	"fmt"
+ 
+ 	"example.com/warehouse/internal/audit"
+@@ -23,16 +24,47 @@ func NewRestockWatcher(inv *inventory.Service, log audit.Log, threshold int) *Re
+ }
+ 
+ // RunOnce makes one pass and returns how many SKUs need reordering.
++//
++// The audit record is the alert, so a pass only succeeds if every SKU that
++// needs reordering was recorded and every low SKU could be classified. Anything
++// short of that returns an error naming what was missed, alongside the count of
++// SKUs known to need reordering. SKUs that could not be classified are recorded
++// as restock.undetermined so they show up in the log rather than being absent.
+ func (w *RestockWatcher) RunOnce(ctx context.Context) (int, error) {
+ 	skus, err := w.inventory.ReorderReport(ctx, w.threshold)
+-	if err != nil {
++	var undetermined *inventory.UndeterminedError
++	if err != nil && !errors.As(err, &undetermined) {
+ 		return 0, err
+ 	}
++
++	var failures []error
+ 	for _, sku := range skus {
+-		_ = w.audit.Record(ctx, audit.Event{
++		if err := w.audit.Record(ctx, audit.Event{
+ 			Actor: "restock", Action: "restock.needed", Subject: sku.String(),
+ 			Detail: map[string]string{"threshold": fmt.Sprint(w.threshold)},
+-		})
++		}); err != nil {
++			failures = append(failures, fmt.Errorf("alert for %s not recorded: %w", sku, err))
++		}
++	}
++	if undetermined != nil {
++		for _, u := range undetermined.SKUs {
++			if err := w.audit.Record(ctx, audit.Event{
++				Actor: "restock", Action: "restock.undetermined", Subject: u.SKU.String(),
++				Detail: map[string]string{
++					"threshold": fmt.Sprint(w.threshold),
++					"error":     u.Err.Error(),
++				},
++			}); err != nil {
++				failures = append(failures,
++					fmt.Errorf("undetermined %s not recorded: %w", u.SKU, err))
++			}
++		}
++		failures = append(failures, undetermined)
++	}
++
++	if len(failures) > 0 {
++		return len(skus), fmt.Errorf("restock: pass incomplete (%d SKU(s) need reordering): %w",
++			len(skus), errors.Join(failures...))
+ 	}
+ 	return len(skus), nil
+ }
+diff --git a/internal/worker/restock_test.go b/internal/worker/restock_test.go
+new file mode 100644
+index 0000000..5dff8f8
+--- /dev/null
++++ b/internal/worker/restock_test.go
+@@ -0,0 +1,103 @@
++package worker
++
++import (
++	"context"
++	"errors"
++	"testing"
++	"time"
++
++	"example.com/warehouse/internal/audit"
++	"example.com/warehouse/internal/domain"
++	"example.com/warehouse/internal/inventory"
++	"example.com/warehouse/internal/store"
++)
++
++// failingLog refuses to record events for chosen subjects.
++type failingLog struct {
++	*audit.MemoryLog
++	fail map[string]bool
++}
++
++var errLogDown = errors.New("audit log unavailable")
++
++func (l failingLog) Record(ctx context.Context, ev audit.Event) error {
++	if l.fail[ev.Subject] {
++		return errLogDown
++	}
++	return l.MemoryLog.Record(ctx, ev)
++}
++
++func lowStock(t *testing.T, catalogued bool, skus ...domain.SKU) *store.Memory {
++	t.Helper()
++	mem := store.NewMemory()
++	ctx := context.Background()
++	for _, sku := range skus {
++		if catalogued {
++			if err := mem.PutItem(ctx, domain.Item{SKU: sku, Name: string(sku)}); err != nil {
++				t.Fatal(err)
++			}
++		}
++		if err := mem.PutStock(ctx, store.Stock{SKU: sku, OnHand: 1}); err != nil {
++			t.Fatal(err)
++		}
++	}
++	return mem
++}
++
++func actions(t *testing.T, log *audit.MemoryLog) map[string]string {
++	t.Helper()
++	evs, err := log.Since(context.Background(), time.Time{})
++	if err != nil {
++		t.Fatal(err)
++	}
++	out := map[string]string{}
++	for _, ev := range evs {
++		out[ev.Subject] = ev.Action
++	}
++	return out
++}
++
++func TestRestockRecordsEveryLowSKU(t *testing.T) {
++	mem := lowStock(t, true, "AB-1234", "CD-5678")
++	log := audit.NewMemoryLog()
++	n, err := NewRestockWatcher(inventory.New(mem, mem), log, 5).RunOnce(context.Background())
++	if err != nil || n != 2 {
++		t.Fatalf("got %d, %v; want 2, nil", n, err)
++	}
++	got := actions(t, log)
++	if got["AB-1234"] != "restock.needed" || got["CD-5678"] != "restock.needed" {
++		t.Fatalf("audit = %v", got)
++	}
++}
++
++func TestRestockFailsWhenAlertNotRecorded(t *testing.T) {
++	mem := lowStock(t, true, "AB-1234", "CD-5678")
++	log := failingLog{MemoryLog: audit.NewMemoryLog(), fail: map[string]bool{"AB-1234": true}}
++	n, err := NewRestockWatcher(inventory.New(mem, mem), log, 5).RunOnce(context.Background())
++	if !errors.Is(err, errLogDown) {
++		t.Fatalf("got %v, want the audit failure", err)
++	}
++	if n != 2 {
++		t.Fatalf("n = %d, want 2", n)
++	}
++	// The other SKU's alert must still have been recorded.
++	if got := actions(t, log.MemoryLog); got["CD-5678"] != "restock.needed" {
++		t.Fatalf("audit = %v", got)
++	}
++}
++
++func TestRestockFailsWhenSKUCannotBeClassified(t *testing.T) {
++	mem := lowStock(t, false, "AB-1234")
++	log := audit.NewMemoryLog()
++	n, err := NewRestockWatcher(inventory.New(mem, mem), log, 5).RunOnce(context.Background())
++	var undet *inventory.UndeterminedError
++	if !errors.As(err, &undet) {
++		t.Fatalf("got %v, want *inventory.UndeterminedError", err)
++	}
++	if n != 0 {
++		t.Fatalf("n = %d, want 0", n)
++	}
++	if got := actions(t, log); got["AB-1234"] != "restock.undetermined" {
++		t.Fatalf("audit = %v, want AB-1234 recorded as undetermined", got)
++	}
++}

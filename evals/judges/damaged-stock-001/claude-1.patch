@@ -1,0 +1,302 @@
+diff --git a/internal/inventory/inventory.go b/internal/inventory/inventory.go
+index 9b3c746..9a19fc7 100644
+--- a/internal/inventory/inventory.go
++++ b/internal/inventory/inventory.go
+@@ -71,12 +71,17 @@ func (s *Service) Release(ctx context.Context, sku domain.SKU, quantity int) err
+ }
+ 
+ // Consume converts a reservation into a despatch: the units leave the building,
+-// so both the on-hand and the reserved counts fall.
++// so both the on-hand and the reserved counts fall. Only undamaged units can be
++// despatched, so it refuses rather than ship a damaged one.
+ func (s *Service) Consume(ctx context.Context, sku domain.SKU, quantity int) error {
+ 	st, err := s.stock.GetStock(ctx, sku)
+ 	if err != nil {
+ 		return err
+ 	}
++	if st.Sellable() < quantity {
++		return fmt.Errorf("%w: %s has %d undamaged on hand, %d to despatch",
++			ErrInsufficientStock, sku, st.Sellable(), quantity)
++	}
+ 	st.OnHand -= quantity
+ 	st.Reserved -= quantity
+ 	if st.Reserved < 0 {
+@@ -105,6 +110,26 @@ func (s *Service) Receive(ctx context.Context, sku domain.SKU, quantity int) err
+ 	return s.stock.PutStock(ctx, st)
+ }
+ 
++// SetDamaged records how many of a SKU's on-hand units are unsellable. It sets
++// the count rather than adding to it, so a recount corrects the figure outright.
++// The units stay in OnHand, because they are still in the building; they simply
++// stop being available to promise.
++func (s *Service) SetDamaged(ctx context.Context, sku domain.SKU, count int) error {
++	if count < 0 {
++		return fmt.Errorf("inventory: damaged count must not be negative, got %d", count)
++	}
++	st, err := s.stock.GetStock(ctx, sku)
++	if err != nil {
++		return err
++	}
++	if count > st.OnHand {
++		return fmt.Errorf("inventory: %s has %d on hand, cannot mark %d damaged",
++			sku, st.OnHand, count)
++	}
++	st.Damaged = count
++	return s.stock.PutStock(ctx, st)
++}
++
+ // ReorderReport lists SKUs whose available count has fallen below a threshold
+ // and which are still orderable.
+ func (s *Service) ReorderReport(ctx context.Context, threshold int) ([]domain.SKU, error) {
+diff --git a/internal/inventory/inventory_test.go b/internal/inventory/inventory_test.go
+index bf4dfc7..ac7dafe 100644
+--- a/internal/inventory/inventory_test.go
++++ b/internal/inventory/inventory_test.go
+@@ -66,3 +66,125 @@ func TestConsumeDropsOnHand(t *testing.T) {
+ 		t.Fatalf("on hand %d reserved %d, want 6 and 0", st.OnHand, st.Reserved)
+ 	}
+ }
++
++func TestDamagedStaysOnHandButIsNotAvailable(t *testing.T) {
++	svc, mem := setup(t)
++	ctx := context.Background()
++	if err := svc.SetDamaged(ctx, "AB-1234", 3); err != nil {
++		t.Fatal(err)
++	}
++	got, err := svc.Available(ctx, "AB-1234")
++	if err != nil {
++		t.Fatal(err)
++	}
++	if got != 7 {
++		t.Fatalf("available = %d, want 7", got)
++	}
++	st, err := mem.GetStock(ctx, "AB-1234")
++	if err != nil {
++		t.Fatal(err)
++	}
++	if st.OnHand != 10 || st.Damaged != 3 {
++		t.Fatalf("on hand %d damaged %d, want 10 and 3", st.OnHand, st.Damaged)
++	}
++}
++
++func TestSetDamagedReplacesCount(t *testing.T) {
++	svc, _ := setup(t)
++	ctx := context.Background()
++	if err := svc.SetDamaged(ctx, "AB-1234", 5); err != nil {
++		t.Fatal(err)
++	}
++	if err := svc.SetDamaged(ctx, "AB-1234", 2); err != nil {
++		t.Fatal(err)
++	}
++	got, err := svc.Available(ctx, "AB-1234")
++	if err != nil {
++		t.Fatal(err)
++	}
++	if got != 8 {
++		t.Fatalf("available = %d, want 8", got)
++	}
++}
++
++func TestSetDamagedRejectsOutOfRange(t *testing.T) {
++	svc, _ := setup(t)
++	ctx := context.Background()
++	if err := svc.SetDamaged(ctx, "AB-1234", -1); err == nil {
++		t.Fatal("negative damaged count accepted")
++	}
++	if err := svc.SetDamaged(ctx, "AB-1234", 11); err == nil {
++		t.Fatal("damaged count above on hand accepted")
++	}
++	if err := svc.SetDamaged(ctx, "ZZ-9999", 1); !errors.Is(err, store.ErrNotFound) {
++		t.Fatalf("got %v, want ErrNotFound", err)
++	}
++}
++
++func TestReserveCannotPromiseDamaged(t *testing.T) {
++	svc, _ := setup(t)
++	ctx := context.Background()
++	if err := svc.SetDamaged(ctx, "AB-1234", 4); err != nil {
++		t.Fatal(err)
++	}
++	if err := svc.Reserve(ctx, "AB-1234", 7); !errors.Is(err, ErrInsufficientStock) {
++		t.Fatalf("got %v, want ErrInsufficientStock", err)
++	}
++	if err := svc.Reserve(ctx, "AB-1234", 6); err != nil {
++		t.Fatal(err)
++	}
++}
++
++func TestAvailableNeverNegativeWhenDamagedAfterReserve(t *testing.T) {
++	svc, _ := setup(t)
++	ctx := context.Background()
++	if err := svc.Reserve(ctx, "AB-1234", 8); err != nil {
++		t.Fatal(err)
++	}
++	if err := svc.SetDamaged(ctx, "AB-1234", 5); err != nil {
++		t.Fatal(err)
++	}
++	got, err := svc.Available(ctx, "AB-1234")
++	if err != nil {
++		t.Fatal(err)
++	}
++	if got != 0 {
++		t.Fatalf("available = %d, want 0", got)
++	}
++}
++
++func TestConsumeRefusesToShipDamaged(t *testing.T) {
++	svc, mem := setup(t)
++	ctx := context.Background()
++	if err := svc.Reserve(ctx, "AB-1234", 8); err != nil {
++		t.Fatal(err)
++	}
++	if err := svc.SetDamaged(ctx, "AB-1234", 5); err != nil {
++		t.Fatal(err)
++	}
++	if err := svc.Consume(ctx, "AB-1234", 8); !errors.Is(err, ErrInsufficientStock) {
++		t.Fatalf("got %v, want ErrInsufficientStock", err)
++	}
++	st, err := mem.GetStock(ctx, "AB-1234")
++	if err != nil {
++		t.Fatal(err)
++	}
++	if st.OnHand != 10 || st.Reserved != 8 {
++		t.Fatalf("on hand %d reserved %d, want 10 and 8 unchanged", st.OnHand, st.Reserved)
++	}
++}
++
++func TestReorderReportCountsDamagedAsGone(t *testing.T) {
++	svc, _ := setup(t)
++	ctx := context.Background()
++	if err := svc.SetDamaged(ctx, "AB-1234", 8); err != nil {
++		t.Fatal(err)
++	}
++	skus, err := svc.ReorderReport(ctx, 5)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if len(skus) != 1 || skus[0] != "AB-1234" {
++		t.Fatalf("reorder report = %v, want [AB-1234]", skus)
++	}
++}
+diff --git a/internal/store/store.go b/internal/store/store.go
+index 2abbd8b..dd83f23 100644
+--- a/internal/store/store.go
++++ b/internal/store/store.go
+@@ -31,7 +31,7 @@ type OrderStore interface {
+ 	PutOrder(ctx context.Context, order domain.Order) error
+ }
+ 
+-// StockStore holds on-hand and reserved counts per SKU.
++// StockStore holds on-hand, reserved and damaged counts per SKU.
+ type StockStore interface {
+ 	GetStock(ctx context.Context, sku domain.SKU) (Stock, error)
+ 	PutStock(ctx context.Context, stock Stock) error
+@@ -40,12 +40,25 @@ type StockStore interface {
+ 
+ // Stock is the warehouse's count for one SKU.
+ type Stock struct {
+-	SKU      domain.SKU
++	SKU domain.SKU
++	// OnHand is every unit physically in the building, damaged or not.
+ 	OnHand   int
+ 	Reserved int
++	// Damaged units are on the premises, and so included in OnHand, but
++	// cannot be sold: crushed boxes, split seals, expired date codes.
++	Damaged int
+ 	// Version guards against a lost update when two reservations race.
+ 	Version int
+ }
+ 
+-// Available is what can still be promised to a new order.
+-func (s Stock) Available() int { return s.OnHand - s.Reserved }
++// Sellable is the number of undamaged units on hand, reserved or not.
++func (s Stock) Sellable() int { return s.OnHand - s.Damaged }
++
++// Available is what can still be promised to a new order. It never goes below
++// zero: units damaged after they were reserved leave nothing to promise, not a
++// negative amount.
++func (s Stock) Available() int { return max(s.Sellable()-s.Reserved, 0) }
++
++// Overcommitted is how many reserved units have no undamaged unit behind them,
++// which happens when stock is marked damaged after it was promised.
++func (s Stock) Overcommitted() int { return max(s.Reserved-s.Sellable(), 0) }
+diff --git a/internal/worker/reconcile.go b/internal/worker/reconcile.go
+index dda2ed5..108758d 100644
+--- a/internal/worker/reconcile.go
++++ b/internal/worker/reconcile.go
+@@ -68,11 +68,27 @@ func (r *Reconciler) RunOnce(ctx context.Context) (Report, error) {
+ 		}
+ 	}
+ 
++	// Stock marked damaged after it was reserved leaves customers promised
++	// units that cannot be shipped. Nothing here can fix that automatically,
++	// so it is reported for a human to resolve.
++	rows, err := r.stock.ListStock(ctx)
++	if err != nil {
++		return rep, err
++	}
++	for _, st := range rows {
++		if n := st.Overcommitted(); n > 0 {
++			rep.Discrepancies = append(rep.Discrepancies,
++				fmt.Sprintf("stock %s: %d reserved but only %d undamaged on hand (%d damaged)",
++					st.SKU, st.Reserved, st.Sellable(), st.Damaged))
++		}
++	}
++
+ 	_ = r.audit.Record(ctx, audit.Event{
+ 		Actor: "reconciler", Action: "reconcile.pass", Subject: "stock",
+ 		Detail: map[string]string{
+ 			"orders_examined": fmt.Sprint(rep.OrdersExamined),
+ 			"freed":           fmt.Sprint(rep.ReservationsFreed),
++			"discrepancies":   fmt.Sprint(len(rep.Discrepancies)),
+ 		},
+ 	})
+ 	return rep, nil
+diff --git a/internal/worker/reconcile_test.go b/internal/worker/reconcile_test.go
+new file mode 100644
+index 0000000..54d13d0
+--- /dev/null
++++ b/internal/worker/reconcile_test.go
+@@ -0,0 +1,42 @@
++package worker
++
++import (
++	"context"
++	"strings"
++	"testing"
++
++	"example.com/warehouse/internal/audit"
++	"example.com/warehouse/internal/domain"
++	"example.com/warehouse/internal/inventory"
++	"example.com/warehouse/internal/store"
++)
++
++func TestReconcileReportsReservationsLostToDamage(t *testing.T) {
++	ctx := context.Background()
++	mem := store.NewMemory()
++	item := domain.Item{
++		SKU: "AB-1234", Name: "Widget", Category: domain.CategoryGeneral,
++		UnitPrice: domain.NewMoney(500, domain.GBP), WeightGram: 250,
++	}
++	if err := mem.PutItem(ctx, item); err != nil {
++		t.Fatal(err)
++	}
++	if err := mem.PutStock(ctx, store.Stock{SKU: "AB-1234", OnHand: 10}); err != nil {
++		t.Fatal(err)
++	}
++	inv := inventory.New(mem, mem)
++	if err := inv.Reserve(ctx, "AB-1234", 8); err != nil {
++		t.Fatal(err)
++	}
++	if err := inv.SetDamaged(ctx, "AB-1234", 5); err != nil {
++		t.Fatal(err)
++	}
++
++	rep, err := NewReconciler(mem, mem, inv, audit.NewMemoryLog()).RunOnce(ctx)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if len(rep.Discrepancies) != 1 || !strings.Contains(rep.Discrepancies[0], "AB-1234") {
++		t.Fatalf("discrepancies = %v, want one for AB-1234", rep.Discrepancies)
++	}
++}

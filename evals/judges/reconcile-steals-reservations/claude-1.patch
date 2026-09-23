@@ -1,0 +1,373 @@
+diff --git a/internal/domain/order.go b/internal/domain/order.go
+index 3d1d22c..83878aa 100644
+--- a/internal/domain/order.go
++++ b/internal/domain/order.go
+@@ -51,6 +51,10 @@ type OrderLine struct {
+ 	SKU       SKU
+ 	Quantity  int
+ 	UnitPrice Money
++	// ReleasePending is set on a cancelled order's line while its reservation
++	// has not yet been handed back. It is cleared once the release succeeds,
++	// so a reservation is released exactly once, by whoever gets there first.
++	ReleasePending bool
+ }
+ 
+ // LineTotal returns the cost of this line before any discount.
+@@ -67,6 +71,19 @@ type Order struct {
+ 	// ShippingZone is resolved at placement and frozen, so a later change to
+ 	// zone definitions does not silently reprice a shipped order.
+ 	ShippingZone string
++	// CancelledAt is when the order was cancelled; zero if it was not.
++	CancelledAt time.Time
++}
++
++// PendingReleases reports whether any line still holds a reservation that
++// should have been released.
++func (o Order) PendingReleases() bool {
++	for _, l := range o.Lines {
++		if l.ReleasePending {
++			return true
++		}
++	}
++	return false
+ }
+ 
+ // Subtotal sums the lines. It returns an error when the order mixes
+diff --git a/internal/orders/orders.go b/internal/orders/orders.go
+index b874b62..e601682 100644
+--- a/internal/orders/orders.go
++++ b/internal/orders/orders.go
+@@ -120,6 +120,11 @@ func (s *Service) Place(ctx context.Context, req PlaceRequest) (domain.Order, pr
+ }
+ 
+ // Cancel stops an order and releases its stock.
++//
++// The cancellation is saved first with every line marked ReleasePending, and
++// each mark is cleared as its release succeeds. A release that fails, or never
++// happens because the process dies, is left marked for the reconciler to
++// finish; a release that succeeded is never repeated.
+ func (s *Service) Cancel(ctx context.Context, id domain.OrderID, reason string) error {
+ 	order, err := s.orders.GetOrder(ctx, id)
+ 	if err != nil {
+@@ -128,15 +133,29 @@ func (s *Service) Cancel(ctx context.Context, id domain.OrderID, reason string)
+ 	if err := order.Transition(domain.StateCancelled); err != nil {
+ 		return err
+ 	}
+-	for _, line := range order.Lines {
+-		if err := s.inventory.Release(ctx, line.SKU, line.Quantity); err != nil {
+-			return err
+-		}
++	order.CancelledAt = s.now()
++	order.Lines = append([]domain.OrderLine(nil), order.Lines...)
++	for i := range order.Lines {
++		order.Lines[i].ReleasePending = true
+ 	}
+ 	if err := s.orders.PutOrder(ctx, order); err != nil {
+ 		return err
+ 	}
+ 	s.record(ctx, "order.cancelled", string(order.ID), map[string]string{"reason": reason})
++
++	for i, line := range order.Lines {
++		if err := s.inventory.Release(ctx, line.SKU, line.Quantity); err != nil {
++			s.record(ctx, "release.deferred", string(order.ID), map[string]string{
++				"sku": line.SKU.String(), "error": err.Error(),
++			})
++			continue
++		}
++		order.Lines[i].ReleasePending = false
++		if err := s.orders.PutOrder(ctx, order); err != nil {
++			return err
++		}
++	}
++
+ 	if err := s.notifier.OrderCancelled(ctx, order, reason); err != nil {
+ 		s.record(ctx, "notify.failed", string(order.ID), map[string]string{"error": err.Error()})
+ 	}
+diff --git a/internal/store/memory.go b/internal/store/memory.go
+index eace1f7..9d4a904 100644
+--- a/internal/store/memory.go
++++ b/internal/store/memory.go
+@@ -61,7 +61,7 @@ func (m *Memory) GetOrder(_ context.Context, id domain.OrderID) (domain.Order, e
+ 	if !ok {
+ 		return domain.Order{}, ErrNotFound
+ 	}
+-	return o, nil
++	return cloneOrder(o), nil
+ }
+ 
+ func (m *Memory) ListOrdersByState(_ context.Context, state domain.OrderState) ([]domain.Order, error) {
+@@ -70,7 +70,7 @@ func (m *Memory) ListOrdersByState(_ context.Context, state domain.OrderState) (
+ 	var out []domain.Order
+ 	for _, o := range m.orders {
+ 		if o.State == state {
+-			out = append(out, o)
++			out = append(out, cloneOrder(o))
+ 		}
+ 	}
+ 	sort.Slice(out, func(a, b int) bool { return out[a].ID < out[b].ID })
+@@ -80,10 +80,17 @@ func (m *Memory) ListOrdersByState(_ context.Context, state domain.OrderState) (
+ func (m *Memory) PutOrder(_ context.Context, order domain.Order) error {
+ 	m.mu.Lock()
+ 	defer m.mu.Unlock()
+-	m.orders[order.ID] = order
++	m.orders[order.ID] = cloneOrder(order)
+ 	return nil
+ }
+ 
++// cloneOrder copies the lines so that a caller changing an order it holds
++// cannot change the stored one without a PutOrder.
++func cloneOrder(o domain.Order) domain.Order {
++	o.Lines = append([]domain.OrderLine(nil), o.Lines...)
++	return o
++}
++
+ func (m *Memory) GetStock(_ context.Context, sku domain.SKU) (Stock, error) {
+ 	m.mu.RLock()
+ 	defer m.mu.RUnlock()
+diff --git a/internal/worker/reconcile.go b/internal/worker/reconcile.go
+index dda2ed5..626d28e 100644
+--- a/internal/worker/reconcile.go
++++ b/internal/worker/reconcile.go
+@@ -14,21 +14,31 @@ import (
+ 	"example.com/warehouse/internal/store"
+ )
+ 
++// ReleaseGrace is how long after a cancellation the reconciler leaves the
++// order alone, so that it does not race the cancellation's own release.
++const ReleaseGrace = 5 * time.Minute
++
+ // Reconciler corrects reservations that outlived their orders. A reservation
+ // belonging to a cancelled order holds stock nobody can buy, which is the most
+ // expensive kind of bug this service has.
++//
++// Only lines still marked ReleasePending are released. Releasing a line that
++// was already released takes the units from some other, live order's
++// reservation, which is just as expensive in the other direction.
+ type Reconciler struct {
+ 	orders    store.OrderStore
+ 	stock     store.StockStore
+ 	inventory *inventory.Service
+ 	audit     audit.Log
+ 	now       func() time.Time
++	grace     time.Duration
+ }
+ 
+ // NewReconciler builds a reconciler.
+ func NewReconciler(orders store.OrderStore, stock store.StockStore,
+ 	inv *inventory.Service, log audit.Log) *Reconciler {
+-	return &Reconciler{orders: orders, stock: stock, inventory: inv, audit: log, now: time.Now}
++	return &Reconciler{orders: orders, stock: stock, inventory: inv, audit: log,
++		now: time.Now, grace: ReleaseGrace}
+ }
+ 
+ // Report is what one pass changed.
+@@ -48,23 +58,29 @@ func (r *Reconciler) RunOnce(ctx context.Context) (Report, error) {
+ 	}
+ 	rep.OrdersExamined = len(cancelled)
+ 
++	cutoff := r.now().Add(-r.grace)
+ 	for _, order := range cancelled {
+-		for _, line := range order.Lines {
+-			st, err := r.stock.GetStock(ctx, line.SKU)
+-			if err != nil {
+-				rep.Discrepancies = append(rep.Discrepancies,
+-					fmt.Sprintf("order %s line %s: %v", order.ID, line.SKU, err))
+-				continue
+-			}
+-			if st.Reserved <= 0 {
++		if !order.PendingReleases() || order.CancelledAt.After(cutoff) {
++			continue
++		}
++		for i, line := range order.Lines {
++			if !line.ReleasePending {
+ 				continue
+ 			}
+ 			if err := r.inventory.Release(ctx, line.SKU, line.Quantity); err != nil {
+ 				rep.Discrepancies = append(rep.Discrepancies,
+-					fmt.Sprintf("releasing %s: %v", line.SKU, err))
++					fmt.Sprintf("order %s releasing %s: %v", order.ID, line.SKU, err))
+ 				continue
+ 			}
+ 			rep.ReservationsFreed += line.Quantity
++			order.Lines[i].ReleasePending = false
++			if err := r.orders.PutOrder(ctx, order); err != nil {
++				// The units are back in the pool but the order still says they
++				// are owed; stop here rather than widen the gap.
++				rep.Discrepancies = append(rep.Discrepancies,
++					fmt.Sprintf("order %s recording release of %s: %v", order.ID, line.SKU, err))
++				break
++			}
+ 		}
+ 	}
+ 
+diff --git a/internal/worker/reconcile_test.go b/internal/worker/reconcile_test.go
+new file mode 100644
+index 0000000..aeeaef1
+--- /dev/null
++++ b/internal/worker/reconcile_test.go
+@@ -0,0 +1,165 @@
++package worker
++
++import (
++	"context"
++	"testing"
++	"time"
++
++	"example.com/warehouse/internal/audit"
++	"example.com/warehouse/internal/domain"
++	"example.com/warehouse/internal/inventory"
++	"example.com/warehouse/internal/notify"
++	"example.com/warehouse/internal/orders"
++	"example.com/warehouse/internal/pricing"
++	"example.com/warehouse/internal/shipping"
++	"example.com/warehouse/internal/store"
++)
++
++const sku domain.SKU = "AB-1234"
++
++type fixture struct {
++	mem        *store.Memory
++	inv        *inventory.Service
++	orders     *orders.Service
++	reconciler *Reconciler
++}
++
++func setup(t *testing.T) fixture {
++	t.Helper()
++	mem := store.NewMemory()
++	ctx := context.Background()
++	if err := mem.PutItem(ctx, domain.Item{
++		SKU: sku, Name: "Widget", Category: domain.CategoryGeneral,
++		UnitPrice: domain.NewMoney(1000, domain.GBP), WeightGram: 500,
++		Dimensions: domain.Dimensions{LengthMM: 100, WidthMM: 100, HeightMM: 50},
++	}); err != nil {
++		t.Fatal(err)
++	}
++	if err := mem.PutStock(ctx, store.Stock{SKU: sku, OnHand: 20}); err != nil {
++		t.Fatal(err)
++	}
++	inv := inventory.New(mem, mem)
++	log := audit.NewMemoryLog()
++	svc := orders.New(mem, mem, inv,
++		pricing.New(mem, 2000),
++		shipping.New(mem, shipping.DefaultZones()...),
++		log, notify.New(notify.NewRecorder()),
++	)
++	rec := NewReconciler(mem, mem, inv, log)
++	// Every order in these tests is long past the grace period.
++	rec.now = func() time.Time { return time.Now().Add(time.Hour) }
++	return fixture{mem: mem, inv: inv, orders: svc, reconciler: rec}
++}
++
++func (f fixture) place(t *testing.T, id domain.OrderID, qty int) {
++	t.Helper()
++	if _, _, err := f.orders.Place(context.Background(), orders.PlaceRequest{
++		OrderID: id, CustomerID: "c1", Currency: domain.GBP, CountryCode: "GB",
++		Lines: []orders.RequestLine{{SKU: sku, Quantity: qty}},
++	}); err != nil {
++		t.Fatal(err)
++	}
++}
++
++func (f fixture) reserved(t *testing.T) int {
++	t.Helper()
++	st, err := f.mem.GetStock(context.Background(), sku)
++	if err != nil {
++		t.Fatal(err)
++	}
++	return st.Reserved
++}
++
++func TestReconcileLeavesLiveReservationsAlone(t *testing.T) {
++	f := setup(t)
++	ctx := context.Background()
++	f.place(t, "live", 5)
++	for _, id := range []domain.OrderID{"gone1", "gone2", "gone3"} {
++		f.place(t, id, 2)
++		if err := f.orders.Cancel(ctx, id, "changed mind"); err != nil {
++			t.Fatal(err)
++		}
++	}
++	for pass := 0; pass < 3; pass++ {
++		rep, err := f.reconciler.RunOnce(ctx)
++		if err != nil {
++			t.Fatal(err)
++		}
++		if rep.ReservationsFreed != 0 {
++			t.Fatalf("pass %d freed %d units, want 0", pass, rep.ReservationsFreed)
++		}
++	}
++	if got := f.reserved(t); got != 5 {
++		t.Fatalf("reserved = %d, want the live order's 5", got)
++	}
++}
++
++func TestReconcileRecoversAnOrphanedReservationOnce(t *testing.T) {
++	f := setup(t)
++	ctx := context.Background()
++	f.place(t, "live", 5)
++	f.place(t, "orphan", 3)
++
++	// A cancellation that was saved but whose release never happened.
++	order, err := f.mem.GetOrder(ctx, "orphan")
++	if err != nil {
++		t.Fatal(err)
++	}
++	if err := order.Transition(domain.StateCancelled); err != nil {
++		t.Fatal(err)
++	}
++	order.CancelledAt = time.Now()
++	for i := range order.Lines {
++		order.Lines[i].ReleasePending = true
++	}
++	if err := f.mem.PutOrder(ctx, order); err != nil {
++		t.Fatal(err)
++	}
++
++	rep, err := f.reconciler.RunOnce(ctx)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if rep.ReservationsFreed != 3 {
++		t.Fatalf("freed %d, want 3", rep.ReservationsFreed)
++	}
++	if got := f.reserved(t); got != 5 {
++		t.Fatalf("reserved = %d after recovery, want 5", got)
++	}
++
++	rep, err = f.reconciler.RunOnce(ctx)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if rep.ReservationsFreed != 0 || f.reserved(t) != 5 {
++		t.Fatalf("second pass freed %d, reserved now %d; want 0 and 5",
++			rep.ReservationsFreed, f.reserved(t))
++	}
++}
++
++func TestReconcileWaitsOutTheGracePeriod(t *testing.T) {
++	f := setup(t)
++	ctx := context.Background()
++	f.place(t, "orphan", 3)
++	order, err := f.mem.GetOrder(ctx, "orphan")
++	if err != nil {
++		t.Fatal(err)
++	}
++	if err := order.Transition(domain.StateCancelled); err != nil {
++		t.Fatal(err)
++	}
++	order.CancelledAt = time.Now()
++	order.Lines[0].ReleasePending = true
++	if err := f.mem.PutOrder(ctx, order); err != nil {
++		t.Fatal(err)
++	}
++
++	f.reconciler.now = time.Now
++	rep, err := f.reconciler.RunOnce(ctx)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if rep.ReservationsFreed != 0 || f.reserved(t) != 3 {
++		t.Fatalf("freed %d inside the grace period, want 0", rep.ReservationsFreed)
++	}
++}
