@@ -1,0 +1,51 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "agent": {
+    "bc-editor": {
+      "description": "Supervised editing under BoundedCode. Verification, impact and memory come from the le_* tools; this agent has no shell and no network.",
+      "mode": "primary",
+      "permission": {
+        "bash": "deny",
+        "edit": "deny",
+        "external_directory": "deny",
+        "glob": "allow",
+        "grep": "allow",
+        "list": "allow",
+        "read": "deny",
+        "task": "deny",
+        "webfetch": "deny",
+        "websearch": "deny"
+      }
+    }
+  },
+  "mcp": {
+    "servers": {
+      "boundedcode": {
+        "command": [
+          "bcode",
+          "mcp"
+        ],
+        "disabled": false,
+        "timeout": {
+          "request": 1200000
+        },
+        "type": "local"
+      }
+    }
+  },
+  "model": "boundedcode-local/boundedcode-bonsai",
+  "provider": {
+    "boundedcode-local": {
+      "models": {
+        "boundedcode-bonsai": {
+          "name": "boundedcode-bonsai"
+        }
+      },
+      "name": "Local (via boundedcode)",
+      "npm": "@ai-sdk/openai-compatible",
+      "options": {
+        "baseURL": "http://127.0.0.1:8080/v1"
+      }
+    }
+  }
+}
