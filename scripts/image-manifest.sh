@@ -57,7 +57,7 @@ is exactly the claim someone reads it to check.
 
 ## Image
 
-| | |
+| Field | Value |
 |---|---|
 | Reference | \`$image\` |
 | Digest | \`$digest\` |

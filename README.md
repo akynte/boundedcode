@@ -27,7 +27,7 @@ BoundedCode investigates repositories, plans scoped changes, edits code, and run
 verification on your machine. A Go supervisor surrounds local inference with a
 code graph, bounded tools, persistent evidence, and a human approval gate.
 
-|  |  |
+| Aspect | Summary |
 |---|---|
 | **Generation** | Local. Every token of code comes from your GPU; no prompt, file or conversation leaves the machine. |
 | **Decisions** | Narrow, typed judgments about work in progress go to a hosted decision model, [TypeSafe Jev](#why-a-hosted-decision-model) — a required component, not an optional integration. [Exactly what leaves the machine](docs/explanation/judgment-data-flow.md). |
@@ -142,7 +142,7 @@ DETERMINISTIC   Go supervisor + tools     State, policy, side effects, evidence,
 The bottom layer owns every decision that can accept work. That ordering is the
 product.
 
-| | |
+| Question | Answer |
 |---|---|
 | **What goes to Jev** | Eleven narrow, typed questions over bounded, structured state the supervisor already has: an objective, a plan's waivers, a window of tool-call evidence, a set of diff hunks. Never a transcript, never free text, never a whole file. |
 | **What leaves** | One HTTPS request per consultation, carrying a `state` object whose contents the `redact` mode bounds. [The full data flow](docs/explanation/judgment-data-flow.md). |

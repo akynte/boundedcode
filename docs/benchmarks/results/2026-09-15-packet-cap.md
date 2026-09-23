@@ -128,7 +128,7 @@ ceiling*, which is the one error this test exists not to make:
 
 ## Disclosure
 
-| | |
+| Item | Value |
 |---|---|
 | CPU | 13th Gen Intel Core i7-13620H, 16 threads |
 | RAM | 61 GiB |

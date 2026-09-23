@@ -9,7 +9,7 @@ is exactly the claim someone reads it to check.
 
 ## Image
 
-| | |
+| Field | Value |
 |---|---|
 | Reference | `boundedcode:cpu-test` |
 | Digest | `boundedcode@sha256:4399bbd8a39f7248f659c492f92a00d10b6bb9f528924ec7ec386991e39c83f5` |

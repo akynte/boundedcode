@@ -10,7 +10,7 @@ enforced by something, that thing is named.
 
 ## The short version
 
-| | |
+| Where | What |
 | --- | --- |
 | Runs locally | The coding model, the code graph, retrieval, the sandbox, every verification command, the ledger, the index, telemetry. |
 | Leaves the machine | One HTTPS request per judgment site consultation, to your configured Jev endpoint, carrying a structured `state` object and a set of typed questions. |
