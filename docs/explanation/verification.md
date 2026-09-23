@@ -49,15 +49,87 @@ The worktree content fingerprint lets code identify stale evidence and detect
 changes around verification, approval and recovery. Full output is stored as a
 content-addressed artifact with read-only permissions.
 
-**Verification does not run in an immutable source snapshot.** It runs commands
-against the writable task worktree with writable build caches. There is no
-separate always-on verification worker. Repository tests and build scripts can
-execute code and modify files within their sandbox grants. Candidate checks
-are not proof against every concurrent or temporary modification.
+**Verification runs in a fresh snapshot, not in the task worktree.** Before
+each run the supervisor checks out the task's base commit into a separate
+directory and applies the task's diff (`git diff --binary` against the base,
+ignored files excluded). `.bc/` and `.agent/` always come from the base commit,
+so a candidate cannot change which checks run. The snapshot is removed after
+the run and recreated for the next one. The journal records the base commit,
+the SHA-256 of the applied patch and the snapshot's content manifest beside the
+worktree candidate.
 
-Generated-output checks separately snapshot, run, compare and restore declared
-outputs. That narrower mechanism must not be generalized into a claim that all
-verification is immutable.
+What this does and does not buy:
+
+- A check that writes files cannot change the task's worktree or what is
+  committed to its branch. Build output, ignored files and scratch state from
+  the edit loop never reach verification.
+- The snapshot is **writable, not immutable**. Tests and build scripts can
+  still modify it during a run, and build caches are still shared and writable.
+- It runs as the same user, under the same sandbox, in the same supervisor
+  process. It is not a separate verifier identity or an always-on
+  verification worker.
+- The engine's own `run_recipe` tool still runs in the task worktree. It is
+  the model's self-check and has no say in acceptance.
+
+Generated-output checks additionally snapshot, run, compare and restore their
+declared outputs within the verification snapshot.
+
+When an operator has installed [hidden acceptance
+checks](../how-to/add-hidden-acceptance-checks.md), they run in the same
+snapshot after the recipes. Their results carry only a check ID and a verdict,
+and the completion contract requires each one that applies to pass. A hidden
+check that could not run blocks acceptance.
+
+## Tests that reach the change
+
+The test preset answers whether the suite passes. It does not say whether
+anything in the suite exercises the code that changed, and it cannot tell a test
+that passed from one the change taught to skip. After the recipes, and before
+any hidden check is installed, verification:
+
+1. finds the Go functions and methods whose lines the patch touches, new ones
+   included;
+2. finds the tests that reach each one: through the code graph (callers across
+   packages, up to three hops, as of the base commit), and in the candidate's
+   own test files in the same package, by name;
+3. runs exactly those tests with `go test -json`, one run per package;
+4. records one result, `impact: tests reaching the change`, with a report in
+   the artifact store naming each declaration, its tests and how each was found.
+
+That result fails, and blocks acceptance, when a test that reaches the change
+**now skips and its file was changed by the task**, when such a test was
+**removed or renamed** by the task, or when a
+[`require_tests` policy](../how-to/write-a-policy-rule.md#require-test-evidence)
+covers a changed declaration and no reaching test passed. A reaching test that
+fails is noted but judged by the test preset, with its baseline allowance.
+Everything else, such as a declaration no test reaches outside a policy, is
+reported, not enforced.
+
+This is static reach, not coverage. The graph misses calls through function
+values, reflection and generated code. The same-package scan matches by name,
+so a test that mentions a same-named identifier counts. Neither sees other
+languages. It is skipped at the `low` level and when the build fails.
+
+## The evidence chain
+
+Every verification run appends one record to an append-only, hash-linked chain
+in the ledger: the base commit, the SHA-256 of the exact patch applied to the
+snapshot, the snapshot's content manifest, the oracle digest and hidden-check
+IDs, and each check's verdict and artifact hash. Each record carries the hash
+of the one before it and a signature by the verifier key under `keys/`.
+
+`bcode task attest` verifies every hash, link and signature. What that detects,
+and what it does not:
+
+- A record edited, removed, inserted or reordered after the fact.
+- A chain rewritten and re-hashed: the signatures cannot be redone without
+  the key.
+- **Not** truncation of the newest records, on its own. The task's commit
+  carries an `Evidence-Head:` trailer; `attest --head` checks the chain still
+  reaches it.
+- **Not** a dishonest supervisor. The key is readable by the user the
+  supervisor runs as. The signature says a record came from the supervisor or
+  someone with its credentials, not that the verification was honest.
 
 ## Two reasons a green run can still be wrong
 

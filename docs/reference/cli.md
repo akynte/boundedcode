@@ -126,6 +126,7 @@ months from now.
 | `journal <task-id>` | The operation journal; `UNCERTAIN` marks a missing outcome |
 | `recover` | Reconcile every non-terminal task and report resumable state |
 | `retry <task-id>` | Return a failed task to pending, keeping its id, journal and worktree |
+| `attest <task-id>` | The task's signed verification records, and a check of the whole evidence chain |
 
 ### `bcode task retry`
 
@@ -147,6 +148,29 @@ evidence that no longer describes the worktree.
 |---|---|
 | `--reason` | What you changed so this run goes differently. Recorded in the journal as a decision |
 
+### `bcode task attest`
+
+Every verification run appends one record to the workspace's evidence chain:
+the base commit, the SHA-256 of the exact patch verified, the snapshot's content
+manifest, the oracle digest and hidden-check IDs, and each check's verdict and
+artifact hash. Each record carries the hash of the one before it and a signature
+by the verifier key in `keys/` under the data directory, created on first use.
+
+`attest` lists a task's records and verifies the whole chain: every hash, every
+link, every signature. With a key, an unsigned record counts as broken, because
+rewriting the chain and recomputing its hashes is exactly what leaves one.
+
+| Flag | |
+|---|---|
+| `--pub` | Verify against an exported public key (`keys/verifier.ed25519.pub`) instead of this data directory's |
+| `--head` | A chain hash recorded elsewhere that the chain must still contain |
+| `--json` | Machine-readable report |
+
+A task's commit carries an `Evidence-Head:` trailer with the hash of its last
+verification record. Passing it as `--head` detects a chain whose newest records
+were removed, which the hashes alone cannot. Exit status is 1 when the chain is
+broken or the head is missing.
+
 ### `bcode task verify`
 
 Creates a task, gives it a fresh git worktree, **syncs your uncommitted
@@ -158,6 +182,7 @@ reports whether the completion contract is met.
 |---|---|
 | `--verify` | `low` (build only), `standard` (build, vet, test, format), `high` (adds race and — where the repository declared them — lint, semgrep, generator checks and integration steps) |
 | `--committed` | Verify the last commit instead of your working tree |
+| `--oracle` | Absolute directory of [hidden acceptance checks](../how-to/add-hidden-acceptance-checks.md); overrides `oracle.dir` |
 | `--json` | Machine-readable outcome |
 
 Exit status is 1 when the contract is not met, so it composes in a script.
@@ -172,7 +197,8 @@ nobody is running.
 `create` flags: `--title` (required), `--verify`, `--requirement`, `--scope`
 (allowed paths, directory prefixes or globs), `--attempts`.
 
-`run` flags: `--json`, `--diff`.
+`run` flags: `--json`, `--diff`, `--oracle` (hidden acceptance checks; see
+`task verify`).
 
 A task runs in its own worktree; your working copy is never touched. Every
 action is journalled intent-first, so an interruption at any point leaves a
@@ -196,7 +222,13 @@ A task is accepted only when:
    state cannot be reused,
 4. **no check that ran found a problem**, including the conditional kinds
    (`lint`, `analyzer`) the level does not demand a result from,
-5. no file changed outside the declared scope.
+5. no file changed outside the declared scope,
+6. **every [hidden acceptance check](../how-to/add-hidden-acceptance-checks.md)
+   that ran passed** on the current candidate; for these an `error` blocks too,
+7. **the tests that reach the change** were not taught to skip or removed by
+   it, and every `require_tests` policy covering a changed declaration has a
+   passing test that reaches it (see
+   [verification](../explanation/verification.md#tests-that-reach-the-change)).
 
 Rules 1 and 4 answer different questions. A level says which kinds must have
 produced evidence; `lint` and `analyzer` cannot be on that list because they

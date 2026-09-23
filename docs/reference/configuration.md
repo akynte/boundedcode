@@ -48,6 +48,8 @@ Key settings, from [the loader](https://github.com/akynte/boundedcode/blob/main/
 | `index.watch_enabled` | true; watcher requires the service lifecycle, not just a one-shot index |
 | `index.excludes` | Repository walk exclusions |
 | `gates` | Defaults enable breaking-change, out-of-scope and apply gates; plan gate is off |
+| `oracle.dir` | Empty by default. Absolute directory of [hidden acceptance checks](../how-to/add-hidden-acceptance-checks.md), outside every repository; `--oracle` overrides it |
+| `oracle.feedback_rounds` | 3. Distinct failing candidates a task's model may learn hidden verdicts about; the next one ends the task |
 
 For an embedded server, the profile contributes runtime flags and `inference.args`
 are appended. Explicit arguments must match the measured profile. Do not apply

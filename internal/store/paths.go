@@ -54,6 +54,11 @@ func (l *Layout) ModelsDir() string     { return filepath.Join(l.root, "models")
 func (l *Layout) WorkspacesDir() string { return filepath.Join(l.root, "workspaces") }
 func (l *Layout) BackupsDir() string    { return filepath.Join(l.root, "backups") }
 
+// KeysDir holds the verifier's signing key. It is created on first use, 0700,
+// and is deliberately outside every workspace directory: nothing a task's model
+// or its verification sandbox is granted reaches it.
+func (l *Layout) KeysDir() string { return filepath.Join(l.root, "keys") }
+
 // ProvisioningDir holds the §6.1 provisioning lanes' caches — the module cache
 // a `bcode deps sync` populates, and the lane's tmp.
 //

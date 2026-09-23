@@ -129,6 +129,11 @@ func (e *Engine) refreshTools() {
 
 func (e *Engine) WorkflowProvider() llm.Provider { return e.Provider }
 
+// WrapProvider replaces the engine's provider with wrap(provider). The
+// supervisor uses it to put a guard in front of every model call the engine
+// makes; the engine has exactly one call site, so nothing can go around it.
+func (e *Engine) WrapProvider(wrap func(llm.Provider) llm.Provider) { e.Provider = wrap(e.Provider) }
+
 func (e *Engine) Name() string { return "native/" + e.Provider.Name() }
 
 func (e *Engine) Health(ctx context.Context) error { return e.Provider.Health(ctx) }

@@ -54,6 +54,9 @@ func AllKinds() []Kind {
 type Ledger struct {
 	db *store.DB
 	ws workspace.ID
+	// signer signs evidence-chain records. Nil leaves them chained but
+	// unsigned, which VerifyChain reports.
+	signer Signer
 }
 
 // New binds a ledger to a workspace store.

@@ -43,8 +43,22 @@ network-restricted verification.
 
 ## Verification and security
 
-Checks run in a writable worktree, not an immutable snapshot. Tests may be
-incomplete or altered by a patch. Model review is fallible. Optional Jev taint
+Checks run in a fresh, disposable snapshot of the candidate, not the task
+worktree, but the snapshot is writable, not immutable, and runs under the same
+user and sandbox as the supervisor. Tests may be incomplete or altered by a
+patch. Hidden acceptance checks are kept from the model's context, but the
+candidate's code runs beside them in the snapshot and can read them, and each
+reported rejection tells the model which checks failed, up to the feedback
+budget.
+
+Which tests reach a change is decided statically: the graph as of the base
+commit and a same-package scan by name. Calls through function values,
+reflection or generated code are missed, and only Go is examined.
+
+The evidence chain is signed with a key the supervisor's user can read. It
+detects edits to the ledger by anything else, and truncation only when checked
+against the commit's `Evidence-Head`. It is not an attestation from an
+independent party. Model review is fallible. Optional Jev taint
 annotations do not directly change a recipe's pass status.
 
 Host mode has no outer container boundary. Landlock port restrictions do not

@@ -441,8 +441,9 @@ those writes, not a general filesystem sandbox.
 
 Native edits happen in a separate task worktree, with path and policy checks.
 Verification runs repository code under the available sandbox. Evidence is
-stored by content hash; verification itself runs on a **writable** worktree,
-not an immutable snapshot.
+stored by content hash. Verification runs in a disposable snapshot (base commit
+plus the task's diff, verification config from the base), not the task
+worktree; the snapshot is **writable**, not immutable.
 
 Container mounts, Landlock, and optional bubblewrap provide different
 boundaries. Landlock alone is not complete network isolation. Treat the

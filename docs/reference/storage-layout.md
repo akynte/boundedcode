@@ -11,7 +11,7 @@
   workspaces/<workspace_id>/
     workspace.json     the data-side record: name, root, last opened
     index.db           files, nodes, edges, chunks, FTS, embeddings, index keys
-    ledger.db          requirements, tasks, operations, checkpoints, evidence, handoffs, leases
+    ledger.db          requirements, tasks, operations, checkpoints, evidence, evidence chain, handoffs, leases
     telemetry.db       events, GPU samples
     artifacts/<xx>/<hash>   content-addressed evidence, read-only once written
     cache/analysis/    keyed by workspace and content manifest
@@ -19,14 +19,23 @@
     slots/             saved prompt-cache slots, cleared on workspace switch
     tmp/               wiped at task end; the only tmp a sandboxed task sees
   backups/<timestamp>/<workspace_id>/{index,ledger,telemetry}.db
+  keys/                    verifier signing key (0700; private key 0600) and its public half
   provisioning/<lane>/     §6.1 lane caches: go-mod, go-build, tmp
   telemetry-aggregate.db   §2.2's optional cross-workspace counters
 ```
 
-## The two things outside a workspace directory
+## The things outside a workspace directory
 
-Everything above is per workspace except `config/`, `models/`, and these two,
+Everything above is per workspace except `config/`, `models/`, and these,
 and each is outside for a stated reason rather than by omission.
+
+**`keys/`** holds `verifier.ed25519`, the key that signs every record of the
+evidence chain, and `verifier.ed25519.pub`, which you can hand to anyone who
+needs to check a chain with `bcode task attest --pub`. It is outside every
+workspace directory because nothing a task's model or its verification sandbox
+is granted may reach it. It is created on first use; losing it means records
+signed before cannot be told apart from forgeries, so back it up with the
+ledgers.
 
 **`provisioning/<lane>/`** holds what `bcode deps` fetches. A downloaded module is
 not workspace state: two projects needing the same version should not download

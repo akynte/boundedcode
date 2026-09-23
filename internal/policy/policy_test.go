@@ -146,3 +146,33 @@ func shippedPolicyDir(t *testing.T) string {
 	t.Skip("policies/ not found")
 	return ""
 }
+
+func TestRequireTestsRules(t *testing.T) {
+	dir := t.TempDir()
+	body := "name: tested-areas\nrequire_tests:\n  - path: services/auth/**\n    reason: auth changes need a test\n"
+	if err := os.WriteFile(filepath.Join(dir, "tests.yaml"), []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	set, err := policy.Load(dir)
+	if err != nil {
+		t.Fatalf("a policy with only require_tests is valid: %v", err)
+	}
+	req, ok := set.RequiresTests("services/auth/refresh.go")
+	if !ok || req.Policy != "tested-areas" || req.Reason != "auth changes need a test" {
+		t.Errorf("RequiresTests = %+v, %v", req, ok)
+	}
+	if _, ok := set.RequiresTests("services/billing/total.go"); ok {
+		t.Error("a path outside the rule must not require tests")
+	}
+	if v := set.Check([]string{"services/auth/refresh.go"}); len(v) != 0 {
+		t.Error("require_tests must not protect the path from changes")
+	}
+
+	bad := "name: tested-areas\nrequire_tests:\n  - path: services/auth/**\n"
+	if err := os.WriteFile(filepath.Join(dir, "tests.yaml"), []byte(bad), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := policy.Load(dir); err == nil {
+		t.Error("a require_tests rule without a reason must be refused")
+	}
+}

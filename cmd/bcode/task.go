@@ -36,7 +36,8 @@ func newTaskCmd() *cobra.Command {
 			"than assuming either success or failure.",
 	}
 	cmd.AddCommand(newTaskListCmd(), newTaskJournalCmd(), newTaskRecoverCmd(),
-		newTaskCreateCmd(), newTaskRunCmd(), newTaskVerifyCmd(), newTaskRetryCmd())
+		newTaskCreateCmd(), newTaskRunCmd(), newTaskVerifyCmd(), newTaskRetryCmd(),
+		newTaskAttestCmd())
 	return cmd
 }
 
@@ -142,8 +143,12 @@ func runnerFor(cmd *cobra.Command, root *store.Root, st *store.Store, eng engine
 	warn := func(format string, args ...any) {
 		fmt.Fprintf(cmd.ErrOrStderr(), format+"\n", args...)
 	}
+	var oracleDir string
+	if f := cmd.Flags().Lookup("oracle"); f != nil {
+		oracleDir = f.Value.String()
+	}
 	return supervisor.Runner(cmd.Context(), root, st, eng, supervisor.Options{
-		RepoRoot: repoRoot, Logf: warn, Warnf: warn,
+		RepoRoot: repoRoot, Logf: warn, Warnf: warn, OracleDir: oracleDir,
 	})
 }
 
@@ -260,6 +265,8 @@ func newTaskRunCmd() *cobra.Command {
 	}
 	cmd.Flags().BoolVar(&asJSON, "json", false, "emit JSON")
 	cmd.Flags().BoolVar(&showDiff, "diff", false, "print the diff the task produced")
+	cmd.Flags().String("oracle", "",
+		"absolute directory of hidden acceptance checks, outside the repository (overrides oracle.dir)")
 	cmd.Flags().StringVar(&replaySeed, "replay-edit-seed", "",
 		"development only: start this task at EDIT from a recorded pre-EDIT state file")
 	_ = cmd.Flags().MarkHidden("replay-edit-seed")
@@ -325,6 +332,8 @@ func newTaskVerifyCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&committed, "committed", false,
 		"verify the last commit instead of your uncommitted working tree")
 	cmd.Flags().BoolVar(&asJSON, "json", false, "emit JSON")
+	cmd.Flags().String("oracle", "",
+		"absolute directory of hidden acceptance checks, outside the repository (overrides oracle.dir)")
 	return cmd
 }
 

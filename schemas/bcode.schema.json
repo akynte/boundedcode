@@ -269,6 +269,22 @@
         }
       }
     },
+    "oracle": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Hidden acceptance checks the coding model never sees (internal/oracle).",
+      "properties": {
+        "dir": {
+          "type": "string",
+          "description": "Absolute directory of check files, outside every repository a task works on. Empty means none."
+        },
+        "feedback_rounds": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Distinct failing candidates a task's model may learn hidden verdicts about. 0 uses the default (3)."
+        }
+      }
+    },
     "profile": {
       "type": "string",
       "description": "Names a profile in profiles/ (§9.2)."

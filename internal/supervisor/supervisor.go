@@ -31,6 +31,7 @@ import (
 	sqlan "github.com/akynte/boundedcode/internal/analyzers/sql"
 	"github.com/akynte/boundedcode/internal/analyzers/terraform"
 	"github.com/akynte/boundedcode/internal/analyzers/typescript"
+	"github.com/akynte/boundedcode/internal/attest"
 	"github.com/akynte/boundedcode/internal/broker"
 	"github.com/akynte/boundedcode/internal/config"
 	"github.com/akynte/boundedcode/internal/critic"
@@ -38,6 +39,7 @@ import (
 	"github.com/akynte/boundedcode/internal/index"
 	"github.com/akynte/boundedcode/internal/ledger"
 	"github.com/akynte/boundedcode/internal/llm"
+	"github.com/akynte/boundedcode/internal/oracle"
 	"github.com/akynte/boundedcode/internal/policy"
 	"github.com/akynte/boundedcode/internal/recipe"
 	"github.com/akynte/boundedcode/internal/sandbox"
@@ -57,6 +59,8 @@ type Options struct {
 	Logf func(format string, args ...any)
 	// Warnf reports analyzer problems. Nil discards them.
 	Warnf func(format string, args ...any)
+	// OracleDir overrides the configured hidden acceptance suite.
+	OracleDir string
 }
 
 // Runner builds a task runner with every control in place.
@@ -102,6 +106,28 @@ func Runner(ctx context.Context, root *store.Root, st *store.Store, eng engine.E
 			len(policies.Policies), len(policies.Paths()))
 	}
 	r.Policies = policies
+
+	suite, err := loadOracle(firstNonEmpty(o.OracleDir, cfg.Oracle.Dir), o.RepoRoot)
+	if err != nil {
+		return nil, err
+	}
+	if suite != nil {
+		logf("oracle: %d hidden acceptance check(s) from %s (digest %.12s)",
+			len(suite.Checks), suite.Dir, suite.Digest)
+	}
+	r.Oracle = suite
+	r.HiddenFeedbackRounds = cfg.Oracle.FeedbackRounds
+
+	// Every verification run is appended to the evidence chain and signed
+	// with the data directory's verifier key, created on first use. A runner
+	// that cannot sign refuses to start: unsigned evidence would look like
+	// the signed kind to anyone who does not check.
+	key, err := attest.LoadOrCreate(root.Layout().KeysDir())
+	if err != nil {
+		return nil, fmt.Errorf("the verifier signing key: %w", err)
+	}
+	r.Ledger.SetSigner(key)
+
 	if profile := Profile(root, cfg); profile != nil {
 		r.PhaseBudgets = profile.PhaseBudgets
 	}
@@ -352,4 +378,35 @@ func Analyzers(warnf func(string, ...any)) []index.Analyzer {
 // before launching anything.
 func Semantic(logf func(string, ...any)) index.SemanticIndexer {
 	return &python.Indexer{Logf: logf}
+}
+
+// loadOracle loads the hidden acceptance suite, refusing one that sits inside
+// the repository. A task's model can read the repository; a hidden check it can
+// read is a visible check that pretends otherwise. An empty dir means none.
+func loadOracle(dir, repoRoot string) (*oracle.Suite, error) {
+	if dir == "" {
+		return nil, nil
+	}
+	// Location first: whatever an in-repository directory holds, the answer
+	// is the same, and a parse error would hide the reason that matters.
+	if repoRoot != "" {
+		outside, err := oracle.Outside(dir, repoRoot)
+		if err != nil {
+			return nil, fmt.Errorf("oracle: %w", err)
+		}
+		if !outside {
+			return nil, fmt.Errorf("oracle: %s is inside the repository %s, where the model "+
+				"can read it; keep hidden checks outside every repository a task works on", dir, repoRoot)
+		}
+	}
+	return oracle.Load(dir)
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, v := range values {
+		if v != "" {
+			return v
+		}
+	}
+	return ""
 }

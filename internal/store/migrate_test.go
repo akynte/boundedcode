@@ -222,6 +222,10 @@ func TestMigrationTakesABackupFirst(t *testing.T) {
 	if _, err := db.ExecContext(ctx, `ALTER TABLE gates DROP COLUMN candidate`); err != nil {
 		t.Fatalf("undoing migration 5: %v", err)
 	}
+	// Dropping the table drops its append-only triggers with it.
+	if _, err := db.ExecContext(ctx, `DROP TABLE evidence_chain`); err != nil {
+		t.Fatalf("undoing migration 9: %v", err)
+	}
 	if _, err := db.ExecContext(ctx, `DROP TABLE judgment_consultations`); err != nil {
 		t.Fatalf("undoing migration 8: %v", err)
 	}

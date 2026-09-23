@@ -45,6 +45,30 @@ Write the reason as what would go wrong, not as a restatement of the path:
       restriction has to be outside what it restricts.
 ```
 
+## Require test evidence
+
+`protected` says a path may not change. `require_tests` says it may, but only
+with evidence: every Go function or method the change touches under the path
+must be reached by at least one test that then passes.
+
+```yaml
+name: tested-areas
+require_tests:
+  - path: services/auth/**
+    reason: >-
+      Token handling fails silently. A change here that no test exercises has
+      nothing standing between it and production but a reviewer's reading.
+```
+
+A test reaches a changed declaration when the code graph finds a path from the
+test to it through calls, at most three hops, or when a test in the same
+package, including one the task adds, names it in its body. Those tests are run
+by name with per-test results. A policy can hold both lists.
+
+The rule is stored in `policies/`, which the shipped policy protects, and is read
+from your checkout when the supervisor starts, so a task cannot loosen the rule
+it is being judged by.
+
 ## Checking it
 
 ```console

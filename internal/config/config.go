@@ -56,6 +56,20 @@ type Config struct {
 
 	// Gates configures the human gates of §3.3.
 	Gates GateConfig `yaml:"gates"`
+
+	// Oracle configures the hidden acceptance suite (internal/oracle).
+	Oracle OracleConfig `yaml:"oracle"`
+}
+
+// OracleConfig names where the operator's hidden acceptance checks live.
+type OracleConfig struct {
+	// Dir is an absolute directory of check files, outside every repository
+	// a task works on. Empty means no hidden checks. `--oracle` overrides it.
+	Dir string `yaml:"dir,omitempty"`
+	// FeedbackRounds is how many distinct failing candidates a task's model
+	// may learn hidden verdicts about. The next failing candidate ends the
+	// task instead of going back to the model. Zero uses the default.
+	FeedbackRounds int `yaml:"feedback_rounds,omitempty"`
 }
 
 // GateConfig selects which decisions need a person.
@@ -340,6 +354,12 @@ func Save(configDir string, cfg Config) error {
 // Validate rejects configurations that would start a container in a state the
 // operator did not intend.
 func (c Config) Validate() error {
+	if c.Oracle.Dir != "" && !filepath.IsAbs(c.Oracle.Dir) {
+		return fmt.Errorf("config: oracle.dir %q must be an absolute path", c.Oracle.Dir)
+	}
+	if c.Oracle.FeedbackRounds < 0 {
+		return fmt.Errorf("config: oracle.feedback_rounds must not be negative")
+	}
 	if c.API.ACPAddr != "" && len(c.API.ACPCommand) == 0 {
 		return fmt.Errorf("config: api.acp_addr is set but api.acp_command is empty; " +
 			"the bridge would accept connections and have no agent to hand them to")

@@ -12,6 +12,8 @@ package worktree
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
@@ -121,6 +123,114 @@ func (m *Manager) Remove(ctx context.Context, wt *Worktree, keepBranch bool) err
 	}
 	if !keepBranch {
 		_, _ = git(ctx, wt.Repo, "branch", "-D", wt.Branch)
+	}
+	return nil
+}
+
+// verificationConfig is what a snapshot always takes from the base commit,
+// whatever the candidate did to it. It is what decides which checks run, so a
+// candidate that could change it would choose its own examiner.
+var verificationConfig = []string{".bc", ".agent"}
+
+// Snapshot is a candidate materialized apart from the checkout that produced
+// it: the base commit with the task's diff applied, and nothing else.
+//
+// Verification runs here rather than in the task's worktree. A check run in the
+// editing checkout sees whatever the edit loop left lying around — build
+// output, ignored files, a test's scratch state — none of which is part of the
+// change a gate would apply, and the checks themselves could write into the
+// tree the task keeps. The snapshot holds exactly what a commit of the task
+// would hold, and is discarded after the checks read it.
+type Snapshot struct {
+	// Path is the absolute path of the snapshot checkout.
+	Path string
+	// Base is the commit the patch was applied to.
+	Base string
+	// PatchSHA256 identifies the exact bytes applied, so evidence names the
+	// change it describes rather than a directory that no longer exists.
+	PatchSHA256 string
+	// Manifest is the content manifest of the snapshot as verified.
+	Manifest string
+	// Changed lists the repository-relative paths the patch touches.
+	Changed []string
+	// OldRanges are the base lines the patch touches, per base path: what
+	// maps a change onto the declarations the index recorded for the base.
+	OldRanges map[string][]LineRange
+	// NewRanges are the snapshot lines the patch touches, per path: what
+	// maps a change onto declarations the base does not have yet.
+	NewRanges map[string][]LineRange
+	repo      string
+}
+
+// Snapshot materializes the worktree's candidate as a fresh detached checkout
+// of its base commit with the task's diff applied.
+//
+// The snapshot path is stable per task and recreated each time, so build and
+// test caches keyed on the directory stay warm across verification runs while
+// no state survives from one run to the next.
+func (m *Manager) Snapshot(ctx context.Context, wt *Worktree) (*Snapshot, error) {
+	if _, err := git(ctx, wt.Path, "add", "-A"); err != nil {
+		return nil, fmt.Errorf("worktree: stage candidate: %w", err)
+	}
+	patch, err := gitRaw(ctx, wt.Path, "diff", "--cached", "--binary", wt.Base)
+	if err != nil {
+		return nil, fmt.Errorf("worktree: read candidate diff: %w", err)
+	}
+	names, err := git(ctx, wt.Path, "diff", "--cached", "--name-only", wt.Base)
+	if err != nil {
+		return nil, fmt.Errorf("worktree: list candidate changes: %w", err)
+	}
+
+	path := filepath.Join(m.Root, "vf-"+strings.TrimPrefix(wt.ID, "wt-"))
+	s := &Snapshot{Path: path, Base: wt.Base, repo: wt.Repo}
+	for _, line := range strings.Split(names, "\n") {
+		if p := strings.TrimSpace(line); p != "" {
+			s.Changed = append(s.Changed, p)
+		}
+	}
+	// A snapshot left by an interrupted run is removed, not reused: its
+	// contents are whatever that run's checks left behind.
+	if err := s.Remove(ctx); err != nil {
+		return nil, err
+	}
+	if _, err := git(ctx, wt.Repo, "worktree", "add", "--detach", path, wt.Base); err != nil {
+		return nil, fmt.Errorf("worktree: add snapshot: %w", err)
+	}
+	if strings.TrimSpace(patch) != "" {
+		excludes := make([]string, 0, 2*len(verificationConfig))
+		for _, dir := range verificationConfig {
+			excludes = append(excludes, "--exclude="+dir, "--exclude="+dir+"/*")
+		}
+		if err := gitApply(ctx, path, patch, excludes...); err != nil {
+			_ = s.Remove(ctx)
+			return nil, fmt.Errorf("worktree: apply candidate to snapshot: %w", err)
+		}
+	}
+	sum := sha256.Sum256([]byte(patch))
+	s.PatchSHA256 = hex.EncodeToString(sum[:])
+	s.OldRanges, s.NewRanges = Ranges(patch)
+	if s.Manifest, err = ledger.ContentManifest(path); err != nil {
+		_ = s.Remove(ctx)
+		return nil, err
+	}
+	return s, nil
+}
+
+// Remove deletes the snapshot checkout and its registration. Removing one that
+// does not exist is not an error.
+func (s *Snapshot) Remove(ctx context.Context) error {
+	if s == nil {
+		return nil
+	}
+	if _, err := os.Stat(s.Path); os.IsNotExist(err) {
+		_, _ = git(ctx, s.repo, "worktree", "prune")
+		return nil
+	}
+	if _, err := git(ctx, s.repo, "worktree", "remove", "--force", s.Path); err != nil {
+		if rmErr := os.RemoveAll(s.Path); rmErr != nil {
+			return errors.Join(err, rmErr)
+		}
+		_, _ = git(ctx, s.repo, "worktree", "prune")
 	}
 	return nil
 }
@@ -406,11 +516,12 @@ func gitRaw(ctx context.Context, dir string, args ...string) (string, error) {
 }
 
 // gitApply feeds a patch to `git apply` on stdin.
-func gitApply(ctx context.Context, dir, patch string) error {
+func gitApply(ctx context.Context, dir, patch string, extra ...string) error {
 	ctx, cancel := context.WithTimeout(ctx, gitTimeout)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "git", "-C", dir, "apply", "--whitespace=nowarn", "-")
+	args := append([]string{"-C", dir, "apply", "--whitespace=nowarn"}, extra...)
+	cmd := exec.CommandContext(ctx, "git", append(args, "-")...) //nolint:gosec // flags are constants from this file
 	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GIT_OPTIONAL_LOCKS=0")
 	cmd.Stdin = strings.NewReader(patch)
 	var stderr strings.Builder

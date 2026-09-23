@@ -65,7 +65,7 @@ func TestVerificationSandboxUsesSharedModuleCache(t *testing.T) {
 	}
 	wt := &worktree.Worktree{Path: wtPath}
 
-	spec := r.specFor(wt)
+	spec := r.specFor(wt.Path)
 
 	// ONE: GOMODCACHE must be the provisioning module cache path, not a path
 	// under the workspace directory.

@@ -443,6 +443,11 @@ type State struct {
 	Tried []TriedCall `json:"tried_calls,omitempty"`
 	// Reads carries what inspection already found across those boundaries.
 	Reads []ReadEvidence `json:"read_evidence,omitempty"`
+
+	// HiddenRejected lists the distinct candidates hidden acceptance checks
+	// have failed, each a verdict the model was told. Persisted so a restart
+	// does not reset the bound on what the model may learn about the suite.
+	HiddenRejected []string `json:"hidden_rejected,omitempty"`
 }
 
 // StructuredOutcome counts what happened to this task's structured calls.

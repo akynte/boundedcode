@@ -66,6 +66,13 @@ const (
 	// "compiles but wrong".
 	KindIntegration Kind = "integration"
 	KindCustom      Kind = "custom"
+	// KindHidden is an operator's hidden acceptance check (internal/oracle).
+	// Its result carries an ID and a status and nothing the check asserted;
+	// the full output stays in the artifact store for a person to read.
+	KindHidden Kind = "hidden"
+	// KindImpact is evidence derived from what the change touches: the tests
+	// that reach the changed declarations, run by name (task/impact.go).
+	KindImpact Kind = "impact"
 )
 
 // Recipe is one deterministic check.

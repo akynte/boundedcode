@@ -42,6 +42,10 @@ type Policy struct {
 	Name string `yaml:"name"`
 	// Protected lists paths no task may change.
 	Protected []Rule `yaml:"protected"`
+	// RequireTests lists paths where a changed function or method must be
+	// reached, in the code graph, by at least one test that then passes. A
+	// change there with no test exercising it is not accepted.
+	RequireTests []Rule `yaml:"require_tests"`
 }
 
 // Set is every policy the operator has installed.
@@ -57,10 +61,10 @@ func (p Policy) Validate() error {
 	if strings.TrimSpace(p.Name) == "" {
 		return fmt.Errorf("%w: a policy needs a name", ErrInvalid)
 	}
-	if len(p.Protected) == 0 {
-		return fmt.Errorf("%w: %s protects nothing", ErrInvalid, p.Name)
+	if len(p.Protected) == 0 && len(p.RequireTests) == 0 {
+		return fmt.Errorf("%w: %s protects nothing and requires nothing", ErrInvalid, p.Name)
 	}
-	for i, r := range p.Protected {
+	for i, r := range append(append([]Rule(nil), p.Protected...), p.RequireTests...) {
 		if strings.TrimSpace(r.Path) == "" {
 			return fmt.Errorf("%w: %s rule %d has no path", ErrInvalid, p.Name, i+1)
 		}
@@ -115,6 +119,27 @@ func Load(dir string) (Set, error) {
 		set.Policies = append(set.Policies, p)
 	}
 	return set, nil
+}
+
+// TestRequirement is a rule demanding test evidence for changes to a path.
+type TestRequirement struct {
+	Policy string `json:"policy"`
+	Rule   string `json:"rule"`
+	Reason string `json:"reason"`
+}
+
+// RequiresTests returns the first rule demanding that a change to rel be
+// reached by a passing test, if any.
+func (s Set) RequiresTests(rel string) (TestRequirement, bool) {
+	rel = filepath.ToSlash(strings.TrimPrefix(rel, "./"))
+	for _, p := range s.Policies {
+		for _, r := range p.RequireTests {
+			if matches(r.Path, rel) {
+				return TestRequirement{Policy: p.Name, Rule: r.Path, Reason: r.Reason}, true
+			}
+		}
+	}
+	return TestRequirement{}, false
 }
 
 // Violation is one changed path that a policy protects.

@@ -200,7 +200,7 @@ func (r *Runner) runPhases(ctx context.Context, t *Task, wt *worktree.Worktree) 
 					return stop(StateBlocked, "index refresh: "+freshErr.Error())
 				}
 			}
-			s.Baseline, err = r.verify(ctx, t, wt, s.Candidate)
+			s.Baseline, err = r.verify(ctx, t, wt, s.Candidate, false)
 			if err != nil {
 				return nil, err
 			}
@@ -551,7 +551,7 @@ func (r *Runner) runPhases(ctx context.Context, t *Task, wt *worktree.Worktree) 
 				remaining = t.Budget.MaxTokens - s.Tokens
 			}
 			if setter, ok := r.Engine.(interface{ SetRecipeRunner(*recipe.Runner) }); ok {
-				setter.SetRecipeRunner(&recipe.Runner{Sandbox: r.Sandbox, Spec: r.specFor(wt), Store: r.Artifacts})
+				setter.SetRecipeRunner(&recipe.Runner{Sandbox: r.Sandbox, Spec: r.specFor(wt.Path), Store: r.Artifacts})
 			}
 			counted := s.Edit.Tokens
 			phaseBudget := r.phaseBudget(workflow.Edit)
@@ -822,7 +822,7 @@ func (r *Runner) runPhases(ctx context.Context, t *Task, wt *worktree.Worktree) 
 			}
 
 			s.VerifyLoops++
-			s.Results, err = r.verify(ctx, t, wt, s.Candidate)
+			s.Results, err = r.verify(ctx, t, wt, s.Candidate, true)
 			if err != nil {
 				return nil, err
 			}
@@ -920,7 +920,7 @@ func (r *Runner) runPhases(ctx context.Context, t *Task, wt *worktree.Worktree) 
 			if len(s.Feedback) > 0 && s.VerifyLoops < 4 {
 				// An unchanged rerun distinguishes a flaky failure from repair.
 				s.VerifyLoops++
-				rerun, rerunErr := r.verify(ctx, t, wt, s.Candidate)
+				rerun, rerunErr := r.verify(ctx, t, wt, s.Candidate, true)
 				if rerunErr != nil {
 					return nil, rerunErr
 				}
@@ -993,6 +993,11 @@ func (r *Runner) runPhases(ctx context.Context, t *Task, wt *worktree.Worktree) 
 			// still applies.
 			if r.Baseline == nil {
 				for _, result := range s.Results {
+					// Hidden and impact results have their own rules in
+					// checkVerification.
+					if result.Kind == recipe.KindHidden || result.Kind == recipe.KindImpact {
+						continue
+					}
 					if result.Status == recipe.Fail || result.Status == recipe.Error {
 						accepted = false
 						reasons = append(reasons, result.Recipe+": "+result.Summary.Headline)
@@ -1025,6 +1030,9 @@ func (r *Runner) runPhases(ctx context.Context, t *Task, wt *worktree.Worktree) 
 				// check that decides whether the edit was any good.
 				err = move(workflow.Review)
 				break
+			}
+			if spent, why := r.spendHiddenFeedback(&s.HiddenRejected, s.Results, s.Candidate); spent {
+				return stop(StateFailed, why)
 			}
 			if s.Budgeted {
 				// Verification failed and nothing further may be asked of the
@@ -1229,7 +1237,7 @@ func (r *Runner) runPhases(ctx context.Context, t *Task, wt *worktree.Worktree) 
 			if commitErr != nil {
 				return nil, commitErr
 			}
-			committed, commitErr := wt.Commit(ctx, "bcode: "+t.Title)
+			committed, commitErr := wt.Commit(ctx, "bcode: "+t.Title+"\n"+evidenceTrailer(r.lastChain.Hash))
 			if commitErr != nil {
 				_ = commitOp.Interrupted(ctx, commitErr)
 				return stop(StateBlocked, "final commit failed: "+commitErr.Error())
@@ -1903,13 +1911,26 @@ func (r *Runner) worthVerifying(ctx context.Context, t *Task, wt *worktree.Workt
 
 // checkVerification decides whether the candidate's verification results are
 // acceptable, relative to the recorded baseline when there is one.
+//
+// Hidden acceptance checks are judged by CheckHidden in either case. The
+// preset rules look results up by preset name, so without this a hidden
+// result would be ignored whenever a baseline is in force.
 func (r *Runner) checkVerification(root string, s *workflow.State) (bool, []string, []recipe.PresetComparison) {
+	var (
+		ok          bool
+		reasons     []string
+		comparisons []recipe.PresetComparison
+	)
 	if r.Baseline == nil {
-		ok, reasons := recipe.CheckPresets(s.Presets, s.Results, s.Candidate)
-		return ok, reasons, nil
+		ok, reasons = recipe.CheckPresets(s.Presets, s.Results, s.Candidate)
+	} else {
+		ok, reasons, comparisons = recipe.CheckAgainstBaseline(root, s.Presets, s.Results, s.Candidate,
+			r.Baseline, r.BaselineImage, r.BaselineEnv)
 	}
-	return recipe.CheckAgainstBaseline(root, s.Presets, s.Results, s.Candidate,
-		r.Baseline, r.BaselineImage, r.BaselineEnv)
+	hiddenOK, hiddenReasons := CheckHidden(s.Results, s.Candidate)
+	impactOK, impactReasons := CheckImpact(s.Results, s.Candidate)
+	reasons = append(append(reasons, hiddenReasons...), impactReasons...)
+	return ok && hiddenOK && impactOK, reasons, comparisons
 }
 
 // maxEditContinuations bounds how many times an EDIT phase may be restarted

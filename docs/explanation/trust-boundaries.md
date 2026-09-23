@@ -28,8 +28,9 @@ must stand independently of prompt wording.
 Native `bcode task run` edits a separate Git worktree. Finalization checks the
 candidate and, with the default apply gate enabled, asks for approval before
 committing on `bc/task/<task-id>`. It does **not** merge that branch into the
-original checkout. Verification commands can modify the task worktree; it is not
-an immutable snapshot. See [verification](verification.md).
+original checkout. Verification commands run in a disposable snapshot (base commit plus the
+task's diff) and cannot modify the task worktree; the snapshot itself is
+writable, not immutable. See [verification](verification.md).
 
 The optional MCP/OpenCode tools can edit the opened checkout. Running
 `bcode opencode setup` configures tools and instructions; it does not confine

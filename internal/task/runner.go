@@ -19,6 +19,7 @@ import (
 	"github.com/akynte/boundedcode/internal/ledger"
 	"github.com/akynte/boundedcode/internal/llm"
 	"github.com/akynte/boundedcode/internal/lsp"
+	"github.com/akynte/boundedcode/internal/oracle"
 	"github.com/akynte/boundedcode/internal/policy"
 	"github.com/akynte/boundedcode/internal/recipe"
 	"github.com/akynte/boundedcode/internal/retrieval"
@@ -86,6 +87,16 @@ type Runner struct {
 	// whatever it was asked to do. Empty means none are installed, which is the
 	// ordinary case for a fresh checkout.
 	Policies policy.Set
+	// Oracle is the operator's hidden acceptance suite (internal/oracle),
+	// kept outside the repository and applied to every candidate in the
+	// verification snapshot. Nil means none is installed. Its checks' content
+	// never reaches the model; their IDs and verdicts do.
+	Oracle *oracle.Suite
+	// HiddenFeedbackRounds bounds how many distinct failing candidates the
+	// model may learn hidden verdicts about. Each verdict tells it which
+	// checks failed, and enough of them amount to a search against the
+	// suite. Zero uses DefaultHiddenFeedbackRounds.
+	HiddenFeedbackRounds int
 	// Baseline is what this task's declared presets did on the untouched
 	// tree, recorded by preflight. When present, verification judges a
 	// candidate on what it changed rather than on whether everything passes
@@ -147,6 +158,12 @@ type Runner struct {
 	// still reach the outcome either way, so the measurement is never lost
 	// just because nobody is aggregating it.
 	Telemetry *telemetry.Recorder
+
+	// leaked is the ID of a hidden check whose canary the leak guard found
+	// in a request to a model. Once set, the task cannot be accepted.
+	leaked string
+	// lastChain is the evidence-chain record of the most recent verification.
+	lastChain ledger.ChainRecord
 
 	// lastPacket is what the engine was given on the current attempt.
 	lastPacket *retrieval.Packet
@@ -367,6 +384,10 @@ type Outcome struct {
 	// Worktree is the checkout path, kept while a task is unfinished or
 	// waiting at a gate so a person can look at it.
 	Worktree string `json:"worktree,omitempty"`
+	// EvidenceHead is the evidence-chain hash of the last verification run,
+	// also written as the Evidence-Head trailer of the task's commit. Kept
+	// outside the ledger, it is what shows the chain was not truncated.
+	EvidenceHead string `json:"evidence_head,omitempty"`
 }
 
 // Run executes a task against a repository.
@@ -394,6 +415,7 @@ func (r *Runner) Run(ctx context.Context, taskID, repoPath string) (*Outcome, er
 	if r.Engine == nil {
 		return nil, engine.ErrNoEngine
 	}
+	r.guardModels()
 
 	// A step whose dependency has not been accepted would run against code
 	// that does not exist yet, and its verification findings would be about
@@ -456,6 +478,15 @@ func (r *Runner) Run(ctx context.Context, taskID, repoPath string) (*Outcome, er
 	}
 
 	out, runErr := r.run(ctx, &t, wt)
+	if errors.Is(runErr, ErrOracleLeak) {
+		// The request was refused, so nothing reached the model, but the
+		// supervisor was about to send hidden content and the task is not
+		// trustworthy until someone finds out why.
+		if err := r.Store.SetState(ctx, t.ID, StateBlocked); err != nil {
+			r.logf("task %s: %v", t.ID, err)
+		}
+		return out, fmt.Errorf("task %s blocked: %w", t.ID, runErr)
+	}
 	if out != nil {
 		out.Verified = verified
 		out.Branch = wt.Branch
@@ -553,6 +584,7 @@ func (r *Runner) run(ctx context.Context, t *Task, wt *worktree.Worktree) (*Outc
 
 	out := &Outcome{Task: *t}
 	var feedback []recipe.Result
+	var hiddenRejected []string
 
 	for attempt := 1; attempt <= budget.MaxAttempts; attempt++ {
 		if err := ctx.Err(); err != nil {
@@ -600,12 +632,19 @@ func (r *Runner) run(ctx context.Context, t *Task, wt *worktree.Worktree) (*Outc
 			return r.finish(ctx, t, wt, out, StateBlocked)
 		}
 
-		results, err := r.verify(ctx, t, wt, after)
+		results, err := r.verify(ctx, t, wt, after, true)
 		if err != nil {
 			return nil, err
 		}
 		out.Results = results
 		feedback = failedOnly(results)
+		if spent, why := r.spendHiddenFeedback(&hiddenRejected, results, after); spent {
+			out.Reasons = append(out.Reasons, why)
+			if diff, err := wt.Diff(ctx); err == nil {
+				out.Diff = diff
+			}
+			return r.finish(ctx, t, wt, out, StateFailed)
+		}
 
 		// §8.3: a needed file absent from the packet, discovered later by a
 		// failure. It is counted apart from "the model got it wrong" because
@@ -746,12 +785,13 @@ func (r *Runner) step(ctx context.Context, t *Task, wt *worktree.Worktree,
 		return nil, err
 	}
 
-	// The engine's own verification tool runs in the same sandbox as the
-	// supervisor's, so a model checking its work sees exactly what the
-	// completion contract will see.
+	// The engine's own verification tool runs under the same sandbox spec as
+	// the supervisor's, but in the worktree rather than a snapshot: it is the
+	// model's self-check, so it sees the model's checkout, ignored files
+	// included. Only the supervisor's run in a snapshot counts as evidence.
 	if setter, ok := r.Engine.(interface{ SetRecipeRunner(*recipe.Runner) }); ok {
 		setter.SetRecipeRunner(&recipe.Runner{
-			Sandbox: r.Sandbox, Spec: r.specFor(wt), Store: r.Artifacts,
+			Sandbox: r.Sandbox, Spec: r.specFor(wt.Path), Store: r.Artifacts,
 		})
 	}
 
@@ -795,8 +835,39 @@ func (r *Runner) step(ctx context.Context, t *Task, wt *worktree.Worktree,
 
 // verify runs the recipes the task's level demands and records each result as
 // evidence against the candidate it describes.
-func (r *Runner) verify(ctx context.Context, t *Task, wt *worktree.Worktree, candidate string) ([]recipe.Result, error) {
-	spec := r.specFor(wt)
+//
+// The recipes run in a snapshot, never in the task's worktree: the base commit
+// with the task's diff applied and the verification configuration taken from
+// the base. What is verified is therefore exactly what a commit of the task
+// would contain, and nothing a check does can reach the checkout the task
+// keeps editing. The journal records the patch digest and the snapshot's
+// manifest beside the worktree candidate, so the evidence names the bytes it
+// describes.
+//
+// hidden applies the operator's hidden acceptance checks after the recipes.
+// It is false for the baseline run at INTAKE: the task has not been attempted
+// yet, so a hidden check's verdict there is expected to be a failure, and it
+// would be a failure the model then reads about.
+func (r *Runner) verify(ctx context.Context, t *Task, wt *worktree.Worktree, candidate string, hidden bool) ([]recipe.Result, error) {
+	snap, err := r.Worktrees.Snapshot(ctx, wt)
+	if err != nil {
+		return nil, fmt.Errorf("task %s: verification snapshot: %w", t.ID, err)
+	}
+	defer func() {
+		if rmErr := snap.Remove(ctx); rmErr != nil {
+			r.logf("task %s: removing verification snapshot %s: %v", t.ID, snap.Path, rmErr)
+		}
+	}()
+	results, err := r.verifyIn(ctx, t, snap, candidate, hidden)
+	// Failure output names files by their path in the snapshot, which is gone
+	// once this returns. Fingerprints, triage and the model's feedback all
+	// resolve paths against the worktree, so they are told the worktree's.
+	return rebaseResults(results, snap.Path, wt.Path), err
+}
+
+func (r *Runner) verifyIn(ctx context.Context, t *Task, snap *worktree.Snapshot, candidate string, hidden bool) ([]recipe.Result, error) {
+	dir := snap.Path
+	spec := r.specFor(dir)
 
 	recipes := recipe.GoRecipes(t.Verification)
 	if r.WorkflowModel != nil && engine.Edits(r.Engine) {
@@ -814,7 +885,7 @@ func (r *Runner) verify(ctx context.Context, t *Task, wt *worktree.Worktree, can
 		recipes = nil
 		var generators []recipe.Recipe
 		for _, preset := range state.Presets {
-			if err := preset.Validate(wt.Path); err != nil {
+			if err := preset.Validate(dir); err != nil {
 				return nil, err
 			}
 			if preset.Kind == recipe.KindGenerate {
@@ -833,7 +904,7 @@ func (r *Runner) verify(ctx context.Context, t *Task, wt *worktree.Worktree, can
 	// schema that moved — and integration runs last, because it is the only
 	// check that needs something running.
 	if t.Verification.IncludesDeclared() {
-		declared := recipe.DeclaredRecipes(t.Verification, wt.Path, recipe.SelfPath())
+		declared := recipe.DeclaredRecipes(t.Verification, dir, recipe.SelfPath())
 		if len(declared) > 0 {
 			var gen, integ []recipe.Recipe
 			for _, d := range declared {
@@ -848,7 +919,7 @@ func (r *Runner) verify(ctx context.Context, t *Task, wt *worktree.Worktree, can
 			// the sandbox grants exactly those. They are declared rather than
 			// discovered because a rule for a port nobody named would either
 			// be missing when needed or wider than intended.
-			if d, err := recipe.LoadDeclared(wt.Path); err == nil {
+			if d, err := recipe.LoadDeclared(dir); err == nil {
 				ports := d.Ports()
 				spec.TCPBind = dedupePorts(append(spec.TCPBind, ports...))
 				spec.TCPConnect = dedupePorts(append(spec.TCPConnect, ports...))
@@ -856,7 +927,11 @@ func (r *Runner) verify(ctx context.Context, t *Task, wt *worktree.Worktree, can
 		}
 	}
 
-	if len(recipes) == 0 {
+	var checks []oracle.Check
+	if hidden {
+		checks = hiddenApplicable(r.Oracle, snap.Changed)
+	}
+	if len(recipes) == 0 && len(checks) == 0 {
 		return nil, nil
 	}
 
@@ -866,14 +941,42 @@ func (r *Runner) verify(ctx context.Context, t *Task, wt *worktree.Worktree, can
 		Store:   r.Artifacts,
 	}
 
-	h, err := r.Ledger.Begin(ctx, t.ID, ledger.KindRecipeRun, map[string]any{
+	intent := map[string]any{
 		"kind": "verification", "level": string(t.Verification), "recipes": names(recipes),
-	}, candidate)
+		"base": snap.Base, "patch_sha256": snap.PatchSHA256, "snapshot_manifest": snap.Manifest,
+	}
+	if hidden && !r.Oracle.Empty() {
+		// The suite's digest and the IDs that applied, never its content: the
+		// journal is something a model-facing summary may one day be built from.
+		ids := make([]string, len(checks))
+		for i, c := range checks {
+			ids[i] = c.ID
+		}
+		intent["oracle_digest"] = r.Oracle.Digest
+		intent["hidden_checks"] = ids
+	}
+	h, err := r.Ledger.Begin(ctx, t.ID, ledger.KindRecipeRun, intent, candidate)
 	if err != nil {
 		return nil, err
 	}
 
-	results := runner.RunAll(ctx, recipes, wt.Path, candidate)
+	results := runner.RunAll(ctx, recipes, dir, candidate)
+	compiled := true
+	for _, res := range results {
+		if res.Kind == recipe.KindBuild && res.Status == recipe.Fail {
+			compiled = false
+		}
+	}
+	// Impact runs before the hidden checks are installed, so the tests it
+	// runs are the candidate's and the repository's, never the oracle's. It
+	// is skipped at the baseline, which has no change, and at the low level,
+	// which promises a build and nothing more.
+	if hidden && compiled && t.Verification != recipe.Low {
+		results = append(results, r.runImpact(ctx, runner, snap, candidate)...)
+	}
+	if len(checks) > 0 {
+		results = append(results, runHidden(ctx, runner, snap, checks, candidate, compiled)...)
+	}
 
 	for i, res := range results {
 		evidenceID := fmt.Sprintf("%s-%s-%d", t.ID, res.Kind, i)
@@ -882,21 +985,60 @@ func (r *Runner) verify(ctx context.Context, t *Task, wt *worktree.Worktree, can
 			return nil, err
 		}
 	}
-	if err := h.Complete(ctx, map[string]any{"results": summaries(results)}, candidate, ""); err != nil {
+	rec, err := r.Ledger.AppendChain(ctx, t.ID, candidate, verificationRecord(t, snap, candidate, intent, results))
+	if err != nil {
+		return nil, err
+	}
+	r.lastChain = rec
+	if err := h.Complete(ctx, map[string]any{
+		"results": summaries(results), "chain_seq": rec.Seq, "chain_hash": rec.Hash,
+	}, candidate, ""); err != nil {
 		return nil, err
 	}
 	return results, nil
 }
 
-// specFor builds the sandbox specification for a task: its worktree writable,
-// the toolchain and its caches reachable, and nothing else.
+// rebaseResults rewrites the snapshot's path to the worktree's in everything a
+// reader of the results resolves paths from. The raw output in the artifact
+// store keeps the path the checks actually ran in.
+func rebaseResults(results []recipe.Result, from, to string) []recipe.Result {
+	roots := []string{from}
+	if resolved, err := filepath.EvalSymlinks(from); err == nil && resolved != from {
+		roots = append(roots, resolved)
+	}
+	fix := func(s string) string {
+		for _, root := range roots {
+			s = strings.ReplaceAll(s, root, to)
+		}
+		return s
+	}
+	for i := range results {
+		res := &results[i]
+		res.Err = fix(res.Err)
+		res.Summary.Headline = fix(res.Summary.Headline)
+		if len(res.Summary.Findings) > 0 {
+			findings := make([]recipe.Finding, len(res.Summary.Findings))
+			copy(findings, res.Summary.Findings)
+			for j := range findings {
+				findings[j].File = fix(findings[j].File)
+				findings[j].Message = fix(findings[j].Message)
+			}
+			res.Summary.Findings = findings
+		}
+	}
+	return results
+}
+
+// specFor builds the sandbox specification for a directory a task's checks
+// run in: that directory writable, the toolchain and its caches reachable, and
+// nothing else.
 //
 // The writable set is derived from the environment the recipes will run with,
 // so a cache directory named in GOCACHE is always one the sandbox granted. The
 // alternative — expecting every caller to keep the two in step — produces a
 // permission error from inside the compiler, which reads as a broken sandbox
 // rather than a missing grant.
-func (r *Runner) specFor(wt *worktree.Worktree) sandbox.Spec {
+func (r *Runner) specFor(dir string) sandbox.Spec {
 	spec := r.SandboxSpec
 
 	tmp := spec.TmpDir
@@ -911,7 +1053,7 @@ func (r *Runner) specFor(wt *worktree.Worktree) sandbox.Spec {
 	// caches the container cannot see. The worktree still arrives as the
 	// working directory, which is all the container runner needs.
 	if spec.Image != "" {
-		spec.Dir = wt.Path
+		spec.Dir = dir
 		return spec
 	}
 	if len(spec.Env) == 0 {
@@ -919,7 +1061,7 @@ func (r *Runner) specFor(wt *worktree.Worktree) sandbox.Spec {
 	}
 
 	rw, ro := recipe.GoSandboxPaths(envValue(spec.Env, "GOCACHE"), envValue(spec.Env, "GOMODCACHE"), tmp)
-	spec.ReadWrite = dedupe(append(append([]string{wt.Path}, spec.ReadWrite...), rw...))
+	spec.ReadWrite = dedupe(append(append([]string{dir}, spec.ReadWrite...), rw...))
 	spec.ReadOnly = dedupe(append(append([]string{}, spec.ReadOnly...), ro...))
 	// Device nodes every ordinary program expects. Granting them read-write is
 	// correct: /dev/null is written to constantly.
@@ -933,7 +1075,7 @@ func (r *Runner) specFor(wt *worktree.Worktree) sandbox.Spec {
 	if self := recipe.SelfPath(); filepath.IsAbs(self) {
 		spec.ReadOnly = append(spec.ReadOnly, self)
 	}
-	spec.Dir = wt.Path
+	spec.Dir = dir
 
 	// Each directory must exist before the sandbox can grant it: Landlock
 	// rules on a missing path are dropped, and the task then fails on a write
@@ -988,9 +1130,21 @@ func dedupe(in []string) []string {
 func (r *Runner) finish(ctx context.Context, t *Task, wt *worktree.Worktree,
 	out *Outcome, state State) (*Outcome, error) {
 
+	// A leak refused on an advisory call — a review whose failure is
+	// otherwise ignored — still means hidden content was on its way to a
+	// model. Nothing is accepted after that.
+	if r.leaked != "" && state == StateAccepted {
+		out.Accepted = false
+		out.Gate = nil
+		out.Reasons = append(out.Reasons, fmt.Sprintf(
+			"blocked: content of hidden acceptance check %s was about to be sent to a model", r.leaked))
+		state = StateBlocked
+	}
+
 	// What retrieval delivered over the whole task, for the metrics scored
 	// afterwards. Filled here because both the phased and the single-step
 	// paths end up in this function, so neither can forget.
+	out.EvidenceHead = r.lastChain.Hash
 	out.Retrieved = sortedKeys(r.retrieved)
 	out.Generated = sortedKeys(r.generated)
 	out.JudgmentConcerns = append(out.JudgmentConcerns, r.injectionConcerns...)
@@ -1095,7 +1249,17 @@ func commitMessage(t *Task, out *Outcome) string {
 	for _, res := range out.Results {
 		fmt.Fprintf(&b, "  %s: %s — %s\n", res.Recipe, res.Status, res.Summary.Headline)
 	}
-	return b.String()
+	return b.String() + evidenceTrailer(out.EvidenceHead)
+}
+
+// evidenceTrailer anchors the evidence chain in git: the commit carries the
+// chain hash of the verification that judged it, so a ledger whose chain no
+// longer reaches that hash has been truncated or rewritten.
+func evidenceTrailer(head string) string {
+	if head == "" {
+		return ""
+	}
+	return "\nEvidence-Head: " + head + "\n"
 }
 
 func nextAfter(state State) string {
@@ -1169,7 +1333,10 @@ type Effect struct {
 //  4. no check that ran may have FAILED, including the conditional kinds the
 //     level does not demand a result from,
 //  5. no file may be changed outside the task's declared scope,
-//  6. a task that was supposed to change the worktree must have changed it.
+//  6. a task that was supposed to change the worktree must have changed it,
+//  7. every hidden acceptance check that ran must have passed on the current
+//     candidate; for these, an Error blocks too,
+//  8. the change-impact result must not have failed: see CheckImpact.
 //
 // Rule 6 exists because rules 1 to 4 are questions about the code in the
 // worktree, not about the work. Against an untouched worktree every required
@@ -1259,7 +1426,8 @@ func Accept(level recipe.Level, results []recipe.Result, candidate string,
 	sort.Slice(extra, func(i, j int) bool { return extra[i] < extra[j] })
 	for _, kind := range extra {
 		res := byKind[kind]
-		if res.Status != recipe.Fail {
+		// Hidden and impact results have their own rules below.
+		if kind == recipe.KindHidden || kind == recipe.KindImpact || res.Status != recipe.Fail {
 			continue
 		}
 		if candidate != "" && res.Candidate != "" && res.Candidate != candidate {
@@ -1269,6 +1437,19 @@ func Accept(level recipe.Level, results []recipe.Result, candidate string,
 		}
 		ok = false
 		reasons = append(reasons, fmt.Sprintf("%s failed: %s", kind, res.Summary.Headline))
+	}
+
+	// Rule 7: every hidden acceptance check that ran passed, against this
+	// candidate. An Error blocks here, unlike under rule 4: see CheckHidden.
+	if hiddenOK, hiddenReasons := CheckHidden(results, candidate); !hiddenOK {
+		ok = false
+		reasons = append(reasons, hiddenReasons...)
+	}
+	// Rule 8: the tests that reach the change did not skip because of it,
+	// were not removed by it, and satisfy any policy demanding test evidence.
+	if impactOK, impactReasons := CheckImpact(results, candidate); !impactOK {
+		ok = false
+		reasons = append(reasons, impactReasons...)
 	}
 
 	if len(outOfScope) > 0 {

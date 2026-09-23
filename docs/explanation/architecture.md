@@ -125,8 +125,9 @@ and LSP processes spend host RAM to improve semantic coverage or freshness.
 
 ## What the architecture does not guarantee
 
-Verification runs on a writable task worktree, not an immutable snapshot or
-separate always-on verification service. Runtime profiles describe memory and
+Verification runs in a disposable snapshot of the candidate rather than the
+task worktree, but that snapshot is writable, and there is no separate
+verifier identity or always-on verification service. Runtime profiles describe memory and
 concurrency targets; they are not a machine-wide VRAM scheduler. Saved-slot
 directories and cleanup exist, but the ordinary client does not implement a
 llama.cpp slot save/restore protocol.
