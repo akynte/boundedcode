@@ -20,6 +20,11 @@ that generated setup and update it only when something changed. The command
 also makes the `bcode` executable that launched OpenCode available to its MCP
 process, so a stale binary elsewhere on `PATH` is not used.
 
+The MCP entry uses OpenCode 2's `mcp.servers` configuration. If the project has
+the older flat `mcp` server map, setup moves those server entries under
+`mcp.servers` while preserving MCP-wide settings and the other project config.
+See [OpenCode's MCP configuration](https://opencode.ai/v2/docs/mcp-servers/).
+
 The workspace marker, `opencode.json`, and managed `AGENTS.md` block are local
 project setup; review them before committing. `bcode opencode` does not build
 the source index. Run `bcode index` when you want graph-backed retrieval, and

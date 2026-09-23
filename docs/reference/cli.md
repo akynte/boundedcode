@@ -763,8 +763,8 @@ commands. It takes no subcommands.
 Register it with OpenCode in `opencode.jsonc`:
 
 ```jsonc
-{ "mcp": { "boundedcode": {
-    "type": "local", "command": ["bcode", "mcp"], "enabled": true } } }
+{ "mcp": { "servers": { "boundedcode": {
+    "type": "local", "command": ["bcode", "mcp"] } } }
 ```
 
 | Tool | |

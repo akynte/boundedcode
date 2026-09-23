@@ -12,8 +12,8 @@ import (
 // ServerName is the key BoundedCode registers itself under.
 const ServerName = "boundedcode"
 
-// verifyTimeoutMillis bounds one MCP call. Twenty minutes is the task budget a
-// verification runs under, so a client that gives up earlier would abandon a
+// verifyTimeoutMillis bounds one MCP request. Twenty minutes is the task budget
+// a verification runs under, so a client that gives up earlier would abandon a
 // call the supervisor is still honouring.
 const verifyTimeoutMillis = 20 * 60 * 1000
 
@@ -30,30 +30,48 @@ func RegisterMCP(repoRoot string, command []string) (path string, changed bool, 
 	if jsonc := filepath.Join(repoRoot, "opencode.jsonc"); exists(jsonc) {
 		return jsonc, false, fmt.Errorf(
 			"%s already exists and may contain comments this cannot preserve. Add by hand:\n"+
-				"  \"mcp\": { %q: { \"type\": \"local\", \"command\": %s, \"enabled\": true } }",
+				"  \"mcp\": { \"servers\": { %q: { \"type\": \"local\", \"command\": %s } } }",
 			jsonc, ServerName, mustJSON(command))
 	}
 	return mergeConfig(repoRoot, func(doc map[string]any) bool {
-		servers, _ := doc["mcp"].(map[string]any)
+		mcpConfig, _ := doc["mcp"].(map[string]any)
+		if mcpConfig == nil {
+			mcpConfig = map[string]any{}
+		}
+		servers, _ := mcpConfig["servers"].(map[string]any)
 		if servers == nil {
 			servers = map[string]any{}
 		}
+		// OpenCode 1.x stored server names directly under "mcp". Move those
+		// entries into the 2.x "mcp.servers" map while preserving MCP-wide
+		// settings such as its default timeout.
+		for name, value := range mcpConfig {
+			server, ok := value.(map[string]any)
+			if name == "servers" || !ok {
+				continue
+			}
+			if serverType, _ := server["type"].(string); serverType == "local" || serverType == "remote" {
+				if _, alreadyMoved := servers[name]; !alreadyMoved {
+					servers[name] = value
+				}
+				delete(mcpConfig, name)
+			}
+		}
 		want := map[string]any{
-			"type":    "local",
-			"command": toAny(command),
-			"enabled": true,
-			// OpenCode's default MCP timeout is five seconds. bc_verify runs
+			"type":     "local",
+			"command":  toAny(command),
+			"disabled": false,
+			// OpenCode's default MCP request timeout is short. bc_verify runs
 			// this repository's build, vet, test and format checks in a
-			// sandbox, which is minutes on anything real — at the default the
-			// call is abandoned while the work is still running, and the agent
-			// is told nothing rather than told it failed.
-			"timeout": verifyTimeoutMillis,
+			// sandbox, which is minutes on anything real.
+			"timeout": map[string]any{"request": verifyTimeoutMillis},
 		}
 		if equalJSON(servers[ServerName], want) {
 			return false
 		}
 		servers[ServerName] = want
-		doc["mcp"] = servers
+		mcpConfig["servers"] = servers
+		doc["mcp"] = mcpConfig
 		return true
 	})
 }

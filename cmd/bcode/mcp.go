@@ -24,8 +24,8 @@ func newMCPCmd() *cobra.Command {
 		Long: "mcp speaks the Model Context Protocol over stdin and stdout, so an editor or\n" +
 			"agent can ask about this repository without the operator typing CLI commands.\n\n" +
 			"Register it with OpenCode by adding to opencode.jsonc:\n\n" +
-			"  { \"mcp\": { \"boundedcode\": {\n" +
-			"      \"type\": \"local\", \"command\": [\"bcode\", \"mcp\"], \"enabled\": true } } }\n\n" +
+			"  { \"mcp\": { \"servers\": { \"boundedcode\": {\n" +
+			"      \"type\": \"local\", \"command\": [\"bcode\", \"mcp\"] } } } }\n\n" +
 			"The tools are read-mostly: status, impact analysis, retrieval and re-indexing.\n" +
 			"Running tasks and anything destructive stays on the CLI, where a person is\n" +
 			"already watching.",

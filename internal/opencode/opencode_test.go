@@ -130,7 +130,8 @@ func TestRegisterMCPMergesIntoAnExistingConfig(t *testing.T) {
 	if doc["model"] != "anthropic/claude" {
 		t.Error("an unrelated setting was lost")
 	}
-	servers := doc["mcp"].(map[string]any)
+	mcpConfig := doc["mcp"].(map[string]any)
+	servers := mcpConfig["servers"].(map[string]any)
 	if _, ok := servers["other"]; !ok {
 		t.Error("another MCP server was removed")
 	}
@@ -168,9 +169,7 @@ func TestAnExistingJsoncIsNotRewritten(t *testing.T) {
 }
 
 // Verification runs this repository's checks in a sandbox, which is minutes on
-// anything real. OpenCode's default MCP timeout is five seconds, at which the
-// call is abandoned while the work is still running and the agent is told
-// nothing rather than told it failed.
+// anything real. Give MCP requests enough time for the full verification.
 func TestTheRegisteredServerGetsATimeoutVerificationCanFinishIn(t *testing.T) {
 	dir := t.TempDir()
 	if _, _, err := opencode.RegisterMCP(dir, []string{"bcode", "mcp"}); err != nil {
@@ -181,14 +180,18 @@ func TestTheRegisteredServerGetsATimeoutVerificationCanFinishIn(t *testing.T) {
 		t.Fatal(err)
 	}
 	var doc struct {
-		MCP map[string]struct {
-			Timeout int `json:"timeout"`
+		MCP struct {
+			Servers map[string]struct {
+				Timeout struct {
+					Request int `json:"request"`
+				} `json:"timeout"`
+			} `json:"servers"`
 		} `json:"mcp"`
 	}
 	if err := json.Unmarshal(body, &doc); err != nil {
 		t.Fatal(err)
 	}
-	got := doc.MCP[opencode.ServerName].Timeout
+	got := doc.MCP.Servers[opencode.ServerName].Timeout.Request
 	if got < 5*60*1000 {
 		t.Errorf("timeout is %dms; a verification cannot finish inside it", got)
 	}
