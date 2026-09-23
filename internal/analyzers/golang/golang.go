@@ -216,7 +216,9 @@ func (b *builder) analyzeModule(ctx context.Context, root string) error {
 		Tests:   b.a.Tests,
 		// A hermetic load: no network, no implicit toolchain download. An
 		// analysis that reaches the network would break the offline lane.
-		Env: append(os.Environ(), "GOFLAGS=-mod=mod", "GOPROXY=off", "GOTOOLCHAIN=local"),
+		// readonly is valid both for standalone modules and for modules loaded
+		// through a go.work file. -mod=mod is rejected in workspace mode.
+		Env: append(os.Environ(), "GOFLAGS=-mod=readonly", "GOPROXY=off", "GOTOOLCHAIN=local"),
 	}
 
 	pkgs, err := packages.Load(cfg, "./...")
