@@ -185,3 +185,76 @@ func TestAnAnnotatedObligationNamesItsConsumer(t *testing.T) {
 		t.Error("a different name matched after its annotation was removed")
 	}
 }
+
+// A rewritten plan that drops an obligation an earlier round settled gets it
+// back while it is still valid for the new plan. The recorded rewrite dropped
+// Reconciler.Run, answered the round before, and the task ran out of rounds.
+func TestSettledObligationsAreRestoredWhileStillValid(t *testing.T) {
+	var m workflow.PlanMemory
+	run := workflow.Obligation{Symbol: "Reconciler.Run", Path: "internal/worker/reconcile.go",
+		Resolution: workflow.Resolution{Action: workflow.ActionEdit}}
+	api := workflow.Obligation{Symbol: "Server.cancelOrder", Path: "internal/api/api.go",
+		Resolution: workflow.Resolution{Action: workflow.ActionNoChange, Reason: "signature unchanged"}}
+	m.Settle(run)
+	m.Settle(api)
+	m.Settle(api) // settling twice keeps one
+
+	plan := workflow.Plan{WriteAllowlist: []string{"internal/worker/reconcile.go"},
+		Obligations: []workflow.Obligation{api}}
+	if n := m.Restore(&plan); n != 1 || len(plan.Obligations) != 2 {
+		t.Fatalf("restored %d, obligations now %+v", n, plan.Obligations)
+	}
+	// An edit of a file the new plan may not write is no longer valid, so it
+	// is not restored: the harness never makes a plan claim what it cannot do.
+	narrower := workflow.Plan{WriteAllowlist: []string{"internal/worker/reconcile_test.go"}}
+	if n := m.Restore(&narrower); n != 1 || narrower.Obligations[0].Symbol != "Server.cancelOrder" {
+		t.Errorf("restored %d into a plan that cannot write reconcile.go: %+v", n, narrower.Obligations)
+	}
+}
+
+// A waiver's reason written in the obligation's own reason field counts. The
+// recorded plan was refused on its last round for three waivers whose reasons
+// were one field over.
+func TestAWaiverReasonInTheObligationFieldCounts(t *testing.T) {
+	p := workflow.Plan{Obligations: []workflow.Obligation{
+		{Symbol: "Server.placeOrder", Path: "internal/api/api.go",
+			Reason:     "calls orders.Service.Place, whose signature is preserved",
+			Resolution: workflow.Resolution{Action: workflow.ActionNoChange}},
+		{Symbol: "Run", Path: "internal/worker/reconcile.go", Reason: "caller",
+			Resolution: workflow.Resolution{Action: workflow.ActionEdit}},
+		{Symbol: "Keep", Path: "a.go", Reason: "top",
+			Resolution: workflow.Resolution{Action: workflow.ActionNoChange, Reason: "its own"}},
+	}}
+	if n := p.FillWaiverReasons(); n != 1 {
+		t.Fatalf("filled %d, want 1", n)
+	}
+	if !p.Obligations[0].Resolution.Valid() || p.Obligations[0].Resolution.Reason == "" {
+		t.Error("the waiver is still refused")
+	}
+	if p.Obligations[1].Resolution.Reason != "" || p.Obligations[2].Resolution.Reason != "its own" {
+		t.Error("an edit, or a waiver with its own reason, was rewritten")
+	}
+}
+
+// An answer that no longer counts is replaced by the settled one. The recorded
+// rewrite kept UserHandler.Email but turned its valid no_change_needed into an
+// edit of a file the plan could not write.
+func TestASettledAnswerReplacesOneThatNoLongerCounts(t *testing.T) {
+	var m workflow.PlanMemory
+	settled := workflow.Obligation{Symbol: "UserHandler.Email", Path: "internal/handler/user.go",
+		Resolution: workflow.Resolution{Action: workflow.ActionNoChange, Reason: "only calls Email, whose signature is kept"}}
+	m.Settle(settled)
+	plan := workflow.Plan{WriteAllowlist: []string{"internal/service/user.go"}, Obligations: []workflow.Obligation{
+		{Symbol: "UserHandler.Email", Path: "internal/handler/user.go", Resolution: workflow.Resolution{Action: workflow.ActionEdit}},
+	}}
+	if n := m.Restore(&plan); n != 1 || len(plan.Obligations) != 1 || plan.Obligations[0] != settled {
+		t.Fatalf("restored %d: %+v", n, plan.Obligations)
+	}
+	// A present answer that does count is the model's newer word and stays.
+	edit := workflow.Obligation{Symbol: "UserHandler.Email", Path: "internal/handler/user.go",
+		Resolution: workflow.Resolution{Action: workflow.ActionEdit}}
+	writable := workflow.Plan{WriteAllowlist: []string{"internal/handler/user.go"}, Obligations: []workflow.Obligation{edit}}
+	if n := m.Restore(&writable); n != 0 || writable.Obligations[0] != edit {
+		t.Errorf("a valid newer answer was replaced: %+v", writable.Obligations)
+	}
+}

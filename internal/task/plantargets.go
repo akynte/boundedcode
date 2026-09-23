@@ -36,9 +36,11 @@ import (
 
 // maxPlanRegenerations bounds how many times a plan may be sent back.
 //
-// Two corrections is enough for a planner that mistyped a path and not enough
-// to be worth a third round of the same answer.
-const maxPlanRegenerations = 2
+// It was two, set when a round usually carried the same answer again. Rounds
+// now carry every problem at once and what earlier rounds settled, so a third
+// is a different answer rather than a repeat; and the task's wall-clock budget
+// bounds planning time whatever this allows.
+const maxPlanRegenerations = 3
 
 // maxEvidence is how many real alternatives a contradiction carries.
 const maxEvidence = 5

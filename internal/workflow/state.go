@@ -172,6 +172,28 @@ func (p *Plan) DeclareWriteGrants() (added []string) {
 	return added
 }
 
+// FillWaiverReasons gives a no_change_needed obligation that left its
+// resolution reason empty the reason the obligation itself states, and reports
+// how many it filled.
+//
+// The recorded plan answered every owed consumer with a concrete compatibility
+// reason — "calls orders.Service.Place, whose signature is preserved" — in the
+// obligation's reason field, left resolution.reason empty, and was refused on
+// its last round for three waivers with no reason. It is the planner's own
+// statement, in the field beside the one it was checked in.
+func (p *Plan) FillWaiverReasons() int {
+	filled := 0
+	for i := range p.Obligations {
+		o := &p.Obligations[i]
+		if o.Resolution.Action == ActionNoChange && strings.TrimSpace(o.Resolution.Reason) == "" &&
+			strings.TrimSpace(o.Reason) != "" {
+			o.Resolution.Reason = o.Reason
+			filled++
+		}
+	}
+	return filled
+}
+
 // RegeneratesGenerated reports whether the plan declared any generator, which
 // is what makes a changed generated file an expected outcome rather than an
 // edit outside the allowlist.
@@ -424,6 +446,12 @@ type State struct {
 	Obligations ObligationOutcome `json:"obligation_resolution,omitzero"`
 	// PlanTargets records what deterministic plan validation refused.
 	PlanTargets PlanTargetOutcome `json:"plan_targets,omitzero"`
+	// Settled is what earlier plan rounds established; see PlanMemory.
+	Settled PlanMemory `json:"plan_settled,omitzero"`
+	// DecodeTPS and PrefillTPS are this task's measured model throughput in
+	// tokens per second, which size calls to the time a phase has left.
+	DecodeTPS  float64 `json:"decode_tps,omitempty"`
+	PrefillTPS float64 `json:"prefill_tps,omitempty"`
 	// Rescue records the one bounded context-rescue attempt.
 	Rescue RescueOutcome `json:"context_rescue,omitzero"`
 	// Budgeted says the edit loop ran out of attempts with work in the
@@ -546,4 +574,97 @@ type TriedCall struct {
 	// Corrected records that the supervisor already told the model to stop
 	// making this call.
 	Corrected bool `json:"corrected,omitempty"`
+}
+
+// PlanMemory is what earlier plan rounds of a task established, kept so a
+// rewritten plan cannot silently undo it.
+//
+// A planner answers a correction by writing the whole plan again, and the
+// recorded rewrites undid earlier fixes: one dropped an obligation the round
+// before had satisfied, another named an out-of-scope file the round before
+// had removed. Each cost a correction, and the task ran out of them with the
+// diagnosis right. The supervisor keeps the model's own settled statements and
+// its refusals; it never writes a plan's content itself.
+type PlanMemory struct {
+	// Obligations are obligations a plan wrote that discharged an owed
+	// consumer. A later plan that drops one has it restored while it is still
+	// valid for that plan.
+	Obligations []Obligation `json:"obligations,omitempty"`
+	// Refused maps a target — a file or a symbol — to why it was refused, so
+	// naming it again is answered as a repeat.
+	Refused map[string]string `json:"refused,omitempty"`
+	// FreeRoundUsed records that the one correction round that only repeated
+	// earlier refusals has been given without spending the budget.
+	FreeRoundUsed bool `json:"free_round_used,omitempty"`
+}
+
+// MaxSettledObligations bounds PlanMemory.Obligations.
+const MaxSettledObligations = 64
+
+// Settle records an obligation that discharged a consumer.
+func (m *PlanMemory) Settle(o Obligation) {
+	for i, have := range m.Obligations {
+		if have.Path == o.Path && have.Symbol == o.Symbol {
+			m.Obligations[i] = o
+			return
+		}
+	}
+	if len(m.Obligations) < MaxSettledObligations {
+		m.Obligations = append(m.Obligations, o)
+	}
+}
+
+// Refuse records why a target was refused.
+func (m *PlanMemory) Refuse(target, why string) {
+	if target == "" {
+		return
+	}
+	if m.Refused == nil {
+		m.Refused = map[string]string{}
+	}
+	if _, seen := m.Refused[target]; !seen && len(m.Refused) < MaxRefusedTargets*4 {
+		m.Refused[target] = why
+	}
+}
+
+// Restore gives plan every settled obligation it dropped, or answered in a way
+// that no longer counts, while the settled one is still valid for it, and
+// reports how many it restored. An edit resolution is valid only while its
+// file is in the plan's write_allowlist; a no-change resolution only while it
+// carries its reason.
+//
+// A dropped answer was the first recorded regression; the second kept the
+// consumer and changed a valid no_change_needed into an edit of a file the
+// plan could not write, and a present-but-invalid answer was left alone.
+func (m PlanMemory) Restore(plan *Plan) int {
+	counts := func(o Obligation) bool {
+		return o.Resolution.Valid() &&
+			(o.Resolution.Action != ActionEdit || policy.Covers(plan.WriteAllowlist, o.Path))
+	}
+	restored := 0
+	for _, o := range m.Obligations {
+		if !counts(o) {
+			continue
+		}
+		present, answered := -1, false
+		for i, have := range plan.Obligations {
+			if have.Path == o.Path && have.Symbol == o.Symbol {
+				if counts(have) {
+					answered = true
+				} else if present < 0 {
+					present = i
+				}
+			}
+		}
+		switch {
+		case answered:
+		case present >= 0:
+			plan.Obligations[present] = o
+			restored++
+		default:
+			plan.Obligations = append(plan.Obligations, o)
+			restored++
+		}
+	}
+	return restored
 }

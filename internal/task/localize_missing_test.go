@@ -34,3 +34,26 @@ func TestExistingFilesDropsOnlyWhatIsNotThere(t *testing.T) {
 		t.Errorf("kept = %v", kept)
 	}
 }
+
+// A later localization call that returns no files or symbols keeps the
+// selection before it. The recorded refinement answered with empty lists and
+// ended the task in LOCALIZE with the first call's nine files in hand.
+func TestAnEmptyRefinementKeepsTheEarlierSelection(t *testing.T) {
+	earlier := selection{Files: []string{"internal/shipping/shipping.go"}, Symbols: []string{"Quote"}, Hypothesis: "first"}
+	var logged []string
+	got := keepSelection(selection{Hypothesis: "refined"}, earlier, func(what string, _ int) { logged = append(logged, what) })
+	if !slices.Equal(got.Files, earlier.Files) || !slices.Equal(got.Symbols, earlier.Symbols) {
+		t.Errorf("the earlier selection was not kept: %+v", got)
+	}
+	if got.Hypothesis != "refined" {
+		t.Errorf("the newer hypothesis was replaced: %q", got.Hypothesis)
+	}
+	if !slices.Equal(logged, []string{"files", "symbols"}) {
+		t.Errorf("the fallback was not reported: %v", logged)
+	}
+	// A newer answer that says something is taken as it is.
+	newer := selection{Files: []string{"internal/orders/orders.go"}, Symbols: []string{"Place"}, Hypothesis: "h"}
+	if got := keepSelection(newer, earlier, func(string, int) {}); !slices.Equal(got.Files, newer.Files) {
+		t.Errorf("a non-empty newer selection was replaced: %+v", got)
+	}
+}

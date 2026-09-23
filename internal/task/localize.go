@@ -64,11 +64,6 @@ func (r *Runner) localize(ctx context.Context, t *Task, wt *worktree.Worktree, s
 	if err != nil {
 		return err
 	}
-	type selection struct {
-		Files      []string `json:"files"`
-		Symbols    []string `json:"symbols"`
-		Hypothesis string   `json:"hypothesis"`
-	}
 	// §6.3's structure pass takes the repository skeleton and the files a
 	// lexical search already liked, not the whole tree. Thousands of paths is
 	// thousands of tokens spent proving that most of a repository is
@@ -138,9 +133,13 @@ func (r *Runner) localize(ctx context.Context, t *Task, wt *worktree.Worktree, s
 		r.logf("task %s: LOCALIZE signatures %d of %d, %d dropped for the phase evidence budget",
 			t.ID, len(signatures), len(skeleton), droppedSigs)
 	}
+	selected := chosen
 	if err := r.decide(ctx, t, s, "Refine the file and symbol selection using signatures. Do not claim confirmation yet.", sigEvidence, localizationSchema, &chosen); err != nil {
 		return err
 	}
+	chosen = keepSelection(chosen, selected, func(what string, n int) {
+		r.logf("task %s: LOCALIZE refinement returned no %s; keeping the %d from the selection before it", t.ID, what, n)
+	})
 	// The selection is the model's guess at paths, made before it has read
 	// anything, and a plausible guess is often a file that does not exist —
 	// the recorded case named restock_test.go beside restock.go. Stat-ing it
@@ -153,8 +152,13 @@ func (r *Runner) localize(ctx context.Context, t *Task, wt *worktree.Worktree, s
 		r.logf("task %s: LOCALIZE dropped %d selected path(s) that do not exist: %s",
 			t.ID, len(missing), strings.Join(missing, ", "))
 	}
-	if len(chosen.Files) == 0 || len(chosen.Files) > 12 {
-		return fmt.Errorf("localization requires 1–12 existing files")
+	if len(chosen.Files) > maxLocalizedFiles {
+		r.logf("task %s: LOCALIZE selected %d files; keeping the first %d as the model ordered them",
+			t.ID, len(chosen.Files), maxLocalizedFiles)
+		chosen.Files = chosen.Files[:maxLocalizedFiles]
+	}
+	if len(chosen.Files) == 0 {
+		return fmt.Errorf("localization selected no file that exists in this repository")
 	}
 	skeleton, err = r.Retriever.Skeleton(ctx, chosen.Files)
 	if err != nil {
@@ -193,9 +197,13 @@ func (r *Runner) localize(ctx context.Context, t *Task, wt *worktree.Worktree, s
 	if len(missing) > 0 {
 		confirmEvidence["missing_files"] = missing
 	}
+	refined := chosen
 	if err := r.decide(ctx, t, s, "Confirm the root cause against source bodies. Identify the files and symbols the plan must address.", confirmEvidence, localizationSchema, &chosen); err != nil {
 		return err
 	}
+	chosen = keepSelection(chosen, refined, func(what string, n int) {
+		r.logf("task %s: LOCALIZE confirmation returned no %s; keeping the %d it was shown", t.ID, what, n)
+	})
 	// The confirmation can reintroduce a guess the refinement dropped.
 	chosen.Files, _ = existingFiles(wt.Path, chosen.Files)
 	if strings.TrimSpace(chosen.Hypothesis) == "" || len(chosen.Files) == 0 || len(chosen.Symbols) == 0 {
@@ -204,6 +212,36 @@ func (r *Runner) localize(ctx context.Context, t *Task, wt *worktree.Worktree, s
 	s.Files, s.Symbols, s.Hypothesis = chosen.Files, chosen.Symbols, chosen.Hypothesis
 	s.Bodies = bodies
 	return nil
+}
+
+// maxLocalizedFiles bounds a localization selection.
+const maxLocalizedFiles = 12
+
+// selection is one localization answer.
+type selection struct {
+	Files      []string `json:"files"`
+	Symbols    []string `json:"symbols"`
+	Hypothesis string   `json:"hypothesis"`
+}
+
+// keepSelection fills what a later localization call left empty from the
+// selection before it. The model's own earlier answer stands until it gives a
+// new one: a refinement that returned an empty list of files ended a recorded
+// task in LOCALIZE with the first selection's nine files in hand. The
+// hypothesis comes from the newer call whenever it gave one.
+func keepSelection(newer, earlier selection, logf func(what string, n int)) selection {
+	if len(newer.Files) == 0 && len(earlier.Files) > 0 {
+		newer.Files = earlier.Files
+		logf("files", len(earlier.Files))
+	}
+	if len(newer.Symbols) == 0 && len(earlier.Symbols) > 0 {
+		newer.Symbols = earlier.Symbols
+		logf("symbols", len(earlier.Symbols))
+	}
+	if strings.TrimSpace(newer.Hypothesis) == "" {
+		newer.Hypothesis = earlier.Hypothesis
+	}
+	return newer
 }
 
 // existingFiles splits a selection into the paths present in the worktree and

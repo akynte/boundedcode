@@ -35,3 +35,29 @@ func TestAFailedFormatCheckShowsTheLinesToChange(t *testing.T) {
 		t.Error("a passing check produced a hint")
 	}
 }
+
+// A Go file is written in gofmt form, so a format check cannot fail on it.
+// The recorded attempt ended with every check green but gofmt.
+func TestWrittenGoIsFormatted(t *testing.T) {
+	unformatted := []byte("package inv\n\nfunc F() int {\n  return 1\n}\n")
+	out, note := gofmtOnWrite("inv.go", unformatted)
+	if string(out) != "package inv\n\nfunc F() int {\n\treturn 1\n}\n" {
+		t.Errorf("not formatted:\n%s", out)
+	}
+	if !strings.Contains(note, "formatted with gofmt") {
+		t.Errorf("the model was not told its text changed: %q", note)
+	}
+	// Already formatted: untouched, and nothing to say.
+	if out2, note2 := gofmtOnWrite("inv.go", out); string(out2) != string(out) || note2 != "" {
+		t.Errorf("a formatted file was changed or annotated: %q", note2)
+	}
+	// Not Go, or not parseable yet: written as given.
+	if out3, _ := gofmtOnWrite("notes.md", unformatted); string(out3) != string(unformatted) {
+		t.Error("a non-Go file was formatted")
+	}
+	broken := []byte("package inv\n\nfunc F( {\n")
+	out4, note4 := gofmtOnWrite("inv.go", broken)
+	if string(out4) != string(broken) || !strings.Contains(note4, "does not parse") {
+		t.Errorf("an unparseable file was changed, or the model was not told: %q", note4)
+	}
+}

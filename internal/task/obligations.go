@@ -326,3 +326,27 @@ func (r *Runner) changedImpact(ctx context.Context, plan workflow.Plan, localize
 	}
 	return pkt.Impact
 }
+
+// dischargingObligations are the plan's obligations that discharge an owed
+// consumer, which is what an earlier round has settled and a later one may
+// not silently drop.
+func dischargingObligations(plan workflow.Plan, owed *graph.Impact) []workflow.Obligation {
+	if owed == nil {
+		return nil
+	}
+	actionable, _ := workflow.ActionableConsumers(owed)
+	var out []workflow.Obligation
+	for _, o := range plan.Obligations {
+		if !o.Resolution.Valid() ||
+			(o.Resolution.Action == workflow.ActionEdit && !policy.Covers(plan.WriteAllowlist, o.Path)) {
+			continue
+		}
+		for _, c := range actionable {
+			if o.Path == c.Node.Path && workflow.NamesConsumer(o.Symbol, c.Node) {
+				out = append(out, o)
+				break
+			}
+		}
+	}
+	return out
+}

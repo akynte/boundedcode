@@ -302,6 +302,12 @@ func (r *Runner) runPhases(ctx context.Context, t *Task, wt *worktree.Worktree) 
 					r.logf("task %s: PLAN declared %d write grant(s) the plan left out of files: %s",
 						t.ID, len(added), strings.Join(added, ", "))
 				}
+				if n := plan.FillWaiverReasons(); n > 0 {
+					r.logf("task %s: PLAN took %d waiver reason(s) from the obligation's own reason field", t.ID, n)
+				}
+				if n := s.Settled.Restore(&plan); n > 0 {
+					r.logf("task %s: PLAN restored %d obligation(s) an earlier round had settled", t.ID, n)
+				}
 			}
 			// Deterministic target validation, before anything downstream
 			// trusts a path. A plan that parses is not a plan about this
@@ -314,8 +320,20 @@ func (r *Runner) runPhases(ctx context.Context, t *Task, wt *worktree.Worktree) 
 			// obligations, and the third finding arrived after the last
 			// correction had been spent — at about three minutes a plan.
 			var correction string
+			freeRound := false
 			if err == nil {
-				var problems, summaries []string
+				var problems, summaries, repeats []string
+				fresh := 0
+				// refused records a refusal and reports whether an earlier
+				// round had already made it.
+				refused := func(target, why string) {
+					if earlier, seen := s.Settled.Refused[target]; seen {
+						repeats = append(repeats, fmt.Sprintf("`%s` — %s", target, earlier))
+					} else {
+						fresh++
+					}
+					s.Settled.Refuse(target, why)
+				}
 				targets := PlanTargets{Root: wt.Path, Graph: r.Retriever.Graph(), Presets: s.Presets}
 				bad, checked := targets.Validate(ctx, plan)
 				s.PlanTargets.Checked += checked
@@ -329,6 +347,7 @@ func (r *Runner) runPhases(ctx context.Context, t *Task, wt *worktree.Worktree) 
 						// three different fixes, and a probe against the
 						// fixture showed the obvious guess was wrong.
 						s.PlanTargets.Refuse(string(c.Kind) + ":" + c.Target + " — " + c.Reason)
+						refused(c.Target, c.Reason)
 					}
 					problems = append(problems, CorrectionFor(bad))
 					summaries = append(summaries, fmt.Sprintf("%d plan target(s) do not exist in this repository", len(bad)))
@@ -336,8 +355,10 @@ func (r *Runner) runPhases(ctx context.Context, t *Task, wt *worktree.Worktree) 
 				if verr := plan.Validate(t.Budget.Scope); verr != nil {
 					if scope := (*workflow.ScopeError)(nil); errors.As(verr, &scope) {
 						problems = append(problems, scope.Correction())
+						refused(scope.File, "outside the operator scope")
 					} else {
 						problems = append(problems, verr.Error()+". Correct exactly that.")
+						fresh++
 					}
 					summaries = append(summaries, verr.Error())
 				}
@@ -352,7 +373,11 @@ func (r *Runner) runPhases(ctx context.Context, t *Task, wt *worktree.Worktree) 
 				s.Obligations.Resolved += len(reports) - open
 				s.Obligations.Searchable += open - unresolvable
 				s.Obligations.Unresolved += unresolvable
+				for _, o := range dischargingObligations(plan, owed) {
+					s.Settled.Settle(o)
+				}
 				if open > 0 {
+					fresh++
 					s.Obligations.Expanded++
 					problems = append(problems, ObligationCorrection(reports))
 					summaries = append(summaries, fmt.Sprintf(
@@ -360,6 +385,15 @@ func (r *Runner) runPhases(ctx context.Context, t *Task, wt *worktree.Worktree) 
 				}
 				if len(summaries) > 0 {
 					err = errors.New(strings.Join(summaries, "; "))
+					if len(repeats) > 0 {
+						problems = append([]string{"These were refused in an earlier round and the plan " +
+							"names them again. Leave them out:\n- " + strings.Join(repeats, "\n- ")}, problems...)
+					}
+					// One round that only repeats earlier refusals does not
+					// spend the budget: the plan is otherwise acceptable and
+					// the correction names exactly what to drop. Once per
+					// task, so a planner that keeps repeating still ends.
+					freeRound = fresh == 0 && len(repeats) > 0 && !s.Settled.FreeRoundUsed
 					correction = strings.Join(problems, "\n\n")
 					if len(problems) > 1 {
 						correction = fmt.Sprintf("The plan has %d problems. Fix all of them in one corrected plan.\n\n",
@@ -446,7 +480,7 @@ func (r *Runner) runPhases(ctx context.Context, t *Task, wt *worktree.Worktree) 
 				// exceeded", spent a correction round, and the task was
 				// reported as a transport failure after its corrections ran
 				// out rather than as the budget it had exhausted.
-				if ctx.Err() != nil {
+				if ctx.Err() != nil || isOutOfTime(err) {
 					return stop(StateBlocked, budgetAwareReason(t, s, err))
 				}
 				// A rejected plan was terminal, which gave the model one
@@ -454,10 +488,15 @@ func (r *Runner) runPhases(ctx context.Context, t *Task, wt *worktree.Worktree) 
 				// validator knows exactly what is missing, so it says so and
 				// the plan is made again within the same bounded budget the
 				// rest of the ladder uses.
-				if s.Replans >= maxPlanRegenerations {
-					return stop(StateBlocked, "planning failed after "+strconv.Itoa(s.Replans)+" corrections: "+err.Error())
+				if freeRound {
+					s.Settled.FreeRoundUsed = true
+					r.logf("task %s: PLAN repeated only earlier refusals; correcting without spending a round", t.ID)
+				} else {
+					if s.Replans >= maxPlanRegenerations {
+						return stop(StateBlocked, "planning failed after "+strconv.Itoa(s.Replans)+" corrections: "+err.Error())
+					}
+					s.Replans++
 				}
-				s.Replans++
 				s.PlanTargets.Regenerations++
 				detail := err.Error() + ". Correct exactly that and return the plan again."
 				if correction != "" {
@@ -555,7 +594,10 @@ func (r *Runner) runPhases(ctx context.Context, t *Task, wt *worktree.Worktree) 
 			}
 			counted := s.Edit.Tokens
 			phaseBudget := r.phaseBudget(workflow.Edit)
-			response, stepErr := r.Engine.Step(ctx, engine.Request{
+			// EDIT ends where VERIFY's and REVIEW's reserve begins, so a fix
+			// the model finishes late is still verified and reviewed.
+			editCtx, cancelEdit := withPhaseDeadline(ctx, t, s, workflow.Edit)
+			response, stepErr := r.Engine.Step(editCtx, engine.Request{
 				TaskID: t.ID, Objective: t.Title, Worktree: wt.Path, Packet: pkt, Feedback: s.Feedback, Attempt: s.Attempts, Presets: s.Presets,
 				Phase: workflow.Edit, Plan: &s.Plan, Access: firewall.Access{WriteScope: s.Plan.WriteAllowlist, Protected: r.Policies},
 				Budget: engine.Budget{MaxTokens: remaining, ContextTokens: phaseBudget.ContextTokens, OutputTokens: phaseBudget.OutputTokens, ReasoningTokens: phaseBudget.ReasoningTokens}, Journal: r.Ledger, Transcript: &s.Edit,
@@ -570,6 +612,22 @@ func (r *Runner) runPhases(ctx context.Context, t *Task, wt *worktree.Worktree) 
 					return r.Store.SaveWorkflow(ctx, t.ID, s)
 				},
 			})
+			editOutOfTime := editCtx.Err() != nil && ctx.Err() == nil
+			cancelEdit()
+			if stepErr != nil && editOutOfTime {
+				// EDIT's share of the budget is spent, not the task's: what
+				// is in the worktree is verified now, while there is time to.
+				// The recorded run passed verification, then ran out of time
+				// in REVIEW with nothing held back for it.
+				if verify, why := r.worthVerifying(ctx, t, wt, "EDIT reached its share of the wall-clock budget"); verify {
+					s.Budgeted = true
+					err = move(workflow.Verify)
+					break
+				} else if why != "" {
+					return stop(StateBlocked, why)
+				}
+				return stop(StateBlocked, "wall-clock budget: EDIT reached its share of the time without a change to verify")
+			}
 			if stepErr != nil {
 				return stop(StateBlocked, budgetAwareReason(t, s, stepErr))
 			}
@@ -1452,6 +1510,14 @@ func (r *Runner) decide(ctx context.Context, t *Task, s *workflow.State, instruc
 			limit = available
 		}
 	}
+	// Fitted to the time this phase has left, from the throughput this task
+	// has measured: when time is short the model thinks less rather than
+	// being cut off mid-answer. See deadline.go.
+	reasoning := budget.ReasoningTokens
+	limit, reasoning, err = sizeCall(t, s, s.Phase, pack.PrefixTokens()+pack.LogTokens(), limit, reasoning, time.Now())
+	if err != nil {
+		return err
+	}
 	messages, prefixCount := pack.Messages(contextpack.Tail{
 		Instruction:     instruction,
 		TokensUsed:      s.Tokens,
@@ -1468,19 +1534,27 @@ func (r *Runner) decide(ctx context.Context, t *Task, s *workflow.State, instruc
 	if err != nil {
 		return err
 	}
-	response, err := provider.ChatStructured(ctx, llm.ChatRequest{
+	callCtx, cancelCall := withPhaseDeadline(ctx, t, s, s.Phase)
+	defer cancelCall()
+	response, err := provider.ChatStructured(callCtx, llm.ChatRequest{
 		Messages:              messages,
 		MaxTokens:             limit,
 		Thinking:              "on",
-		ReasoningBudgetTokens: min(budget.ReasoningTokens, max(1, limit-1)),
+		ReasoningBudgetTokens: min(reasoning, max(1, limit-1)),
 		// The frozen region is the cacheable prefix. Naming it lets a
 		// cache-aware provider keep the layout instead of inferring it.
 		CachePrefixHint: prefixCount,
 	}, schema)
 	if err != nil {
 		_ = h.Interrupted(ctx, err)
+		// The phase's window closed under the call while the task still
+		// has time: that is the phase out of its share, not a failed call.
+		if callCtx.Err() != nil && ctx.Err() == nil {
+			return &OutOfTimeError{Phase: s.Phase, Need: tokensTime(limit, decodeRate(s))}
+		}
 		return err
 	}
+	observeThroughput(s, response)
 	usage := response.PromptTokens + response.OutputTokens
 	if usage <= 0 {
 		usage = pack.PrefixTokens() + pack.LogTokens() + contextpack.EstimateTokens(response.Content+response.Reasoning)
@@ -1604,7 +1678,7 @@ func (r *Runner) phaseBudget(phase workflow.Phase) config.PhaseBudget {
 	return config.DefaultPhaseBudgets()[string(phase)]
 }
 
-var planSchemaV2 = json.RawMessage(`{"type":"object","properties":{"root_cause":{"type":"string"},"files":{"type":"array","minItems":1,"items":{"type":"object","properties":{"path":{"type":"string","description":"the repository-relative path and nothing else: no line numbers, no parentheses, no explanation"},"reason":{"type":"string","description":"why this file changes. Rationale belongs here, never in path"}},"required":["path"],"additionalProperties":false},"description":"every file this change writes, including new files"},"symbols":{"type":"array","items":{"type":"string","description":"one declaration name exactly as the code declares it: FunctionName, TypeName or TypeName.MethodName. No file path, no line number, no parentheses, no explanation"},"description":"the existing declarations this change edits. The editor is shown their code. Do not list declarations the change will add, such as a new test"},"tests":{"type":"array","minItems":1,"items":{"type":"string"},"description":"the checks that will show this worked: a preset name such as \"go test\" or a specific test name. Never empty"},"contracts":{"type":"array","items":{"type":"string"}},"write_allowlist":{"type":"array","minItems":1,"items":{"type":"string"},"description":"the subset of file paths the editor may write, each exactly as it appears in files[].path. Never empty"},"risks":{"type":"array","items":{"type":"string"}},"obligations":{"type":"array","items":{"type":"object","properties":{"symbol":{"type":"string","description":"the short declaration name, exactly as the impact evidence spells it"},"path":{"type":"string","description":"the repository-relative file the declaration is in"},"reason":{"type":"string","description":"why this change affects it"},"resolution":{"type":"object","properties":{"action":{"type":"string","enum":["edit","no_change_needed"]},"reason":{"type":"string","description":"required for no_change_needed: the concrete compatibility reason it keeps working"}},"required":["action"],"additionalProperties":false}},"required":["symbol","path","reason","resolution"],"additionalProperties":false}},"regenerate":{"type":"array","items":{"type":"string"},"description":"omit this unless the change makes generated code stale. Then name the frozen generate presets to re-run, exactly as the repository card spells them. Never a test name or a file"}},"required":["root_cause","files","symbols","tests","contracts","write_allowlist","risks","obligations"],"additionalProperties":false}`)
+var planSchemaV2 = json.RawMessage(`{"type":"object","properties":{"root_cause":{"type":"string"},"files":{"type":"array","minItems":1,"items":{"type":"object","properties":{"path":{"type":"string","description":"the repository-relative path and nothing else: no line numbers, no parentheses, no explanation"},"reason":{"type":"string","description":"why this file changes. Rationale belongs here, never in path"}},"required":["path"],"additionalProperties":false},"description":"every file this change writes, including new files"},"symbols":{"type":"array","items":{"type":"string","description":"one declaration name exactly as the code declares it: FunctionName, TypeName or TypeName.MethodName. No file path, no line number, no parentheses, no explanation"},"description":"the existing declarations this change edits. The editor is shown their code. Do not list declarations the change will add, such as a new test"},"tests":{"type":"array","minItems":1,"items":{"type":"string"},"description":"the checks that will show this worked: a preset name such as \"go test\" or a specific test name. Never empty"},"contracts":{"type":"array","items":{"type":"string"}},"write_allowlist":{"type":"array","minItems":1,"items":{"type":"string"},"description":"the subset of file paths the editor may write, each exactly as it appears in files[].path. Never empty"},"risks":{"type":"array","items":{"type":"string"}},"obligations":{"type":"array","items":{"type":"object","properties":{"symbol":{"type":"string","description":"the short declaration name, exactly as the impact evidence spells it"},"path":{"type":"string","description":"the repository-relative file the declaration is in"},"reason":{"type":"string","description":"why this change affects it"},"resolution":{"type":"object","properties":{"action":{"type":"string","enum":["edit","no_change_needed"]},"reason":{"type":"string","description":"for no_change_needed, the concrete compatibility reason it keeps working; for edit, what changes in it"}},"required":["action","reason"],"additionalProperties":false}},"required":["symbol","path","reason","resolution"],"additionalProperties":false}},"regenerate":{"type":"array","items":{"type":"string"},"description":"omit this unless the change makes generated code stale. Then name the frozen generate presets to re-run, exactly as the repository card spells them. Never a test name or a file"}},"required":["root_cause","files","symbols","tests","contracts","write_allowlist","risks","obligations"],"additionalProperties":false}`)
 var reviewSchemaV2 = json.RawMessage(`{"type":"object","properties":{"accept":{"type":"boolean"},"findings":{"type":"array","items":{"type":"string"}}},"required":["accept","findings"],"additionalProperties":false}`)
 
 func (r *Runner) signatureObligations(ctx context.Context, wt *worktree.Worktree, s *workflow.State, changed []string) (bool, error) {

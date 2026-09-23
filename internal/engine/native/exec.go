@@ -135,10 +135,11 @@ func (e *Engine) writeFile(wt string, args map[string]any) Result {
 		return failed("%s already exists. Use edit_file to change part of it; "+
 			"write_file replaces the whole file and would discard anything you have not read.", rel)
 	}
-	if err := worktree.WriteWithin(wt, rel, []byte(content)); err != nil {
+	out, note := gofmtOnWrite(rel, []byte(content))
+	if err := worktree.WriteWithin(wt, rel, out); err != nil {
 		return failed("%v", err)
 	}
-	return Result{Content: fmt.Sprintf("Wrote %s (%d bytes).", rel, len(content)), Edited: true}
+	return Result{Content: fmt.Sprintf("Wrote %s (%d bytes).%s", rel, len(out), note), Edited: true}
 }
 
 func (e *Engine) editFile(wt string, args map[string]any) Result {
@@ -167,10 +168,36 @@ func (e *Engine) editFile(wt string, args map[string]any) Result {
 		return failed("That text appears %d times in %s. Include more surrounding "+
 			"context so it identifies exactly one place.", n, rel)
 	}
-	if err := worktree.WriteWithin(wt, rel, []byte(strings.Replace(text, oldText, newText, 1))); err != nil {
+	out, note := gofmtOnWrite(rel, []byte(strings.Replace(text, oldText, newText, 1)))
+	if err := worktree.WriteWithin(wt, rel, out); err != nil {
 		return failed("%v", err)
 	}
-	return Result{Content: fmt.Sprintf("Edited %s.", rel), Edited: true}
+	return Result{Content: fmt.Sprintf("Edited %s.%s", rel, note), Edited: true}
+}
+
+// gofmtOnWrite formats a Go file on its way to disk.
+//
+// A formatting failure was an outcome the model could not reliably repair:
+// gofmt's rules are whitespace and alignment, the edit tool matches text
+// exactly, and the recorded attempt ended with every check green but gofmt.
+// The formatter is deterministic and changes no meaning, so the harness runs
+// it — the same thing an editor does on save — and says so, because the text
+// the model wrote is no longer byte-for-byte what is in the file. A file that
+// does not parse is written as given: it may be mid-edit, and the parse error
+// is information the model needs.
+func gofmtOnWrite(rel string, content []byte) ([]byte, string) {
+	if !strings.HasSuffix(rel, ".go") {
+		return content, ""
+	}
+	formatted, err := format.Source(content)
+	if err != nil {
+		return content, fmt.Sprintf(" It does not parse yet, so it was not formatted: %v", err)
+	}
+	if string(formatted) == string(content) {
+		return content, ""
+	}
+	return formatted, " It was formatted with gofmt, which changed whitespace: read the lines " +
+		"again before another edit_file there."
 }
 
 func (e *Engine) listFiles(wt string, args map[string]any) Result {

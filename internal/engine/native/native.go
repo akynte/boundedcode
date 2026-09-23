@@ -233,6 +233,7 @@ func (e *Engine) Step(ctx context.Context, req engine.Request) (*engine.Response
 
 	temp := e.Temperature
 	cutReplies := 0
+	clock := newEditClock(ctx)
 	maxSteps := e.MaxSteps
 	if req.Budget.MaxSteps > 0 && req.Budget.MaxSteps < maxSteps {
 		maxSteps = req.Budget.MaxSteps
@@ -275,6 +276,18 @@ func (e *Engine) Step(ctx context.Context, req engine.Request) (*engine.Response
 			}
 		}
 
+		if capped, ok := clock.output(outputLimit); !ok {
+			resp.Summary = "EDIT reached its share of the wall-clock budget; " +
+				"there was not time for another step to finish"
+			e.logf("  %s", resp.Summary)
+			return finish()
+		} else {
+			outputLimit = capped
+		}
+		if note := clock.nudge(resp.Edited); note != "" {
+			messages = append(messages, llm.Message{Role: "user", Content: note})
+			e.logf("  %s", strings.TrimPrefix(strings.TrimSpace(note), "[supervisor] "))
+		}
 		out, err := e.Provider.Chat(ctx, llm.ChatRequest{
 			Messages:              messages,
 			Tools:                 e.tools,
@@ -282,7 +295,7 @@ func (e *Engine) Step(ctx context.Context, req engine.Request) (*engine.Response
 			Temperature:           &temp,
 			MaxTokens:             outputLimit,
 			Thinking:              e.Thinking,
-			ReasoningBudgetTokens: min(req.Budget.ReasoningTokens, max(1, outputLimit-1)),
+			ReasoningBudgetTokens: clock.reasoning(min(req.Budget.ReasoningTokens, max(1, outputLimit-1))),
 			// The system prompt and the packet are the stable prefix; the
 			// tool exchange follows. §8.2: stable prefix first, so the
 			// provider's prompt cache survives the loop.
@@ -291,6 +304,7 @@ func (e *Engine) Step(ctx context.Context, req engine.Request) (*engine.Response
 		if err != nil {
 			return nil, fmt.Errorf("native: step %d: %w", step, err)
 		}
+		clock.observe(out)
 		promptTokens, outputTokens := out.PromptTokens, out.OutputTokens
 		if promptTokens <= 0 {
 			promptTokens = estimate
