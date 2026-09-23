@@ -188,8 +188,8 @@ func checkSandbox(ctx context.Context, cfg *config.Config) (*sandbox.Report, []C
 		Name: "network containment", Level: Warn,
 		Detail: "Landlock TCP rules do not cover Multipath TCP sockets, and Go's net.Listen uses MPTCP by default. " +
 			"Port rules are therefore augmented, not relied on alone (§6.1).",
-		Fix: "Use --network none plus an in-container inference route for a fully network-isolated deployment. " +
-			"Provisioning goes through the §6.1 allowlisting proxy, which a task sandbox cannot reach.",
+		Fix: "For full network isolation, run tasks in a network namespace with no egress. If they need model access, " +
+			"provide a deliberate route to the inference server; Landlock port rules alone are insufficient.",
 	})
 
 	checks = append(checks, checkEgress(cfg))

@@ -228,6 +228,9 @@ the index.
 
 BoundedCode requires TypeSafe Jev to run tasks. From the checkout, run:
 
+If you pulled newer BoundedCode changes since Step 2, rebuild first with
+`make build` so the doctor check uses the updated executable.
+
 ```bash
 scripts/configure-judgment.sh && source "$HOME/.bashrc"
 ```

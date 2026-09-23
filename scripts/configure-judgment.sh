@@ -93,6 +93,6 @@ if grep -Fq '[FAIL]' "${doctor_tmp}"; then
   exit 1
 fi
 if [[ "${doctor_status}" -ne 0 ]]; then
-  echo "Doctor reported warnings; host-install isolation and profile warnings may be expected." >&2
+  echo "Doctor reported warnings; review each entry above. Host installs warn about the missing container boundary and network limits; profile and index warnings clear after those checks are completed. The judgment warning describes metadata sent to Jev." >&2
 fi
 echo "New Bash terminals will load the key automatically. Keep this private file out of backups or sync services you do not trust."
