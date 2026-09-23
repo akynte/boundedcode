@@ -214,14 +214,20 @@ func TestRegisterModelPointsTheEditorAtTheSupervisorsEndpoint(t *testing.T) {
 		t.Fatalf("changed=%v err=%v", changed, err)
 	}
 	var doc struct {
-		Model    string `json:"model"`
-		Provider map[string]struct {
-			NPM     string            `json:"npm"`
-			Options map[string]string `json:"options"`
-			Models  map[string]struct {
-				Name string `json:"name"`
+		Model     string `json:"model"`
+		Providers map[string]struct {
+			Package  string            `json:"package"`
+			Settings map[string]string `json:"settings"`
+			Models   map[string]struct {
+				Name         string `json:"name"`
+				Capabilities struct {
+					Tools  bool     `json:"tools"`
+					Input  []string `json:"input"`
+					Output []string `json:"output"`
+				} `json:"capabilities"`
+				Limit map[string]int `json:"limit"`
 			} `json:"models"`
-		} `json:"provider"`
+		} `json:"providers"`
 	}
 	body, err := os.ReadFile(filepath.Join(repo, "opencode.json")) //nolint:gosec // written above
 	if err != nil {
@@ -230,15 +236,23 @@ func TestRegisterModelPointsTheEditorAtTheSupervisorsEndpoint(t *testing.T) {
 	if err := json.Unmarshal(body, &doc); err != nil {
 		t.Fatal(err)
 	}
-	p, ok := doc.Provider[opencode.ProviderName]
+	p, ok := doc.Providers[opencode.ProviderName]
 	if !ok {
 		t.Fatalf("no provider registered: %s", body)
 	}
-	if p.Options["baseURL"] != "http://127.0.0.1:8080/v1" {
-		t.Fatalf("baseURL is %q", p.Options["baseURL"])
+	if p.Settings["baseURL"] != "http://127.0.0.1:8080/v1" {
+		t.Fatalf("baseURL is %q", p.Settings["baseURL"])
 	}
-	if p.NPM != "@ai-sdk/openai-compatible" {
-		t.Fatalf("adapter is %q", p.NPM)
+	if p.Package != "@opencode/ai/providers/openai-compatible" {
+		t.Fatalf("adapter is %q", p.Package)
+	}
+	model := p.Models["Ternary-Bonsai-2-27B-PTQ1_0"]
+	if !model.Capabilities.Tools || len(model.Capabilities.Input) != 1 || model.Capabilities.Input[0] != "text" ||
+		len(model.Capabilities.Output) != 1 || model.Capabilities.Output[0] != "text" {
+		t.Fatalf("model capabilities do not describe text-only tool support: %+v", model.Capabilities)
+	}
+	if model.Limit["context"] != 32768 || model.Limit["output"] != 8192 {
+		t.Fatalf("model limits are %v", model.Limit)
 	}
 	// opencode.json is committed. A local GGUF path in it would put one
 	// developer's filesystem into a file everyone else clones.
@@ -291,10 +305,10 @@ func TestRegisterModelRepointsItsOwnSelection(t *testing.T) {
 		t.Fatal(err)
 	}
 	var doc struct {
-		Model    string `json:"model"`
-		Provider map[string]struct {
-			Options map[string]string `json:"options"`
-		} `json:"provider"`
+		Model     string `json:"model"`
+		Providers map[string]struct {
+			Settings map[string]string `json:"settings"`
+		} `json:"providers"`
 	}
 	if err := json.Unmarshal(body, &doc); err != nil {
 		t.Fatal(err)
@@ -302,7 +316,7 @@ func TestRegisterModelRepointsItsOwnSelection(t *testing.T) {
 	if doc.Model != opencode.ProviderName+"/second-model" {
 		t.Fatalf("selection is %q, want the new model", doc.Model)
 	}
-	if got := doc.Provider[opencode.ProviderName].Options["baseURL"]; got != "http://127.0.0.1:9090/v1" {
+	if got := doc.Providers[opencode.ProviderName].Settings["baseURL"]; got != "http://127.0.0.1:9090/v1" {
 		t.Fatalf("baseURL is %q, want the new endpoint", got)
 	}
 	// Re-running with nothing changed must not rewrite a committed file.

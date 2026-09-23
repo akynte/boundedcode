@@ -24,6 +24,23 @@ The MCP entry uses OpenCode 2's `mcp.servers` configuration. If the project has
 the older flat `mcp` server map, setup moves those server entries under
 `mcp.servers` while preserving MCP-wide settings and the other project config.
 See [OpenCode's MCP configuration](https://opencode.ai/v2/docs/mcp-servers/).
+BoundedCode sets `codemode: false`, so its MCP tools are exposed as direct tools
+instead of being routed through OpenCode's JavaScript `execute` Code Mode. This
+avoids asking the model to encode ordinary tool inputs as JavaScript.
+
+Setup also manages a small block in `~/.config/opencode/AGENTS.md` (or the
+platform's OpenCode config directory). OpenCode loads global `AGENTS.md`
+guidance in every project, so the instructions distinguish JavaScript Code Mode
+from the shell and language runtimes across repositories. Only the managed
+block is refreshed; your other global instructions are preserved. See
+[OpenCode's instruction scope](https://opencode.ai/v2/docs/instructions/).
+
+When BoundedCode has a local inference endpoint configured, setup also registers
+it using OpenCode 2's custom provider format. For the reference Bonsai model, it
+declares tool support, text-only input, a 32K context, and an 8K output limit.
+Bonsai's optional vision projector is not loaded by the reference text-coding
+setup, so OpenCode cannot send screenshots to that model. Use a vision-capable
+model for image questions.
 
 The workspace marker, `opencode.json`, and managed `AGENTS.md` block are local
 project setup; review them before committing. `bcode opencode` does not build
@@ -71,6 +88,15 @@ If tools do not appear, run OpenCode with `bcode opencode` from the project
 directory so its MCP process uses the same binary. Check `bcode version`, and
 confirm the workspace marker exists at `.bc/workspace.yaml`. Refresh stale
 graph evidence with `bc_reindex` or `bcode index`.
+
+If a task reports `Unknown identifier 'None'` from an `execute` tool, the model
+sent Python syntax to a JavaScript execution tool (`None` is Python syntax; use
+`null` in JavaScript). That individual tool call failed; it does not mean the
+BoundedCode MCP connection or inference server stopped. Run Python through the
+shell tool instead. If the assistant then ends after extended reasoning without
+a final answer, continue the conversation and ask it to summarize the result.
+For image input rejected by the local endpoint, switch to a vision-capable
+model; the local Bonsai model is text-only.
 
 Tool paths are confined to the opened repository, including symlink resolution.
 This does not confine unrelated tools supplied by another MCP server or an

@@ -30,7 +30,7 @@ func RegisterMCP(repoRoot string, command []string) (path string, changed bool, 
 	if jsonc := filepath.Join(repoRoot, "opencode.jsonc"); exists(jsonc) {
 		return jsonc, false, fmt.Errorf(
 			"%s already exists and may contain comments this cannot preserve. Add by hand:\n"+
-				"  \"mcp\": { \"servers\": { %q: { \"type\": \"local\", \"command\": %s } } }",
+				"  \"mcp\": { \"servers\": { %q: { \"type\": \"local\", \"command\": %s, \"codemode\": false } } }",
 			jsonc, ServerName, mustJSON(command))
 	}
 	return mergeConfig(repoRoot, func(doc map[string]any) bool {
@@ -61,6 +61,10 @@ func RegisterMCP(repoRoot string, command []string) (path string, changed bool, 
 			"type":     "local",
 			"command":  toAny(command),
 			"disabled": false,
+			// These tools are clearer and more reliable when called directly.
+			// Code Mode's execute tool is JavaScript for orchestrating other
+			// tools, not a general-purpose interpreter for their inputs.
+			"codemode": false,
 			// OpenCode's default MCP request timeout is short. bc_verify runs
 			// this repository's build, vet, test and format checks in a
 			// sandbox, which is minutes on anything real.
@@ -174,7 +178,7 @@ func RegisterModel(repoRoot, baseURL, model string) (path string, changed bool, 
 				return false
 			}
 		}
-		providers, _ := doc["provider"].(map[string]any)
+		providers, _ := doc["providers"].(map[string]any)
 		if providers == nil {
 			providers = map[string]any{}
 		}
@@ -188,17 +192,40 @@ func RegisterModel(repoRoot, baseURL, model string) (path string, changed bool, 
 		// by what they loaded rather than by this field — a single-model
 		// llama-server answers to any name — so the alias costs nothing.
 		id := shortModelName(model)
+		modelConfig := map[string]any{"name": id}
+		// The reference Bonsai setup serves a text-only model with a 32K
+		// context. These are known facts about that artifact, not safe defaults
+		// to impose on every OpenAI-compatible endpoint.
+		if strings.Contains(strings.ToLower(id), "bonsai") {
+			modelConfig["capabilities"] = map[string]any{
+				"tools":  true,
+				"input":  []any{"text"},
+				"output": []any{"text"},
+			}
+			modelConfig["limit"] = map[string]any{"context": 32768, "output": 8192}
+		}
 		want := map[string]any{
-			"npm":     "@ai-sdk/openai-compatible",
-			"name":    "Local (via boundedcode)",
-			"options": map[string]any{"baseURL": strings.TrimSuffix(baseURL, "/") + "/v1"},
-			"models":  map[string]any{id: map[string]any{"name": id}},
+			"name":     "Local (via boundedcode)",
+			"package":  "@opencode/ai/providers/openai-compatible",
+			"settings": map[string]any{"baseURL": strings.TrimSuffix(baseURL, "/") + "/v1"},
+			"models":   map[string]any{id: modelConfig},
 		}
 		if equalJSON(providers[ProviderName], want) && doc["model"] == ProviderName+"/"+id {
 			return false
 		}
 		providers[ProviderName] = want
-		doc["provider"] = providers
+		doc["providers"] = providers
+		// Remove only our generated V1 entry. Other V1 provider entries may
+		// still be used by the developer and remain intact for OpenCode's
+		// compatibility layer.
+		if legacy, ok := doc["provider"].(map[string]any); ok {
+			delete(legacy, ProviderName)
+			if len(legacy) == 0 {
+				delete(doc, "provider")
+			} else {
+				doc["provider"] = legacy
+			}
+		}
 		doc["model"] = ProviderName + "/" + id
 		return true
 	})

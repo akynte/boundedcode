@@ -61,7 +61,8 @@ func newOpenCodeSetupCmd() *cobra.Command {
 			"which OpenCode reads into every session — telling the agent that a\n" +
 			"compiler-backed index of this repository exists, which questions it answers\n" +
 			"better than search, and what this repository has already recorded about\n" +
-			"itself.\n\n" +
+			"itself. It also installs a small managed block in OpenCode's global\n" +
+			"AGENTS.md so tool-language guidance applies in every repository.\n\n" +
 			"Re-run it after recording notes or re-indexing. It replaces only its own\n" +
 			"block in AGENTS.md and merges into opencode.json, so anything you have\n" +
 			"written in either file is left alone.",
@@ -84,6 +85,11 @@ func setupOpenCode(cmd *cobra.Command, dataDir string, printNext bool) error {
 	}
 	defer closeRoot(cmd, root)
 	out := cmd.OutOrStdout()
+	globalPath, globalChanged, err := opencode.ApplyGlobalInstructions()
+	if err != nil {
+		return fmt.Errorf("install global OpenCode tool guidance: %w", err)
+	}
+	fmt.Fprintf(out, "%s %s\n", verb(globalChanged), globalPath)
 
 	command := []string{"bcode", "mcp"}
 	if dataDir != "" {

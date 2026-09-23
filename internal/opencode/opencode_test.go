@@ -135,8 +135,10 @@ func TestRegisterMCPMergesIntoAnExistingConfig(t *testing.T) {
 	if _, ok := servers["other"]; !ok {
 		t.Error("another MCP server was removed")
 	}
-	if _, ok := servers[opencode.ServerName]; !ok {
+	if config, ok := servers[opencode.ServerName].(map[string]any); !ok {
 		t.Error("boundedcode was not registered")
+	} else if config["codemode"] != false {
+		t.Errorf("BoundedCode tools are wrapped in Code Mode: codemode=%v", config["codemode"])
 	}
 	if _, changed, _ := opencode.RegisterMCP(dir, []string{"bcode", "mcp"}); changed {
 		t.Error("re-registering an identical entry reported a change")
@@ -182,7 +184,8 @@ func TestTheRegisteredServerGetsATimeoutVerificationCanFinishIn(t *testing.T) {
 	var doc struct {
 		MCP struct {
 			Servers map[string]struct {
-				Timeout struct {
+				CodeMode bool `json:"codemode"`
+				Timeout  struct {
 					Request int `json:"request"`
 				} `json:"timeout"`
 			} `json:"servers"`

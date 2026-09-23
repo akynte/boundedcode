@@ -41,7 +41,16 @@ import (
 const (
 	BeginMarker = "<!-- BEGIN boundedcode (generated; edit outside these markers) -->"
 	EndMarker   = "<!-- END boundedcode -->"
+	globalBegin = "<!-- BEGIN boundedcode global OpenCode tool guidance -->"
+	globalEnd   = "<!-- END boundedcode global OpenCode tool guidance -->"
 )
+
+const globalToolGuidance = globalBegin + "\n" +
+	"## Tool execution (BoundedCode)\n\n" +
+	"- OpenCode's `execute` tool runs JavaScript in Code Mode to call and combine tools. It is not a shell, Python, Go, or SQL runtime. Follow its JavaScript interface when using it.\n" +
+	"- Use OpenCode's `shell` tool for host commands and language runtimes. Check whether optional command-line tools are installed before relying on them; a missing CLI does not mean the application library is missing.\n" +
+	"- When a tool call fails, read the error and retry with a tool that supports the required language or operation. Do not treat one tool error as a disconnected session, and provide a concise final answer after completing the work.\n" +
+	globalEnd + "\n"
 
 // Facts are what the block is rendered from.
 type Facts struct {
@@ -77,6 +86,9 @@ func Render(f Facts) string {
 			"`boundedcode` MCP tools: %d symbols and %d relationships, built from the source "+
 			"rather than from search.\n\n", f.Nodes, f.Edges)
 	}
+	b.WriteString("Use each tool in its documented language: if `execute` evaluates JavaScript, " +
+		"write JavaScript there and run Python through the shell. After the work is complete, " +
+		"send the user a concise final answer; reasoning without a final response is not a result.\n\n")
 
 	b.WriteString("Any task that changes code runs under supervision: open it with " +
 		"`bc_task_start`, do the work with your own tools, ask the user anything you cannot " +
@@ -174,15 +186,46 @@ func renderNotes(byKind map[memory.Kind][]memory.Note) string {
 // changed, so a caller can say "already current" instead of claiming work.
 func Apply(repoRoot, block string) (path string, changed bool, err error) {
 	path = filepath.Join(repoRoot, "AGENTS.md")
+	return applyManagedBlock(path, BeginMarker, EndMarker, block, 0o644)
+}
+
+// ApplyGlobalInstructions installs BoundedCode's tool-language guidance in
+// OpenCode's user-level AGENTS.md. OpenCode loads this file for every project,
+// so the guidance does not depend on each repository being configured.
+// Existing user instructions are preserved outside the managed block.
+func ApplyGlobalInstructions() (path string, changed bool, err error) {
+	configDir, err := os.UserConfigDir()
+	if err != nil {
+		return "", false, fmt.Errorf("find the user config directory: %w", err)
+	}
+	dir := filepath.Join(configDir, "opencode")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return filepath.Join(dir, "AGENTS.md"), false, err
+	}
+	path = filepath.Join(dir, "AGENTS.md")
+	return applyManagedBlock(path, globalBegin, globalEnd, globalToolGuidance, 0o644)
+}
+
+func applyManagedBlock(path, begin, end, block string, mode os.FileMode) (string, bool, error) {
+	info, err := os.Lstat(path)
+	if err != nil && !os.IsNotExist(err) {
+		return path, false, err
+	}
+	if err == nil {
+		if !info.Mode().IsRegular() {
+			return path, false, fmt.Errorf("refusing to replace non-regular instructions file %s", path)
+		}
+		mode = info.Mode().Perm()
+	}
 	existing, err := os.ReadFile(path) //nolint:gosec // a path derived from the workspace root
 	if err != nil && !os.IsNotExist(err) {
 		return path, false, err
 	}
-	updated := replaceBlock(string(existing), block)
+	updated := replaceManagedBlock(string(existing), begin, end, block)
 	if updated == string(existing) {
 		return path, false, nil
 	}
-	if err := os.WriteFile(path, []byte(updated), 0o644); err != nil { //nolint:gosec // AGENTS.md is committed and read by an editor
+	if err := os.WriteFile(path, []byte(updated), mode); err != nil { //nolint:gosec // instructions are read by OpenCode
 		return path, false, err
 	}
 	return path, true, nil
@@ -190,10 +233,14 @@ func Apply(repoRoot, block string) (path string, changed bool, err error) {
 
 // replaceBlock swaps the managed region, or appends one when there is none.
 func replaceBlock(doc, block string) string {
-	start := strings.Index(doc, BeginMarker)
-	end := strings.Index(doc, EndMarker)
-	if start >= 0 && end > start {
-		tail := doc[end+len(EndMarker):]
+	return replaceManagedBlock(doc, BeginMarker, EndMarker, block)
+}
+
+func replaceManagedBlock(doc, begin, end string, block string) string {
+	start := strings.Index(doc, begin)
+	endIndex := strings.Index(doc, end)
+	if start >= 0 && endIndex > start {
+		tail := doc[endIndex+len(end):]
 		return doc[:start] + strings.TrimSuffix(block, "\n") + tail
 	}
 	if strings.TrimSpace(doc) == "" {

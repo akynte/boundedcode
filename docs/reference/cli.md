@@ -703,7 +703,11 @@ Setup registers `bcode mcp` in `opencode.json`, merging rather than replacing
 so an existing model choice or another MCP server survives, and writes a block
 into `AGENTS.md` — which OpenCode reads into every session — naming the tools,
 saying which questions they answer better than search, and carrying what this
-repository has recorded about itself.
+repository has recorded about itself. BoundedCode's MCP tools are exposed
+directly (`codemode: false`) instead of through JavaScript Code Mode. Setup also
+updates a managed block in the user-level OpenCode `AGENTS.md`, which applies
+the tool-language guidance to every repository while preserving other global
+instructions.
 
 Only the block between its markers is replaced, so anything you write in
 `AGENTS.md` yourself is left alone. An existing `opencode.jsonc` is refused
