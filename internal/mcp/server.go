@@ -61,9 +61,6 @@ type Server struct {
 
 // New builds the MCP server with BoundedCode's tools registered.
 func New(o Options) (*mcp.Server, error) {
-	if o.DataDir == "" {
-		return nil, errors.New("mcp: no data directory")
-	}
 	if o.WorkDir == "" {
 		return nil, errors.New("mcp: no working directory")
 	}
