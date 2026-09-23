@@ -217,69 +217,34 @@ It preserves other settings in `bcode.yaml`; it replaces `providers.yaml` with
 the single-provider reference setup. Run it again any time you want to restore
 these reference settings.
 
-The profile's published budgets are starting settings, not
-measurements from your machine. Run `bcode doctor` after Step 7, once judgment
-is configured. On this host install, the missing outer container boundary and
-the documented network-containment limitation are expected warnings. The
-profile-fit estimate remains until you benchmark it, and index freshness remains
-until Step 8 builds the index. Judgment should pass once its config and
-credential are available; act on any other failures `bcode doctor` reports.
+The profile's published budgets are starting settings, not measurements from
+your machine. Step 7 runs `bcode doctor` after configuring judgment. On this
+host install, the missing outer container boundary and documented
+network-containment limitation are expected warnings. The profile-fit estimate
+remains until you benchmark it, and index freshness remains until Step 8 builds
+the index.
 
 ## 7. Configure the decision plane (required)
 
-BoundedCode asks a hosted decision model, TypeSafe Jev, a bounded set of typed
-questions during a task — never a transcript, never free text. It is a required
-runtime component: `bcode task run` refuses to start without a usable one rather
-than quietly falling back to weaker semantics.
-
-Create `$BC_DATA/config/judgment.yaml`:
-
-```yaml
-enabled: true
-model: jev-1.13.0
-api_key_env: TYPESAFE_API_KEY
-redact: strict
-min_confidence: 0.75
-cache: true
-```
-
-Put the credential in the environment, never in the file:
+BoundedCode requires TypeSafe Jev to run tasks. From the checkout, run:
 
 ```bash
-export TYPESAFE_API_KEY="…"
+scripts/configure-judgment.sh && source "$HOME/.bashrc"
 ```
 
-`redact: strict` is the default and sends repository *metadata* only — paths,
-symbol names, kinds, line ranges, the objective as you wrote it. No line of
-source leaves under it. Read
-[what leaves the machine](../explanation/judgment-data-flow.md) before choosing
-anything less strict; `bcode doctor` reports the mode on every run.
+It prompts for the API key without displaying it, writes the reference
+`judgment.yaml`, and runs `bcode doctor`. The key is stored outside the
+repository in `~/.config/boundedcode/jev.env` with owner-only permissions
+(mode `600`); it is plaintext on disk, and `~/.bashrc` loads it in new Bash
+terminals. If a judgment config already exists, the script backs it up before
+replacing it. Keep the private key file out of untrusted backups and sync
+services; use an OS secret manager instead if you require encrypted storage.
 
-Pin a dated model snapshot rather than a moving alias. The model id is part of
-the answer cache key, so an alias that moves underneath makes cached judgments
-and evaluation runs incomparable while the configuration looks unchanged.
-
-Validate before spending GPU time on a task:
-
-```bash
-bcode doctor
-bcode judgment sites
-```
-
-`bcode doctor` must not report a judgment failure. The common ones it names
-directly: the credential is unset, the endpoint is unreachable, or a site has
-been promoted to a tier whose questions the configured `redact` mode forbids —
-a configuration that would refuse every task that reached it.
-
-Under `redact: strict`, two sites route by default — `intake_profile` and
-`obligation_reason`, whose questions are metadata-only. They can stop a task
-when they cannot get an answer. The other four routing-capable sites read
-source or tool output, so they stay at `logged` until you raise `redact`.
-`bcode doctor` lists which sites can stop a task under your configuration.
-
-No site's calibration on this kind of work has been established yet. Turn any
-of them down to `logged` in `judgment.yaml` with one line.
-[Use judgments](use-judgments.md) covers the tiers.
+The reference uses a pinned Jev model and `redact: strict`, which sends
+repository metadata only, not source lines. Read
+[what leaves the machine](../explanation/judgment-data-flow.md) before changing
+the redaction mode. `bcode judgment sites` lists the decisions that can affect a
+task; [Use judgments](use-judgments.md) explains their authority tiers.
 
 ## 8. Prepare a repository and run a task
 
