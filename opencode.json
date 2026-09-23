@@ -21,7 +21,6 @@
   "mcp": {
     "servers": {
       "boundedcode": {
-        "codemode": false,
         "command": [
           "bcode",
           "mcp"
@@ -35,6 +34,20 @@
     }
   },
   "model": "boundedcode-local/boundedcode-bonsai",
+  "provider": {
+    "boundedcode-local": {
+      "models": {
+        "boundedcode-bonsai": {
+          "name": "boundedcode-bonsai"
+        }
+      },
+      "name": "Local (via boundedcode)",
+      "npm": "@ai-sdk/openai-compatible",
+      "options": {
+        "baseURL": "http://127.0.0.1:8080/v1"
+      }
+    }
+  },
   "providers": {
     "boundedcode-local": {
       "models": {

@@ -3,8 +3,6 @@
 
 A compiler-backed index of this repository is available through the `boundedcode` MCP tools: 11259 symbols and 32397 relationships, built from the source rather than from search.
 
-Use each tool in its documented language: if `execute` evaluates JavaScript, write JavaScript there and run Python through the shell. After the work is complete, send the user a concise final answer; reasoning without a final response is not a result.
-
 Any task that changes code runs under supervision: open it with `bc_task_start`, do the work with your own tools, ask the user anything you cannot safely infer, then `bc_verify` and `bc_task_finish`. You edit and you talk to the user; BoundedCode records what happened and judges the result.
 
 Prefer these over text search when the question is structural, because they answer from the type checker instead of from string matching:
