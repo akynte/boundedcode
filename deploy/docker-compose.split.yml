@@ -1,0 +1,101 @@
+# The conventional multi-container layout (design v3 §4.3).
+#
+# DR-1 chose a single container and stated the trade-off plainly: several
+# processes under one PID 1 reduce orchestrator visibility. This file is the
+# alternative that trade-off promised, and it is maintained and tested so the
+# promise is real.
+#
+#   docker compose -f deploy/docker-compose.split.yml up -d
+#
+# The supervisor's child management sits behind an interface, so running
+# llama-server in its own container is a configuration change only: the
+# supervisor sets inference.mode to external and talks to it over HTTP.
+services:
+  inference:
+    image: ${BC_LLAMA_IMAGE:-ghcr.io/ggml-org/llama.cpp:server-cuda}
+    container_name: bc-inference
+    restart: unless-stopped
+    command:
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8080"
+      - --model
+      - /models/${BC_MODEL:?set BC_MODEL to a GGUF filename under the models volume}
+      - --ctx-size
+      - "${BC_CTX:-32768}"
+      - --n-gpu-layers
+      - "999"
+      - --flash-attn
+      - "on"
+      - --slots
+    volumes:
+      - bc-models:/models:ro
+    # Not published to the host: only the supervisor needs to reach it.
+    expose: ["8080"]
+    networks: [bcode]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/health"]
+      interval: 10s
+      timeout: 5s
+      start_period: 300s
+      retries: 30
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  supervisor:
+    image: ${BC_IMAGE:-ghcr.io/akynte/boundedcode:latest}
+    container_name: bc-supervisor
+    restart: unless-stopped
+    init: true
+    stop_grace_period: 40s
+    depends_on:
+      inference:
+        condition: service_healthy
+    # An inference server on your host — llama.cpp, vLLM, anything speaking the
+    # OpenAI API — is reachable at http://host.docker.internal:PORT with this.
+    # Without it the container resolves nothing by that name, and 127.0.0.1
+    # inside a container is the container, so a model on the host is invisible.
+    # Point providers.yaml's base_url at that name, not just bcode.yaml's.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+    ports:
+      - "127.0.0.1:7777:7777"
+    volumes:
+      - bc-data:/data
+      - ${BC_WORK:-${HOME}/code}:/work
+    environment:
+      BC_DATA: /data
+      BC_API_ADDR: 0.0.0.0:7777
+      BC_PROFILE: external-inference
+      # These are read on every start and win over bcode.yaml, so the deployment
+      # does not depend on what a previous start happened to write.
+      BC_INFERENCE_MODE: external
+      BC_INFERENCE_BASE_URL: http://inference:8080
+    user: "10001:10001"
+    cap_drop: ["ALL"]
+    security_opt:
+      - no-new-privileges:true
+    networks: [bcode]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:7777/readyz"]
+      interval: 15s
+      timeout: 5s
+      start_period: 60s
+      retries: 4
+
+networks:
+  bcode:
+    driver: bridge
+
+volumes:
+  bc-data:
+    name: bc-data-split
+  bc-models:
+    name: bc-models

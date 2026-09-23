@@ -1,0 +1,39 @@
+# Evidence Suite v1 generator runtime configuration — design instruction
+# GAP 1/§46. Frozen alongside manifest.json and jev-profile.yaml, but kept
+# as its own artifact rather than folded into manifest.json: manifest.json
+# was already frozen (its SHA-256 is checked by every subcommand) before a
+# usable generator configuration existed, and re-freezing it here would be
+# a hard failure under that rule.
+#
+# Secret-free: every field below is either public (provider name, model
+# id, tuning numbers) or the NAME of an environment variable, never a
+# credential value. `le evidence preflight` reports this file's own
+# SHA-256; every persisted Result carries it, so CONTROL and treatment
+# runs — and any two runs of this suite — can be proven to have used the
+# identical generator identity.
+schema_version: 1
+suite: evidence-v1
+
+generator:
+  # Read via the same internal/llm.LoadProvidersFile every ordinary `le
+  # task run` uses — no Evidence-specific model client.
+  providers_file: evals/evidence-v1/generator/providers.yaml
+  provider: anthropic
+  model: claude-sonnet-5
+  api_key_env: ANTHROPIC_API_KEY
+
+  reasoning:
+    thinking_policy: auto # off | auto | always — see internal/config.Profile.Thinking
+
+  sampling:
+    temperature: 0.2
+
+  context:
+    context_tokens: 200000
+    reserved_output_tokens: 8192
+    max_tools_exposed: 40
+    max_steps: 20
+
+  routing:
+    role: coding
+    single_role: true # CONTROL and treatment route the coding role identically; no per-arm override

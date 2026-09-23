@@ -1,0 +1,262 @@
+package config_test
+
+import (
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/akynte/boundedcode/internal/config"
+)
+
+// TestShippedProfiles validates every profile in profiles/. CI runs this as a
+// gate: a shipped profile that does not parse or whose budgets do not add up
+// would fail at startup on a user's machine instead.
+func TestShippedProfiles(t *testing.T) {
+	// The embedded set is what users actually get, in every install shape.
+	embedded := config.Embedded()
+	if len(embedded) == 0 {
+		t.Fatal("no profiles are embedded in the binary")
+	}
+	for _, name := range embedded {
+		if _, err := config.LoadEmbeddedProfile(name); err != nil {
+			t.Errorf("embedded profile %s does not load: %v", name, err)
+		}
+	}
+	// An empty directory must still list the embedded profiles.
+	listed, err := config.ListProfiles(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(listed) != len(embedded) {
+		t.Errorf("listing an empty directory returned %d profiles, expected the %d embedded ones",
+			len(listed), len(embedded))
+	}
+
+	dir := findProfilesDir(t)
+	names, err := config.ListProfiles(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(names) == 0 {
+		t.Fatalf("no profiles found under %s", dir)
+	}
+
+	for _, name := range names {
+		t.Run(name, func(t *testing.T) {
+			p, err := config.LoadProfile(dir, name)
+			if err != nil {
+				t.Fatalf("profile %s does not load: %v", name, err)
+			}
+			if p.Name != name {
+				t.Errorf("profile file %s.yaml declares name %q", name, p.Name)
+			}
+			if p.Description == "" {
+				t.Error("a profile must describe what hardware it targets")
+			}
+			// Every shipped profile is an unmeasured starting point, and must
+			// say so: §9.2 wants real numbers to come from `bcode models bench`.
+			if p.Measured == nil && !strings.Contains(strings.ToLower(p.Description), "unmeasured") &&
+				!strings.Contains(strings.ToLower(p.Description), "external") &&
+				!strings.Contains(strings.ToLower(p.Description), "hosted") {
+				t.Error("a profile with no measurement must say so in its description")
+			}
+		})
+	}
+
+	// The default configuration must name a profile that actually ships, and
+	// it must resolve from an empty data directory too.
+	def := config.Default()
+	if _, err := config.LoadProfile(dir, def.Profile); err != nil {
+		t.Errorf("the default profile %q does not exist: %v", def.Profile, err)
+	}
+	if _, err := config.LoadProfile(t.TempDir(), def.Profile); err != nil {
+		t.Errorf("the default profile %q does not resolve without an on-disk copy: %v", def.Profile, err)
+	}
+}
+
+// A profile on disk must win over an embedded one of the same name, so a
+// measurement always overrides a shipped starting point.
+func TestOnDiskProfileOverridesEmbedded(t *testing.T) {
+	dir := t.TempDir()
+	name := config.Default().Profile
+
+	override := config.Profile{
+		Name: name, Description: "measured on this machine",
+		ContextTokens: 4096, MaxPacketTokens: 1000, ReservedOutput: 500,
+		PeakVRAMMB: 1234,
+	}
+	if err := config.SaveProfile(dir, override); err != nil {
+		t.Fatal(err)
+	}
+	got, err := config.LoadProfile(dir, name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.PeakVRAMMB != 1234 {
+		t.Fatalf("the embedded profile won over the on-disk one: %+v", got)
+	}
+	if !config.OnDisk(dir, name) {
+		t.Error("OnDisk must report a profile written to the directory")
+	}
+}
+
+func findProfilesDir(t *testing.T) string {
+	t.Helper()
+	dir, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 5; i++ {
+		candidate := filepath.Join(dir, "profiles")
+		if st, err := os.Stat(candidate); err == nil && st.IsDir() {
+			return candidate
+		}
+		dir = filepath.Dir(dir)
+	}
+	t.Skip("profiles/ not found from the test working directory")
+	return ""
+}
+
+func TestProfileBudgetsMustAddUp(t *testing.T) {
+	p := config.Profile{Name: "bad", ContextTokens: 1000, MaxPacketTokens: 900, ReservedOutput: 500}
+	if err := p.Validate(); err == nil {
+		t.Fatal("a packet cap plus reserved output exceeding the window must be rejected")
+	}
+}
+
+func TestFallbackProfileIsValidAndSaysItIsAFallback(t *testing.T) {
+	p := config.FallbackProfile()
+	if err := p.Validate(); err != nil {
+		t.Fatalf("the fallback profile must itself be valid: %v", err)
+	}
+	if !strings.Contains(p.Description, "bench") {
+		t.Error("the fallback profile must point at `bcode models bench`")
+	}
+}
+
+func TestExposureWarning(t *testing.T) {
+	if w := config.ExposureWarning("127.0.0.1:7777", false); w != "" {
+		t.Errorf("a loopback bind needs no warning, got %q", w)
+	}
+	if w := config.ExposureWarning("0.0.0.0:7777", true); !strings.Contains(w, "-p 127.0.0.1:7777:7777") {
+		t.Errorf("in a container the warning must name the safe publish flag, got %q", w)
+	}
+	if w := config.ExposureWarning("0.0.0.0:7777", false); !strings.Contains(w, "not to loopback") {
+		t.Errorf("on a host the warning must say the bind is not loopback, got %q", w)
+	}
+}
+
+func TestEnvOverridesTheBindAddress(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv(config.EnvAPIAddr, "0.0.0.0:9999")
+	cfg, err := config.Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.API.Addr != "0.0.0.0:9999" {
+		t.Fatalf("BC_API_ADDR was not honoured: %q", cfg.API.Addr)
+	}
+}
+
+// A generated bcode.yaml must carry the excludes. Leaving them nil in Default
+// wrote `excludes: []`, which on the next load is an empty-but-present list —
+// and the indexer then walked .git and node_modules.
+func TestGeneratedConfigCarriesExcludes(t *testing.T) {
+	dir := t.TempDir()
+	if err := config.Save(dir, config.Default()); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := config.Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(loaded.Index.Excludes) == 0 {
+		t.Fatal("a generated configuration must carry the default excludes, or indexing walks .git")
+	}
+	want := map[string]bool{".git": true, "node_modules": true, "vendor": true, ".bc": true}
+	got := map[string]bool{}
+	for _, e := range loaded.Index.Excludes {
+		got[e] = true
+	}
+	for name := range want {
+		if !got[name] {
+			t.Errorf("the default excludes are missing %q", name)
+		}
+	}
+}
+
+// The split deployment (deploy/docker-compose.split.yml) points the supervisor
+// at an inference container purely through the environment. Those two variables
+// were set by the compose file and documented as honoured, and nothing read
+// them — so a supervisor deployed that way came up with inference.mode "none"
+// and no base URL, never talking to the container it was deployed beside.
+func TestInferenceModeAndBaseURLComeFromTheEnvironment(t *testing.T) {
+	dir := t.TempDir()
+	if err := config.Save(dir, config.Default()); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv(config.EnvInferenceMode, "external")
+	t.Setenv(config.EnvInferenceBaseURL, "http://inference:8080")
+
+	cfg, err := config.Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Inference.Mode != config.ModeExternal {
+		t.Errorf("inference mode = %q, want external", cfg.Inference.Mode)
+	}
+	if cfg.Inference.BaseURL != "http://inference:8080" {
+		t.Errorf("base URL = %q, want the value from the environment", cfg.Inference.BaseURL)
+	}
+}
+
+// A misspelled mode must fail by name. Falling back to a default would leave a
+// deployment running with no inference and no indication why.
+func TestBadInferenceModeIsRejectedByName(t *testing.T) {
+	dir := t.TempDir()
+	if err := config.Save(dir, config.Default()); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv(config.EnvInferenceMode, "externl")
+
+	_, err := config.Load(dir)
+	if err == nil {
+		t.Fatal("a misspelled inference mode was accepted")
+	}
+	if !strings.Contains(err.Error(), "externl") {
+		t.Errorf("the error does not name the offending value: %v", err)
+	}
+}
+
+// External mode without a base URL is a misconfiguration, whichever way it
+// arrived.
+func TestExternalModeRequiresABaseURL(t *testing.T) {
+	dir := t.TempDir()
+	if err := config.Save(dir, config.Default()); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv(config.EnvInferenceMode, "external")
+
+	if _, err := config.Load(dir); err == nil {
+		t.Fatal("external mode was accepted with no base URL")
+	}
+}
+
+// The file still wins when the environment says nothing, or the override would
+// be impossible to turn off.
+func TestInferenceEnvIsOptional(t *testing.T) {
+	dir := t.TempDir()
+	cfg := config.Default()
+	cfg.Inference.Mode = config.ModeEmbedded
+	if err := config.Save(dir, cfg); err != nil {
+		t.Fatal(err)
+	}
+	got, err := config.Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Inference.Mode != config.ModeEmbedded {
+		t.Errorf("inference mode = %q, want the value from bcode.yaml", got.Inference.Mode)
+	}
+}

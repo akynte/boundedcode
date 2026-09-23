@@ -1,0 +1,224 @@
+// Package bwrap implements the optional bubblewrap layer of design v3 §6.1,
+// layer 3, and DR-3.
+//
+// It adds mount and PID namespaces on top of Landlock, restoring the
+// process-level isolation the container boundary alone does not give (§6.2:
+// "Cannot see other tasks' processes" is the only row that needs this layer).
+//
+// It is optional because unprivileged user namespaces are commonly unavailable
+// inside a container, and the runtime's seccomp profile may block namespace
+// creation. Available() explains exactly which of those is the case, because
+// "bwrap unavailable" on its own is useless in a support conversation.
+package bwrap
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"os/exec"
+	"sort"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/akynte/boundedcode/internal/sandbox"
+)
+
+// Runner wraps a task process tree in bubblewrap.
+type Runner struct {
+	// Binary is the bwrap executable; empty means look it up on PATH.
+	Binary string
+	// Inner, when set, is applied inside the namespaces. The design layers
+	// bwrap on top of Landlock rather than instead of it, so the usual value
+	// is the Landlock runner's helper invocation.
+	Inner sandbox.Runner
+}
+
+// New builds a bubblewrap runner layered over inner.
+func New(inner sandbox.Runner) *Runner { return &Runner{Inner: inner} }
+
+func (r *Runner) Name() string {
+	if r.Inner != nil {
+		return "bwrap+" + r.Inner.Name()
+	}
+	return "bwrap"
+}
+
+func (r *Runner) Layers() []sandbox.Layer {
+	layers := []sandbox.Layer{sandbox.LayerContainer, sandbox.LayerBwrap}
+	if r.Inner != nil {
+		layers = append(layers, r.Inner.Layers()...)
+	}
+	return dedupe(layers)
+}
+
+func dedupe(in []sandbox.Layer) []sandbox.Layer {
+	seen := map[sandbox.Layer]bool{}
+	var out []sandbox.Layer
+	for _, l := range in {
+		if !seen[l] {
+			seen[l] = true
+			out = append(out, l)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i] < out[j] })
+	return out
+}
+
+func (r *Runner) binary() string {
+	if r.Binary != "" {
+		return r.Binary
+	}
+	return "bwrap"
+}
+
+// UserNamespacesAvailable reports whether unprivileged user namespaces can be
+// created here. This is §16 verify item 2, answered at runtime rather than
+// assumed.
+func UserNamespacesAvailable() (bool, string) {
+	// Debian and Ubuntu kernels expose this switch; absent means the kernel
+	// has no such restriction and namespaces are governed by other policy.
+	if body, err := os.ReadFile("/proc/sys/kernel/unprivileged_userns_clone"); err == nil {
+		if strings.TrimSpace(string(body)) == "0" {
+			return false, "kernel.unprivileged_userns_clone is 0: unprivileged user namespaces are disabled on this host"
+		}
+	}
+	if body, err := os.ReadFile("/proc/sys/user/max_user_namespaces"); err == nil {
+		if n, err := strconv.Atoi(strings.TrimSpace(string(body))); err == nil && n == 0 {
+			return false, "user.max_user_namespaces is 0: unprivileged user namespaces are disabled on this host"
+		}
+	}
+	if body, err := os.ReadFile("/proc/sys/kernel/apparmor_restrict_unprivileged_userns"); err == nil {
+		if strings.TrimSpace(string(body)) == "1" {
+			return false, "kernel.apparmor_restrict_unprivileged_userns is 1: AppArmor blocks unprivileged user namespaces " +
+				"(Ubuntu 24.04 and later default). Run the container with --security-opt apparmor=unconfined to enable this layer"
+		}
+	}
+	return true, ""
+}
+
+// Available reports whether the bubblewrap layer can be used.
+func (r *Runner) Available(ctx context.Context) (bool, string) {
+	path, err := exec.LookPath(r.binary())
+	if err != nil {
+		return false, fmt.Sprintf("%s is not on PATH: %v", r.binary(), err)
+	}
+	if ok, reason := UserNamespacesAvailable(); !ok {
+		return false, reason
+	}
+	// A probe is the only honest test: the seccomp profile may permit the
+	// binary and still deny clone(CLONE_NEWUSER). Bounded, because a probe
+	// that hangs would hang `bcode doctor`.
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	//nolint:gosec // path comes from exec.LookPath on this runner's configured
+	// binary name, and the arguments are constants.
+	cmd := exec.CommandContext(ctx, path, "--unshare-user", "--unshare-pid", "--dev-bind", "/", "/", "true")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return false, fmt.Sprintf("bwrap probe failed (%v): %s. "+
+			"Inside a container this usually means the runtime's seccomp profile blocks namespace creation; "+
+			"see DR-3 and docs/how-to/troubleshooting.md", err, strings.TrimSpace(string(out)))
+	}
+	if r.Inner != nil {
+		if ok, reason := r.Inner.Available(ctx); !ok {
+			return false, "inner runner unavailable: " + reason
+		}
+	}
+	return true, ""
+}
+
+// underDev reports a path this runner must not bind.
+//
+// A spec grants /dev/null and its siblings because the Landlock layer works by
+// path and has to be told about them. bubblewrap does not: --dev builds a fresh
+// devtmpfs holding exactly those nodes. Binding the host's node on top of the
+// one bwrap just made produces a device that cannot be opened for writing
+// inside an unprivileged user namespace — and the symptom is every Go tool
+// invocation failing with "open /dev/null: permission denied", which reads as a
+// broken toolchain rather than as a mount that undid itself.
+func underDev(p string) bool {
+	return p == "/dev" || strings.HasPrefix(p, "/dev/")
+}
+
+// Command builds the bubblewrap invocation. Mount namespaces expose only the
+// spec's paths; the PID namespace is what makes §6.2's "cannot see other
+// tasks' processes" true.
+func (r *Runner) Command(ctx context.Context, spec sandbox.Spec, argv ...string) (*exec.Cmd, error) {
+	if err := spec.Validate(); err != nil {
+		return nil, err
+	}
+	if len(argv) == 0 {
+		return nil, fmt.Errorf("bwrap: no command to run")
+	}
+
+	args := []string{
+		"--unshare-user", "--unshare-pid", "--unshare-ipc", "--unshare-uts", "--unshare-cgroup-try",
+	}
+	if spec.Network != sandbox.NetworkHost {
+		args = append(args, "--unshare-net")
+	}
+	args = append(args, []string{
+		"--die-with-parent", // the sandbox must not outlive the supervisor
+		"--new-session",     // no shared terminal: prevents TIOCSTI injection into the parent's tty
+		"--proc", "/proc",
+		"--dev", "/dev",
+	}...)
+	// /tmp is mounted before anything else, because a bind replaces whatever
+	// the namespace already had at that path — including earlier binds beneath
+	// it. With the task's tmp mounted last, a data directory that happens to
+	// live under /tmp had its worktree bind silently discarded, and bwrap
+	// failed to chdir into a path the spec had explicitly granted. Mounting it
+	// first means the paths below are laid on top and survive.
+	//
+	// The isolation is unchanged: /tmp still shows only the task's own tmp plus
+	// whatever else the spec granted by name (§2.2).
+	if spec.TmpDir != "" {
+		args = append(args, "--bind", spec.TmpDir, "/tmp")
+	} else {
+		args = append(args, "--tmpfs", "/tmp")
+	}
+	for _, p := range spec.ReadOnly {
+		if underDev(p) {
+			continue
+		}
+		args = append(args, "--ro-bind-try", p, p)
+	}
+	for _, p := range spec.ReadWrite {
+		if underDev(p) {
+			continue
+		}
+		args = append(args, "--bind", p, p)
+	}
+	args = append(args, "--chdir", spec.Dir, "--")
+
+	// §9's default. Loopback survives the unshare — a test that binds
+	// 127.0.0.1:0 and dials itself still works, which is what most of the
+	// ephemeral-port grant is for — but nothing off this machine is reachable,
+	// so an instruction injected into repository text has nowhere to send what
+	// it read. A child that must reach the model gateway asks for
+	// NetworkHost explicitly.
+
+	inner := argv
+	if r.Inner != nil {
+		cmd, err := r.Inner.Command(ctx, spec, argv...)
+		if err != nil {
+			return nil, err
+		}
+		inner = append([]string{cmd.Path}, cmd.Args[1:]...)
+		args = append(args, inner...)
+		//nolint:gosec // the command is what the sandbox exists to confine; the
+		// mitigation is the mount and PID namespaces bwrap creates around it.
+		full := exec.CommandContext(ctx, r.binary(), args...)
+		full.Dir = spec.Dir
+		full.Env = cmd.Env
+		return full, nil
+	}
+
+	args = append(args, inner...)
+	//nolint:gosec // as above: confining this command is the point of the type.
+	cmd := exec.CommandContext(ctx, r.binary(), args...)
+	cmd.Dir = spec.Dir
+	cmd.Env = spec.Env
+	return cmd, nil
+}

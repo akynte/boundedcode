@@ -1,0 +1,37 @@
+# gitleaks configuration.
+#
+# The default rule set is kept in full. This file exists for one exemption,
+# and the narrowness of it is the point: an allowlist is a hole in secret
+# scanning, so it names an exact published non-secret rather than a file, a
+# path pattern, or a rule to switch off.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = """
+AKIAIOSFODNN7EXAMPLE is the example access key ID from AWS's own
+documentation. It is published by AWS as a placeholder, corresponds to no
+account, and grants nothing.
+
+It appears once in this repository, in
+internal/judgment/judgment_test.go's TestRepoRefusesCredentialsWithoutEchoingThem,
+which exists to prove that judgment.State refuses a credential-shaped value
+and does not repeat it in the error. That test needs a literal that looks like
+a credential in order to test anything at all, so the string cannot be removed
+without removing the check it verifies.
+
+When this matters: CI scans only the newest commit, so it does not normally
+reach line 208 at all. A full-history scan does — which is what plain
+`gitleaks detect` does by default, and what a developer running the tool
+locally gets. Without this, that scan reports a leak that is not one.
+
+Scoped to this one literal deliberately. Allowlisting the file would mean a
+real credential pasted into it later would not be caught, and allowlisting the
+aws-access-token rule would disable the check everywhere. Verified with
+gitleaks 8.16.1: a different AKIA-shaped key in the same file is still
+reported.
+"""
+regexes = [
+  '''AKIAIOSFODNN7EXAMPLE''',
+]

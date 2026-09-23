@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/akynte/boundedcode/schemas/judgment.schema.json",
+  "title": "Judgment service",
+  "description": "/data/config/judgment.yaml. Typed, calibrated answers from an external service, used where deterministic code has to make a semantic call. Advisory everywhere: a judgment may reorder evidence and divide the context budget, and may never accept work, reject work, or widen a refusal. Absent file means disabled, which is the shipped state.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "enabled": {
+      "type": "boolean",
+      "default": false,
+      "description": "Required. Six registered sites can change control flow and are answered by this service, so a task cannot run without it. Disabling this leaves those decisions unmakeable rather than defaulted."
+    },
+    "endpoint": {
+      "type": "string",
+      "format": "uri",
+      "default": "https://api.typesafe.ai/v1/systemone",
+      "description": "The System One endpoint."
+    },
+    "model": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Required when enabled. Pin a concrete version such as jev-1.13.0 rather than a moving alias: the model id is part of the judgment cache key and of every benchmark's provenance, so an alias makes two runs incomparable while the configuration looks unchanged. `bcode judgment smoke` confirms the service accepts it."
+    },
+    "api_key_env": {
+      "type": "string",
+      "minLength": 1,
+      "default": "TYPESAFE_API_KEY",
+      "description": "The name of an environment variable holding the key. The name, never the value, so this file stays safe to commit and to attach to a bug report."
+    },
+    "redact": {
+      "enum": [
+        "strict",
+        "repo_text"
+      ],
+      "default": "strict",
+      "description": "strict sends no repository source: the objective, paths, symbol names, kinds, line ranges and counts only. repo_text additionally permits signatures and short excerpts, subject to the egress-sensitive path check and the credential scan, and bcode doctor names the mode on every run."
+    },
+    "min_confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "default": 0.75,
+      "description": "The floor for choice and score answers where a call site sets none of its own. Below it the deterministic answer stands. It does not apply to yes/no questions, which report no separate confidence."
+    },
+    "timeout_seconds": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Bounds one request. Zero or absent means 20 seconds. A slow judge is treated as an absent one."
+    },
+    "cache": {
+      "type": "boolean",
+      "description": "Store answers content-addressed by state, model and question set, so a repeated question costs nothing."
+    }
+  },
+  "allOf": [
+    {
+      "$comment": "The loader refuses an enabled configuration with no model, because the model id is part of the judgment cache key: without one, a cached answer cannot be tied to what produced it. The schema has to refuse it too, or an editor would call a file valid that the program then rejects.",
+      "if": {
+        "properties": {
+          "enabled": {
+            "const": true
+          }
+        },
+        "required": [
+          "enabled"
+        ]
+      },
+      "then": {
+        "required": [
+          "model"
+        ]
+      }
+    }
+  ]
+}

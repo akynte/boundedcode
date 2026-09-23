@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "method": "For each task: fresh pristine container from the pinned official image; run the dataset's own before_repo_set_cmd (checks out the FAIL_TO_PASS test file from its future commit, using the container's still-full git history — this step happens only in this isolated oracle container, never in an agent workspace); run the official test runner with no source fix applied (BASELINE, expected to fail); apply the instance's real gold `patch` field with `git apply`; re-run the same official test runner (ORACLE, expected to pass). No scoring logic was reimplemented: every result below comes from the project's own test command (go test, yarn jest, pytest, node test.js).",
+  "tasks": [
+    {
+      "task_id": "instance_future-architect__vuls-bff6b7552370b55ff76d474860eead4ab5de785a-v1151a6325649aaf997cd541ebe533b53fddf1b07",
+      "language": "go",
+      "test_command": "go test ./scanner/... -run 'Test_redhatBase_parseUpdatablePacksLine|Test_redhatBase_parseUpdatablePacksLines' -v",
+      "fail_to_pass_count": 7,
+      "baseline_result": "FAIL",
+      "baseline_status": "BASELINE_EXPECTED",
+      "gold_patch_applies": true,
+      "oracle_result": "PASS",
+      "oracle_status": "ORACLE_VALIDATION_PASSED"
+    },
+    {
+      "task_id": "instance_element-hq__element-web-ca58617cee8aa91c93553449bfdf9b3465a5119b-vnan",
+      "language": "js",
+      "test_command": "yarn jest test/LegacyCallHandler-test.ts -t 'should unmute'",
+      "fail_to_pass_count": 1,
+      "baseline_result": "FAIL",
+      "baseline_status": "BASELINE_EXPECTED",
+      "gold_patch_applies": true,
+      "oracle_result": "PASS",
+      "oracle_status": "ORACLE_VALIDATION_PASSED"
+    },
+    {
+      "task_id": "instance_internetarchive__openlibrary-1894cb48d6e7fb498295a5d3ed0596f6f603b784-v0f5aece3601a5b4419f7ccec1dbda2071be28ee4",
+      "language": "python",
+      "test_command": "python3 -m pytest openlibrary/catalog/add_book/tests/test_add_book.py::test_find_match_title_only_promiseitem_against_noisbn_marc -v",
+      "fail_to_pass_count": 1,
+      "baseline_result": "FAIL",
+      "baseline_status": "BASELINE_EXPECTED",
+      "gold_patch_applies": true,
+      "oracle_result": "PASS",
+      "oracle_status": "ORACLE_VALIDATION_PASSED"
+    },
+    {
+      "task_id": "instance_tutao__tutanota-b4934a0f3c34d9d7649e944b183137e8fad3e859-vbc0d9ba8f0071fbe982809910959a6ff8884dbbf",
+      "language": "ts",
+      "test_command": "node test.js -f",
+      "note": "tutanota's own test runner has no per-file filter; it runs the entire suite (8681 assertions). Baseline fails at BUILD time (esbuild: 'No matching export ... removeTechnicalFields', since the gold patch is what adds that export) rather than at a specific assertion; this is still a real BASELINE_EXPECTED failure produced by the official toolchain, not a reimplementation.",
+      "fail_to_pass_count": 1,
+      "baseline_result": "BUILD_FAIL",
+      "baseline_status": "BASELINE_EXPECTED",
+      "gold_patch_applies": true,
+      "oracle_result": "PASS (full suite: 8681 assertions passed)",
+      "oracle_status": "ORACLE_VALIDATION_PASSED"
+    }
+  ],
+  "all_tasks_oracle_validated": true,
+  "isolation": "Every container used for oracle validation was disposable (docker run --rm), stopped and removed at the end of the session. The gold patch, test_patch content, and oracle container never touched any agent-workspace directory under .local-engineer-runs/evidence-v1/agent-workspaces/ — confirmed by re-running the anti-leakage probe (redteam_probe.py) against those directories after this oracle validation session; see redteam-probe-results.json, unchanged and still all-PASS."
+}

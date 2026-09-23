@@ -1,0 +1,236 @@
+// Package sandbox implements the layered isolation of design v3 §6 and DR-3.
+//
+// Three layers, each documented with what it does and does not guarantee:
+//
+//  1. the container boundary (always),
+//  2. Landlock per task (default inside the container),
+//  3. bubblewrap per task (optional, when user namespaces are available).
+//
+// `bcode doctor` reports which layers are active. Nothing here claims a guarantee
+// a layer does not provide: the guarantee table of §6.2 is encoded in
+// Guarantees() so the honest statement and the code cannot drift apart.
+package sandbox
+
+import (
+	"context"
+	"fmt"
+	"os/exec"
+	"sort"
+)
+
+// Layer names the three layers of §6.1.
+type Layer string
+
+const (
+	LayerContainer Layer = "container"
+	LayerLandlock  Layer = "landlock"
+	LayerBwrap     Layer = "bwrap"
+)
+
+// Network states whether a child may reach the network at all.
+//
+// §9 makes no network the default and says so for a reason: with no egress, an
+// instruction injected into repository text has nowhere to send anything, which
+// is capability containment rather than a model-side defence that an adaptive
+// attacker gets past. A verification command that genuinely needs the network —
+// fetching a module — runs as a separate, supervisor-initiated warm-up outside
+// the model loop.
+//
+// The zero value is NetworkNone, so a caller that says nothing gets the
+// default the review asks for rather than the network.
+type Network string
+
+const (
+	// NetworkNone unshares the network namespace where the runner can. Loopback
+	// still works, so a test that binds 127.0.0.1:0 and dials itself is
+	// unaffected — which is most of what AllowEphemeralTCP exists for.
+	NetworkNone Network = ""
+	// NetworkHost leaves the namespace alone. It is for the one child that has
+	// to reach the model gateway: an interactive editing session.
+	NetworkHost Network = "host"
+)
+
+// Spec describes one task's sandbox. Paths are absolute and already resolved
+// by the caller; the runner never composes paths itself.
+type Spec struct {
+	// Network is the egress policy. Only the bubblewrap layer can enforce
+	// NetworkNone outright; the Landlock layer approximates it with port rules
+	// and says so in Guarantees.
+	Network Network
+	// ReadOnly are toolchain and library paths the task may read.
+	ReadOnly []string
+	// ReadWrite are the task worktree, its tmp and its caches.
+	ReadWrite []string
+	// TCPConnect are the ports the task may dial: the inference proxy and
+	// assigned test-service ports, and nothing else.
+	TCPConnect []uint16
+	// TCPBind are ports the task may listen on (test servers).
+	TCPBind []uint16
+	// AllowEphemeralTCP grants bind and connect on the host's ephemeral port
+	// range, which a test suite needs and no allowlist can predict.
+	//
+	// Landlock's network rules name one port each — the kernel's rule struct
+	// carries a single port, so a range cannot be expressed — and a server
+	// bound to port 0 gets whatever the kernel picks. That is how every Go
+	// test that uses httptest works, so without this the verification of any
+	// repository with HTTP tests fails with "connect: permission denied" on a
+	// port nobody chose. On this repository that was 22 tests across three
+	// packages, failing regardless of the change under test.
+	//
+	// It does not weaken the guarantee §6.2 actually makes. The range holds no
+	// services: by convention and by IANA's dynamic-port assignment, a service
+	// listens below it, so the inference endpoint, the supervisor API and the
+	// egress proxy stay denied. TCPDeny covers the case where an operator has
+	// moved one into the range anyway.
+	AllowEphemeralTCP bool
+	// TCPDeny are ports excluded from the AllowEphemeralTCP grant: the
+	// system's own service ports, in case an operator configured one inside
+	// the ephemeral range. It has no effect on TCPConnect and TCPBind, which
+	// are deliberate grants.
+	TCPDeny []uint16
+	// Env is the child's environment. XDG variables are set per task so that
+	// OpenCode never sees another workspace's directories (§2.2).
+	Env []string
+	// Dir is the working directory.
+	Dir string
+	// TmpDir is the per-workspace tmp the sandbox exposes as the only tmp.
+	TmpDir string
+
+	// Image pins the container the command must run inside, as an immutable
+	// reference — name@sha256:… — or empty for the host.
+	//
+	// It exists because a generic sandbox is the wrong environment for a
+	// repository this project did not write. The host's interpreter, its
+	// toolchain version and its installed packages are properties of the
+	// operator's machine, and verifying a third-party tree against them
+	// measures the machine. A task that names the runtime it was built for
+	// gets that runtime, and the answer means something.
+	//
+	// A tag is refused: "latest" is not a runtime, it is whatever was pushed
+	// last, and a measurement has to name what it ran against.
+	Image string
+	// ImageDir is where Dir is mounted inside Image. The image's own
+	// installation is usually rooted at a fixed path — a package installed in
+	// development mode points at it — so the worktree has to arrive there
+	// rather than at its host path.
+	ImageDir string
+	// Prelude runs inside Image before the command, in the same shell. It is
+	// for restoring what mounting the worktree displaced, never for doing
+	// any part of the work being measured.
+	Prelude string
+}
+
+// Validate rejects a spec that would sandbox nothing, which is the failure
+// mode most likely to pass unnoticed.
+func (s Spec) Validate() error {
+	if len(s.ReadWrite) == 0 {
+		return fmt.Errorf("sandbox: spec grants no writable path; a task needs at least its worktree")
+	}
+	if s.Dir == "" {
+		return fmt.Errorf("sandbox: spec has no working directory")
+	}
+	return nil
+}
+
+// Runner applies a sandbox to a child process. DR-3 keeps this an interface so
+// a gVisor or microVM runner can be added for untrusted repositories without
+// touching callers.
+type Runner interface {
+	// Name identifies the runner in `bcode doctor` output and in the journal.
+	Name() string
+	// Layers reports which layers this runner actually applies.
+	Layers() []Layer
+	// Command builds a sandboxed exec.Cmd. The command is not started.
+	Command(ctx context.Context, spec Spec, argv ...string) (*exec.Cmd, error)
+	// Available reports whether this runner can work on this host, and why not
+	// when it cannot. The reason is user-visible: "unavailable" without a
+	// reason is useless in a support conversation.
+	//
+	// It takes a context because probing can mean spawning a process, and a
+	// probe that hangs would hang `bcode doctor` — the command people run when
+	// something is already wrong.
+	Available(ctx context.Context) (bool, string)
+}
+
+// Guarantee is one row of the §6.2 table.
+type Guarantee struct {
+	Statement string `json:"statement"`
+	Container bool   `json:"container_only"`
+	Landlock  bool   `json:"with_landlock"`
+	Bwrap     bool   `json:"with_bwrap"`
+	// Note carries the qualification the table states in prose.
+	Note string `json:"note,omitempty"`
+}
+
+// Guarantees returns the §6.2 table verbatim. `bcode doctor` prints the rows for
+// the layers actually active, so the product never claims more than it does.
+func Guarantees() []Guarantee {
+	return []Guarantee{
+		{Statement: "Cannot touch host files outside mounts", Container: true, Landlock: true, Bwrap: true},
+		{Statement: "Cannot read another workspace's data", Container: true, Landlock: true, Bwrap: true,
+			Note: "container only: by file permissions and per-task Landlock rules; with Landlock: paths outside the task set are denied"},
+		{Statement: "Cannot reach model-management endpoints", Container: true, Landlock: true, Bwrap: true,
+			Note: "container only: via the §6.1 proxy allowlist when egress is enabled, and the container's " +
+				"network configuration otherwise; with Landlock: TCP port rules. A task never gets the " +
+				"proxy port either way"},
+		{Statement: "Cannot see other tasks' processes", Container: false, Landlock: false, Bwrap: true,
+			Note: "requires the PID namespace, which only the bubblewrap layer provides"},
+		{Statement: "Cannot reach the network when the spec denies it", Container: false, Landlock: false, Bwrap: true,
+			Note: "only the bubblewrap layer unshares the network namespace. With Landlock alone this is " +
+				"port rules on TCP bind and connect, which do not cover UDP, raw sockets or Multipath TCP; " +
+				"with the container boundary alone it is the container's own network configuration"},
+		{Statement: "Out-of-scope writes in the worktree", Container: true, Landlock: true, Bwrap: true,
+			Note: "detected by diff at every layer, not prevented"},
+		{Statement: "Cannot modify policy, ledger, hidden tests", Container: true, Landlock: true, Bwrap: true,
+			Note: "container only: file permissions and Landlock"},
+	}
+}
+
+// ReadmeStatement is the honest summary §6.2 requires the README to carry.
+const ReadmeStatement = "The default container gives strong isolation from your host and between " +
+	"workspaces; process-level isolation between concurrent tasks requires the optional namespace mode."
+
+// Report describes the active configuration for `bcode doctor`.
+type Report struct {
+	Runner     string      `json:"runner"`
+	Active     []Layer     `json:"active_layers"`
+	Inactive   []LayerNote `json:"inactive_layers"`
+	Guarantees []Guarantee `json:"guarantees"`
+	Statement  string      `json:"statement"`
+}
+
+// LayerNote explains why a layer is not active.
+type LayerNote struct {
+	Layer  Layer  `json:"layer"`
+	Reason string `json:"reason"`
+}
+
+// Select picks the strongest available runner and reports what it chose and
+// what it rejected. Order: bubblewrap (strongest) then Landlock then the
+// container boundary alone.
+func Select(ctx context.Context, candidates []Runner) (Runner, Report) {
+	rep := Report{Guarantees: Guarantees(), Statement: ReadmeStatement}
+	var chosen Runner
+	for _, c := range candidates {
+		ok, reason := c.Available(ctx)
+		if ok && chosen == nil {
+			chosen = c
+			continue
+		}
+		if !ok {
+			for _, l := range c.Layers() {
+				if l == LayerContainer {
+					continue
+				}
+				rep.Inactive = append(rep.Inactive, LayerNote{Layer: l, Reason: reason})
+			}
+		}
+	}
+	if chosen == nil {
+		return nil, rep
+	}
+	rep.Runner = chosen.Name()
+	rep.Active = chosen.Layers()
+	sort.Slice(rep.Inactive, func(i, j int) bool { return rep.Inactive[i].Layer < rep.Inactive[j].Layer })
+	return chosen, rep
+}

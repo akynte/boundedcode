@@ -1,0 +1,277 @@
+schema_version: 1
+sites:
+    context_injection:
+        site: context_injection
+        effect_class: ordering
+        min_reportable_samples: 20
+        min_promotion_samples:
+            value: 0
+            requires_selection: true
+            note: must be > min_reportable_samples and chosen from real held-out evidence, not guessed
+        min_skill_lower_bound:
+            value: 0
+            requires_selection: true
+            note: the lower 95% bootstrap CI bound on Brier skill this site must clear; 0 is the theoretical floor (beats guessing the base rate) but the operating threshold is a domain choice
+        max_flip_rate:
+            value: 0
+            requires_selection: true
+            note: repeat-evaluation label flip rate this site must stay under
+        max_distractor_delta:
+            value: 0
+            requires_selection: true
+            note: max probability movement under an irrelevant distractor or permutation this site must stay under
+        max_latency_p95_seconds:
+            value: 0
+            requires_selection: true
+            note: p95 request latency this site must stay under; tightest for a site that sits in the execution path
+        require_baseline_beaten: false
+    diff_conformance:
+        site: diff_conformance
+        effect_class: routing
+        min_reportable_samples: 20
+        min_promotion_samples:
+            value: 0
+            requires_selection: true
+            note: must be > min_reportable_samples and chosen from real held-out evidence, not guessed
+        min_skill_lower_bound:
+            value: 0
+            requires_selection: true
+            note: the lower 95% bootstrap CI bound on Brier skill this site must clear; 0 is the theoretical floor (beats guessing the base rate) but the operating threshold is a domain choice
+        max_flip_rate:
+            value: 0
+            requires_selection: true
+            note: repeat-evaluation label flip rate this site must stay under
+        max_distractor_delta:
+            value: 0
+            requires_selection: true
+            note: max probability movement under an irrelevant distractor or permutation this site must stay under
+        max_latency_p95_seconds:
+            value: 0
+            requires_selection: true
+            note: p95 request latency this site must stay under; tightest for a site that sits in the execution path
+        require_baseline_beaten: true
+    fact_relevance:
+        site: fact_relevance
+        effect_class: ordering
+        min_reportable_samples: 20
+        min_promotion_samples:
+            value: 0
+            requires_selection: true
+            note: must be > min_reportable_samples and chosen from real held-out evidence, not guessed
+        min_skill_lower_bound:
+            value: 0
+            requires_selection: true
+            note: the lower 95% bootstrap CI bound on Brier skill this site must clear; 0 is the theoretical floor (beats guessing the base rate) but the operating threshold is a domain choice
+        max_flip_rate:
+            value: 0
+            requires_selection: true
+            note: repeat-evaluation label flip rate this site must stay under
+        max_distractor_delta:
+            value: 0
+            requires_selection: true
+            note: max probability movement under an irrelevant distractor or permutation this site must stay under
+        max_latency_p95_seconds:
+            value: 0
+            requires_selection: true
+            note: p95 request latency this site must stay under; tightest for a site that sits in the execution path
+        require_baseline_beaten: false
+    failure_triage:
+        site: failure_triage
+        effect_class: routing
+        min_reportable_samples: 20
+        min_promotion_samples:
+            value: 0
+            requires_selection: true
+            note: must be > min_reportable_samples and chosen from real held-out evidence, not guessed
+        min_skill_lower_bound:
+            value: 0
+            requires_selection: true
+            note: the lower 95% bootstrap CI bound on Brier skill this site must clear; 0 is the theoretical floor (beats guessing the base rate) but the operating threshold is a domain choice
+        max_flip_rate:
+            value: 0
+            requires_selection: true
+            note: repeat-evaluation label flip rate this site must stay under
+        max_distractor_delta:
+            value: 0
+            requires_selection: true
+            note: max probability movement under an irrelevant distractor or permutation this site must stay under
+        max_latency_p95_seconds:
+            value: 0
+            requires_selection: true
+            note: p95 request latency this site must stay under; tightest for a site that sits in the execution path
+        require_baseline_beaten: true
+    hypothesis_check:
+        site: hypothesis_check
+        effect_class: ordering
+        min_reportable_samples: 20
+        min_promotion_samples:
+            value: 0
+            requires_selection: true
+            note: must be > min_reportable_samples and chosen from real held-out evidence, not guessed
+        min_skill_lower_bound:
+            value: 0
+            requires_selection: true
+            note: the lower 95% bootstrap CI bound on Brier skill this site must clear; 0 is the theoretical floor (beats guessing the base rate) but the operating threshold is a domain choice
+        max_flip_rate:
+            value: 0
+            requires_selection: true
+            note: repeat-evaluation label flip rate this site must stay under
+        max_distractor_delta:
+            value: 0
+            requires_selection: true
+            note: max probability movement under an irrelevant distractor or permutation this site must stay under
+        max_latency_p95_seconds:
+            value: 0
+            requires_selection: true
+            note: p95 request latency this site must stay under; tightest for a site that sits in the execution path
+        require_baseline_beaten: false
+    intake_profile:
+        site: intake_profile
+        effect_class: routing
+        min_reportable_samples: 20
+        min_promotion_samples:
+            value: 0
+            requires_selection: true
+            note: must be > min_reportable_samples and chosen from real held-out evidence, not guessed
+        min_skill_lower_bound:
+            value: 0
+            requires_selection: true
+            note: the lower 95% bootstrap CI bound on Brier skill this site must clear; 0 is the theoretical floor (beats guessing the base rate) but the operating threshold is a domain choice
+        max_flip_rate:
+            value: 0
+            requires_selection: true
+            note: repeat-evaluation label flip rate this site must stay under
+        max_distractor_delta:
+            value: 0
+            requires_selection: true
+            note: max probability movement under an irrelevant distractor or permutation this site must stay under
+        max_latency_p95_seconds:
+            value: 0
+            requires_selection: true
+            note: p95 request latency this site must stay under; tightest for a site that sits in the execution path
+        require_baseline_beaten: true
+    note_relevance:
+        site: note_relevance
+        effect_class: ordering
+        min_reportable_samples: 20
+        min_promotion_samples:
+            value: 0
+            requires_selection: true
+            note: must be > min_reportable_samples and chosen from real held-out evidence, not guessed
+        min_skill_lower_bound:
+            value: 0
+            requires_selection: true
+            note: the lower 95% bootstrap CI bound on Brier skill this site must clear; 0 is the theoretical floor (beats guessing the base rate) but the operating threshold is a domain choice
+        max_flip_rate:
+            value: 0
+            requires_selection: true
+            note: repeat-evaluation label flip rate this site must stay under
+        max_distractor_delta:
+            value: 0
+            requires_selection: true
+            note: max probability movement under an irrelevant distractor or permutation this site must stay under
+        max_latency_p95_seconds:
+            value: 0
+            requires_selection: true
+            note: p95 request latency this site must stay under; tightest for a site that sits in the execution path
+        require_baseline_beaten: false
+    obligation_reason:
+        site: obligation_reason
+        effect_class: routing
+        min_reportable_samples: 20
+        min_promotion_samples:
+            value: 0
+            requires_selection: true
+            note: must be > min_reportable_samples and chosen from real held-out evidence, not guessed
+        min_skill_lower_bound:
+            value: 0
+            requires_selection: true
+            note: the lower 95% bootstrap CI bound on Brier skill this site must clear; 0 is the theoretical floor (beats guessing the base rate) but the operating threshold is a domain choice
+        max_flip_rate:
+            value: 0
+            requires_selection: true
+            note: repeat-evaluation label flip rate this site must stay under
+        max_distractor_delta:
+            value: 0
+            requires_selection: true
+            note: max probability movement under an irrelevant distractor or permutation this site must stay under
+        max_latency_p95_seconds:
+            value: 0
+            requires_selection: true
+            note: p95 request latency this site must stay under; tightest for a site that sits in the execution path
+        require_baseline_beaten: true
+    progress_monitor:
+        site: progress_monitor
+        effect_class: routing
+        min_reportable_samples: 20
+        min_promotion_samples:
+            value: 0
+            requires_selection: true
+            note: must be > min_reportable_samples and chosen from real held-out evidence, not guessed
+        min_skill_lower_bound:
+            value: 0
+            requires_selection: true
+            note: the lower 95% bootstrap CI bound on Brier skill this site must clear; 0 is the theoretical floor (beats guessing the base rate) but the operating threshold is a domain choice
+        max_flip_rate:
+            value: 0
+            requires_selection: true
+            note: repeat-evaluation label flip rate this site must stay under
+        max_distractor_delta:
+            value: 0
+            requires_selection: true
+            note: max probability movement under an irrelevant distractor or permutation this site must stay under
+        max_latency_p95_seconds:
+            value: 0
+            requires_selection: true
+            note: p95 request latency this site must stay under; tightest for a site that sits in the execution path
+        require_baseline_beaten: true
+    review_rubric:
+        site: review_rubric
+        effect_class: ordering
+        min_reportable_samples: 20
+        min_promotion_samples:
+            value: 0
+            requires_selection: true
+            note: must be > min_reportable_samples and chosen from real held-out evidence, not guessed
+        min_skill_lower_bound:
+            value: 0
+            requires_selection: true
+            note: the lower 95% bootstrap CI bound on Brier skill this site must clear; 0 is the theoretical floor (beats guessing the base rate) but the operating threshold is a domain choice
+        max_flip_rate:
+            value: 0
+            requires_selection: true
+            note: repeat-evaluation label flip rate this site must stay under
+        max_distractor_delta:
+            value: 0
+            requires_selection: true
+            note: max probability movement under an irrelevant distractor or permutation this site must stay under
+        max_latency_p95_seconds:
+            value: 0
+            requires_selection: true
+            note: p95 request latency this site must stay under; tightest for a site that sits in the execution path
+        require_baseline_beaten: false
+    verification_integrity:
+        site: verification_integrity
+        effect_class: routing
+        min_reportable_samples: 20
+        min_promotion_samples:
+            value: 0
+            requires_selection: true
+            note: must be > min_reportable_samples and chosen from real held-out evidence, not guessed
+        min_skill_lower_bound:
+            value: 0
+            requires_selection: true
+            note: the lower 95% bootstrap CI bound on Brier skill this site must clear; 0 is the theoretical floor (beats guessing the base rate) but the operating threshold is a domain choice
+        max_flip_rate:
+            value: 0
+            requires_selection: true
+            note: repeat-evaluation label flip rate this site must stay under
+        max_distractor_delta:
+            value: 0
+            requires_selection: true
+            note: max probability movement under an irrelevant distractor or permutation this site must stay under
+        max_latency_p95_seconds:
+            value: 0
+            requires_selection: true
+            note: p95 request latency this site must stay under; tightest for a site that sits in the execution path
+        require_baseline_beaten: true

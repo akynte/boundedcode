@@ -1,0 +1,268 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/akynte/boundedcode/schemas/task.schema.json",
+  "title": "Evaluation task",
+  "description": "A task under evals/tasks/ (design v3 \u00a710.2). Two properties make the numbers mean anything: the acceptance files are never in the worktree while the task runs, and the system's own verdict is recorded separately from the ground truth.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "category",
+    "objective",
+    "fixture",
+    "leak_risk",
+    "acceptance",
+    "budget"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "category": {
+      "enum": [
+        "bug_fix",
+        "feature",
+        "refactor",
+        "schema_change",
+        "api_change",
+        "test_gap"
+      ],
+      "description": "Results are reported per category."
+    },
+    "objective": {
+      "type": "string",
+      "minLength": 1,
+      "description": "What the system is asked to do, in the words a user would use. It must not name the fix: an objective that says what to change measures typing, not engineering."
+    },
+    "fixture": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Directory relative to the task file."
+    },
+    "scope": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Paths a solution may change, as a real task would restrict them."
+    },
+    "verification": {
+      "enum": [
+        "low",
+        "standard",
+        "high"
+      ]
+    },
+    "leak_risk": {
+      "enum": [
+        "none",
+        "public",
+        "unknown"
+      ],
+      "description": "Provenance is disclosed per task, never assumed. Results over public tasks are an upper bound and the report says so."
+    },
+    "notes": {
+      "type": "string",
+      "description": "What a reader of the results needs to interpret them: why the task is hard, and what a wrong-but-passing solution looks like."
+    },
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_attempts",
+        "max_wall_seconds"
+      ],
+      "properties": {
+        "max_attempts": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_wall_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "A result without a fixed budget is not comparable."
+        },
+        "max_tokens": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "acceptance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "argv",
+        "files"
+      ],
+      "properties": {
+        "argv": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          },
+          "description": "Decides the task. A non-zero exit means it was not solved."
+        },
+        "timeout_seconds": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "must_not_change": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "A task 'passed' by deleting the failing test has not been solved."
+        },
+        "files": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Written into the worktree copy AFTER the run. If the test is already in the fixture the model can read it, and satisfying a test you can see is not solving the problem."
+        }
+      }
+    },
+    "set": {
+      "enum": [
+        "dev",
+        "heldout"
+      ],
+      "description": "Which evaluation set this task belongs to. Ranking weights, thresholds and retrieval constants may be fitted on dev; a held-out task is judged on and never fitted to, because a threshold chosen because it scored well on a task is no longer measured by that task. Absent means dev, which is the conservative reading."
+    },
+    "origin": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Where this task came from in real project history. It is the evidence the admission protocol checks: a task with no origin is one nobody can show is a real engineering problem rather than one written to be solvable. gold_revision is evaluator-only and must never be reachable from the fixture.",
+      "properties": {
+        "repository": {
+          "type": "string",
+          "description": "The project, when the set draws on more than one."
+        },
+        "base_revision": {
+          "type": "string",
+          "description": "The pre-fix state the solver executes against."
+        },
+        "gold_revision": {
+          "type": "string",
+          "description": "The fixing commit. Evaluator-only: evidence for an annotator, never ground truth by itself."
+        },
+        "base_digest": {
+          "type": "string",
+          "description": "Content digest of the base state, from `bcode eval integrity --print-digest`. It is what makes the base revision checkable here: an edited fixture stops matching."
+        },
+        "date": {
+          "type": "string",
+          "description": "When the fix landed, for ordering a split by time and judging training-data leakage."
+        },
+        "reference": {
+          "type": "string",
+          "description": "A link or identifier a reader can follow."
+        },
+        "derived_from_history": {
+          "type": "boolean",
+          "description": "The objective was written from the real change rather than invented for the benchmark. A claim the author makes and a reviewer checks."
+        },
+        "synthetic": {
+          "type": "boolean",
+          "description": "Written for the benchmark. Allowed in dev, refused in a held-out publication set."
+        },
+        "external_dependencies": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Anything the acceptance check needs that is not in the fixture. A mandatory one makes the task unreproducible."
+        },
+        "runtime_image": {
+          "type": "string",
+          "description": "the immutable environment (name@sha256:\u2026) this task's own verification runs in; empty means the host"
+        },
+        "runtime_workdir": {
+          "type": "string",
+          "description": "where the worktree is mounted inside runtime_image"
+        },
+        "runtime_env": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "KEY=VALUE the runtime needs before the repository's checks will run"
+        },
+        "runtime_prepared_image": {
+          "type": "string",
+          "description": "runtime_image with the repository's dependencies already fetched, so the measured run needs no network"
+        },
+        "runtime_prelude": {
+          "type": "string",
+          "description": "a command run inside the runtime before each verification command, to restore what mounting the worktree displaced"
+        }
+      }
+    },
+    "traits": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Facets the split protocol balances on and the duplicate audit groups by. Descriptive, not scored.",
+      "properties": {
+        "subsystem": {
+          "type": "string",
+          "description": "The area of the project the work is in. Two tasks in one subsystem are the likeliest pair to leak across a split."
+        },
+        "language": {
+          "type": "string",
+          "description": "The primary language of the change."
+        },
+        "family": {
+          "type": "string",
+          "description": "Groups tasks a human judged to be variations of one problem. A declared family must not span dev and held-out."
+        }
+      }
+    },
+    "expected": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Localization ground truth, applied only when scoring and never shown to the system. Written by ApplyAnnotations from the annotation files rather than by hand: ground truth has provenance or it has no standing.",
+      "properties": {
+        "files": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "symbols": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "callers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "tests": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "useful": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "rubric_version": {
+          "type": "string"
+        },
+        "annotator": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

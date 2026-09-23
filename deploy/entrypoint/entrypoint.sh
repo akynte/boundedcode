@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# boundedcode container entrypoint (design v3 §4.3, §4.4).
+#
+# It prepares the data volume, reports which isolation layers the runtime
+# actually permits, and then execs `bcode` so the supervisor is the process that
+# receives SIGTERM and runs the orderly shutdown of §4.4.
+set -euo pipefail
+
+: "${BC_DATA:=/data}"
+
+log() { printf '%s entrypoint: %s\n' "$(date -u +%H:%M:%S)" "$*" >&2; }
+
+# The data volume must be writable by the unprivileged user. A fresh named
+# volume is created root-owned by the daemon, so say so clearly rather than
+# failing later inside SQLite.
+if [ ! -w "$BC_DATA" ]; then
+  log "FATAL: $BC_DATA is not writable by uid $(id -u)."
+  log "  Named volume: run 'docker run --rm -v bc-data:/data alpine chown -R 10001:10001 /data' once."
+  log "  Bind mount:   chown the host directory to uid 10001, or pass --user \"\$(id -u):\$(id -g)\"."
+  exit 1
+fi
+
+# Only the directories the supervisor owns. XDG directories are NOT created
+# here: §2.2 sets them per task process, pointing at that workspace's own
+# opencode/ directory, so the engine can never see another workspace's sessions.
+mkdir -p "$BC_DATA"/config "$BC_DATA"/models "$BC_DATA"/workspaces "$BC_DATA"/backups
+
+# SQLite needs a real filesystem with working fsync (§5.4). Warn loudly here;
+# `bcode doctor` fails the check properly, but by then the user has already
+# written data to a layer that will vanish.
+fstype="$(stat -f -c %T "$BC_DATA" 2>/dev/null || echo unknown)"
+case "$fstype" in
+  overlayfs|overlay|aufs)
+    log "WARNING: $BC_DATA is on $fstype, a container overlay layer."
+    log "  Mount a named volume or a bind mount at $BC_DATA, or your data will be lost"
+    log "  when the container is removed, and SQLite's fsync guarantees will not hold."
+    ;;
+  nfs|smb2|cifs)
+    log "WARNING: $BC_DATA is on $fstype, a network filesystem. SQLite locking is unreliable there."
+    ;;
+esac
+
+# Report the isolation layers the runtime actually permits (DR-3). This runs
+# before the supervisor so a restrictive seccomp profile is visible in the
+# first lines of `docker logs`.
+if [ "${BC_SKIP_PREFLIGHT:-0}" != "1" ]; then
+  bcode doctor 2>&1 | sed 's/^/  /' >&2 || true
+fi
+
+if [ ! -f "$BC_DATA/config/bcode.yaml" ]; then
+  log "no configuration found; writing defaults to $BC_DATA/config"
+  bcode config init >/dev/null
+fi
+
+log "starting: bcode $*"
+exec bcode "$@"

@@ -1,0 +1,81 @@
+version: "2"
+run:
+  tests: true
+linters:
+  enable:
+    - bodyclose
+    - contextcheck
+    - copyloopvar
+    - errorlint
+    - gosec
+    - nilerr
+    - noctx
+    - rowserrcheck
+    - sqlclosecheck
+    - unconvert
+    - usestdlibvars
+  disable:
+    - cyclop
+    - depguard
+    - exhaustruct
+    - funlen
+    - gocognit
+    - lll
+    - nlreturn
+    - varnamelen
+    - wsl
+  settings:
+    errcheck:
+      check-type-assertions: true
+      exclude-functions:
+        - (io.Closer).Close
+        - (*database/sql.Rows).Close
+        # hash.Hash documents that Write never returns an error, and every
+        # call site here is writing into a digest. Checking them would add
+        # unreachable branches to the identity and manifest derivations, which
+        # are the code most in need of being readable.
+        - (hash.Hash).Write
+        - io.WriteString
+    gosec:
+      excludes:
+        - G104
+        - G306
+    govet:
+      disable:
+        - fieldalignment
+        - shadow
+      enable-all: true
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      - linters:
+          - bodyclose
+          - errcheck
+          - gosec
+          - noctx
+          # Test helpers build fixtures; threading a context through them adds
+          # noise without adding cancellability that anything would use.
+          - contextcheck
+        path: _test\.go
+      - linters:
+          - gosec
+        path: tools/analyzers/
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+formatters:
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

@@ -1,0 +1,189 @@
+# EXPERIMENTAL_JEV_ASSISTED profile — Local Engineer Standard Evidence Suite v1
+#
+# This file is NOT judgment.yaml. It is read only by the Evidence Suite v1
+# benchmark harness (evals/evidence-v1/), never by a normal `le` invocation,
+# and it never writes or is copied into a workspace's own judgment.yaml.
+# Nothing here is a production promotion: it exists only inside isolated
+# evaluation runs, for the duration of this suite.
+#
+# FROZEN. Once the first Evidence Suite v1 task begins, this file's content
+# (as verified by its own manifest hash, recorded in manifest.json) must not
+# change. Any change to a site's inclusion, tier, threshold, or the Jev model
+# version constitutes Evidence Suite v2, per the design instruction that
+# created this suite. See docs/evidence/evidence-v1.md for the rule.
+#
+# Site selection rationale — design instruction §10: an effect is included
+# only if it can materially influence an *unattended* run (no literal human
+# in the loop). Local Engineer's "reviewer" step (workflow.CheckReviewRubric
+# feeding internal/task/phases.go's r.decide "critic" call) is itself a model
+# call, not a person, so review_rubric's ordering effect is a legitimate
+# candidate — it can change what the critic model reads first and therefore,
+# in principle, its verdict. Every site below was checked against its actual
+# consumer in internal/task/phases.go before being included; none of them
+# gates on interactive human input in the unattended benchmark harness.
+#
+# Every site is set to its own registered MaxEffect (internal/judgment's
+# ceiling for what that site's code actually implements) — never higher, and
+# nothing here can be higher, because judgment.Config.Validate refuses an
+# over-grant structurally, the same check production judgment.yaml is
+# subject to. This profile does not, and cannot, invent authority a site's
+# own code does not implement.
+
+schema_version: 1
+suite: evidence-v1
+jev_model: jev-1.13.0  # judgment.RecommendedModel; pinned, never an alias — see judgment.Config.PinnedModel
+redact: repo_text       # the least permissive mode every included site needs; see each site's own Redaction floor
+
+sites:
+  - site: intake_profile
+    site_version: "1"
+    authority: routing            # == MaxEffect
+    threshold: 0.65                # EffectThreshold, judgment.SiteInfo (task/intake.go)
+    permitted_effects: [STOP_EARLIER]
+    reason: >
+      Included: a high-confidence "needs dependency/migration" finding ends a
+      task with StateBlocked before any generator call — an automated
+      terminal state, not an interactive gate (internal/task/phases.go INTAKE
+      phase). Directly testable against SWE-Bench Pro / SWE Atlas tasks,
+      which sometimes do require a dependency change.
+
+  - site: progress_monitor
+    site_version: "1"
+    authority: routing
+    threshold: 0.7
+    permitted_effects: [STOP_EARLIER, ROUTE]
+    reason: >
+      Included: the mechanism most directly aimed at this suite's Q3
+      (efficiency/recovery) — detects circling/oscillating/drifting tool-call
+      windows within one EDIT Step and can end an attempt early or reroute.
+      Known granularity limitation (Step-level, not per-tool-call) is
+      unchanged by this suite and is measured qualitatively via the paired
+      attempt/tool-call counts, not assumed away.
+
+  - site: obligation_reason
+    site_version: "1"
+    authority: routing
+    threshold: 0
+    permitted_effects: [ROUTE]
+    reason: >
+      Included: judges whether a plan's stated reason for waiving an
+      obligation actually holds, at PLAN validation — an automated recheck,
+      not a human approval. Material for multi-file SWE Atlas Refactoring
+      tasks where call-site completeness claims are exactly this kind of
+      waiver.
+
+  - site: hypothesis_check
+    site_version: "1"
+    authority: ordering
+    threshold: 0
+    permitted_effects: [ORDER, SELECT]
+    reason: >
+      Included: only ever changes what is read (the compaction card), never
+      control flow — the standard "ordering can only reorder" bound. Relevant
+      to Q3 (efficiency): a corrected hypothesis can reduce wasted
+      exploration in a repository the agent has never seen before.
+
+  - site: verification_integrity
+    site_version: "1"
+    authority: routing
+    threshold: 0
+    permitted_effects: [TAINT]
+    reason: >
+      Included: this is the mechanism the suite's own §11 names as
+      important evidence. TAINT never changes recipe.Result.Passed() (see
+      internal/task/phases.go's EDIT->VERIFY wiring); it only makes a
+      weakened-test finding visible to the automated reviewer step and to
+      this suite's report. The official benchmark evaluator remains the sole
+      source of the benchmark score in every case — see "Safety" in
+      docs/evidence/evidence-v1.md.
+
+  - site: diff_conformance
+    site_version: "1"
+    authority: routing
+    threshold: 0.7
+    permitted_effects: [ROUTE]
+    reason: >
+      Included: judges each diff hunk against the plan's stated reason for
+      touching that file, before VERIFY — directly relevant to SWE Atlas
+      Refactoring's "professional refactoring quality" criterion (unrelated
+      or undermining changes are exactly what this site flags).
+
+  - site: failure_triage
+    site_version: "1"
+    authority: routing
+    threshold: 0.7
+    permitted_effects: [ROUTE]
+    reason: >
+      Included: classifies a verification failure's kind and same-cause
+      recurrence, feeding a fresh-sandbox rerun. Directly testable against
+      SWE-Bench Pro Verified's FAIL_TO_PASS / PASS_TO_PASS structure, where
+      "same underlying cause" is a well-defined, checkable question. Also
+      the one site with an existing deterministic baseline to compare
+      against — see the component evaluation in judgments/.
+
+  - site: review_rubric
+    site_version: "1"
+    authority: ordering
+    threshold: 0
+    permitted_effects: [ORDER]
+    reason: >
+      Included: reorders which diff hunks the automated critic step
+      (internal/task/phases.go's r.decide "review" call) reads first. This
+      is a model call, not a human gate, so the ordering effect has a real
+      causal path to the review verdict. Distractor/permutation stability of
+      this site is separately measured in the component evaluation, because
+      an unstable ordering effect here would be the clearest failure mode.
+
+  - site: context_injection
+    site_version: "1"
+    authority: ordering
+    threshold: 0
+    permitted_effects: [FLAG]
+    reason: >
+      Included: never removes content, only prefixes a warning notice — see
+      internal/retrieval/injection.go and
+      TestInjectionScreenNeverRemovesContentItFlags. Relevant because
+      benchmark repositories sometimes contain agent-instruction-shaped
+      files (CI configs, CONTRIBUTING.md) that a generator model could
+      misread as directives.
+
+  - site: note_relevance
+    site_version: "1"
+    authority: ordering
+    threshold: 0
+    permitted_effects: [SELECT]
+    reason: >
+      Included: selects which durable memory notes compete for the packet's
+      memory budget. Low expected effect on a single-attempt benchmark task
+      (little durable memory accumulates in one run) but included for
+      completeness and because it costs nothing extra to enable alongside
+      fact_relevance.
+
+  - site: fact_relevance
+    site_version: "1"
+    authority: ordering
+    threshold: 0
+    permitted_effects: [SELECT]
+    reason: >
+      Included: judges whether each confirmed fact on the compaction card
+      still bears on the current hypothesis or open failure — directly
+      relevant to Q3 (efficiency) on longer multi-file refactoring tasks
+      where the card can accumulate stale facts.
+
+excluded_effects: []  # every registered site is included; none was excluded
+
+hard_invariants:
+  # Restated here, not enforced by this file — the actual enforcement is
+  # internal/judgment's tier system (Permits, MaxEffect, monotone_test.go)
+  # and internal/judgment/config.go's Validate, which this profile is
+  # subject to exactly like judgment.yaml. Listed so a reader of this file
+  # does not have to cross-reference the code to know what "routing" cannot
+  # do.
+  - "No site may mark a task solved."
+  - "No site may skip or shorten official benchmark verification."
+  - "No site may convert a deterministic fail to a pass."
+  - "No site may widen filesystem, network, or allowlist permissions."
+  - "No site may increase a budget or timeout."
+  - "No site may suppress a security finding."
+  - "No site may access the benchmark's gold patch, hidden tests, or oracle solution."
+  - "No site may auto-approve a gate."

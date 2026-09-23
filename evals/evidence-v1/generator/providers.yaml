@@ -1,0 +1,15 @@
+# Evidence Suite v1's own generator provider file — read only by
+# internal/evidence's RunnerFactory (never .le/config/providers.yaml, which
+# is per-operator and untracked). Secret-free and committed: it names the
+# provider, the exact model, and the environment variable that supplies
+# the credential, never the credential itself. Uses the same loader every
+# ordinary `le task run` uses (llm.LoadProvidersFile) — no Evidence-specific
+# model client.
+default: anthropic
+providers:
+  - name: anthropic
+    kind: anthropic
+    model: claude-sonnet-5
+    api_key_env: ANTHROPIC_API_KEY
+    timeout_seconds: 600
+roles: {}

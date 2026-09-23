@@ -1,0 +1,81 @@
+package main
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
+
+	"github.com/spf13/cobra"
+
+	"github.com/akynte/boundedcode/internal/config"
+	"github.com/akynte/boundedcode/internal/session"
+	"github.com/akynte/boundedcode/internal/store"
+	"github.com/akynte/boundedcode/internal/supervisor"
+	"github.com/akynte/boundedcode/internal/workspace"
+)
+
+// openRoot opens the data directory named by --data, $BC_DATA, or /data.
+func openRoot() (*store.Root, error) {
+	return store.OpenRoot(g.dataDir)
+}
+
+// openWorkspace finds the workspace containing the working directory and opens
+// its storage. Failure is explicit: a command that needs a workspace must not
+// silently operate on a default one.
+func openWorkspace(ctx context.Context) (*workspace.Workspace, *store.Root, *store.Store, error) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	// The binding sequence, including §2.2's slot-clearing switch, lives in
+	// internal/session so that every interface onto this system performs it
+	// identically. See that package for why it is not a helper here.
+	s, err := session.Open(ctx, g.dataDir, cwd)
+	if err != nil {
+		var missing *session.ErrNoWorkspace
+		if errors.As(err, &missing) {
+			return nil, nil, nil, fmt.Errorf(
+				"%w\nRun `bcode workspace init` in the repository root first", err)
+		}
+		return nil, nil, nil, err
+	}
+	return s.Workspace, s.Root, s.Store, nil
+}
+
+// loadConfig reads bcode.yaml from the data directory's config folder.
+func loadConfig(root *store.Root) (config.Config, error) {
+	return supervisor.Config(root)
+}
+
+// loadProfile resolves the active hardware profile, returning nil when none is
+// configured so callers can say so rather than pretend.
+func loadProfile(root *store.Root, cfg config.Config) *config.Profile {
+	return supervisor.Profile(root, cfg)
+}
+
+// profileDir is where generated profiles are written and read. Shipped
+// profiles are embedded in the binary, so this directory only ever holds the
+// operator's own, and one of those always overrides a shipped name.
+func profileDir(root *store.Root) string {
+	return filepath.Join(root.Layout().ConfigDir(), "profiles")
+}
+
+// emitJSON writes a value as indented JSON to stdout.
+func emitJSON(v any) error {
+	enc := json.NewEncoder(os.Stdout)
+	enc.SetIndent("", "  ")
+	return enc.Encode(v)
+}
+
+// closeRoot closes the data directory and reports a failure on stderr rather
+// than discarding it. CloseAll flushes every SQLite write-ahead log, so a
+// failure here means data may not have reached disk — silently swallowing that
+// in a deferred call is exactly how a corrupt database goes unnoticed.
+func closeRoot(cmd *cobra.Command, root *store.Root) {
+	if err := root.CloseAll(); err != nil {
+		fmt.Fprintf(cmd.ErrOrStderr(), "bcode: warning: closing the data directory: %v\n", err)
+	}
+}

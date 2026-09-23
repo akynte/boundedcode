@@ -1,0 +1,77 @@
+# Default deployment (design v3 §4.1): one image, one container, one volume.
+#
+#   docker compose -f deploy/docker-compose.yml up -d
+#   docker compose -f deploy/docker-compose.yml exec boundedcode bcode doctor
+#
+# For the conventional multi-container layout, use docker-compose.split.yml.
+services:
+  boundedcode:
+    image: ${BC_IMAGE:-ghcr.io/akynte/boundedcode:latest}
+    container_name: boundedcode
+    restart: unless-stopped
+
+    # The supervisor runs the orderly shutdown of §4.4 on SIGTERM: pause tasks
+    # with a handoff record, terminate sandboxes, flush every SQLite WAL.
+    # Give it the documented 30 s grace period.
+    stop_grace_period: 40s
+    init: true
+
+    # An inference server on your host — llama.cpp, vLLM, anything speaking the
+    # OpenAI API — is reachable at http://host.docker.internal:PORT with this.
+    # Without it the container resolves nothing by that name, and 127.0.0.1
+    # inside a container is the container, so a model on the host is invisible.
+    # Point providers.yaml's base_url at that name, not just bcode.yaml's.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+    ports:
+      # Loopback only. Publishing as "7777:7777" would expose a supervisor
+      # that can run sandboxed commands and read every indexed repository to
+      # your whole network.
+      - "127.0.0.1:7777:7777"
+
+    volumes:
+      # Named volume: a real filesystem with working fsync, which SQLite
+      # requires (§5.4). Never point this at an overlay layer or a network share.
+      - bc-data:/data
+      # Your repositories. Read-write because tasks edit them; the container
+      # can reach nothing else on your host (§6.1 layer 1).
+      - ${BC_WORK:-${HOME}/code}:/work
+
+    environment:
+      BC_DATA: /data
+      # Bind every interface inside the container; the ports mapping above is
+      # what restricts exposure to this host.
+      BC_API_ADDR: 0.0.0.0:7777
+      BC_PROFILE: ${BC_PROFILE:-reference-8gb-cuda-64gb-ram}
+
+    # DR-3 layer 1: an unprivileged user, no added capabilities, no privilege
+    # escalation. The Docker socket is deliberately absent: mounting it would
+    # hand the container root on the host.
+    user: "10001:10001"
+    cap_drop: ["ALL"]
+    security_opt:
+      - no-new-privileges:true
+
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:7777/readyz"]
+      interval: 15s
+      timeout: 5s
+      start_period: 90s
+      retries: 4
+
+    # GPU access. Comment this out on a CPU-only host: the image detects the
+    # absence and falls back.
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+volumes:
+  bc-data:
+    # A named volume is created root-owned. Initialise it once with:
+    #   docker run --rm -v bc-data:/data alpine chown -R 10001:10001 /data
+    name: bc-data

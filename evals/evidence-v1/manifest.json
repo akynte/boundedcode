@@ -1,0 +1,53 @@
+{
+  "benchmark_revisions": {
+    "swe_atlas": {
+      "evaluator": "harbor (https://github.com/laude-institute/harbor, pinned v0.18.0) + Modal sandboxes; rubric grading via Claude Opus 4.5 as judge model plus programmatic checks",
+      "license": "apache-2.0",
+      "paper": "arXiv:2605.08366",
+      "repo": "https://github.com/scaleapi/SWE-Atlas"
+    },
+    "swe_bench_pro_verified": {
+      "dataset": "opencompass/SWEBench-Pro-Verified",
+      "evaluator": "AgentCompass (https://github.com/open-compass/AgentCompass), FAIL_TO_PASS/PASS_TO_PASS test-based resolution",
+      "license": "apache-2.0",
+      "paper": "arXiv:2609.08149",
+      "source": "https://huggingface.co/datasets/opencompass/SWEBench-Pro-Verified"
+    }
+  },
+  "budget": {
+    "attempts_per_task": "Local Engineer default (see le.yaml); not overridden for this suite",
+    "runs_per_task_per_arm": 1
+  },
+  "container_identifiers": "SWE-Bench Pro Verified: dockerhub_tag per selected instance, recorded in selection/cache/swebenchpro_all.json. SWE Atlas: ghcr.io image per task, resolved from each task's environment/Dockerfile FROM line at build time by harbor.",
+  "generator_model": "UNSET \u2014 no generator credentials were available when this manifest was frozen; see docs/evidence/evidence-v1.md 'Environment'. Must be filled in and this manifest re-frozen (as a new suite_version, if already begun) before Arm A/B execution.",
+  "generator_settings": {},
+  "jev_profile_sha256": "3e40d1f9569a45d896455e1cc4509577635749b638a91193225c03516a17ac14",
+  "local_engineer_commit": "1c3adefee3ebb45600a3ae95e99f04c5e8cc7341",
+  "local_engineer_dirty": true,
+  "network_policy": {
+    "swe_atlas": "harbor allowlist network_mode; only package registries and language toolchains reachable during the agent phase (see each task's agent.allowed_hosts in task.toml).",
+    "swe_bench_pro_verified": "AgentCompass anti-leakage: code-hosting domains (GitHub, GitLab, Gitee, Bitbucket, mirrors) blocked during the agent phase; dependency-fetch services allowed."
+  },
+  "schema_version": 1,
+  "selection_algorithm": "evals/evidence-v1/selection/select_tasks.py",
+  "selection_seed": "local-engineer-evidence-v1",
+  "selection_sha256": "225233e2545673bba43d51b086373f9958d4a3e653cfbde6a91178c6c78f5173",
+  "suite_version": "evidence-v1",
+  "task_ids": {
+    "swe_atlas_refactoring": [
+      "task-694b4b99829f00e24fd11891",
+      "task-69b7c2a04b6f8ff9ed98812c"
+    ],
+    "swe_atlas_test_writing": [
+      "task-6902ef3ab97fe23e2ad271f5",
+      "task-6902ef3ab97fe23e2ad2727a"
+    ],
+    "swe_bench_pro_verified": [
+      "instance_future-architect__vuls-bff6b7552370b55ff76d474860eead4ab5de785a-v1151a6325649aaf997cd541ebe533b53fddf1b07",
+      "instance_element-hq__element-web-ca58617cee8aa91c93553449bfdf9b3465a5119b-vnan",
+      "instance_internetarchive__openlibrary-1894cb48d6e7fb498295a5d3ed0596f6f603b784-v0f5aece3601a5b4419f7ccec1dbda2071be28ee4",
+      "instance_tutao__tutanota-b4934a0f3c34d9d7649e944b183137e8fad3e859-vbc0d9ba8f0071fbe982809910959a6ff8884dbbf"
+    ]
+  },
+  "timeout": "per-task, per benchmark's own task.toml / instance defaults (SWE Atlas: agent.timeout_sec in each task.toml; SWE-Bench Pro Verified: AgentCompass's default)"
+}

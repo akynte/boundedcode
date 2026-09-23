@@ -1,0 +1,126 @@
+{
+  "seed": "local-engineer-evidence-v1",
+  "swe_atlas_refactoring": {
+    "rule": {
+      "distinct_repos_in_eligible_set": 12,
+      "eligible_count": 70,
+      "notes": "Every task under data/tw/ and data/rf/ in scaleapi/SWE-Atlas that has a complete harbor task directory (task.toml, environment/, tests/, instruction.md all present) is eligible. No instance was excluded on difficulty or repository grounds beyond the 'different repository preferred' stratification rule in design instruction \u00a76.",
+      "stratification": "round-robin across repo_key, alphabetical order, min-sha256-digest pick within each repo bucket"
+    },
+    "selected": [
+      {
+        "complete": true,
+        "difficulty": "hard",
+        "language_tag": "JavaScript",
+        "repo_key": "Automattic/wp-calypso",
+        "task_id": "task-694b4b99829f00e24fd11891"
+      },
+      {
+        "complete": true,
+        "difficulty": "hard",
+        "language_tag": "C++",
+        "repo_key": "MariaDB/server",
+        "task_id": "task-69b7c2a04b6f8ff9ed98812c"
+      }
+    ]
+  },
+  "swe_atlas_test_writing": {
+    "rule": {
+      "distinct_repos_in_eligible_set": 13,
+      "eligible_count": 90,
+      "notes": "Every task under data/tw/ and data/rf/ in scaleapi/SWE-Atlas that has a complete harbor task directory (task.toml, environment/, tests/, instruction.md all present) is eligible. No instance was excluded on difficulty or repository grounds beyond the 'different repository preferred' stratification rule in design instruction \u00a76.",
+      "stratification": "round-robin across repo_key, alphabetical order, min-sha256-digest pick within each repo bucket"
+    },
+    "selected": [
+      {
+        "base_commit": "be7e5cc641622d153040491fd5625c6cb83e12eb",
+        "complete": true,
+        "repo_key": "Automattic/wp-calypso",
+        "repo_url": "https://github.com/Automattic/wp-calypso",
+        "task_id": "task-6902ef3ab97fe23e2ad271f5"
+      },
+      {
+        "base_commit": "44634210287cb192f2a53147eafb84a33a96826b",
+        "complete": true,
+        "repo_key": "drakkan/sftpgo",
+        "repo_url": "https://github.com/drakkan/sftpgo",
+        "task_id": "task-6902ef3ab97fe23e2ad2727a"
+      }
+    ]
+  },
+  "swebench_pro_verified": {
+    "rule": {
+      "eligible_count": 489,
+      "filter": {
+        "max_files_changed": 5,
+        "min_fail_to_pass": 1,
+        "min_files_changed": 1,
+        "requires_dockerhub_tag": true
+      },
+      "languages_present_in_eligible_set": {
+        "go": 164,
+        "js": 92,
+        "python": 222,
+        "ts": 11
+      },
+      "stratification": "round-robin across repo_language, alphabetical language order, min-sha256-digest pick within each language bucket, preferring an unused repo"
+    },
+    "selected": [
+      {
+        "dockerhub_tag": "future-architect.vuls-future-architect__vuls-bff6b7552370b55ff76d474860eead4ab5de785a-v1151a6325649aaf997cd541ebe533b53fddf1b07",
+        "fail_to_pass_count": 7,
+        "files_changed": 1,
+        "instance_id": "instance_future-architect__vuls-bff6b7552370b55ff76d474860eead4ab5de785a-v1151a6325649aaf997cd541ebe533b53fddf1b07",
+        "issue_categories": [
+          "back_end_knowledge",
+          "security_knowledge",
+          "infrastructure_knowledge"
+        ],
+        "pass_to_pass_count": 0,
+        "repo": "future-architect/vuls",
+        "repo_language": "go"
+      },
+      {
+        "dockerhub_tag": "element-hq.element-element-hq__element-web-ca58617cee8aa91c93553449bfdf9b3465a5119b",
+        "fail_to_pass_count": 1,
+        "files_changed": 2,
+        "instance_id": "instance_element-hq__element-web-ca58617cee8aa91c93553449bfdf9b3465a5119b-vnan",
+        "issue_categories": [
+          "front_end_knowledge",
+          "web_knowledge",
+          "performance_knowledge",
+          "ui_ux_knowledge"
+        ],
+        "pass_to_pass_count": 90,
+        "repo": "element-hq/element-web",
+        "repo_language": "js"
+      },
+      {
+        "dockerhub_tag": "internetarchive.openlibrary-internetarchive__openlibrary-1894cb48d6e7fb498295a5d3ed0596f6f603b784-v0f5aece3601a5b4419f7ccec1dbda",
+        "fail_to_pass_count": 1,
+        "files_changed": 3,
+        "instance_id": "instance_internetarchive__openlibrary-1894cb48d6e7fb498295a5d3ed0596f6f603b784-v0f5aece3601a5b4419f7ccec1dbda2071be28ee4",
+        "issue_categories": [
+          "back_end_knowledge",
+          "database_knowledge"
+        ],
+        "pass_to_pass_count": 62,
+        "repo": "internetarchive/openlibrary",
+        "repo_language": "python"
+      },
+      {
+        "dockerhub_tag": "tutao.tutanota-tutao__tutanota-b4934a0f3c34d9d7649e944b183137e8fad3e859-vbc0d9ba8f0071fbe982809910959a6ff8884dbbf",
+        "fail_to_pass_count": 1,
+        "files_changed": 3,
+        "instance_id": "instance_tutao__tutanota-b4934a0f3c34d9d7649e944b183137e8fad3e859-vbc0d9ba8f0071fbe982809910959a6ff8884dbbf",
+        "issue_categories": [
+          "back_end_knowledge",
+          "api_knowledge"
+        ],
+        "pass_to_pass_count": 0,
+        "repo": "tutao/tutanota",
+        "repo_language": "ts"
+      }
+    ]
+  }
+}

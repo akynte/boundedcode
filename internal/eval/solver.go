@@ -1,0 +1,464 @@
+package eval
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"os"
+	"os/exec"
+	"strings"
+	"time"
+
+	"github.com/akynte/boundedcode/internal/engine"
+	"github.com/akynte/boundedcode/internal/engine/native"
+	"github.com/akynte/boundedcode/internal/firewall"
+	"github.com/akynte/boundedcode/internal/graph"
+	"github.com/akynte/boundedcode/internal/index"
+	"github.com/akynte/boundedcode/internal/judgment"
+	"github.com/akynte/boundedcode/internal/llm"
+	"github.com/akynte/boundedcode/internal/recipe"
+	"github.com/akynte/boundedcode/internal/retrieval"
+	"github.com/akynte/boundedcode/internal/sandbox"
+	"github.com/akynte/boundedcode/internal/sandbox/container"
+	"github.com/akynte/boundedcode/internal/store"
+	"github.com/akynte/boundedcode/internal/task"
+	"github.com/akynte/boundedcode/internal/workspace"
+	"github.com/akynte/boundedcode/internal/worktree"
+)
+
+// SystemSolver runs a task through this project's own pipeline, configured by
+// the arm.
+//
+// Each arm's flags turn a piece of the system off, and they must turn it off
+// *properly*. An ablation that leaves the ablated component partly running
+// measures nothing, so the differences are structural — a different retriever,
+// a different recipe set — rather than a flag the pipeline might ignore.
+type SystemSolver struct {
+	// Root opens a fresh workspace per run. A supervised arm retrieves from an
+	// index, and the only index that can answer a question about the task copy
+	// is one built from the task copy: pointing retrieval at the operator's
+	// own workspace returns facts about a repository the model cannot see, and
+	// leaving it unindexed returns nothing at all. Either way the arms that
+	// exist to measure retrieval and the graph measure neither.
+	Root *store.Root
+	// Store is the operator's workspace, used only for what is not per-run.
+	Store   *store.Store
+	Router  *llm.Router
+	Sandbox sandbox.Runner
+	// SandboxSpec is the base spec; the task copy is added per run.
+	SandboxSpec sandbox.Spec
+	// Profile-derived limits (§9.3: never hardcoded).
+	MaxTools      int
+	MaxTokens     int
+	Temperature   float64
+	Thinking      string
+	ContextTokens int
+	MaxSteps      int
+	// Analyzers are the language analyzers `bcode index` runs, so a task copy is
+	// indexed exactly the way a real repository would be. Without them the
+	// graph holds containment edges only, and the graph ablation compares two
+	// arms that both lack a graph.
+	Analyzers []index.Analyzer
+	// Semantic is the compiler-backed indexer, so a Python task gets symbols
+	// rather than a directory listing. Without it the EDIT phase asks for
+	// candidates by symbol name and a Python repository has none, which is
+	// how nine cells measured nothing.
+	Semantic index.SemanticIndexer
+	// IndexOptions mirror the operator's index configuration.
+	IndexOptions index.Options
+	// Judge is the decision plane. Every supervised arm hands it to the task
+	// runner, as `bcode task run` does, because the runner refuses to start
+	// without one. Only the judged-rerank arm also uses it to rank retrieval
+	// candidates. Nil means no supervised arm can run, and supervised-rerank
+	// is never run as a duplicate of supervised — an ablation whose component
+	// is absent measures nothing and would publish a null result as if it
+	// were a finding.
+	Judge judgment.Judge
+	// LocalReranker is the control arm's embedding reranker. Nil means the
+	// local arm cannot run, and Solve says so rather than silently producing
+	// the baseline's numbers under the treatment's name.
+	LocalReranker *retrieval.LocalReranker
+	// Tuning and LocalizeTuning are the frozen experimental parameters for
+	// this run. They are recorded in the report so a benchmark states the
+	// configuration it was produced under.
+	Tuning         retrieval.RerankTuning
+	LocalizeTuning task.LocalizeTuning
+	Logf           func(format string, args ...any)
+}
+
+func (s *SystemSolver) logf(format string, args ...any) {
+	if s.Logf != nil {
+		s.Logf(format, args...)
+	}
+}
+
+// Solve runs one attempt under one arm.
+func (s *SystemSolver) Solve(ctx context.Context, req SolveRequest) (SolveResult, error) {
+	// Check the configuration before anything else. A supervised arm with
+	// nowhere to build an index would otherwise run to completion and report a
+	// failure to solve the task, when what actually happened is that the
+	// harness handed the pipeline an empty index.
+	if req.Arm.Supervised && s.Root == nil {
+		return SolveResult{}, fmt.Errorf(
+			"eval: arm %q is supervised but no store root was configured; the task copy "+
+				"cannot be indexed and retrieval would answer from an empty index", req.Arm.Name)
+	}
+	// An ablation whose component is missing is not an ablation. Running
+	// either rerank arm without its reranker would produce numbers identical
+	// to the baseline and publish them as a measurement of reranking.
+	switch req.Arm.Rerank {
+	case RerankJudged:
+		if s.Judge == nil || !s.Judge.Available() {
+			return SolveResult{}, fmt.Errorf(
+				"eval: arm %q reranks with an external judge but none is configured or "+
+					"reachable; configure %s and export its api_key_env, or run the arms "+
+					"that do not need it. This arm is never silently downgraded to one "+
+					"that does not rerank",
+				req.Arm.Name, judgment.ConfigFile)
+		}
+	case RerankLocal:
+		if s.LocalReranker == nil || !s.LocalReranker.Available() {
+			return SolveResult{}, fmt.Errorf(
+				"eval: arm %q reranks locally but no embedding provider is configured or "+
+					"reachable; route the embedding role in providers.yaml, or run the "+
+					"arms that do not need it", req.Arm.Name)
+		}
+	}
+
+	provider, err := s.Router.For(llm.Role(roleOf(req.Arm)))
+	if err != nil {
+		return SolveResult{}, err
+	}
+
+	// The task copy is not a git repository, and the pipeline's worktree
+	// machinery needs one. Initialising here keeps the fixture on disk free of
+	// version control, so a fixture cannot smuggle history to the model.
+	if err := initRepo(ctx, req.Worktree); err != nil {
+		return SolveResult{}, fmt.Errorf("preparing the task repository: %w", err)
+	}
+
+	// The unsupervised arm has no retrieval and no graph, so it needs no
+	// index: building one would cost wall clock the arm is judged on and
+	// change nothing it can see.
+	st := s.Store
+	if req.Arm.Supervised {
+		indexed, release, err := s.indexCopy(ctx, req)
+		if err != nil {
+			return SolveResult{}, err
+		}
+		defer release()
+		st = indexed
+	}
+
+	eng, err := s.engineFor(req.Arm, provider, st)
+	if err != nil {
+		return SolveResult{}, err
+	}
+	defer eng.Close()
+
+	if !req.Arm.Supervised {
+		return s.solveUnsupervised(ctx, req, eng)
+	}
+	return s.solveSupervised(ctx, req, eng, st)
+}
+
+// indexCopy gives the run its own workspace and indexes the task copy into it.
+//
+// The copy is a throwaway directory unique to this run, so it gets a workspace
+// id of its own: one run's index can then never answer another run's query,
+// and nothing the operator has indexed leaks into a measurement.
+func (s *SystemSolver) indexCopy(ctx context.Context, req SolveRequest) (*store.Store, func(), error) {
+	if s.Root == nil {
+		return nil, nil, fmt.Errorf("eval: the supervised arm needs a store root to index the task copy into")
+	}
+	id := workspace.DeriveID(req.Worktree, "", "eval-"+req.Task.ID+"-"+req.Arm.Name)
+	st, err := s.Root.OpenWorkspace(ctx, id)
+	if err != nil {
+		return nil, nil, fmt.Errorf("eval: opening the run workspace: %w", err)
+	}
+	dir := st.Dir()
+	// The suppression below is deliberate: this is cleanup, and cleanup runs
+	// precisely when req's context is already cancelled. Store.Close builds
+	// its own bounded context (a WAL checkpoint on close must not be skipped
+	// because the caller went away), so threading ctx in here would make the
+	// checkpoint cancellable at the one moment it must not be.
+	release := func() { //nolint:contextcheck // cleanup must not inherit a cancelled context
+		if err := st.Close(); err != nil {
+			s.logf("eval: closing the run workspace: %v", err)
+		}
+		// A benchmark that reports why a task failed needs the ledger the run
+		// wrote, and the ledger lives in the workspace this deletes. The
+		// default stays "delete": these directories are per-run and a set of
+		// them fills a disk. Retention is opt-in, off the measured path, and
+		// changes nothing about how the task is solved.
+		if os.Getenv("BC_EVAL_KEEP_WORKSPACE") != "" {
+			s.logf("eval: keeping the run workspace at %s", dir)
+			return
+		}
+		if err := os.RemoveAll(dir); err != nil {
+			s.logf("eval: removing the run workspace: %v", err)
+		}
+	}
+
+	opts := s.IndexOptions
+	opts.Analyzers = s.Analyzers
+	opts.Semantic = s.Semantic
+	ix := index.New(st, opts)
+
+	repo := workspace.Repository{
+		ID:            workspace.DeriveRepositoryID(id, ".", ""),
+		Name:          req.Task.ID,
+		Path:          ".",
+		DefaultBranch: "main",
+	}
+	if err := ix.RegisterRepository(ctx, repo); err != nil {
+		release()
+		return nil, nil, fmt.Errorf("eval: registering the task repository: %w", err)
+	}
+	stats, err := ix.Repository(ctx, repo.ID, req.Worktree)
+	if err != nil {
+		release()
+		return nil, nil, fmt.Errorf("eval: indexing the task copy: %w", err)
+	}
+	// An empty index is not a usable one, and a supervised arm running against
+	// it would be scored as the pipeline failing rather than as the harness
+	// handing it nothing.
+	if stats.Files == 0 {
+		release()
+		return nil, nil, fmt.Errorf("eval: indexing %s produced no files; the supervised arm "+
+			"would retrieve from an empty index", req.Worktree)
+	}
+	s.logf("  indexed %d files, %d chunks, %d nodes, %d edges",
+		stats.Files, stats.Chunks, stats.Nodes, stats.Edges)
+	return st, release, nil
+}
+
+// solveUnsupervised gives the model the objective and the worktree and nothing
+// else: no retrieval, no graph, no verification loop.
+//
+// This is the comparison that says whether the harness earns its complexity,
+// so it must be a fair version of the baseline — the same model, the same
+// editing tools, the same budget. What it does not get is everything this
+// project adds.
+func (s *SystemSolver) solveUnsupervised(ctx context.Context, req SolveRequest, eng engine.Engine) (SolveResult, error) {
+	var total int
+	for attempt := 1; attempt <= req.Task.Budget.MaxAttempts; attempt++ {
+		// A budget that runs out is an outcome: the task was attempted and not
+		// solved. A user interrupt is not — recording a verdict for a run the
+		// operator stopped would put a fabricated data point in the results.
+		if err := ctx.Err(); err != nil {
+			if errors.Is(err, context.Canceled) {
+				return SolveResult{Attempts: attempt - 1, Tokens: total}, err
+			}
+			return SolveResult{Attempts: attempt - 1, Tokens: total,
+				Reasons: []string{"the wall-clock budget was exhausted"}}, nil
+		}
+		resp, err := eng.Step(ctx, engine.Request{
+			TaskID: req.Task.ID, Objective: req.Task.Objective,
+			Worktree: req.Worktree, Attempt: attempt,
+			Access: firewall.Access{WriteScope: req.Task.Scope},
+			// No packet: retrieval is what the supervised arm adds.
+		})
+		if err != nil {
+			return SolveResult{Attempts: attempt, Tokens: total}, err
+		}
+		total += resp.TokensUsed
+		if resp.ClaimsDone {
+			// With no verification there is nothing to check the claim
+			// against, which is the point of the baseline.
+			return SolveResult{Claimed: true, Attempts: attempt, Tokens: total,
+				Reasons: []string{"the model reported completion; no verification was run"}}, nil
+		}
+		if resp.Truncated || resp.BudgetExhausted {
+			// The model never got to an answer because the output budget ran
+			// out. Retrying under the same budget would truncate again, so the
+			// run stops and says which limit it hit — a result that reads as
+			// "the model failed" would be wrong about what was measured.
+			return SolveResult{Attempts: attempt, Tokens: total,
+				Reasons: []string{resp.Summary}}, nil
+		}
+	}
+	return SolveResult{Attempts: req.Task.Budget.MaxAttempts, Tokens: total,
+		Reasons: []string{"the attempt budget was exhausted"}}, nil
+}
+
+// solveSupervised runs the full pipeline, minus whatever the arm ablates.
+func (s *SystemSolver) solveSupervised(ctx context.Context, req SolveRequest, eng engine.Engine, st *store.Store) (SolveResult, error) {
+	sb, spec := s.Sandbox, s.SandboxSpec
+	if req.Task.Origin.PinnedRuntime() {
+		// The task named the environment its own checks were written
+		// against, so verification runs there rather than on this host. The
+		// container is the confinement as well as the runtime: it has no
+		// network and sees nothing of this machine but the worktree.
+		spec.Image = req.Task.Origin.Runtime()
+		spec.ImageDir = req.Task.Origin.RuntimeWorkdir
+		spec.Prelude = req.Task.Origin.RuntimePrelude
+		// The image supplies the toolchain, so the host's Go environment —
+		// its caches, its PATH, its pinned local toolchain — must not be
+		// forwarded into it. Only what the task declared goes in.
+		spec.Env = req.Task.Origin.RuntimeEnv
+		sb = &container.Runner{}
+		if ok, why := sb.Available(ctx); !ok {
+			return SolveResult{}, fmt.Errorf(
+				"eval: %s declares runtime %s and it is not usable: %s",
+				req.Task.ID, spec.Image, why)
+		}
+	}
+	runner, err := task.NewRunner(st, eng, sb, "eval")
+	if err != nil {
+		return SolveResult{}, err
+	}
+	runner.Logf = s.logf
+	runner.SandboxSpec = spec
+	// Judge the candidate on what it changed. Without a recorded baseline
+	// this stays nil and the absolute rule applies.
+	if b := BaselineFor(req.Task); b != nil {
+		runner.Baseline = b
+		runner.BaselineImage = req.Task.Origin.Runtime()
+		runner.BaselineEnv = recipe.EnvDigest(spec.Env)
+		s.logf("eval: %s verification is baseline-relative over %d preset(s)",
+			req.Task.ID, len(b.Entries))
+	}
+	s.wireJudgment(runner, req.Arm)
+	// No broker: a gate would block an unattended run, and the completion
+	// contract is what is being measured, not the approval policy.
+	runner.Broker = nil
+
+	level := recipe.Level(req.Task.Verification)
+	if _, ok := recipe.ParseLevel(string(level)); !ok {
+		level = recipe.Standard
+	}
+	if !req.Arm.Verification {
+		// The ablation: the lowest level still compiles the result, so the
+		// arm is "no test feedback", not "no checks at all". Removing the
+		// build too would measure a different thing.
+		level = recipe.Low
+	}
+
+	id := task.NewID("eval")
+	if err := task.NewStore(st).Create(ctx, task.Task{
+		ID: id, Title: req.Task.Objective, Verification: level,
+		Budget: task.Budget{
+			MaxAttempts: req.Task.Budget.MaxAttempts,
+			MaxWallTime: time.Until(req.Deadline),
+			MaxTokens:   req.Task.Budget.MaxTokens,
+			Scope:       req.Task.Scope,
+		},
+	}); err != nil {
+		return SolveResult{}, err
+	}
+
+	out, err := runner.Run(ctx, id, req.Worktree)
+	if err != nil {
+		return SolveResult{}, err
+	}
+
+	// The pipeline works in its own worktree; the harness judges the copy it
+	// prepared. Bringing the accepted change back is what makes the two the
+	// same thing.
+	if out.Accepted && out.Branch != "" {
+		if err := applyBranch(ctx, req.Worktree, out.Branch); err != nil {
+			return SolveResult{}, fmt.Errorf("applying the accepted change: %w", err)
+		}
+	}
+	return SolveResult{
+		Claimed: out.Accepted, Attempts: out.Attempts, Reasons: out.Reasons,
+		Tokens: out.TokensUsed, Retrieved: out.Retrieved, Generated: out.Generated,
+		Rerank: out.Rerank, PacketTokens: out.PacketTokens,
+	}, nil
+}
+
+// wireJudgment gives a supervised task runner the decision plane, and the
+// rerank arms their reranker.
+//
+// The decision plane is part of every supervised run, not a treatment: the
+// runner refuses to start without it, so handing it only to the judged-rerank
+// arm made every other supervised arm fail before its first model call.
+// Reranking with the judge stays that arm's alone, so comparing it with
+// supervised still isolates reranking.
+func (s *SystemSolver) wireJudgment(runner *task.Runner, arm Arm) {
+	runner.Judge = s.Judge
+	switch arm.Rerank {
+	case RerankJudged:
+		runner.Retriever = runner.Retriever.WithJudge(s.Judge, s.logf).WithTuning(s.Tuning)
+		runner.LocalizeTuning = s.LocalizeTuning
+	case RerankLocal:
+		runner.Retriever = runner.Retriever.WithLocalReranker(s.LocalReranker, s.logf).WithTuning(s.Tuning)
+	}
+}
+
+// engineFor builds the editing engine, with retrieval wired according to the
+// arm.
+func (s *SystemSolver) engineFor(arm Arm, provider llm.Provider, st *store.Store) (engine.Engine, error) { //nolint:unparam // arm selects the wiring; see Rerank and Graph
+	opts := native.Options{
+		Provider: provider, Logf: s.Logf,
+		MaxTools: s.MaxTools, MaxTokens: s.MaxTokens,
+		Temperature: s.Temperature, Thinking: s.Thinking,
+		ContextTokens: s.ContextTokens,
+		MaxSteps:      s.MaxSteps,
+	}
+	if arm.Supervised {
+		ret := retrieval.New(st)
+		switch arm.Rerank {
+		case RerankJudged:
+			ret = ret.WithJudge(s.Judge, s.Logf).WithTuning(s.Tuning)
+		case RerankLocal:
+			ret = ret.WithLocalReranker(s.LocalReranker, s.Logf).WithTuning(s.Tuning)
+		}
+		opts.Retriever = ret
+		if arm.Graph {
+			// The graph is what the ablation removes: with it off the engine
+			// keeps lexical search and loses symbol lookup, graph expansion
+			// and impact analysis.
+			opts.Graph = graph.New(st)
+		}
+	}
+	return native.New(opts)
+}
+
+func roleOf(arm Arm) string {
+	if arm.Role == "" {
+		return string(llm.RoleCoding)
+	}
+	return arm.Role
+}
+
+// initRepo makes the task copy a git repository with one commit, so the
+// pipeline's worktree machinery has a base.
+func initRepo(ctx context.Context, dir string) error {
+	if worktree.IsRepository(ctx, dir) {
+		return nil
+	}
+	steps := [][]string{
+		{"init", "-q", "-b", "main"},
+		{"add", "-A"},
+		{"-c", "user.name=eval", "-c", "user.email=eval@localhost",
+			"commit", "-q", "-m", "evaluation fixture"},
+	}
+	for _, args := range steps {
+		//nolint:gosec // fixed arguments; dir is passed via -C
+		cmd := exec.CommandContext(ctx, "git", append([]string{"-C", dir}, args...)...)
+		cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0",
+			"GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_SYSTEM=/dev/null")
+		var stderr strings.Builder
+		cmd.Stderr = &stderr
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("git %s: %s", strings.Join(args, " "), strings.TrimSpace(stderr.String()))
+		}
+	}
+	return nil
+}
+
+// applyBranch fast-forwards the task copy onto the branch the pipeline
+// produced, so the harness judges what the system actually built.
+func applyBranch(ctx context.Context, dir, branch string) error {
+	//nolint:gosec // a branch name this process generated
+	cmd := exec.CommandContext(ctx, "git", "-C", dir, "checkout", "-q", branch, "--", ".")
+	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0")
+	var stderr strings.Builder
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("%s", strings.TrimSpace(stderr.String()))
+	}
+	return nil
+}

@@ -1,0 +1,56 @@
+name: CodeQL
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Weekly, so a newly published query finds an old bug.
+    - cron: "27 4 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: Analyze Go
+    runs-on: ubuntu-latest
+    # A pull request opened by Dependabot runs with a read-only token and no
+    # access to secrets, by GitHub's design. `security-events: write` is
+    # therefore unobtainable there and the upload at the end of `analyze`
+    # fails — not because anything is wrong with the code, which init and
+    # autobuild have already compiled by that point. Every dependency bump
+    # would carry a red check that means nothing, which is how a maintainer
+    # learns to stop reading them. The push to main covers the merged result,
+    # and that is the run the security tab is built from.
+    #
+    # And skipped entirely while the repository is private. The analysis itself
+    # runs fine there; the upload at the end does not, because code scanning on
+    # a private repository needs GitHub Advanced Security. Without it the job
+    # burns several minutes of CodeQL evaluation and then fails on the last
+    # step, every push — which is the same permanently-red check the Dependabot
+    # rule above exists to avoid, for a different reason. It resumes by itself
+    # when the repository is made public.
+    if: github.actor != 'dependabot[bot]' && github.event.repository.private == false
+    permissions:
+      # A job-level block replaces the workflow-level one rather than merging
+      # with it, so `contents: read` has to be repeated here. Omitting it worked
+      # only while the repository was public, where checkout needs no permission
+      # at all; the moment it went private, checkout failed with "repository not
+      # found" — which reads as an infrastructure fault rather than a missing
+      # scope, and had nothing to do with CodeQL.
+      contents: read
+      security-events: write
+      actions: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-go@41dfa10bad2bb2ae585af6ee5bb4d7d973ad74ed # v5.1.0
+        with:
+          go-version: "1.27.1"
+      - uses: github/codeql-action/init@f09c1c0a94de965c15400f5634aa42fac8fb8f88 # v3.27.5
+        with:
+          languages: go
+          queries: security-extended,security-and-quality
+      - uses: github/codeql-action/autobuild@f09c1c0a94de965c15400f5634aa42fac8fb8f88 # v3.27.5
+      - uses: github/codeql-action/analyze@f09c1c0a94de965c15400f5634aa42fac8fb8f88 # v3.27.5

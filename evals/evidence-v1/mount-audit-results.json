@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "method": "Instantiated a real container shaped exactly like a future agent run would be: --entrypoint /bin/bash on the exact pinned official image, with the sanitized control workspace bind-mounted at the repo root (/app) in place of the image's own checkout. This is the closest achievable proxy to Local Engineer's actual future runtime without a live model call: the mount topology, filesystem visibility, and environment a real run would see do not depend on which process (a live model call or this probe) is running inside the container.",
+  "architecture_note": "Local Engineer's own sandbox (internal/sandbox) is a single persistent container plus per-task Landlock/bubblewrap layers (design v3 SS6, DR-3) -- it does not itself spin up a separate Docker container per benchmark task/image. Reconciling that model with a benchmark harness's per-task container (AgentCompass/harbor) is real, undecided integration work this task does not resolve unilaterally, since the instructions explicitly forbid redesigning Local Engineer. This mount audit is a faithful proxy for the filesystem/mount question specifically (which does not depend on that unresolved question), not a claim that the full runtime wiring is complete -- see 'Remaining blockers' in the final report.",
+  "task_probed": "instance_future-architect__vuls-bff6b7552370b55ff76d474860eead4ab5de785a-v1151a6325649aaf997cd541ebe533b53fddf1b07",
+  "docker_inspect_mounts": [
+    {
+      "type": "bind",
+      "source": "<repo>/.local-engineer-runs/evidence-v1/agent-workspaces/<task_id>/control",
+      "destination": "/app",
+      "rw": true,
+      "propagation": "rprivate"
+    }
+  ],
+  "mount_count": 1,
+  "mount_allowlist_check": {
+    "sanitized_task_workspace": "present, exactly 1, as expected",
+    "oracle_workspace": "absent",
+    "grading_workspace": "absent",
+    "other_arm_workspace": "absent",
+    "local_engineer_host_repository": "absent",
+    "raw_benchmark_metadata_or_manifest": "absent",
+    "secrets_directory": "absent",
+    "unexpected_mounts": "none"
+  },
+  "host_parent_escape_check": {
+    "command": "cd /app && ls -la ..",
+    "result": "showed the container's own root filesystem (/bin, /etc, /go, /home, ...), not the host filesystem above the mount point -- standard Docker bind-mount isolation, verified empirically rather than assumed",
+    "escape_possible": false
+  },
+  "environment_variable_names": [
+    "GOLANG_VERSION", "GOPATH", "GOTOOLCHAIN", "HOME", "HOSTNAME",
+    "PATH", "PWD", "PYTEST_ADDOPTS", "SHLVL", "UV_HTTP_TIMEOUT", "_"
+  ],
+  "environment_variable_leakage_check": {
+    "credential_leakage": "none -- only standard toolchain/shell variables present",
+    "oracle_or_grader_path_leakage": "none"
+  },
+  "functional_sanity_inside_the_real_mount": {
+    "git_log_all": "62ad282 benchmark base snapshot (exactly 1 commit, matching the host-side probe)",
+    "go_build_all_packages": "succeeded, using the image's own already-installed toolchain"
+  },
+  "result": "PASS"
+}

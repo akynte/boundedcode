@@ -1,0 +1,99 @@
+# Build output
+/bin/
+/dist/
+coverage.out
+coverage.html
+*.test
+*.prof
+*.pprof
+
+# `go build ./cmd/bcode` without -o drops the binary here rather than in bin/.
+/bcode
+
+# Byte-compiled Python from the evaluation tooling under evals/.
+__pycache__/
+*.py[cod]
+
+# Local data directories
+/bc-data/
+*.db
+*.db-wal
+*.db-shm
+
+# A workspace pin is machine-specific: it records the absolute path the id was
+# derived from. Every project runs `bcode workspace init` for itself, including
+# the examples in this repository.
+.bc/
+
+# store.Layout's directories, for anyone whose data directory is this checkout
+# rather than /bc-data. They hold GGUF weights and copies of indexed
+# repositories; the store recreates each one on demand, so nothing here is
+# repository content.
+/config/
+/models/
+/workspaces/
+/backups/
+
+# Task transcripts written by `bcode task run --log`.
+.run-*.log
+
+# Editors and local tool state
+.idea/
+.vscode/
+!.vscode/extensions.json
+*.swp
+*~
+.DS_Store
+
+# Local AI-assistant configuration. It holds absolute paths from one machine
+# and is never useful to another contributor.
+.claude/
+
+# The generated documentation site (`mkdocs build`).
+/site/
+
+# Secrets and local environment. Nothing in this repository reads a .env file;
+# the entry exists so an experiment cannot leave one behind.
+.env
+.env.*
+!.env.example
+
+# Fuzz crashers are kept; the working corpus is not.
+# (Regression seeds under testdata/fuzz/ ARE committed on purpose.)
+
+# Sidecar dependencies are installed, not committed; the lockfile is.
+sidecars/*/node_modules/
+
+# Imported SWE-bench fixtures: three upstream checkouts, 110 MB and ~8,900
+# files, reproduced by evals/tasks/swebench/materialize.sh and pinned by the
+# base_digest in each task file. Committing them would triple this repository
+# to carry code it does not own.
+/evals/tasks/fixtures/swebench-*/
+
+# Judgment Validation Campaign generated output: results and manifests are
+# reproducible from (repo revision + dataset + manifest) per
+# docs/explanation/judgment-validation.md, so they are not committed. The
+# datasets, policy file, fixtures and annotations they are reproduced from
+# are, and are not excluded here.
+/evals/judgment/results/*
+/evals/judgment/manifests/*
+!/evals/judgment/results/.gitkeep
+!/evals/judgment/manifests/.gitkeep
+
+# Standard Evidence Suite v1 raw run artifacts and generated reports: large,
+# reproducible from the frozen manifest + a live run, not committed. The
+# selection, cache, profile and component-eval dataset that produce them are.
+/evals/evidence-v1/raw/control/*
+/evals/evidence-v1/raw/jev-assisted/*
+/evals/evidence-v1/reports/*
+!/evals/evidence-v1/raw/control/.gitkeep
+!/evals/evidence-v1/raw/jev-assisted/.gitkeep
+!/evals/evidence-v1/reports/.gitkeep
+
+# Evidence Suite v1's guarded scratch root (evals/evidence-v1/tooling/safe_cleanup.py
+# RUN_ROOT): every disposable benchmark workspace, cloned repository,
+# evaluator state directory and log lives here, never in evals/ itself.
+/.boundedcode-runs/
+# Pre-rename scratch root. Kept so a checkout that predates the rename does
+# not suddenly show hours of retained evidence runs as untracked files.
+/.local-engineer-runs/
