@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -351,6 +352,10 @@ func (r *Runner) judge(ctx context.Context, task Task, work string) (bool, strin
 	// The paths come from a task file, and a task set may have been written
 	// by someone else. Confining them is the same problem the engine has with
 	// model-supplied paths, so it uses the same confinement.
+	isolated, err := isolateAcceptance(task, work)
+	if err != nil {
+		return false, "", err
+	}
 	for rel, body := range task.Acceptance.Files {
 		if err := worktree.WriteWithin(work, rel, []byte(body)); err != nil {
 			return false, "", fmt.Errorf("acceptance file %s: %w", rel, err)
@@ -368,12 +373,65 @@ func (r *Runner) judge(ctx context.Context, task Task, work string) (bool, strin
 		"NO_COLOR=1", "TERM=dumb")
 
 	output, err := cmd.CombinedOutput()
+	output = append([]byte(isolated), output...)
 	if runCtx.Err() != nil {
 		// A timeout in the acceptance command is a property of the solution —
 		// an infinite loop is a failure — not a harness error.
 		return false, string(output) + "\n[acceptance command timed out]", nil
 	}
 	return err == nil, string(output), nil
+}
+
+// isolateAcceptance sets aside the test files a candidate added to a package
+// that receives a hidden acceptance file, and says which.
+//
+// A hidden test is written against the fixture: it declares its own helpers
+// and may use the fixture tests'. A test file the candidate added is not what
+// is graded, but it compiles into the same package, and the recorded run added
+// restock_test.go declaring a helper named failingLog — as the hidden test
+// does — so the package did not compile and all four hidden tests failed
+// without running. Fixture test files stay as the candidate left them: a
+// correct change updates its callers, and a signature change has to update
+// the tests that call it.
+func isolateAcceptance(task Task, work string) (string, error) {
+	hidden := map[string]bool{}
+	dirs := map[string]bool{}
+	for rel := range task.Acceptance.Files {
+		hidden[filepath.ToSlash(rel)] = true
+		dirs[filepath.Dir(filepath.FromSlash(rel))] = true
+	}
+	var notes []string
+	for dir := range dirs {
+		entries, err := os.ReadDir(filepath.Join(work, dir))
+		if err != nil {
+			if errors.Is(err, fs.ErrNotExist) {
+				continue
+			}
+			return "", fmt.Errorf("acceptance isolation: %w", err)
+		}
+		for _, e := range entries {
+			rel := filepath.ToSlash(filepath.Join(dir, e.Name()))
+			if e.IsDir() || !strings.HasSuffix(e.Name(), "_test.go") || hidden[rel] {
+				continue
+			}
+			_, err := os.Stat(filepath.Join(task.FixturePath(), dir, e.Name()))
+			switch {
+			case errors.Is(err, fs.ErrNotExist):
+				if err := os.Remove(filepath.Join(work, dir, e.Name())); err != nil {
+					return "", fmt.Errorf("acceptance isolation: %w", err)
+				}
+				notes = append(notes, rel)
+			case err != nil:
+				return "", fmt.Errorf("acceptance isolation: %w", err)
+			}
+		}
+	}
+	if len(notes) == 0 {
+		return "", nil
+	}
+	sort.Strings(notes)
+	return "[acceptance: test files the candidate added to a graded package were set aside: " +
+		strings.Join(notes, ", ") + "]\n", nil
 }
 
 // snapshot records the content hash of every file, so the diff after a run is

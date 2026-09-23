@@ -4,8 +4,9 @@
 id: signature-change-001
 category: api_change
 objective: >-
-  billing.Total ignores currency. Change it to take a currency code and to
-  return the total alongside that currency, and update everything that calls it
+  billing.Total ignores currency. Change it to take the currency code as a
+  second argument, after the lines, and to return the total in pence together
+  with that currency code as two results, and update everything that calls it
   so the project still builds.
 fixture: fixtures/signature-change
 scope:
@@ -13,7 +14,12 @@ scope:
 leak_risk: none
 verification: standard
 notes: >-
-  The two consumers are in internal/report and internal/api. A solution that
+  The objective states the signature the hidden test checks by reflection: an
+  earlier wording left argument order and result shape open, and a reasonable
+  design — the currency first, the result in a struct — passed verification and
+  review and failed the hidden test, which is a false acceptance the task
+  caused rather than measured. The two consumers are in internal/report and
+  internal/api. A solution that
   edits only internal/billing fails to compile, so the build check catches it —
   this task measures whether the system finds consumers before editing rather
   than after failing.
