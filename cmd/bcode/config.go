@@ -1,9 +1,11 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -16,8 +18,68 @@ func newConfigCmd() *cobra.Command {
 		Use:   "config",
 		Short: "Inspect and initialise configuration",
 	}
-	cmd.AddCommand(newConfigInitCmd(), newConfigShowCmd(), newConfigProfilesCmd())
+	cmd.AddCommand(newConfigInitCmd(), newConfigReferenceCmd(), newConfigShowCmd(), newConfigProfilesCmd())
 	return cmd
+}
+
+// newConfigReferenceCmd configures the shipped Bonsai reference as one
+// operation, then verifies that the external inference server is reachable.
+func newConfigReferenceCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "reference",
+		Short: "Configure and check the local Bonsai reference setup",
+		Long: "Selects the Bonsai 2 27B profile, points inference at the local " +
+			"llama-server on 127.0.0.1:8080, and routes every role to it. It replaces " +
+			"providers.yaml with the single-provider reference configuration. Start " +
+			"the server from Step 5 before running this command.",
+		Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			root, err := openRoot()
+			if err != nil {
+				return err
+			}
+			defer closeRoot(cmd, root)
+
+			cfg, err := loadConfig(root)
+			if err != nil {
+				return err
+			}
+			const baseURL = "http://127.0.0.1:8080"
+			cfg.Profile = "bonsai-2-27b-8gb-cuda"
+			cfg.Inference.Mode = config.ModeExternal
+			cfg.Inference.BaseURL = baseURL
+			cfg.Inference.Port = 8080
+			cfg.Egress.Enabled = false
+
+			dir := root.Layout().ConfigDir()
+			if err := config.Save(dir, cfg); err != nil {
+				return err
+			}
+			providers := llm.DefaultProvidersFile(baseURL, "boundedcode-bonsai")
+			providers.Providers[0].TimeoutSeconds = 900
+			providers.Roles = map[string]string{}
+			if err := llm.SaveProvidersFile(dir, providers); err != nil {
+				return err
+			}
+			fmt.Fprintf(cmd.OutOrStdout(), "configured %s and %s\n",
+				config.Path(dir), filepath.Join(dir, "providers.yaml"))
+
+			router, err := llm.NewRouter(providers)
+			if err != nil {
+				return err
+			}
+			defer router.Close()
+			ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
+			defer cancel()
+			for name, status := range router.Health(ctx) {
+				fmt.Fprintf(cmd.OutOrStdout(), "%-20s %s\n", name, status)
+				if status != "ok" {
+					return fmt.Errorf("local inference is unreachable; confirm llama-server is running at %s", baseURL)
+				}
+			}
+			return nil
+		},
+	}
 }
 
 func newConfigInitCmd() *cobra.Command {

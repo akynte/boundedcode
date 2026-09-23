@@ -947,6 +947,7 @@ only", holding "counters, never content" — and it is bounded accordingly:
 | Command | |
 |---|---|
 | `init` | Write default `bcode.yaml` and `providers.yaml` |
+| `reference` | Configure the local Bonsai reference and check inference health |
 | `show` | Effective configuration, providers and role routing |
 | `profiles` | Available profiles; `*` is active, and each says shipped or yours |
 

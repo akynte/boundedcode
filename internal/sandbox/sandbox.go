@@ -186,9 +186,10 @@ func Guarantees() []Guarantee {
 	}
 }
 
-// ReadmeStatement is the honest summary §6.2 requires the README to carry.
-const ReadmeStatement = "The default container gives strong isolation from your host and between " +
-	"workspaces; process-level isolation between concurrent tasks requires the optional namespace mode."
+// ReadmeStatement summarizes the deployment boundaries without implying that
+// the container layer is active on a host install.
+const ReadmeStatement = "Container deployments add an outer boundary around host files and workspaces; " +
+	"host installs do not have that layer. Bubblewrap adds process and network namespaces when available."
 
 // Report describes the active configuration for `bcode doctor`.
 type Report struct {

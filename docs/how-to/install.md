@@ -1,4 +1,4 @@
-# Install the 8 GB reference configuration
+# Install the 8 GB reference configuration on Linux
 
 This walkthrough reproduces the **Linux x86-64, NVIDIA RTX 4060 Laptop, Bonsai
 PTQ1_0** inference configuration. It uses the native Go agent and a separately
@@ -16,6 +16,14 @@ generator role (localization, planning, editing and review) from one resident
 server, with nothing swapped in or out.
 [The model stack](../reference/model-stack.md) says what each role does and
 what has been measured.
+
+This is a **host install**: BoundedCode and the Prism inference server run
+directly on Linux. The container boundary is not installed, so `bcode doctor`
+will report that layer as absent. The shipped container image does not include
+the Prism kernels required by this Bonsai model; a tested container recipe for
+this exact setup is not yet available. Use this workflow for local development
+with repositories you trust, and read the [trust boundaries](../explanation/trust-boundaries.md)
+before running tasks against other people's code.
 
 The reference has 64 GB system RAM. Budget at least 20 GB of free disk for the
 model, runtime build and basic caches, plus space for your repositories and
@@ -70,23 +78,22 @@ are prepared to execute. [Trust boundaries](../explanation/trust-boundaries.md).
 git clone https://github.com/akynte/boundedcode.git
 cd boundedcode
 make build
-if ! grep -Fq '# >>> boundedcode environment >>>' "$HOME/.bashrc"; then
-  {
-    printf '\n# >>> boundedcode environment >>>\n'
-    printf 'export PATH="%s/bin:$PATH"\n' "$PWD"
-    printf 'export BC_DATA="%s/.local/share/boundedcode"\n' "$HOME"
-    printf 'export BC_PRISM_DIR="%s/.local/share/boundedcode-runtime"\n' "$HOME"
-    printf '# <<< boundedcode environment <<<\n'
-  } >> "$HOME/.bashrc"
+if ! grep -Fq "export PATH=\"$PWD/bin:\$PATH\"" "$HOME/.bashrc"; then
+  printf '\nexport PATH="%s/bin:$PATH"\n' "$PWD" >> "$HOME/.bashrc"
 fi
+grep -Fq 'export BC_DATA=' "$HOME/.bashrc" || \
+  printf 'export BC_DATA="%s/.local/share/boundedcode"\n' "$HOME" >> "$HOME/.bashrc"
+grep -Fq 'export BC_PRISM_DIR=' "$HOME/.bashrc" || \
+  printf 'export BC_PRISM_DIR="%s/.local/share/boundedcode-runtime"\n' "$HOME" >> "$HOME/.bashrc"
 source "$HOME/.bashrc"
 bcode config init
 ```
 
 This adds the checkout's `bin` directory and the data/runtime paths to Bash's
-startup file once, so they are available from new terminals and other project
-directories. If you move the checkout later, update its `PATH` entry in
-`~/.bashrc`. The binary requires cgo; do not build with `CGO_ENABLED=0`.
+startup file if they are not already present, so they are available from new
+terminals and other project directories. If you move the checkout later, update
+its `PATH` entry in `~/.bashrc`. The binary requires cgo; do not build with
+`CGO_ENABLED=0`.
 
 `config init` creates `$BC_DATA/config/bcode.yaml` and `providers.yaml`; it
 refuses to overwrite existing configuration. Existing installations should edit
@@ -197,50 +204,26 @@ inference; `bcode` does not stop an externally owned server.
 
 ## 6. Configure the reference
 
-Set these fields in `$BC_DATA/config/bcode.yaml`:
-
-```yaml
-profile: bonsai-2-27b-8gb-cuda
-inference:
-  mode: external
-  base_url: http://127.0.0.1:8080
-  port: 8080
-egress:
-  enabled: false
-```
-
-Set `$BC_DATA/config/providers.yaml` to:
-
-```yaml
-default: local
-providers:
-  - name: local
-    kind: llamacpp
-    base_url: http://127.0.0.1:8080
-    model: boundedcode-bonsai
-    timeout_seconds: 900
-roles: {}
-```
-
-The server alias avoids machine-specific absolute paths in client configuration.
-YAML values do not expand shell variables. The URL in `providers.yaml` is the
-one the inference client calls; changing only `bcode.yaml` is insufficient.
-Both URLs must describe the same local server.
-
-`roles: {}` leaves every role on `default`, so Bonsai also does the editing.
-That is the reference configuration.
+Keep the inference server running in its dedicated terminal. In a second
+terminal, run this one command:
 
 ```bash
-bcode config show
-bcode models health
-bcode doctor
+bcode config reference
 ```
 
-The profile should be `bonsai-2-27b-8gb-cuda` and health should report
-`local ... ok`. Warnings about an unmeasured profile and absent container
-boundary are expected on a host installation; sandbox or missing-tool failures
-need resolution. The profile's published budgets are starting settings, not
-measurements from your machine.
+It sets the Bonsai profile, local inference URL, port, and provider routing in
+both configuration files, then checks that the server responds `local ... ok`.
+It preserves other settings in `bcode.yaml`; it replaces `providers.yaml` with
+the single-provider reference setup. Run it again any time you want to restore
+these reference settings.
+
+The profile's published budgets are starting settings, not
+measurements from your machine. Run `bcode doctor` after Step 7, once judgment
+is configured. On this host install, the missing outer container boundary and
+the documented network-containment limitation are expected warnings. The
+profile-fit estimate remains until you benchmark it, and index freshness remains
+until Step 8 builds the index. Judgment should pass once its config and
+credential are available; act on any other failures `bcode doctor` reports.
 
 ## 7. Configure the decision plane (required)
 

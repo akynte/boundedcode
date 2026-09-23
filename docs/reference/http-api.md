@@ -79,7 +79,7 @@ guarantee table, and the honest summary statement.
      "container_only": false, "with_landlock": false, "with_bwrap": true,
      "note": "requires the PID namespace, which only the bubblewrap layer provides"}
   ],
-  "statement": "The default container gives strong isolation from your host and between workspaces; process-level isolation between concurrent tasks requires the optional namespace mode."
+  "statement": "Container deployments add an outer boundary around host files and workspaces; host installs do not have that layer. Bubblewrap adds process and network namespaces when available."
 }
 ```
 

@@ -208,7 +208,7 @@ func checkEgress(cfg *config.Config) Check {
 	}
 	if !cfg.Egress.Enabled {
 		return Check{Name: "egress proxy (§6.1)", Level: OK,
-			Detail: "disabled: nothing in this container has a provisioned route out",
+			Detail: "disabled: no provisioned egress route is configured for this installation",
 			Fix: "A task sandbox never gets egress either way. Enable egress.enabled in bcode.yaml " +
 				"only if you need `bcode deps` or `bcode docs` to fetch; review egress.allowlist first."}
 	}
