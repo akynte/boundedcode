@@ -58,6 +58,32 @@ func TestOpenCodeContextSurvivesSessionRecreation(t *testing.T) {
 	}
 }
 
+// Non-goals are a distinct concept from a constraint: a constraint bounds how
+// the work may be done, a non-goal says what the user explicitly ruled out of
+// scope. A session that forgets a non-goal is prone to "helpfully" doing the
+// very thing the user said not to.
+func TestOpenCodeContextRecoversNonGoals(t *testing.T) {
+	ctx := context.Background()
+	s := bound(t)
+	task, err := supervisor.StartTask(ctx, s.Store, "Add rate limiting to the API", recipe.Standard)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := supervisor.RecordEvent(ctx, s.Store, task.ID, ledger.KindSessionStart,
+		map[string]any{"non_goals": []string{"Do not touch the authentication middleware"}}); err != nil {
+		t.Fatal(err)
+	}
+	for _, session := range []string{"ses_original", "ses_after_restart"} {
+		body, err := supervisor.OpenCodeContext(ctx, s.Store, s.Workspace.Root, session)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(body, "Do not touch the authentication middleware") {
+			t.Errorf("session %s lost the recorded non-goal: %s", session, body)
+		}
+	}
+}
+
 func TestOpenCodeContextBoundsDecisionTail(t *testing.T) {
 	ctx := context.Background()
 	s := bound(t)

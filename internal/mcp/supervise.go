@@ -306,6 +306,7 @@ type startIn struct {
 	Objective    string   `json:"objective" jsonschema:"the user's original objective, concise but faithful"`
 	Requirements []string `json:"requirements,omitempty" jsonschema:"explicit user requirements and acceptance criteria that must survive compaction"`
 	Constraints  []string `json:"constraints,omitempty" jsonschema:"explicit scope, security and performance constraints from the user"`
+	NonGoals     []string `json:"non_goals,omitempty" jsonschema:"explicit things the user said this task should NOT do, so a later session does not reintroduce them as a missed requirement"`
 	// WriteScope is §9.3's plan-scoped allowlist, declared before the work
 	// rather than discovered from the diff afterwards. An injected instruction
 	// cannot widen it: adding a path means opening another task, which is a
@@ -330,7 +331,7 @@ func (s *Server) taskStart(ctx context.Context, req *mcp.CallToolRequest, in sta
 	if strings.TrimSpace(in.Objective) == "" {
 		return fail("objective is required"), startOut{}, nil
 	}
-	if err := validateTaskDetails(in.Requirements, in.Constraints); err != nil {
+	if err := validateTaskDetails(in.Requirements, in.Constraints, in.NonGoals); err != nil {
 		return fail("%v", err), startOut{}, nil
 	}
 	sess, err := s.resolve(ctx, in.Path)
@@ -355,7 +356,8 @@ func (s *Server) taskStart(ctx context.Context, req *mcp.CallToolRequest, in sta
 	}
 	if err := supervisor.RecordEvent(ctx, sess.Store, t.ID, ledger.KindSessionStart,
 		map[string]any{"objective": t.Title, "executor": "opencode", "session_id": openCodeSessionID(req),
-			"requirements": in.Requirements, "constraints": in.Constraints, "original_prompt_hash": promptHash}); err != nil {
+			"requirements": in.Requirements, "constraints": in.Constraints, "non_goals": in.NonGoals,
+			"original_prompt_hash": promptHash}); err != nil {
 		return fail("recording the OpenCode session: %v", err), startOut{}, nil
 	}
 
@@ -393,17 +395,17 @@ func validateTaskDetails(groups ...[]string) error {
 	total := 0
 	for _, group := range groups {
 		if len(group) > 20 {
-			return fmt.Errorf("at most 20 requirements or constraints are allowed per group")
+			return fmt.Errorf("at most 20 requirements, constraints or non-goals are allowed per group")
 		}
 		for _, item := range group {
 			if strings.TrimSpace(item) == "" || len(item) > 500 {
-				return fmt.Errorf("each requirement or constraint must have 1 to 500 characters")
+				return fmt.Errorf("each requirement, constraint or non-goal must have 1 to 500 characters")
 			}
 			total += len(item)
 		}
 	}
 	if total > 6000 {
-		return fmt.Errorf("requirements and constraints exceed the 6000-character context budget")
+		return fmt.Errorf("requirements, constraints and non-goals exceed the 6000-character context budget")
 	}
 	return nil
 }
@@ -412,6 +414,7 @@ type resumeIn struct {
 	TaskID       string   `json:"task_id" jsonschema:"the task ID returned by bc_task_start"`
 	Requirements []string `json:"requirements,omitempty" jsonschema:"explicit user criteria to recover when an older task did not record them at start"`
 	Constraints  []string `json:"constraints,omitempty" jsonschema:"explicit user constraints to recover when an older task did not record them at start"`
+	NonGoals     []string `json:"non_goals,omitempty" jsonschema:"explicit non-goals to recover when an older task did not record them at start"`
 	Path         string   `json:"path,omitempty" jsonschema:"subdirectory of the open repository"`
 }
 
@@ -427,7 +430,7 @@ func openCodeSessionID(req *mcp.CallToolRequest) string {
 }
 
 func (s *Server) taskResume(ctx context.Context, req *mcp.CallToolRequest, in resumeIn) (*mcp.CallToolResult, any, error) {
-	if err := validateTaskDetails(in.Requirements, in.Constraints); err != nil {
+	if err := validateTaskDetails(in.Requirements, in.Constraints, in.NonGoals); err != nil {
 		return fail("%v", err), nil, nil
 	}
 	id := openCodeSessionID(req)
@@ -445,7 +448,7 @@ func (s *Server) taskResume(ctx context.Context, req *mcp.CallToolRequest, in re
 	}
 	if err := supervisor.RecordEvent(ctx, sess.Store, t.ID, ledger.KindSessionStart,
 		map[string]any{"objective": t.Title, "executor": "opencode", "session_id": id, "resumed": true,
-			"requirements": in.Requirements, "constraints": in.Constraints}); err != nil {
+			"requirements": in.Requirements, "constraints": in.Constraints, "non_goals": in.NonGoals}); err != nil {
 		return fail("recording session resume: %v", err), nil, nil
 	}
 	return text("Session bound to task " + t.ID + ". Its durable state will appear in subsequent model requests."), nil, nil

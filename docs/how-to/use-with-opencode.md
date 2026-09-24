@@ -85,14 +85,16 @@ that was never recorded as durable task state may need to be retrieved again.
 
 ## Confinement status
 
-`bcode opencode run` is not yet a usable production path with the new context
-hook. OpenCode 2's private server needs permission to bind port zero, and the
-hook needs access to the workspace ledger. The port-zero grant is implemented,
-but the sandbox still hides the BoundedCode data root. The next integration
-step is a narrow per-workspace state channel; mounting the whole data root
-would expose unrelated workspaces and signing keys. Use `bcode opencode` for
-the currently validated workflow. Review [trust boundaries](../explanation/trust-boundaries.md)
-for the regular editor's security limits.
+`bcode opencode run` is validated end to end: a loopback broker
+(`cmd/bcode/opencode_broker.go`), authenticated by a random per-run capability
+and pinned to one workspace's store, gives the sandboxed session's context hook
+a narrow state channel without mounting the BoundedCode data root — the
+sandbox never sees another workspace's ledger, artifacts or signing keys. See
+[the context architecture doc](../explanation/opencode-context.md) for the
+end-to-end confined run this was validated against, including the real,
+measured VRAM ceiling on an 8 GB card. Review
+[trust boundaries](../explanation/trust-boundaries.md) for the regular
+editor's security limits.
 
 ## Troubleshooting
 

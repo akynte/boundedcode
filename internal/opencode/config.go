@@ -7,28 +7,92 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/akynte/boundedcode/internal/opencode/plugin"
 )
 
 // ServerName is the key BoundedCode registers itself under.
 const ServerName = "boundedcode"
 
+// legacyPluginPath is what every setup before this one wrote: a path relative
+// to the repository OpenCode opened. It happened to resolve only when that
+// repository was a checkout of BoundedCode's own source — the one case this
+// project dogfoods itself in — and silently failed to load (OpenCode logs a
+// WARN, not an error a developer would see) in every other project, which is
+// the only place `bcode opencode` is actually meant to run. RegisterContextPolicy
+// now replaces it with InstallPlugin's absolute, portable path.
+const legacyPluginPath = "./internal/opencode/plugin"
+
+// InstallPlugin unpacks the embedded OpenCode context-hook adapter into
+// stateDir and returns its directory. A source-relative path only resolves
+// when OpenCode happens to be opened at this repository's own root; an
+// absolute path resolves from any project, which is the whole point of an
+// installed tool. Re-extracting is cheap and idempotent: content is compared
+// before writing, so `bcode opencode setup` can call this on every run without
+// dirtying the workspace state directory's mtimes for no reason.
+func InstallPlugin(stateDir string) (dir string, changed bool, err error) {
+	dir = filepath.Join(stateDir, "opencode-plugin")
+	entries, err := plugin.FS.ReadDir(".")
+	if err != nil {
+		return "", false, fmt.Errorf("reading embedded OpenCode plugin: %w", err)
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return dir, false, err
+	}
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		body, err := plugin.FS.ReadFile(e.Name())
+		if err != nil {
+			return dir, false, fmt.Errorf("reading embedded %s: %w", e.Name(), err)
+		}
+		target := filepath.Join(dir, e.Name())
+		if existing, err := os.ReadFile(target); err == nil && bytes.Equal(existing, body) {
+			continue
+		}
+		if err := os.WriteFile(target, body, 0o644); err != nil { //nolint:gosec // the plugin's own source, not a secret
+			return dir, false, fmt.Errorf("writing %s: %w", target, err)
+		}
+		changed = true
+	}
+	return dir, changed, nil
+}
+
 // RegisterContextPolicy installs the OpenCode 2 adapter and a compaction
 // policy that fits the reference 32K Bonsai slot. OpenCode 2.0.15 otherwise
 // retains 15K tokens after compacting while its 20K buffer triggers at 12.8K.
-func RegisterContextPolicy(repoRoot string) (string, bool, error) {
+//
+// pluginDir is the absolute path InstallPlugin returned; the caller extracts
+// once and passes it in, rather than this function reaching into the
+// filesystem on its own, so a test can register a policy against a plugin
+// path it fully controls.
+func RegisterContextPolicy(repoRoot, pluginDir string) (string, bool, error) {
 	return mergeConfig(repoRoot, func(doc map[string]any) bool {
 		changed := false
-		plugins, _ := doc["plugins"].([]any)
-		const adapter = "./internal/opencode/plugin"
+		existing, _ := doc["plugins"].([]any)
+		var plugins []any
 		found := false
-		for _, item := range plugins {
-			if item == adapter {
+		for _, item := range existing {
+			if item == legacyPluginPath {
+				// Drop the broken path outright rather than keeping both: a
+				// project that somehow has a real file at that relative
+				// location is not a case this adapter needs to support, and
+				// keeping it would register the adapter twice.
+				changed = true
+				continue
+			}
+			if item == pluginDir {
 				found = true
 			}
+			plugins = append(plugins, item)
 		}
 		if !found {
-			doc["plugins"] = append(plugins, adapter)
+			plugins = append(plugins, pluginDir)
 			changed = true
+		}
+		if changed {
+			doc["plugins"] = plugins
 		}
 		model, _ := doc["model"].(string)
 		if strings.HasPrefix(model, ProviderName+"/") && strings.Contains(strings.ToLower(model), "bonsai") {

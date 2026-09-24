@@ -206,13 +206,17 @@ func TestRegisterModelRemovesAStaleV1EntryEvenWhenV2IsAlreadyCurrent(t *testing.
 
 func TestContextPolicyFitsTheBonsaiWindowAndIsIdempotent(t *testing.T) {
 	repo := t.TempDir()
+	pluginDir, _, err := opencode.InstallPlugin(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
 	if _, _, err := opencode.RegisterModel(repo, "http://127.0.0.1:8080", "Ternary-Bonsai-2-27B-PTQ1_0.gguf"); err != nil {
 		t.Fatal(err)
 	}
-	if _, changed, err := opencode.RegisterContextPolicy(repo); err != nil || !changed {
+	if _, changed, err := opencode.RegisterContextPolicy(repo, pluginDir); err != nil || !changed {
 		t.Fatalf("first context setup: changed=%v err=%v", changed, err)
 	}
-	if _, changed, err := opencode.RegisterContextPolicy(repo); err != nil || changed {
+	if _, changed, err := opencode.RegisterContextPolicy(repo, pluginDir); err != nil || changed {
 		t.Fatalf("context setup is not idempotent: changed=%v err=%v", changed, err)
 	}
 	body, err := os.ReadFile(filepath.Join(repo, "opencode.json"))
@@ -235,8 +239,67 @@ func TestContextPolicyFitsTheBonsaiWindowAndIsIdempotent(t *testing.T) {
 	if !doc.Compaction.Auto || doc.Compaction.Buffer != 12000 || doc.Compaction.Keep.Tokens != 4000 {
 		t.Fatalf("incorrect 32K compaction policy: %+v", doc.Compaction)
 	}
-	if len(doc.Plugins) != 1 || doc.Plugins[0] != "./internal/opencode/plugin" {
-		t.Fatalf("context adapter not registered: %v", doc.Plugins)
+	if len(doc.Plugins) != 1 || doc.Plugins[0] != pluginDir {
+		t.Fatalf("context adapter not registered at its installed, portable path: %v", doc.Plugins)
+	}
+	if !filepath.IsAbs(doc.Plugins[0]) {
+		t.Fatalf("plugin path is not absolute, so it will not resolve from a different repository: %v", doc.Plugins[0])
+	}
+}
+
+// InstallPlugin unpacks the plugin's own real files, and the extraction must
+// be stable content, not just a stable path: OpenCode reads whatever is on
+// disk at that path, so a corrupt or incomplete extraction would silently
+// disable the context hook exactly like the bug this replaces did.
+func TestInstallPluginExtractsRealContentIdempotently(t *testing.T) {
+	stateDir := t.TempDir()
+	dir, changed, err := opencode.InstallPlugin(stateDir)
+	if err != nil || !changed {
+		t.Fatalf("first install: changed=%v err=%v", changed, err)
+	}
+	body, err := os.ReadFile(filepath.Join(dir, "index.js"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(body), "boundedcode.context") {
+		t.Fatalf("extracted plugin does not look like the real adapter:\n%s", body)
+	}
+	if _, err := os.ReadFile(filepath.Join(dir, "package.json")); err != nil {
+		t.Fatalf("package.json was not extracted: %v", err)
+	}
+	if _, changed, err := opencode.InstallPlugin(stateDir); err != nil || changed {
+		t.Fatalf("re-installing identical content reported changed=%v err=%v", changed, err)
+	}
+}
+
+// A project that ran an older `bcode opencode setup` has the broken
+// source-relative path on record. Setup must replace it, not add the correct
+// path alongside a dead one.
+func TestRegisterContextPolicyMigratesTheLegacyPluginPath(t *testing.T) {
+	repo := t.TempDir()
+	if err := os.WriteFile(filepath.Join(repo, "opencode.json"),
+		[]byte(`{"plugins":["./internal/opencode/plugin"]}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	pluginDir, _, err := opencode.InstallPlugin(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, changed, err := opencode.RegisterContextPolicy(repo, pluginDir); err != nil || !changed {
+		t.Fatalf("legacy path was not migrated: changed=%v err=%v", changed, err)
+	}
+	body, err := os.ReadFile(filepath.Join(repo, "opencode.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var doc struct {
+		Plugins []string `json:"plugins"`
+	}
+	if err := json.Unmarshal(body, &doc); err != nil {
+		t.Fatal(err)
+	}
+	if len(doc.Plugins) != 1 || doc.Plugins[0] != pluginDir {
+		t.Fatalf("the broken legacy path survived alongside or instead of the real one: %v", doc.Plugins)
 	}
 }
 
@@ -307,5 +370,21 @@ func TestTheBlockDirectsTheAgentThroughVerification(t *testing.T) {
 	}
 	if !strings.Contains(got, "your own reading of the code does not") {
 		t.Error("the block does not say the contract decides completion rather than the agent")
+	}
+}
+
+// bc_task_memory, bc_task_memory_add and bc_task_fact are registered MCP tools
+// (internal/mcp/supervise.go) and are the entire typed-memory and evidence
+// architecture the OpenCode context card refers to ("Full typed task memory
+// and evidence are available through bc_task_memory"), but nothing told the
+// agent these tools exist. An agent that never learns of them cannot record a
+// hypothesis, confirm a fact, or recover superseded evidence, which defeats
+// the durable-memory architecture they are the only way to use.
+func TestTheBlockNamesTheTypedMemoryTools(t *testing.T) {
+	got := opencode.Render(opencode.Facts{Nodes: 1, Edges: 1})
+	for _, want := range []string{"bc_task_memory_add", "bc_task_fact", "bc_task_memory", "model_hypothesis", "supersedes"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("the block never mentions %q:\n%s", want, got)
+		}
 	}
 }

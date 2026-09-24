@@ -105,8 +105,9 @@ func Render(f Facts) string {
 	b.WriteString("- **`bc_status`** when answers look stale. It reports how far the index has " +
 		"drifted from the working tree.\n")
 	b.WriteString("- **`bc_task_start`** before implementing, fixing or refactoring anything. " +
-		"Include the user's explicit acceptance criteria in `requirements` and scope or security " +
-		"limits in `constraints`; these survive OpenCode compaction and session recreation. " +
+		"Include the user's explicit acceptance criteria in `requirements`, scope or security " +
+		"limits in `constraints`, and anything the user explicitly ruled out in `non_goals`; " +
+		"these survive OpenCode compaction and session recreation. " +
 		"It opens a supervised task, journals the intent before the work, and tells you which " +
 		"paths this repository protects — which is cheaper to learn before editing than after.\n")
 	b.WriteString("- **`bc_task_resume`** when a new OpenCode session must continue one of several " +
@@ -114,6 +115,18 @@ func Render(f Facts) string {
 		"to its durable objective, requirements, decisions and verification.\n")
 	b.WriteString("- **`bc_task_history`** to page through older user decisions when the active " +
 		"task card says some decisions were omitted. Use the task id and offset.\n")
+	b.WriteString("- **`bc_task_memory_add`** to record what you have established as you work: a " +
+		"`model_hypothesis`, a `contradicted_hypothesis` when new evidence overturns an earlier " +
+		"one (pass `supersedes`), a `tool_observation`, an `open_failure`, a `resolved_failure`, " +
+		"or a `pending_action`. A hypothesis is not a fact — recording it as one does not make it " +
+		"one, and a superseded record stops appearing in the active task card automatically.\n")
+	b.WriteString("- **`bc_task_fact`** to confirm an exact quote in a repository file and turn it " +
+		"into an immutable, evidence-backed `repository_fact`. This is the only way to record a " +
+		"repository fact; asserting one through `bc_task_memory_add` is refused, because a fact " +
+		"the model merely claims is a hypothesis wearing a stronger label.\n")
+	b.WriteString("- **`bc_task_memory`** to page older typed task memory the active card omitted, " +
+		"and to recover the full text behind an `evidence=` hash — including the original raw " +
+		"user request — without asking the user to repeat it.\n")
 	b.WriteString("- **`bc_verify`** when you believe the change is complete. It runs this " +
 		"repository's checks in a sandbox and applies the completion contract, tying every " +
 		"result to the exact content hash it describes. It decides whether the work is done; " +

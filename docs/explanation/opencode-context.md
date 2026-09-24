@@ -48,8 +48,9 @@ the physical window.
 The project OpenCode plugin invokes `bcode opencode context --session <id>` at
 each primary model request. That Go command reconstructs a small card from the
 workspace ledger and current checkout. It contains the original supervised
-objective, explicit requirements and constraints passed to `bc_task_start`,
-recorded user decisions, changed files and last verification result. The
+objective, explicit requirements, constraints and non-goals passed to
+`bc_task_start`, recorded user decisions, changed files and last verification
+result. The
 active card limits the decision tail to about 3 KB and the changed-path list
 to about 2 KB; it reports omitted counts. `bc_task_history` pages older user
 decisions from the ledger by task ID, and `git status` recovers the full changed
@@ -80,10 +81,49 @@ limits to `bc_task_start` at the beginning. Therefore the current system should
 not claim lossless memory or guaranteed absence of semantic drift.
 
 The regular `bcode opencode` path was validated. The confined
-`bcode opencode run` path remains blocked: OpenCode 2's private server now
-starts after allowing Landlock `bind(0)`, but the context hook cannot reach the
-workspace ledger from its deliberately restricted filesystem. A per-workspace
-state channel is needed before this path can be called production ready.
+`bcode opencode run` path is now also validated end to end, in a disposable
+test repository outside this checkout: a loopback broker
+(`cmd/bcode/opencode_broker.go`), authenticated by a random per-run capability
+and pinned to one workspace's `Store`, gives the sandboxed `bcode opencode
+context`/`record-prompt` invocations the per-workspace state channel this
+section used to say was missing. `TestBrokerPinsWorkspaceAndPrompt` covers
+capability forgery and cross-workspace isolation; `TestOpenCodeContextSurvivesSessionRecreation`
+covers same-workspace task isolation (an unbound session with two active
+tasks is refused rather than guessed at).
+
+**A separate defect masked this for every project other than BoundedCode's own
+checkout.** `RegisterContextPolicy` wrote the context/compaction plugin at
+`./internal/opencode/plugin` — a path relative to whatever repository OpenCode
+opened. That resolves only when the opened repository happens to be a checkout
+of BoundedCode's own source; in any real project (the documented normal case:
+`cd` into your project, run `bcode opencode`) OpenCode logged `failed to load
+plugin: ENOENT` at WARN level — easy to miss — and every context-card,
+prompt-capture and deterministic-compaction hook silently never fired. This
+was only caught by testing against a repository that is not BoundedCode
+itself. Fixed by embedding the plugin into the `bcode` binary
+(`internal/opencode/plugin/embed.go`, `//go:embed`) and extracting it to an
+absolute, install-independent path via `opencode.InstallPlugin`; setup now
+also migrates a previously-registered legacy path away
+(`TestRegisterContextPolicyMigratesTheLegacyPluginPath`).
+
+With both fixed, a confined end-to-end run against the live Bonsai model
+(disposable `e2e-repo`, unindexed, real `go build`/`go test` bug) confirmed:
+`boundedcode_bc_task_start` opens a task inside the sandbox; the run was then
+interrupted (a 300s wall-clock timeout while the model was still exploring
+which tools were direct versus Code Mode); a **second, independent** OpenCode
+session (different `sessionID`: `ses_f2edba137ffe1r4RIhJP2afstH` →
+`ses_f2ed3130cffePQedHWHozGYwMs`) called `boundedcode_bc_task_resume` with the
+first session's task ID, recovered its state with no transcript replay, and
+completed it — `bc_read` → `bc_edit` → `bc_verify` (ACCEPTED: build, vet, test,
+gofmt all passed against the real fix) → `bc_task_finish` (real final review).
+This is the strongest evidence so far for OpenCode-session-independent task
+continuity: the second session's success did not depend on anything the first
+session's model turn produced beyond the ledger record. (Incidentally: this
+same run hit an unrelated defect — `bc_reindex`/`bc_graph_impact` failed with
+a foreign-key storage error on this fresh, never-indexed workspace. Recorded
+here rather than investigated; it is an indexing-subsystem bug, not a context
+or confinement one, and the model correctly treated it as non-blocking via a
+recorded `tool_observation` rather than stalling on it.)
 
 ## Effective window
 
@@ -100,6 +140,27 @@ The model's 262K native positional capacity and Qwen3.8's advertised YaRN
 extension to 1M positions are different from this machine's physical slot and
 from durable task memory. No 64K, 128K, 262K or 1M production mode is enabled
 or validated on this 8 GB GPU.
+
+**Measured, not estimated (this session).** With the production 32K/q8_0 KV
+server stopped and VRAM fully reclaimed (confirmed via `nvidia-smi`):
+
+| ctx-size | KV type | Result | VRAM used | Free |
+|---|---|---|---|---|
+| 32,768 | q8_0 | loads (production) | 7,124–7,134 MiB | ~1,050–1,060 MiB |
+| 65,536 | q8_0 | **CUDA OOM** — `cudaMalloc failed: out of memory` allocating the 149.62 MiB recurrent-state cache buffer | — | — |
+| 65,536 | q4_0 | loads | 7,348 MiB | **542 MiB** |
+| 131,072 | q4_0 | **CUDA OOM** — fails allocating a 2,304 MiB KV cache buffer | — | — |
+
+This rules out 262K and 1M on this card without running them: 131,072 already
+fails with the cheaper KV type, and VRAM demand is monotonic in context length
+here, so a larger context cannot succeed where a smaller one already failed by
+the same mechanism. 65,536 only exists at all with q4_0 KV, and even then
+leaves under 7% of the card free — not enough headroom to be called validated
+for real supervised work (a batch-size spike or a second allocation would be
+expected to OOM mid-task), and no OpenCode coding task was run against it for
+that reason. The 32K/q8_0 production configuration is the only one with
+comfortable headroom and the only one exercised by a real end-to-end
+supervised task in this session.
 
 ## Performance and reproduction
 

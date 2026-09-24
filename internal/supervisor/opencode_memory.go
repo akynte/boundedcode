@@ -45,7 +45,14 @@ func RecordMemory(ctx context.Context, st *store.Store, taskID string, r MemoryR
 	if !memoryTypes[r.Type] || r.Text == "" || len(r.Text) > 1000 || len(r.Path) > 500 {
 		return 0, fmt.Errorf("invalid memory type or claim length")
 	}
-	if editor && (r.Type == "supervisor_decision" || r.Type == "external_judgment" || r.Type == "acceptance_criterion" || r.Type == "repository_fact" || r.Type == "tool_observation") {
+	// tool_observation is the editor's own account of what a tool returned:
+	// legitimately editor-sourced, like a hypothesis, and distinct from
+	// repository_fact, which requires the deterministic quote match bc_task_fact
+	// performs. The remaining types name an authority the editor cannot grant
+	// itself: a supervisor verdict, an external judgment, an acceptance
+	// criterion derived from the user's own requirements, or a fact confirmed
+	// independently of the model's say-so.
+	if editor && (r.Type == "supervisor_decision" || r.Type == "external_judgment" || r.Type == "acceptance_criterion" || r.Type == "repository_fact") {
 		return 0, fmt.Errorf("editor cannot assert %s", r.Type)
 	}
 	if editor {r.Source="model"} else if r.Source=="" {r.Source="supervisor"}

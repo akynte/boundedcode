@@ -93,7 +93,8 @@ func OpenCodeContext(ctx context.Context, st *store.Store, repoRoot, sessionID s
 	rows, err := st.Ledger().SQL().QueryContext(ctx, `SELECT intent FROM operations
 		WHERE task_id = ? AND kind = ? AND json_valid(intent)
 		  AND (COALESCE(json_array_length(intent, '$.requirements'), 0) > 0
-		    OR COALESCE(json_array_length(intent, '$.constraints'), 0) > 0)
+		    OR COALESCE(json_array_length(intent, '$.constraints'), 0) > 0
+		    OR COALESCE(json_array_length(intent, '$.non_goals'), 0) > 0)
 		ORDER BY seq LIMIT 1`, taskID, ledger.KindSessionStart)
 	if err != nil {
 		return "", err
@@ -107,11 +108,12 @@ func OpenCodeContext(ctx context.Context, st *store.Store, repoRoot, sessionID s
 		var details struct {
 			Requirements []string `json:"requirements"`
 			Constraints  []string `json:"constraints"`
+			NonGoals     []string `json:"non_goals"`
 		}
 		if json.Unmarshal([]byte(raw), &details) != nil {
 			continue
 		}
-		if len(details.Requirements) == 0 && len(details.Constraints) == 0 {
+		if len(details.Requirements) == 0 && len(details.Constraints) == 0 && len(details.NonGoals) == 0 {
 			continue
 		}
 		for _, item := range details.Requirements {
@@ -119,6 +121,9 @@ func OpenCodeContext(ctx context.Context, st *store.Store, repoRoot, sessionID s
 		}
 		for _, item := range details.Constraints {
 			fmt.Fprintf(&b, "User constraint: %s\n", item)
+		}
+		for _, item := range details.NonGoals {
+			fmt.Fprintf(&b, "User non-goal (explicitly out of scope): %s\n", item)
 		}
 		// A task has one originating request. Resume events carry a session ID,
 		// never a replacement requirement set.

@@ -224,7 +224,11 @@ func setupOpenCode(cmd *cobra.Command, dataDir string, printNext bool) error {
 				"in bcode.yaml, or choose a model inside OpenCode\n")
 		}
 	}
-	if _, changed, err := opencode.RegisterContextPolicy(ws.Root); err != nil {
+	pluginDir, _, err := opencode.InstallPlugin(st.OpenCodeDir())
+	if err != nil {
+		return fmt.Errorf("installing the OpenCode context plugin: %w", err)
+	}
+	if _, changed, err := opencode.RegisterContextPolicy(ws.Root, pluginDir); err != nil {
 		return err
 	} else if changed {
 		fmt.Fprintln(out, "configured OpenCode task context and compaction policy")

@@ -115,5 +115,31 @@ func ValidateRuntime(ctx context.Context, repoRoot, baseURL string) (RuntimeBudg
 	if result.CompactionBuffer <= result.RetainedTail {
 		return result, fmt.Errorf("OpenCode compaction buffer %d is not larger than retained tail %d", result.CompactionBuffer, result.RetainedTail)
 	}
+	// The original compaction-loop defect (docs/explanation/opencode-context.md)
+	// had buffer=20000 and keep=15000: that satisfies buffer > retainedTail above,
+	// yet the preflight threshold (physicalContext - buffer = 12,768) was already
+	// below retainedTail, so the rebuilt request carried more than the trigger
+	// before OpenCode's system prompt, tool schemas and new summary were even
+	// added — a request that must recompact again as soon as it is built. The
+	// buffer > retainedTail check alone cannot see this; only the margin can.
+	threshold := result.PhysicalContext - result.CompactionBuffer
+	margin := threshold - result.RetainedTail
+	if margin < minCompactionSafetyMargin {
+		return result, fmt.Errorf(
+			"compaction margin %d tokens (threshold %d − retained tail %d) is below the %d-token "+
+				"floor a rebuilt request's system prompt, AGENTS.md and tool schemas need; this is how "+
+				"the original compact→compact→compact loop happened even though the buffer exceeds the "+
+				"retained tail",
+			margin, threshold, result.RetainedTail, minCompactionSafetyMargin)
+	}
 	return result, nil
 }
+
+// minCompactionSafetyMargin is the floor for threshold-minus-retained-tail.
+//
+// The measured post-adapter first-request total was 7,494 tokens
+// (docs/explanation/opencode-context.md) for OpenCode's own system prompt,
+// AGENTS.md, built-in and MCP tool schemas, and the BoundedCode task card,
+// before any conversation content. 8,000 gives that observed cost headroom
+// rather than passing at the exact edge of one measurement.
+const minCompactionSafetyMargin = 8000
