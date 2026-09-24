@@ -6,11 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -27,25 +24,28 @@ import (
 )
 
 func newOpenCodeCmd() *cobra.Command {
+	var unconfined bool
+	var budget bool
 	cmd := &cobra.Command{
-		Use:   "opencode",
-		Short: "Set up and start OpenCode for this project",
-		Long: "Run `bcode opencode` from a project directory to initialize its workspace " +
-			"if needed, register BoundedCode's MCP tools, and start OpenCode. Setup is " +
-			"idempotent: later runs refresh generated context only when it has changed.\n\n" +
-			"This starts a regular OpenCode session. Use `bcode opencode run` for the " +
-			"confined session.",
-		Args: cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			if err := initWorkspaceIfNeeded(cmd); err != nil {
-				return err
-			}
-			if err := setupOpenCode(cmd, "", false); err != nil {
-				return err
-			}
-			return startOpenCode(cmd)
+		Use:   "opencode [-- opencode args...]",
+		Short: "Start OpenCode with a managed BoundedCode session",
+		Long: "Start a complete BoundedCode session from any project directory.\n\n" +
+			"BoundedCode initializes or refreshes the workspace, starts the configured local\n" +
+			"model runtime and required services, waits for readiness, and launches OpenCode\n" +
+			"with the supervised tools. When OpenCode exits, the runtime, model process,\n" +
+			"temporary state, and session services are stopped automatically.\n\n" +
+			"Arguments after -- are passed to OpenCode unchanged. The explicit `bcode opencode\n" +
+			"run` spelling remains available for scripts that prefer it.",
+		Args: cobra.ArbitraryArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return launchOpenCode(cmd, args, openCodeLaunchOptions{
+				Unconfined: unconfined, Budget: budget, InitializeWorkspace: true,
+			})
 		},
 	}
+	cmd.Flags().BoolVar(&unconfined, "unconfined", false,
+		"start even when no sandbox layer is available, accepting that the session is not confined")
+	cmd.Flags().BoolVar(&budget, "budget", false, "record tokenizer-based OpenCode request budget by category")
 	cmd.AddCommand(newOpenCodeSetupCmd())
 	cmd.AddCommand(newOpenCodeRunCmd())
 	cmd.AddCommand(newOpenCodeContextCmd())
@@ -165,16 +165,12 @@ func newOpenCodeSetupCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "setup",
 		Short: "Register the MCP server and write AGENTS.md for this repository",
-		Long: "setup makes BoundedCode part of an ordinary OpenCode session.\n\n" +
-			"It registers `bcode mcp` in opencode.json, and writes a block into AGENTS.md —\n" +
-			"which OpenCode reads into every session — telling the agent that a\n" +
-			"compiler-backed index of this repository exists, which questions it answers\n" +
-			"better than search, and what this repository has already recorded about\n" +
-			"itself. It also installs a small managed block in OpenCode's global\n" +
-			"AGENTS.md so tool-language guidance applies in every repository.\n\n" +
-			"Re-run it after recording notes or re-indexing. It replaces only its own\n" +
-			"block in AGENTS.md and merges into opencode.json, so anything you have\n" +
-			"written in either file is left alone.",
+		Long: "setup refreshes the project-side OpenCode registration without starting a session.\n\n" +
+			"Most users should run `bcode opencode`, which performs this setup and owns the\n" +
+			"runtime lifecycle automatically. This subcommand is useful when preparing a\n" +
+			"repository for a later session or refreshing its managed context.\n\n" +
+			"It registers `bcode mcp` in opencode.json, writes the managed context block in\n" +
+			"AGENTS.md, installs the context plugin, and leaves unrelated user settings alone.",
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
@@ -213,13 +209,14 @@ func setupOpenCode(cmd *cobra.Command, dataDir string, printNext bool) error {
 	// The editor needs a model of its own, and the operator already configured
 	// one for the supervisor. Copying it across lets the user start chatting
 	// immediately when that endpoint is configured.
+	contextTokens := 32768
 	if cfg, err := loadConfig(root); err == nil {
 		base, model := inferenceEndpoint(cfg, root)
 		contextTokens, outputTokens := 32768, 8192
 		if profile := loadProfile(root, cfg); profile != nil {
 			contextTokens, outputTokens = profile.ContextTokens, profile.ReservedOutput
 		}
-		if _, modelChanged, err := opencode.RegisterModelWithLimits(ws.Root, base, model, contextTokens, outputTokens); err != nil {
+		if _, modelChanged, err := opencode.RegisterManagedModelWithLimits(ws.Root, base, model, contextTokens, outputTokens); err != nil {
 			return err
 		} else if modelChanged {
 			fmt.Fprintf(out, "wired the editor to %s (%s)\n", base, shortName(model))
@@ -232,7 +229,7 @@ func setupOpenCode(cmd *cobra.Command, dataDir string, printNext bool) error {
 	if err != nil {
 		return fmt.Errorf("installing the OpenCode context plugin: %w", err)
 	}
-	if _, changed, err := opencode.RegisterContextPolicy(ws.Root, pluginDir); err != nil {
+	if _, changed, err := opencode.RegisterContextPolicyWithLimits(ws.Root, pluginDir, contextTokens, 0); err != nil {
 		return err
 	} else if changed {
 		fmt.Fprintln(out, "configured OpenCode task context and compaction policy")
@@ -260,7 +257,7 @@ func setupOpenCode(cmd *cobra.Command, dataDir string, printNext bool) error {
 		fmt.Fprintf(out, "\nThis repository is not indexed yet. Run `bcode index` to build its source graph.\n")
 	}
 	if printNext {
-		fmt.Fprintf(out, "\nOpen this directory in OpenCode and work normally.\n")
+		fmt.Fprintf(out, "\nSupervised tools are registered. Start the managed session with `bcode opencode`; its runtime and cleanup are automatic.\n")
 	}
 	return nil
 }
@@ -292,47 +289,6 @@ func initWorkspaceIfNeeded(cmd *cobra.Command) error {
 	return nil
 }
 
-// startOpenCode starts the regular OpenCode UI, with the exact bcode binary
-// that launched this command available to its MCP subprocesses. This avoids
-// accidentally starting an older bcode elsewhere on PATH after a local build.
-func startOpenCode(cmd *cobra.Command) error {
-	binary, err := exec.LookPath("opencode")
-	if err != nil {
-		return fmt.Errorf("opencode is not on PATH: %w", err)
-	}
-	bcodePath, err := os.Executable()
-	if err != nil {
-		return fmt.Errorf("locating bcode executable: %w", err)
-	}
-	bcodePath, err = filepath.Abs(bcodePath)
-	if err != nil {
-		return fmt.Errorf("resolving bcode executable: %w", err)
-	}
-	path := filepath.Dir(bcodePath) + string(os.PathListSeparator) + os.Getenv("PATH")
-	child := exec.CommandContext(cmd.Context(), binary)
-	child.Env = setEnv(os.Environ(), "PATH", path)
-	child.Stdin, child.Stdout, child.Stderr = cmd.InOrStdin(), cmd.OutOrStdout(), cmd.ErrOrStderr()
-	if err := child.Run(); err != nil {
-		var exitErr *exec.ExitError
-		if errors.As(err, &exitErr) {
-			return nil
-		}
-		return fmt.Errorf("starting opencode: %w", err)
-	}
-	return nil
-}
-
-func setEnv(env []string, key, value string) []string {
-	prefix := key + "="
-	out := make([]string, 0, len(env)+1)
-	for _, item := range env {
-		if !strings.HasPrefix(item, prefix) {
-			out = append(out, item)
-		}
-	}
-	return append(out, prefix+value)
-}
-
 func verb(changed bool) string {
 	if changed {
 		return "wrote"
@@ -340,172 +296,23 @@ func verb(changed bool) string {
 	return "already current:"
 }
 
-// newOpenCodeRunCmd starts OpenCode inside the sandbox.
-//
-// `bcode opencode setup` made the supervisor's tools reachable from a session the
-// developer starts themselves. That session is an ordinary process with the
-// developer's whole environment: their home directory, their SSH agent, their
-// cloud credentials, and a shell tool. The architecture review is direct about
-// this — the coding shell's permission system is not part of the firewall,
-// because its enforcement has documented bypasses — so the boundary has to be
-// the OS sandbox around the process, which nothing was applying because nothing
-// here started the process.
-//
-// This starts it: the strongest confinement the host permits, a scrubbed
-// environment, this workspace's own XDG directories, and the restricted agent.
+// newOpenCodeRunCmd is kept as an explicit spelling for scripts and older
+// documentation. It has the same lifecycle as the bare command.
 func newOpenCodeRunCmd() *cobra.Command {
 	var unconfined bool
 	var budget bool
 	cmd := &cobra.Command{
 		Use:   "run [-- opencode args...]",
-		Short: "Start OpenCode confined to this workspace",
-		Long: "run starts an OpenCode session inside BoundedCode's sandbox.\n\n" +
-			"The session can write its worktree and read the toolchain paths the\n" +
-			"operator granted. It has no home directory, no inherited environment and\n" +
-			"no network beyond the inference endpoint. Its shell, web and subagent\n" +
-			"tools are refused, so verification goes through bc_verify, where the\n" +
-			"command is one the operator froze and the result is tied to a content\n" +
-			"hash.\n\n" +
-			"Arguments after -- are passed to OpenCode unchanged.",
+		Short: "Start OpenCode with a managed BoundedCode session",
+		Long: "Start the same managed session as `bcode opencode`.\n\n" +
+			"The launcher owns the model runtime, services, sandbox, and temporary state for\n" +
+			"the lifetime of the editor. Cleanup is automatic on every exit path.",
+		Args:         cobra.ArbitraryArgs,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			ctx := cmd.Context()
-			ws, root, st, err := openWorkspace(ctx)
-			if err != nil {
-				return err
-			}
-			defer closeRoot(cmd, root)
-			out := cmd.OutOrStdout()
-
-			binary, err := exec.LookPath("opencode")
-			if err != nil {
-				return fmt.Errorf("opencode is not on PATH: %w", err)
-			}
-			cfg, err := loadConfig(root)
-			if err != nil {
-				return err
-			}
-			baseURL, _ := inferenceEndpoint(cfg, root)
-			if _, err := opencode.ValidateRuntime(ctx, ws.Root, baseURL); err != nil {
-				return fmt.Errorf("OpenCode runtime mismatch: %w", err)
-			}
-			dirs, err := st.TaskDirs()
-			if err != nil {
-				return err
-			}
-
-			// The agent is registered on every run rather than only by setup:
-			// a developer who edits opencode.json between sessions should not
-			// end up with a session whose restrictions silently went missing.
-			if _, _, err := opencode.RegisterAgent(ws.Root); err != nil {
-				return err
-			}
-			session := opencode.Session{
-				Binary: binary, Repo: ws.Root,
-				StateDir: st.OpenCodeDir(), TmpDir: dirs.Tmp, Budget: budget,
-			}
-			spec, err := session.Confine(supervisor.BaseSandboxSpec(cfg, dirs))
-			if err != nil {
-				return err
-			}
-			if cfg.Inference.Mode == config.ModeExternal {
-				endpoint, err := url.Parse(cfg.Inference.BaseURL)
-				if err != nil {
-					return err
-				}
-				if endpoint.Hostname() != "127.0.0.1" && endpoint.Hostname() != "localhost" && endpoint.Hostname() != "::1" {
-					return fmt.Errorf("confined OpenCode requires a local inference endpoint, got %q", endpoint.Hostname())
-				}
-				port, err := strconv.ParseUint(endpoint.Port(), 10, 16)
-				if err != nil || port == 0 {
-					return fmt.Errorf("confined OpenCode requires an explicit local inference port")
-				}
-				spec.TCPConnect = append(spec.TCPConnect, uint16(port))
-			}
-			if err := st.EnsureSandboxDirs(spec.ReadWrite); err != nil {
-				return err
-			}
-			self, err := os.Executable()
-			if err != nil {
-				return err
-			}
-			binDir := filepath.Join(session.StateDir, "bin")
-			if err := os.MkdirAll(binDir, 0700); err != nil {
-				return err
-			}
-			link := filepath.Join(binDir, "bcode")
-			if info, err := os.Lstat(link); err == nil {
-				if info.Mode()&os.ModeSymlink == 0 {
-					return fmt.Errorf("refusing to replace non-symlink %s", link)
-				}
-				if err := os.Remove(link); err != nil {
-					return err
-				}
-			} else if !os.IsNotExist(err) {
-				return err
-			}
-			if err := os.Symlink(self, link); err != nil {
-				return err
-			}
-			// Keep both the private per-session symlink and the real executable
-			// directory on PATH. The symlink pins the exact binary for the
-			// session; the real directory is a safe fallback if a tool or a
-			// later OpenCode reconnect loses the private state directory. Both
-			// paths are read-only in the sandbox, so this does not grant the
-			// session access to any workspace data.
-			session.BCodeBinDir = binDir + string(os.PathListSeparator) + filepath.Dir(self)
-			brokerPath, stopBroker, err := startOpenCodeBroker(ctx, st, root.Layout().Root(), ws.Root, session.StateDir, self)
-			if err != nil {
-				return err
-			}
-			defer stopBroker()
-			capPath := filepath.Join(session.StateDir, brokerCapabilityFile)
-			if err := os.WriteFile(capPath, []byte(brokerPath), 0600); err != nil {
-				return err
-			}
-			defer os.Remove(capPath)
-			session.BrokerCapability = brokerPath
-			spec.Env = session.Env()
-
-			runner, report := supervisor.SelectSandbox(ctx, cfg)
-			if runner == nil || (len(report.Active) == 1 && report.Active[0] == sandbox.LayerContainer && !inContainer()) {
-				// Saying "confined" when nothing is confining is the failure
-				// this refuses to make. The escape hatch is explicit and named.
-				if !unconfined {
-					return fmt.Errorf(
-						"no sandbox layer is available on this host, so the session would run "+
-							"unconfined with your whole environment:\n%s\n"+
-							"Run `bcode doctor` to see why, or pass --unconfined to accept it",
-						inactiveReasons(report))
-				}
-				fmt.Fprintf(out, "WARNING: starting unconfined. The shell's own permissions are not a boundary.\n\n")
-			}
-
-			// OpenCode 2 selects the project default agent from configuration.
-			// The old --pure and global --agent flags are rejected by 2.0.15.
-			argv := append([]string{binary}, args...)
-			if len(args) == 0 {
-				argv = append(argv, "--standalone")
-			}
-			child, err := runner.Command(ctx, spec, argv...)
-			if err != nil {
-				return err
-			}
-			child.Stdin, child.Stdout, child.Stderr = cmd.InOrStdin(), out, cmd.ErrOrStderr()
-
-			fmt.Fprintf(out, "Starting OpenCode in %s under %s (%s).\n", ws.Name(), runner.Name(), layerList(report.Active))
-			fmt.Fprintf(out, "Refused in this session:\n%s\n", opencode.DeniedSummary())
-
-			if err := child.Run(); err != nil {
-				var exitErr *exec.ExitError
-				if errors.As(err, &exitErr) {
-					// The session's own exit code is the developer's business,
-					// not an error from this command.
-					return nil
-				}
-				return fmt.Errorf("starting opencode: %w", err)
-			}
-			return nil
+			return launchOpenCode(cmd, args, openCodeLaunchOptions{
+				Unconfined: unconfined, Budget: budget, InitializeWorkspace: true,
+			})
 		},
 	}
 	cmd.Flags().BoolVar(&unconfined, "unconfined", false,

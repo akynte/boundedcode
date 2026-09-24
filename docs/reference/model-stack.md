@@ -11,14 +11,17 @@ and stays resident for the whole task. Use the
 | EDIT | `coding` | Bonsai 2 27B PTQ1_0 |
 | REVIEW | `review` | Bonsai 2 27B PTQ1_0 |
 
-`providers.yaml` can still route a role to a second provider; see
-[configure models](../how-to/configure-models.md). That is a new configuration
-that needs its own measurements, not the reference.
+`providers.yaml` can still route a role to a second provider through the
+configuration reference. That is an advanced configuration and needs its own
+measurements, not part of the supported TUI path.
 
-This page distinguishes the current reference from optional experiments and
-historical measurements. `bcode config init` still writes indexing-only inference
-settings and the older `reference-8gb-cuda-64gb-ram` profile; selecting Bonsai
-explicitly is part of setup. A fresh install does not download or select it.
+The [`bcode setup` TUI](../how-to/install.md) selects the Bonsai profile,
+runtime, model, and provider mapping. When the runtime is absent, the TUI can
+build the pinned Prism revision shown in the table after an explicit
+confirmation. A generic pre-existing `llama-server` is accepted as operator
+state, but setup does not claim that it is Prism or suitable for the PTQ1_0
+artifact; use the pinned build for the reference model. A fresh install does
+not leave inference in an indexing-only mode.
 
 ## Bonsai: the resident generator
 

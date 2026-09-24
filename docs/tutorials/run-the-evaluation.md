@@ -15,7 +15,8 @@ $ bcode models health
 local                ok
 ```
 
-If that fails, do [configure models](../how-to/configure-models.md) first.
+If that fails, rerun [`bcode setup`](../how-to/install.md) and validate the
+installation before measuring.
 
 Then measure the machine, because the packet sizes the run uses come from a
 profile and a guessed profile measures the guess:

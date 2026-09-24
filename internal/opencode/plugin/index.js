@@ -95,6 +95,19 @@ export default {
     // Prism's exact tokenizer counts each category's serialized text. These
     // component counts are diagnostic; the chat template adds further tokens.
     await ctx.session.hook("http.request", async (event) => {
+      if (event.kind === "primary") {
+        // This is the loop-authority boundary. OpenCode may ask for another
+        // model turn, but the broker decides whether the bound task is still
+        // allowed to spend one. A refusal aborts this provider request before
+        // the worker can turn another failure into an unbounded conversation.
+        const authorized = brokerCall({
+          kind: "authorize",
+          session: String(event.sessionID),
+          provider: String(event.model?.providerID ?? ""),
+          model: String(event.model?.id ?? event.model ?? ""),
+        })
+        if (authorized) await authorized
+      }
       if (process.env.BC_OPENCODE_BUDGET !== "1" || event.model.providerID !== "boundedcode-local" || event.kind !== "primary") return
       try {
         const request = await event.request.clone().json()

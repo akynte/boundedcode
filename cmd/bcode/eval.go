@@ -170,7 +170,7 @@ func newEvalRunCmd() *cobra.Command {
 			}
 			providers, err := llm.LoadProvidersFile(root.Layout().ConfigDir())
 			if err != nil {
-				return fmt.Errorf("evaluation needs a model: run `bcode config init` and configure a provider (%w)", err)
+				return fmt.Errorf("evaluation needs a model: run `bcode setup` and complete the guided configuration (%w)", err)
 			}
 			router, err := llm.NewRouter(providers)
 			if err != nil {

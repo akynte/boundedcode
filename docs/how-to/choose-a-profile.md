@@ -4,10 +4,9 @@ Use `profile: bonsai-2-27b-8gb-cuda` for the reference installation.
 Its context and runtime settings are documented in the
 [8 GB runtime guide](../explanation/8gb-runtime.md).
 
-`bcode config init` currently selects the older MoE-oriented
-`reference-8gb-cuda-64gb-ram` profile. Change that field explicitly.
-Other embedded profiles remain experimental starting configurations; their names
-are not proof of measured support.
+The setup TUI selects the reference profile for the detected hardware. Other
+embedded profiles remain experimental starting configurations; their names are
+not proof of measured support.
 
 <!-- test:run -->
 ```console

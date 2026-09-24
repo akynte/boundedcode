@@ -138,7 +138,15 @@ func (e *Engine) Name() string { return "native/" + e.Provider.Name() }
 
 func (e *Engine) Health(ctx context.Context) error { return e.Provider.Health(ctx) }
 
-func (e *Engine) Close() error { return nil }
+// Close releases the provider owned by this engine. Managed providers can
+// own a model process, so a no-op here would leave a task-created server alive
+// after the task returned.
+func (e *Engine) Close() error {
+	if e == nil || e.Provider == nil {
+		return nil
+	}
+	return e.Provider.Close()
+}
 
 func (e *Engine) logf(format string, args ...any) {
 	if e.Logf != nil {

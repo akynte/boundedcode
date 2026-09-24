@@ -8,7 +8,7 @@ bcode [global flags] <command> [flags]
 
 | Flag | Default | |
 |---|---|---|
-| `--data <dir>` | `$BC_DATA`, then `/data` | The data directory |
+| `--data <dir>` | `$BC_DATA`, then `~/.local/share/boundedcode` on a host (`/data` in a container) | The data directory |
 | `--log-json` | off | Structured JSON logs |
 | `-v, --verbose` | off | Debug logging |
 | `-q, --quiet` | off | Errors only |
@@ -23,6 +23,36 @@ bcode [global flags] <command> [flags]
 | `BC_IN_CONTAINER` | Set by the image; used for container detection |
 
 ---
+
+## `bcode setup`
+
+The canonical installation and initial-configuration TUI. It checks dependencies,
+selects a hardware profile, discovers or downloads a model, configures the
+runtime/provider/decision plane, prepares the data directory, and validates the
+result. It is idempotent and is the only supported setup flow.
+
+| Flag | Meaning |
+|---|---|
+| `--data-dir DIR` | Data directory (default `$BC_DATA`, then `~/.local/share/boundedcode`) |
+| `--non-interactive` | Never prompt; use discovered values and explicit flags |
+| `--yes` | Accept defaults; build the pinned runtime and download the reference model when needed |
+| `--install-runtime` | Authorize building the pinned Prism `llama-server` when no runtime is found (the interactive TUI still asks for confirmation) |
+| `--download-model` | Download the reference GGUF atomically when absent |
+| `--model PATH` | Use an existing GGUF |
+| `--runtime PATH` | Use an existing `llama-server` executable |
+| `--external-url URL` | Configure a local external OpenAI-compatible endpoint (local runtime build is skipped) |
+| `--provider-model NAME` | Model/alias exposed by an external endpoint |
+| `--profile NAME` | Select a hardware profile |
+| `--judgment-key KEY` | Configure the hosted decision-plane credential (prefer the environment) |
+| `--skip-judgment` | Leave the decision plane unconfigured for diagnostics |
+| `--json` | Emit the completed setup report; never prompt |
+
+The setup marker is written only after validation succeeds. An interactive
+run asks before cloning and compiling the pinned Prism runtime; `--install-runtime`
+is the explicit non-interactive authorization, and `--yes` accepts that default
+along with the reference model download. Runtime builds require Linux x86-64,
+CUDA, Git, CMake, Ninja, and `nvcc`. The aliases `bcode install` and `bcode init`
+exist for discovery, but documentation and support use `bcode setup`.
 
 ## `bcode version`
 
@@ -688,63 +718,39 @@ $ bcode eval runtime --prepare --task SWEBENCH-CADDY-4943
 
 | Command | |
 |---|---|
-| *(no subcommand)* | Initialize this directory as a workspace if needed, refresh OpenCode setup, and launch OpenCode |
-| `setup` | Register the MCP server and write AGENTS.md for this repository |
-| `run` | Start OpenCode confined to this workspace |
-| `context --session <id>` | Render ledger-backed task state for the OpenCode request hook |
-| `budget [--session <id>]` | Show tokenizer-based categories for the latest instrumented model request |
+| *(no subcommand)* | Initialize or refresh the project, start the managed runtime/services, launch OpenCode, and clean up on exit |
+| `setup` | Refresh only the project-side MCP/context registration |
+| `run` | Explicit spelling of the same managed session lifecycle |
+| `context --session <id>` | Render durable ledger-backed task state for the OpenCode request hook |
+| `budget [--session <id>]` | Show tokenizer-based categories for the latest instrumented request |
 
-Running `bcode opencode` from a project directory initializes its workspace
-marker if one is not already present, applies the setup below, and launches
-OpenCode. The setup is idempotent: later runs update generated files only when
-their contents need refreshing. The launched editor inherits the directory of
-the invoking `bcode` binary first on `PATH`, so its MCP process uses that same
-build rather than another installation elsewhere on the machine.
+`bcode opencode` is the supported daily entry point. From any project it:
 
-Setup registers `bcode mcp` in `opencode.json`, merging rather than replacing
-so an existing model choice or another MCP server survives, and writes a block
-into `AGENTS.md` — which OpenCode reads into every session — naming the tools,
-saying which questions they answer better than search, and carrying what this
-repository has recorded about itself. BoundedCode's MCP tools are exposed
-directly (`codemode: false`) instead of through JavaScript Code Mode. Setup also
-updates a managed block in the user-level OpenCode `AGENTS.md`, which applies
-the tool-language guidance to every repository while preserving other global
-instructions.
+1. finds or creates the workspace marker;
+2. refreshes `opencode.json`, the managed `AGENTS.md` block, and the context
+   plugin without replacing unrelated user settings;
+3. starts the configured supervisor, API, local model runtime, and required
+   services;
+4. waits for readiness and validates the OpenCode model/context contract;
+5. launches OpenCode in the strongest available sandbox.
 
-Only the block between its markers is replaced, so anything you write in
-`AGENTS.md` yourself is left alone. An existing `opencode.jsonc` is refused
-rather than rewritten, because marshalling it would delete its comments; the
-block to paste is printed instead.
+The model and services are session-owned. On OpenCode exit, the command stops
+OpenCode, the broker, the model, and the supervisor in order, escalates to
+process-group termination after the grace period, checkpoints storage, and
+removes private XDG/temp state. A configured external endpoint is explicitly
+operator-owned and is not killed.
 
-Re-run after recording notes or re-indexing, so the generated block matches what
-the tools can actually answer.
+The short command accepts arguments after `--`:
 
-`run` starts the session instead of leaving you to start it. That is the
-difference between the tools being reachable and the process being confined:
-a session you start yourself inherits your home directory, your agent sockets
-and every variable your shell exported, and OpenCode's own permission system is
-not a boundary — its enforcement has documented bypasses, which is why the
-architecture review puts the firewall outside the shell.
+```bash
+bcode opencode -- --continue
+```
 
-A session started here runs under the strongest layer `bcode doctor` reports, can
-write only its worktree, its tmp and this workspace's OpenCode state, reads only
-the toolchain paths the operator granted, and gets an environment built from
-nothing rather than filtered. Its shell, web-fetch, web-search, subagent and
-external-directory tools are refused, so verification goes through `bc_verify`,
-where the command is one the operator froze and the result is tied to a content
-hash. Arguments after `--` reach OpenCode unchanged.
-
-`run` checks the live Prism `/props` slot against the project's OpenCode model
-metadata before starting. A mismatched context, model alias, output reserve or
-compaction policy fails clearly. For local external inference it grants Landlock
-only the configured loopback model port. The confined process reaches its own
-workspace state through an authenticated loopback broker; the data root is not
-mounted. `--budget` records token counts for the final OpenCode request by
-category using Prism's `/tokenize` endpoint. `budget` reads the last record.
-
-When no sandbox layer is available the command refuses and says why, because
-reporting a confinement that is not there is worse than not confining. Pass
-`--unconfined` to start anyway.
+`bcode opencode setup` is useful for refreshing a project before a later
+session, but it does not replace `bcode setup` for installation-level changes.
+When no real sandbox layer is available, the command refuses rather than
+calling an unconfined session safe; `--unconfined` is an explicit diagnostic
+escape hatch.
 
 ## `bcode trace`
 
@@ -968,10 +974,12 @@ only", holding "counters, never content" — and it is bounded accordingly:
 
 ## `bcode config`
 
+Installation and initial configuration are intentionally not here: use the
+canonical `bcode setup` TUI. These commands are for inspection and advanced
+maintenance after setup.
+
 | Command | |
 |---|---|
-| `init` | Write default `bcode.yaml` and `providers.yaml` |
-| `reference` | Configure the local Bonsai reference and check inference health |
 | `show` | Effective configuration, providers and role routing |
 | `profiles` | Available profiles; `*` is active, and each says shipped or yours |
 

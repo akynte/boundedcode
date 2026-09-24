@@ -1,340 +1,226 @@
-# Install the 8 GB reference configuration on Linux
+# Install and use BoundedCode
 
-This walkthrough reproduces the **Linux x86-64, NVIDIA RTX 4060 Laptop, Bonsai
-PTQ1_0** inference configuration. It uses the native Go agent and a separately
-started local model server.
+This is the **canonical BoundedCode installation and configuration guide**. It
+replaces the older host installer, separate model-server recipe, and manual
+runtime setup sequence.
 
-**You will need a TypeSafe Jev credential.** Generation runs on your GPU; the
-decision plane does not. Jev is a required runtime component, and a task run
-refuses to start without a usable one — see
-[step 7](#7-configure-the-decision-plane-required) and
-[what leaves the machine](../explanation/judgment-data-flow.md). Every other
-command, including `bcode doctor`, works without it, which is how you diagnose it.
+## The short version
 
-**Scope.** This builds the whole 8 GB reference: Bonsai answers every
-generator role (localization, planning, editing and review) from one resident
-server, with nothing swapped in or out.
-[The model stack](../reference/model-stack.md) says what each role does and
-what has been measured.
-
-This is a **host install**: BoundedCode and the Prism inference server run
-directly on Linux. The container boundary is not installed, so `bcode doctor`
-will report that layer as absent. The shipped container image does not include
-the Prism kernels required by this Bonsai model; a tested container recipe for
-this exact setup is not yet available. Use this workflow for local development
-with repositories you trust, and read the [trust boundaries](../explanation/trust-boundaries.md)
-before running tasks against other people's code.
-
-The reference has 64 GB system RAM. Budget at least 20 GB of free disk for the
-model, runtime build and basic caches, plus space for your repositories and
-toolchains; this is a planning estimate. [Hardware details](../explanation/8gb-runtime.md).
-
-## 1. Prerequisites
-
-Install Go **1.27.1** from [Go downloads](https://go.dev/dl/), a working NVIDIA
-driver, and the CUDA toolkit. The observed build used **CUDA 13.3**, driver
-**595.84**, and compute capability **8.9**. Those are reference versions, not
-a claimed universal minimum.
-[NVIDIA's Linux installation guide](https://docs.nvidia.com/cuda/cuda-installation-guide-linux/).
-
-On Debian/Ubuntu, the remaining build tools are:
+Install the `bcode` executable, then run the setup TUI once:
 
 ```bash
-sudo apt-get update
-sudo apt-get install -y build-essential cmake ninja-build pkg-config \
-  libssl-dev git curl ripgrep bubblewrap
-go version
-nvidia-smi
-nvcc --version
+bcode setup
 ```
 
-If `go` or `nvcc` is not found, the tool is usually installed but not on
-`PATH`. The Go tarball and NVIDIA's toolkit do not add themselves. Add them
-(and to your shell profile) before building:
+The TUI checks dependencies, creates the data directory, selects a hardware
+profile, configures the model runtime, prepares the model/provider files,
+configures the decision plane, checks the sandbox, and validates the result.
+It is safe to run again after an update or hardware change.
+
+After setup, enter any project:
 
 ```bash
-export PATH="/usr/local/go/bin:/usr/local/cuda/bin:$PATH"
+cd /path/to/your/project
+bcode opencode
 ```
 
-Optional tools. Without them BoundedCode still runs, with less:
+BoundedCode starts and owns the runtime and required services for that
+session. You do not start a model server, API, sandbox helper, or environment
+process first.
 
-| Tool | Without it |
-|---|---|
-| `bubblewrap` (installed above) | No DR-3 layer 3; concurrent tasks share a PID view |
-| Node 22 and `npm` | TypeScript and Python are read lexically, with no call graph ([step 8](#8-prepare-a-repository-and-run-a-task)) |
-| `golangci-lint`, `semgrep` | Their verification recipes skip, which is not the same as passing |
+## Requirements
 
-`ripgrep` is strongly recommended; without it lexical search falls back to a
-slower path.
+The measured reference is Linux x86-64 with an NVIDIA CUDA GPU, 8 GB VRAM,
+64 GB system RAM, and about 20 GB free disk. The setup TUI checks the actual
+host and reports mismatches instead of silently applying the reference values.
+Smaller measured profiles and a local external OpenAI-compatible endpoint are
+available for other machines.
 
-A Linux kernel with Landlock or a working bubblewrap setup is needed for host
-task confinement. `bcode doctor` reports availability. Host mode does not have an
-outer container boundary; use only repositories whose build/test commands you
-are prepared to execute. [Trust boundaries](../explanation/trust-boundaries.md).
+Install these before the TUI:
 
-## 2. Build BoundedCode
+- Git and ripgrep;
+- a C compiler when building BoundedCode from source;
+- OpenCode 2;
+- a CUDA-compatible `llama-server` and GGUF model, or a local external
+  OpenAI-compatible endpoint;
+- a TypeSafe Jev credential for task execution.
+
+For the CUDA path, the setup TUI can build the pinned Prism runtime for you.
+That build additionally needs CMake, Ninja, `nvcc`, an NVIDIA driver, and
+sufficient free disk; it is never started silently. The TUI shows the pinned
+source revision and asks for confirmation. In automation, opt in explicitly:
+
+```bash
+bcode setup --non-interactive --yes
+# or, when the model already exists:
+bcode setup --non-interactive --install-runtime --model /path/to/model.gguf
+```
+
+`--install-runtime` is the explicit build authorization. `--yes` accepts the
+same default and also downloads the reference model when it is missing. A
+runtime that is already discovered is reused. To configure a CPU-only or
+operator-owned server instead, use `--external-url` and do not request a local
+runtime build.
+
+The TUI can discover an existing runtime and model. It never requires you to
+edit YAML by hand. A discovered executable is operator state: setup does not
+claim that an arbitrary `llama-server` is the pinned Prism build, so use the
+approved build or pass the path of a runtime you trust for your model. A model
+download is streamed to a temporary file and renamed only after it completes;
+an interrupted download is discarded and can be retried, and is never treated
+as a valid model.
+
+## Install the executable
+
+From source:
 
 ```bash
 git clone https://github.com/akynte/boundedcode.git
 cd boundedcode
 make build
-if ! grep -Fq "export PATH=\"$PWD/bin:\$PATH\"" "$HOME/.bashrc"; then
-  printf '\nexport PATH="%s/bin:$PATH"\n' "$PWD" >> "$HOME/.bashrc"
-fi
-grep -Fq 'export BC_DATA=' "$HOME/.bashrc" || \
-  printf 'export BC_DATA="%s/.local/share/boundedcode"\n' "$HOME" >> "$HOME/.bashrc"
-grep -Fq 'export BC_PRISM_DIR=' "$HOME/.bashrc" || \
-  printf 'export BC_PRISM_DIR="%s/.local/share/boundedcode-runtime"\n' "$HOME" >> "$HOME/.bashrc"
-source "$HOME/.bashrc"
-bcode config init
+install -Dm755 bin/bcode "$HOME/.local/bin/bcode"
+export PATH="$HOME/.local/bin:$PATH"
 ```
 
-This adds the checkout's `bin` directory and the data/runtime paths to Bash's
-startup file if they are not already present, so they are available from new
-terminals and other project directories. If you move the checkout later, update
-its `PATH` entry in `~/.bashrc`. The binary requires cgo; do not build with
-`CGO_ENABLED=0`.
-
-After installing OpenCode, run `bcode opencode` from any project directory to
-initialize BoundedCode there and launch OpenCode with its MCP tools ready. The
-first run creates the workspace marker and editor configuration; later runs
-check and refresh generated setup only when needed. The command makes the exact
-`bcode` executable it launched available to OpenCode's MCP process, including
-when the checkout is built locally with `make build`.
-
-`config init` creates `$BC_DATA/config/bcode.yaml` and `providers.yaml`; it
-refuses to overwrite existing configuration. Existing installations should edit
-the relevant fields below, not use `--force` indiscriminately.
-
-<!-- test:run -->
-```console
-$ bcode version
-boundedcode …
-schemas: index=… ledger=… telemetry=…
-```
-
-## 3. Build the Prism runtime
-
-Bonsai's PTQ1_0 requires Prism's ternary kernels, not stock llama.cpp. Build
-the latest [Prism release](https://github.com/PrismML-Eng/llama.cpp/releases/latest):
+Then run the TUI:
 
 ```bash
-export BC_PRISM_DIR="$HOME/.local/share/boundedcode-runtime"
-BC_PRISM_TAG="$(curl -fsSLo /dev/null -w '%{url_effective}' \
-  https://github.com/PrismML-Eng/llama.cpp/releases/latest)"
-BC_PRISM_TAG="${BC_PRISM_TAG##*/}"
-echo "Prism release: $BC_PRISM_TAG"
-git clone --depth 1 --branch "$BC_PRISM_TAG" \
-  https://github.com/PrismML-Eng/llama.cpp.git "$BC_PRISM_DIR"
-cmake -S "$BC_PRISM_DIR" -B "$BC_PRISM_DIR/build" -G Ninja \
-  -DCMAKE_BUILD_TYPE=Release -DGGML_CUDA=ON \
-  -DCMAKE_CUDA_ARCHITECTURES=89
-NINJA_STATUS="[%f/%t %p, %es] " \
-  cmake --build "$BC_PRISM_DIR/build" --target llama-server llama-bench -j 8
+bcode setup
 ```
 
-The build prints a `[done/total percent, elapsed]` counter as it compiles each
-file. The CUDA kernels take the longest.
+`--data-dir` selects a non-default data directory. `BC_DATA` is also
+supported. The default on a host is `~/.local/share/boundedcode`; a container
+uses `/data` when `BC_IN_CONTAINER=1`.
 
-Record the printed release tag with any results you report. The reference run
-used revision `1a07bfa5` (see [the model stack](../reference/model-stack.md)).
-This assumes a new runtime directory. Architecture `89` is for the reference
-Ada GPU; use the correct target architecture for another GPU and record that
-configuration separately. See [Prism's runtime guide](https://github.com/PrismML-Eng/Bonsai-demo)
-for upstream build/platform changes.
+## What the TUI configures
 
-## 4. Download the model
+### Dependencies and hardware
 
-Download the latest 1-bit PTQ1_0 file from
-[prism-ml/Ternary-Bonsai-2-27B-gguf](https://huggingface.co/prism-ml/Ternary-Bonsai-2-27B-gguf).
-Only the language model is needed; do not download the F16 or PQ2_0 weights or
-the vision projector for this setup.
+The first screen reports Git, ripgrep, compiler, OpenCode, bubblewrap, NVIDIA
+driver, optional CMake/Ninja/`nvcc` build tools, platform, memory, and
+data-directory filesystem checks. Optional components are clearly marked as
+optional. A failed required check stops the flow with a fix rather than
+producing a half-configured installation.
+
+### Data and configuration
+
+BoundedCode keeps durable state under the selected data directory:
+
+```text
+$BC_DATA/
+├── config/       # generated configuration and owner-only credentials
+├── models/       # downloaded or selected GGUF files
+├── runtime/      # optional pinned Prism source and CUDA build
+├── workspaces/   # per-project indexes, ledgers, evidence, and state
+├── backups/
+└── keys/
+```
+
+The TUI writes `bcode.yaml`, `providers.yaml`, optional `judgment.yaml`, and
+a completion marker. Existing values are preserved unless you choose to
+replace them. A marker is written only after validation succeeds.
+
+### Runtime and model
+
+The default local setup selects a `llama-server` executable and a GGUF model,
+adds a stable model alias, and records the active hardware profile. The
+runtime is embedded: `bcode opencode` starts it through BoundedCode and stops
+it when the editor exits.
+
+When you approve the optional build, setup clones Prism revision
+`1a07bfa5f4144274c8f1c9963821dd9d9a51854b` into
+`$BC_DATA/runtime/src`, configures CUDA for the detected compute capability,
+and builds `llama-server` under `$BC_DATA/runtime/build`. The generated
+configuration records the resulting executable, so later sessions do not
+compile or start it independently. The source and build are installation data,
+not a second process owned by an OpenCode session.
+
+An explicitly external endpoint is also supported for CPU-only or otherwise
+unsupported machines. An external server is not BoundedCode-owned and is not
+terminated by a session. The normal CUDA setup is embedded so cleanup has one
+unambiguous owner.
+
+### Decision plane
+
+Jev is a narrow hosted control plane, separate from local code generation. The
+TUI configures the pinned model, strict redaction, confidence floor, and
+credential environment variable. If you provide a key, it is stored in an
+owner-only `config/jev.env` file rather than in YAML; the session launcher loads
+it into the supervisor environment. The key is never printed.
+
+Without a usable decision-plane configuration, setup can finish other local
+checks but reports that task execution will stop at its required decision-plane
+check. Re-run setup with the credential rather than hiding that boundary.
+
+## Start a session
+
+From any project directory:
 
 ```bash
-BC_MODEL_URL="https://huggingface.co/prism-ml/Ternary-Bonsai-2-27B-gguf/resolve/main/Ternary-Bonsai-2-27B-PTQ1_0.gguf"
-BC_MODEL="$BC_DATA/models/Ternary-Bonsai-2-27B-PTQ1_0.gguf"
-mkdir -p "$BC_DATA/models"
-BC_MODEL_HEADERS="$(curl -fsSI "$BC_MODEL_URL")"
-BC_MODEL_REV="$(printf '%s' "$BC_MODEL_HEADERS" | tr -d '\r' |
-  awk -F': ' 'tolower($1) == "x-repo-commit" { print $2 }')"
-BC_MODEL_SHA="$(printf '%s' "$BC_MODEL_HEADERS" | tr -d '\r"' |
-  awk -F': ' 'tolower($1) == "x-linked-etag" { print $2 }')"
-echo "Model revision: $BC_MODEL_REV"
-curl -fL --retry 3 \
-  "https://huggingface.co/prism-ml/Ternary-Bonsai-2-27B-gguf/resolve/$BC_MODEL_REV/Ternary-Bonsai-2-27B-PTQ1_0.gguf" \
-  -o "$BC_MODEL"
-echo "Verifying SHA-256 (this takes a moment for a 6 GB file)..."
-echo "$BC_MODEL_SHA  $BC_MODEL" | sha256sum -c -
+cd my-project
+bcode opencode
 ```
 
-`curl` prints the percentage downloaded, speed and time remaining while it
-runs. The expected SHA-256 comes from Hugging Face for the same revision that is
-downloaded. Stop if `sha256sum` does not print `OK`. Record the printed model
-revision with any results you report. The reference run used revision
-`6ed5e12b` (see [the model stack](../reference/model-stack.md)).
+BoundedCode automatically:
 
-## 5. Start inference
+1. finds or creates the project workspace marker;
+2. refreshes idempotent project OpenCode configuration and managed context;
+3. creates private per-session XDG state and temporary directories;
+4. starts the supervisor, API, local model runtime, and required services;
+5. waits for `/readyz` and model readiness;
+6. validates the OpenCode model/context/compaction contract;
+7. launches OpenCode in the strongest available sandbox.
 
-In a dedicated terminal, the paths from Step 2 are already set. Confirm the
-model and server binary exist before launching:
+Arguments after `--` are forwarded unchanged:
 
 ```bash
-test -f "$BC_DATA/models/Ternary-Bonsai-2-27B-PTQ1_0.gguf" || {
-  echo "Model not found under $BC_DATA/models; check BC_DATA and complete step 4" >&2
-  exit 1
-}
-test -x "$BC_PRISM_DIR/build/bin/llama-server" || {
-  echo "llama-server not found under $BC_PRISM_DIR/build/bin; check BC_PRISM_DIR and complete step 3" >&2
-  exit 1
-}
-
-"$BC_PRISM_DIR/build/bin/llama-server" \
-  --model "$BC_DATA/models/Ternary-Bonsai-2-27B-PTQ1_0.gguf" \
-  --alias boundedcode-bonsai \
-  --ctx-size 32768 --parallel 1 --n-gpu-layers 99 \
-  --flash-attn on --cache-type-k q8_0 --cache-type-v q8_0 \
-  --batch-size 2048 --ubatch-size 512 --threads 8 --threads-batch 16 \
-  --temp 1.0 --top-p 0.95 --top-k 20 --min-p 0.0 --jinja \
-  --checkpoint-min-step 512 \
-  --host 127.0.0.1 --port 8080
+bcode opencode -- --continue
 ```
 
-Wait for the model to load. In a second terminal:
+`bcode opencode run` is an explicit alias for scripts. It has the same
+automatic lifecycle. `bcode opencode setup` only refreshes project-side
+registration and is not a separate installation path.
+
+## Cleanup contract
+
+The launcher owns the process tree for the whole editor session. On normal
+exit, error exit, or interrupt it:
+
+- stops OpenCode and descendants;
+- stops the broker and removes its capability file;
+- asks the supervisor to stop the model and services in reverse order;
+- escalates to process-group termination after the configured grace period;
+- checkpoints and closes storage;
+- removes the session XDG directory, temporary files, and diagnostics.
+
+The model process is therefore terminated, its VRAM is released, and temporary
+runtime resources are removed before the command returns. The supported
+embedded setup leaves no BoundedCode-owned LLM, API, or session process running
+after the command exits. A separate process that is explicitly configured as
+external remains operator-owned by design.
+
+## Update, reconfigure, troubleshoot, uninstall
+
+Re-run the same command for all three normal maintenance tasks:
 
 ```bash
-curl -fsS http://127.0.0.1:8080/health
+bcode setup
 ```
 
-Expected: `{"status":"ok"}`. Keep one generation server/slot active and leave
-GPU headroom for runtime allocations. Ctrl-C in the server terminal stops
-inference; `bcode` does not stop an externally owned server.
+It preserves the data directory and refreshes configuration. Use
+`bcode config show` for a read-only view and `bcode doctor` for a structured
+health report. See [start, stop and update](start-stop-update.md) and
+[troubleshooting](troubleshooting.md) for recovery details.
 
-## 6. Configure the reference
-
-Keep the inference server running in its dedicated terminal. In a second
-terminal, run this one command:
+To uninstall, stop active sessions, remove the executable, and remove the
+selected data directory:
 
 ```bash
-bcode config reference
+rm -f "$HOME/.local/bin/bcode"
+rm -rf "${BC_DATA:-$HOME/.local/share/boundedcode}"
 ```
 
-It sets the Bonsai profile, local inference URL, port, and provider routing in
-both configuration files, then checks that the server responds `local ... ok`.
-It preserves other settings in `bcode.yaml`; it replaces `providers.yaml` with
-the single-provider reference setup. Run it again any time you want to restore
-these reference settings.
-
-The profile's published budgets are starting settings, not measurements from
-your machine. Step 7 runs `bcode doctor` after configuring judgment. On this
-host install, the missing outer container boundary and documented
-network-containment limitation are expected warnings. The profile-fit estimate
-remains until you benchmark it, and index freshness remains until Step 8 builds
-the index.
-
-## 7. Configure the decision plane (required)
-
-BoundedCode requires TypeSafe Jev to run tasks. From the checkout, run:
-
-If you pulled newer BoundedCode changes since Step 2, rebuild first with
-`make build` so the doctor check uses the updated executable.
-
-```bash
-scripts/configure-judgment.sh && source "$HOME/.bashrc"
-```
-
-It prompts for the API key without displaying it, writes the reference
-`judgment.yaml`, and runs `bcode doctor`. The key is stored outside the
-repository in `~/.config/boundedcode/jev.env` with owner-only permissions
-(mode `600`); it is plaintext on disk, and `~/.bashrc` loads it in new Bash
-terminals. If a judgment config already exists, the script backs it up before
-replacing it. Keep the private key file out of untrusted backups and sync
-services; use an OS secret manager instead if you require encrypted storage.
-
-The reference uses a pinned Jev model and `redact: strict`, which sends
-repository metadata only, not source lines. Read
-[what leaves the machine](../explanation/judgment-data-flow.md) before changing
-the redaction mode. `bcode judgment sites` lists the decisions that can affect a
-task; [Use judgments](use-judgments.md) explains their authority tiers.
-
-## 8. Prepare a repository and run a task
-
-Repositories need a commit, an installed toolchain and locally available
-dependencies. Native tasks start from committed code; commit or separately
-preserve existing work before creating the task. The
-[first-task tutorial](../tutorials/first-task.md) uses a disposable copy of the
-included Go service and needs no third-party Go modules.
-
-For TypeScript analysis, install the sidecar from this checkout:
-
-```bash
-npm --prefix sidecars/typescript ci
-export BC_TYPESCRIPT_SIDECAR_DIR="$PWD/sidecars/typescript"
-```
-
-For Python analysis, install the pinned `scip-python` sidecar the same way:
-
-```bash
-npm --prefix sidecars/python ci
-export BC_PYTHON_SIDECAR_DIR="$PWD/sidecars/python"
-```
-
-Use Node 22 for both sidecars. Without them, those languages are read lexically,
-with no call graph; see
-[repository intelligence](../explanation/repository-intelligence.md).
-These tools do not consume model VRAM.
-
-With the model server running and `TYPESAFE_API_KEY` set, register the
-repository, index it and run a task from inside it:
-
-```bash
-cd /path/to/your/repository
-bcode workspace init
-bcode index
-bcode doctor
-bcode task create --title "Fix the failing parser test without changing its expected behavior" \
-  --scope "internal/parser/**" --verify standard
-bcode task run <task-id> --diff
-```
-
-Replace the title and scope with ones that fit your repository, and use the
-task ID `task create` prints. If work reaches a gate, inspect it with
-`bcode gate list` and `bcode gate show <gate-id>`, approve it explicitly, then
-run `bcode task retry <task-id>`. The
-[first-task tutorial](../tutorials/first-task.md) walks through this end to end.
-
-## Keep the environment across terminals
-
-Every step above relies on environment variables set in the current shell.
-Add the ones you use to your shell profile, adjusting paths to your checkout:
-
-```bash
-export PATH="$HOME/boundedcode/bin:/usr/local/go/bin:/usr/local/cuda/bin:$PATH"
-export BC_DATA="$HOME/.local/share/boundedcode"
-export BC_PRISM_DIR="$HOME/.local/share/boundedcode-runtime"
-export BC_TYPESCRIPT_SIDECAR_DIR="$HOME/boundedcode/sidecars/typescript"
-export BC_PYTHON_SIDECAR_DIR="$HOME/boundedcode/sidecars/python"
-```
-
-Keep `TYPESAFE_API_KEY` in a secrets manager or a file only you can read
-rather than in a shared profile.
-
-## Container deployments
-
-Docker is useful for bounding host access and for reproducible evaluation
-runtimes, but **the shipped CUDA image downloads stock llama.cpp b11042**, not
-the Prism build above. Do not expect its embedded server to load this GGUF.
-
-The existing compose files remain available for CPU tooling and external
-inference, or an operator-built image containing Prism. Build from source with
-`make image DOCKER_TARGET=cpu` to inspect the tooling image. It runs as UID
-10001; its data volume and repository mounts must be writable by that user.
-Do not mount the Docker socket into the supervisor container.
-
-On Linux, a host server bound to `127.0.0.1` is not reachable from a bridge
-container merely by adding `host.docker.internal`. Arrange a deliberately
-restricted reachable inference endpoint or co-locate the server; do not expose
-an unauthenticated model/API service broadly just to make the connection work.
-
-A pinned, tested Bonsai container recipe remains a packaging follow-up.
-[Storage setup](persistent-storage.md) ·
-[Host installer helper](install-on-the-host.md).
+Back up the data directory first if you want to retain indexes, evidence,
+models, or credentials. Project-side generated OpenCode files are not removed
+by the data-directory deletion; review and remove the managed block manually
+if desired.

@@ -239,6 +239,12 @@ func BaseSandboxSpec(cfg config.Config, dirs store.TaskDirs) sandbox.Spec {
 		ReadOnly: cfg.Sandbox.ReadOnlyPaths,
 		TmpDir:   dirs.Tmp,
 		Env:      recipe.GoEnv(dirs.GoBuildCache, dirs.GoModCache, dirs.Tmp),
+		// The MCP worker is started before a task id exists, so its sandbox
+		// cannot be narrowed to one worktree at launch. The parent is granted
+		// only for the task-worktree boundary; the confined agent still has no
+		// direct read/edit/shell tool, and every mutation is re-authorized by
+		// the MCP server against the task's own checkout and scope.
+		ReadWrite: []string{dirs.Worktrees},
 		// A test suite binds port 0 and connects to whatever the kernel
 		// returns, so no allowlist can name those ports in advance. The range
 		// holds no services, and TCPDeny keeps it that way.

@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
 	"text/tabwriter"
 
 	"github.com/spf13/cobra"
@@ -38,11 +37,11 @@ func newEvalJudgesCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			work, err := os.MkdirTemp("", "bcode-judges-")
+			work, cleanup, err := judgebench.NewScratchWorkDir()
 			if err != nil {
 				return err
 			}
-			defer func() { _ = os.RemoveAll(work) }()
+			defer cleanup()
 			judges := []judgebench.Judge{judgebench.CI{WorkDir: work}, judgebench.Bcode{WorkDir: work}}
 			names := []string{"ci", "bcode"}
 			var suites map[string]*oracle.Suite

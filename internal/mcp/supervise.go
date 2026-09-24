@@ -3,6 +3,7 @@ package mcp
 import (
 	"context"
 	"crypto/sha256"
+	"database/sql"
 	"encoding/hex"
 	"fmt"
 	"strings"
@@ -16,7 +17,6 @@ import (
 	"github.com/akynte/boundedcode/internal/ledger"
 	"github.com/akynte/boundedcode/internal/policy"
 	"github.com/akynte/boundedcode/internal/recipe"
-	"github.com/akynte/boundedcode/internal/store"
 	"github.com/akynte/boundedcode/internal/supervisor"
 	"github.com/akynte/boundedcode/internal/task"
 	"github.com/akynte/boundedcode/internal/worktree"
@@ -91,8 +91,8 @@ func (s *Server) registerSupervision(srv *mcp.Server) {
 	// every write rather than two that have to be kept in step.
 	mcp.AddTool(srv, &mcp.Tool{
 		Name: "bc_read",
-		Description: "Read a file through the supervisor's path policy. Secret paths are refused " +
-			"rather than returned, and the content comes back marked as repository data.",
+		Description: "Read a file through the supervisor's path policy from the named task's authoritative worktree. " +
+			"Secret paths are refused rather than returned, and the content comes back marked as repository data.",
 	}, s.readFile)
 	mcp.AddTool(srv, &mcp.Tool{
 		Name: "bc_edit",
@@ -101,18 +101,6 @@ func (s *Server) registerSupervision(srv *mcp.Server) {
 			"A write outside the declared scope is refused and needs a new task, which is what keeps " +
 			"an injected instruction from reaching a file the work never mentioned.",
 	}, s.editFile)
-}
-
-func requireTaskBinding(req *mcp.CallToolRequest, st *store.Store, ctx context.Context, taskID string) error {
-	sessionID := openCodeSessionID(req)
-	bound, err := supervisor.TaskBoundToSession(ctx, st, taskID, sessionID)
-	if err != nil {
-		return fmt.Errorf("checking task/session binding: %w", err)
-	}
-	if !bound {
-		return fmt.Errorf("task %q is not bound to this OpenCode session; call bc_task_start or bc_task_resume first", taskID)
-	}
-	return nil
 }
 
 type factIn struct {
@@ -130,13 +118,15 @@ func (s *Server) taskFact(ctx context.Context, req *mcp.CallToolRequest, in fact
 		return fail("%v", err), nil, nil
 	}
 	defer sess.Close()
-	if err := requireTaskBinding(req, sess.Store, ctx, in.TaskID); err != nil {
+	_, wt, release, err := supervisor.AuthorizeEditorOperation(ctx, sess.Store, sess.Workspace.Root, in.TaskID, openCodeSessionID(req), supervisor.EditorFact)
+	if err != nil {
 		return fail("%v", err), nil, nil
 	}
-	if err := (firewall.Access{Protected: protectedSet(sess.Workspace.Root)}).Check(sess.Workspace.Root, in.Path, false); err != nil {
+	defer release()
+	if err := (firewall.Access{Protected: protectedSet(sess.Workspace.Root)}).Check(wt.Path, in.Path, false); err != nil {
 		return fail("%v", err), nil, nil
 	}
-	body, err := worktree.ReadWithin(sess.Workspace.Root, in.Path)
+	body, err := worktree.ReadWithin(wt.Path, in.Path)
 	if err != nil {
 		return fail("%v", err), nil, nil
 	}
@@ -240,9 +230,11 @@ func (s *Server) taskMemoryAdd(ctx context.Context, req *mcp.CallToolRequest, in
 		return fail("%v", err), nil, nil
 	}
 	defer sess.Close()
-	if err := requireTaskBinding(req, sess.Store, ctx, in.TaskID); err != nil {
+	_, _, release, err := supervisor.AuthorizeEditorOperation(ctx, sess.Store, sess.Workspace.Root, in.TaskID, openCodeSessionID(req), supervisor.EditorMemory)
+	if err != nil {
 		return fail("%v", err), nil, nil
 	}
+	defer release()
 	id, err := supervisor.RecordMemory(ctx, sess.Store, in.TaskID, supervisor.MemoryRecord{Type: in.Type, Text: in.Text, Evidence: in.Evidence, Candidate: in.Candidate, Supersedes: in.Supersedes, Path: in.Path}, true)
 	if err != nil {
 		return fail("%v", err), nil, nil
@@ -348,9 +340,11 @@ func (s *Server) taskAnswer(ctx context.Context, req *mcp.CallToolRequest, in an
 	}
 	defer sess.Close() //nolint:contextcheck // cleanup must not take the request context: a cancelled call would then skip closing the databases.
 
-	if err := requireTaskBinding(req, sess.Store, ctx, in.TaskID); err != nil {
+	_, _, release, err := supervisor.AuthorizeEditorOperation(ctx, sess.Store, sess.Workspace.Root, in.TaskID, openCodeSessionID(req), supervisor.EditorAnswer)
+	if err != nil {
 		return fail("%v", err), nil, nil
 	}
+	defer release()
 
 	// The answer is durable and is read back in the final review, so it goes
 	// through the same credential check as committed content.
@@ -387,17 +381,12 @@ func (s *Server) taskFinish(ctx context.Context, req *mcp.CallToolRequest, in fi
 	}
 	defer sess.Close() //nolint:contextcheck // cleanup must not take the request context: a cancelled call would then skip closing the databases.
 
-	if err := requireTaskBinding(req, sess.Store, ctx, in.TaskID); err != nil {
+	_, wt, release, err := supervisor.AuthorizeEditorOperation(ctx, sess.Store, sess.Workspace.Root, in.TaskID, openCodeSessionID(req), supervisor.EditorFinish)
+	if err != nil {
 		return fail("%v", err), nil, nil
 	}
-	finished, err := task.NewStore(sess.Store).Get(ctx, in.TaskID)
-	if err != nil {
-		return fail("finding task: %v", err), nil, nil
-	}
-	if finished.State.Terminal() {
-		return fail("task %q is already %s and cannot be finished again", in.TaskID, finished.State), nil, nil
-	}
-	rev, err := supervisor.FinishTask(ctx, sess.Store, sess.Workspace.Root, in.TaskID)
+	defer release()
+	rev, err := supervisor.FinishTaskWithPolicyRoot(ctx, sess.Store, wt.Path, sess.Workspace.Root, in.TaskID)
 	if err != nil {
 		return fail("finishing the task: %v", err), nil, nil
 	}
@@ -422,6 +411,7 @@ type startIn struct {
 
 type startOut struct {
 	TaskID        string   `json:"task_id"`
+	Worktree      string   `json:"worktree,omitempty"`
 	ProtectedPath []string `json:"protected_paths,omitempty"`
 	Checks        []string `json:"checks"`
 }
@@ -439,44 +429,73 @@ func (s *Server) taskStart(ctx context.Context, req *mcp.CallToolRequest, in sta
 	if err := validateTaskDetails(in.Requirements, in.AcceptanceCriteria, in.Constraints, in.NonGoals); err != nil {
 		return fail("%v", err), startOut{}, nil
 	}
+	sessionID := openCodeSessionID(req)
+	if sessionID == "" {
+		return fail("a valid OpenCode session is required to start a supervised task"), startOut{}, nil
+	}
 	sess, err := s.resolve(ctx, in.Path)
 	if err != nil {
 		return fail("%v", err), startOut{}, nil
 	}
 	defer sess.Close() //nolint:contextcheck // cleanup must not take the request context: a cancelled call would then skip closing the databases.
 
+	var alreadyBound string
+	bindErr := sess.Store.Ledger().SQL().QueryRowContext(ctx, `
+		SELECT task_id FROM operations
+		WHERE kind='session_start' AND json_valid(intent)
+		  AND json_extract(intent, '$.session_id') = ?
+		ORDER BY id DESC LIMIT 1`, sessionID).Scan(&alreadyBound)
+	if bindErr == nil {
+		return fail("this OpenCode session is already bound to task %s; use bc_task_resume", alreadyBound), startOut{}, nil
+	}
+	if bindErr != sql.ErrNoRows {
+		return fail("checking the session's existing task binding: %v", bindErr), startOut{}, nil
+	}
+
 	t := task.Task{
 		ID:           task.NewID("oc"),
 		Title:        strings.TrimSpace(in.Objective),
 		Kind:         "supervised",
 		Verification: recipe.Standard,
-		Budget:       task.Budget{MaxAttempts: 3, MaxWallTime: 30 * time.Minute, Scope: in.WriteScope},
+		Budget: task.Budget{
+			MaxAttempts: 3, MaxGenerationRequests: 64, MaxWallTime: 30 * time.Minute, Scope: in.WriteScope,
+		},
 	}
 	if err := task.NewStore(sess.Store).Create(ctx, t); err != nil {
 		return fail("opening the task: %v", err), startOut{}, nil
 	}
-	promptHash, err := supervisor.OriginalOpenCodePrompt(ctx, sess.Store, openCodeSessionID(req))
+	wt, release, err := supervisor.EnsureTaskWorktreeForSession(ctx, sess.Store, sess.Workspace.Root, t.ID, sessionID)
+	if err != nil {
+		// A task without an authoritative checkout is not a usable task. Do not
+		// leave a live-looking record that the next session could accidentally
+		// treat as an editor task rooted in the operator checkout.
+		_ = task.NewStore(sess.Store).SetState(ctx, t.ID, task.StateFailed)
+		return fail("creating the authoritative task worktree: %v", err), startOut{}, nil
+	}
+	defer release()
+	promptHash, err := supervisor.OriginalOpenCodePrompt(ctx, sess.Store, sessionID)
 	if err != nil {
 		return fail("finding original user prompt: %v", err), startOut{}, nil
 	}
-	initialCandidate, err := ledger.ContentManifest(sess.Workspace.Root)
+	initialCandidate, err := ledger.ContentManifest(wt.Path)
 	if err != nil {
 		return fail("recording initial candidate: %v", err), startOut{}, nil
 	}
 	if err := supervisor.RecordEventCandidate(ctx, sess.Store, t.ID, ledger.KindSessionStart,
-		map[string]any{"objective": t.Title, "executor": "opencode", "phase": "EDITOR", "session_id": openCodeSessionID(req),
+		map[string]any{"objective": t.Title, "executor": "opencode", "phase": "EDITOR", "session_id": sessionID, "worktree": wt.Path,
 			"requirements": in.Requirements, "acceptance_criteria": in.AcceptanceCriteria,
 			"constraints": in.Constraints, "non_goals": in.NonGoals,
 			"original_prompt_hash": promptHash}, initialCandidate); err != nil {
 		return fail("recording the OpenCode session: %v", err), startOut{}, nil
 	}
 
-	out := startOut{TaskID: t.ID}
+	out := startOut{TaskID: t.ID, Worktree: wt.Path}
 	for _, k := range recipe.Required(recipe.Standard) {
 		out.Checks = append(out.Checks, string(k))
 	}
 	var b strings.Builder
-	fmt.Fprintf(&b, "Task %s opened for: %s\n\n", t.ID, t.Title)
+	fmt.Fprintf(&b, "Task %s opened for: %s\n", t.ID, t.Title)
+	fmt.Fprintf(&b, "Authoritative worktree: %s\n\n", wt.Path)
 
 	// The protected paths are the part the agent most needs before it edits.
 	// Reporting them afterwards, as a rejection, wastes the work.
@@ -495,8 +514,8 @@ func (s *Server) taskStart(ctx context.Context, req *mcp.CallToolRequest, in sta
 		}
 		b.WriteString("\n")
 	}
-	b.WriteString("Edit normally. When you believe the work is complete, call bc_verify — " +
-		"it runs the checks in a sandbox and decides acceptance from the evidence, so " +
+	b.WriteString("Use bc_read and bc_edit for work in this task worktree. When you believe the work is complete, " +
+		"call bc_verify — it runs the checks in a sandbox and decides acceptance from the evidence, so " +
 		"there is no need to assert that it works.\n")
 	return text(b.String()), out, nil
 }
@@ -585,8 +604,13 @@ func (s *Server) taskResume(ctx context.Context, req *mcp.CallToolRequest, in re
 	if err != nil || t.Kind != "supervised" || t.State.Terminal() {
 		return fail("task %q is not an unfinished supervised task", in.TaskID), nil, nil
 	}
+	wt, release, err := supervisor.EnsureTaskWorktreeForSession(ctx, sess.Store, sess.Workspace.Root, t.ID, id)
+	if err != nil {
+		return fail("opening the authoritative task worktree: %v", err), nil, nil
+	}
+	defer release()
 	if err := supervisor.RecordEvent(ctx, sess.Store, t.ID, ledger.KindSessionStart,
-		map[string]any{"objective": t.Title, "executor": "opencode", "phase": "EDITOR", "session_id": id, "resumed": true,
+		map[string]any{"objective": t.Title, "executor": "opencode", "phase": "EDITOR", "session_id": id, "worktree": wt.Path, "resumed": true,
 			"requirements": in.Requirements, "acceptance_criteria": in.AcceptanceCriteria,
 			"constraints": in.Constraints, "non_goals": in.NonGoals}); err != nil {
 		return fail("recording session resume: %v", err), nil, nil
@@ -621,6 +645,9 @@ type verifyOut struct {
 // reason, and a client that times out anyway loses the answer rather than the
 // work: the journal and the evidence are already written.
 func (s *Server) verify(ctx context.Context, req *mcp.CallToolRequest, in verifyIn) (*mcp.CallToolResult, verifyOut, error) {
+	if in.TaskID == "" && openCodeSessionID(req) != "" {
+		return fail("task_id is required for verification requested by an OpenCode worker; verification must remain attached to the authoritative task lifecycle"), verifyOut{}, nil
+	}
 	level := recipe.Standard
 	if in.Level != "" {
 		parsed, ok := recipe.ParseLevel(in.Level)
@@ -637,20 +664,14 @@ func (s *Server) verify(ctx context.Context, req *mcp.CallToolRequest, in verify
 
 	var requiredLevel recipe.Level
 	var verificationScope []string
+	var taskWorktree *worktree.Worktree
 	if in.TaskID != "" {
-		if err := requireTaskBinding(req, sess.Store, ctx, in.TaskID); err != nil {
-			return fail("%v", err), verifyOut{}, nil
+		supervised, wt, release, authErr := supervisor.AuthorizeEditorOperation(ctx, sess.Store, sess.Workspace.Root, in.TaskID, openCodeSessionID(req), supervisor.EditorVerify)
+		if authErr != nil {
+			return fail("%v", authErr), verifyOut{}, nil
 		}
-		supervised, err := task.NewStore(sess.Store).Get(ctx, in.TaskID)
-		if err != nil {
-			return fail("finding supervised task %q: %v", in.TaskID, err), verifyOut{}, nil
-		}
-		if supervised.Kind != "supervised" {
-			return fail("task %q is not a supervised task", in.TaskID), verifyOut{}, nil
-		}
-		if supervised.State.Terminal() {
-			return fail("task %q is %s; use the supervisor retry decision before verifying again", in.TaskID, supervised.State), verifyOut{}, nil
-		}
+		taskWorktree = wt
+		defer release()
 		requiredLevel = supervised.Verification
 		verificationScope = append([]string(nil), supervised.Budget.Scope...)
 		if supervised.Budget.MaxWallTime > 0 && time.Since(supervised.CreatedAt) > supervised.Budget.MaxWallTime {
@@ -687,7 +708,13 @@ func (s *Server) verify(ctx context.Context, req *mcp.CallToolRequest, in verify
 
 	// Discard progress: stdout carries the protocol, and this runs inside a
 	// tool call where there is nowhere to stream it.
+	verificationRoot := sess.Workspace.Root
+	if taskWorktree != nil {
+		verificationRoot = taskWorktree.Path
+	}
 	r, err := supervisor.Runner(ctx, sess.Root, sess.Store, engine.Verify{}, supervisor.Options{
+		// Policies, oracle configuration and the repository index describe the
+		// operator repository. The candidate itself is the task worktree below.
 		RepoRoot: sess.Workspace.Root,
 	})
 	if err != nil {
@@ -696,7 +723,7 @@ func (s *Server) verify(ctx context.Context, req *mcp.CallToolRequest, in verify
 	// Judge what the developer is actually looking at, not the last commit.
 	r.SyncUncommitted = true
 
-	outcome, err := r.Run(ctx, t.ID, sess.Workspace.Root)
+	outcome, err := r.Run(ctx, t.ID, verificationRoot)
 	if err != nil {
 		return fail("verification could not run: %v", err), verifyOut{}, nil
 	}

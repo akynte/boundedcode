@@ -41,7 +41,7 @@ import (
 
 // readIn is the proxied read.
 type readIn struct {
-	TaskID    string `json:"task_id,omitempty" jsonschema:"supervised task ID; records immutable evidence when supplied"`
+	TaskID    string `json:"task_id" jsonschema:"the supervised task ID; reads are always candidate-bound"`
 	Path      string `json:"path" jsonschema:"repository-relative path to read"`
 	StartLine int    `json:"start_line,omitempty" jsonschema:"first line, 1-based; omit for the start"`
 	EndLine   int    `json:"end_line,omitempty" jsonschema:"last line, inclusive; omit for the end"`
@@ -63,6 +63,9 @@ type readOut struct {
 const maxReadBytes = 256 << 10
 
 func (s *Server) readFile(ctx context.Context, req *mcp.CallToolRequest, in readIn) (*mcp.CallToolResult, readOut, error) {
+	if strings.TrimSpace(in.TaskID) == "" {
+		return fail("task_id is required: every supervised read must name the authoritative task worktree"), readOut{}, nil
+	}
 	sess, err := s.resolve(ctx, in.Root)
 	if err != nil {
 		return fail("%v", err), readOut{}, nil
@@ -70,6 +73,14 @@ func (s *Server) readFile(ctx context.Context, req *mcp.CallToolRequest, in read
 	defer sess.Close() //nolint:contextcheck // cleanup must not take the request context: a cancelled call would then skip closing the databases.
 
 	root := sess.Workspace.Root
+	if in.TaskID != "" {
+		_, wt, release, err := supervisor.AuthorizeEditorOperation(ctx, sess.Store, sess.Workspace.Root, in.TaskID, openCodeSessionID(req), supervisor.EditorRead)
+		if err != nil {
+			return fail("%v", err), readOut{}, nil
+		}
+		defer release()
+		root = wt.Path
+	}
 	access := firewall.Access{Protected: protectedSet(root)}
 	if err := access.Check(root, in.Path, false); err != nil {
 		return fail("%v", err), readOut{}, nil
@@ -103,11 +114,7 @@ func (s *Server) readFile(ctx context.Context, req *mcp.CallToolRequest, in read
 	if in.TaskID != "" {
 		// A read with a task id also records an immutable artifact and durable
 		// tool observation. It is therefore a mutation of the task journal, not
-		// a harmless read: require the same session binding as bc_edit and the
-		// other task-mutating tools.
-		if err := requireTaskBinding(req, sess.Store, ctx, in.TaskID); err != nil {
-			return fail("%v", err), readOut{}, nil
-		}
+		// a harmless read; the binding and lease were checked before the read.
 		if _, err := task.NewStore(sess.Store).Get(ctx, in.TaskID); err != nil {
 			return fail("%v", err), readOut{}, nil
 		}
@@ -204,26 +211,18 @@ func (s *Server) editFile(ctx context.Context, req *mcp.CallToolRequest, in edit
 	}
 	defer sess.Close() //nolint:contextcheck // cleanup must not take the request context: a cancelled call would then skip closing the databases.
 
-	if err := requireTaskBinding(req, sess.Store, ctx, in.TaskID); err != nil {
-		return fail("%v", err), editOut{}, nil
-	}
-	t, err := task.NewStore(sess.Store).Get(ctx, in.TaskID)
+	t, wt, release, err := supervisor.AuthorizeEditorOperation(ctx, sess.Store, sess.Workspace.Root, in.TaskID, openCodeSessionID(req), supervisor.EditorEdit)
 	if err != nil {
 		return fail("%v", err), editOut{}, nil
 	}
-	if t.State.Terminal() {
-		return fail("task %q is already %s and cannot be edited", in.TaskID, t.State), editOut{}, nil
-	}
-	if t.State == task.StateReview {
-		return fail("task %q is in review; use the supervisor's retry decision before editing again", in.TaskID), editOut{}, nil
-	}
+	defer release()
 	if t.State == task.StatePending {
 		if err := task.NewStore(sess.Store).SetState(ctx, in.TaskID, task.StateRunning); err != nil {
 			return fail("recording task start: %v", err), editOut{}, nil
 		}
 	}
-	root := sess.Workspace.Root
-	access := firewall.Access{WriteScope: t.Budget.Scope, Protected: protectedSet(root)}
+	root := wt.Path
+	access := firewall.Access{WriteScope: t.Budget.Scope, Protected: protectedSet(sess.Workspace.Root)}
 	if err := access.Check(root, in.Path, true); err != nil {
 		// The refusal names the rule, so the next attempt is a re-plan rather
 		// than the same edit with a different spelling.

@@ -72,13 +72,14 @@ func newRootCmd() *cobra.Command {
 		},
 	}
 	pf := root.PersistentFlags()
-	pf.StringVar(&g.dataDir, "data", "", "data directory (default $BC_DATA, then /data)")
+	pf.StringVar(&g.dataDir, "data", "", "data directory (default $BC_DATA, then the host/container default)")
 	pf.BoolVar(&g.logJSON, "log-json", false, "emit structured JSON logs")
 	pf.BoolVarP(&g.verbose, "verbose", "v", false, "debug logging")
 	pf.BoolVarP(&g.quiet, "quiet", "q", false, "errors only")
 
 	root.AddCommand(
 		newVersionCmd(),
+		newSetupCmd(),
 		newDoctorCmd(),
 		newWorkspaceCmd(),
 		newIndexCmd(),

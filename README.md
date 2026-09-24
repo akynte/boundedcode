@@ -1,491 +1,334 @@
 <div align="center">
 
+<p><strong>LOCAL-FIRST · SUPERVISED · OPEN SOURCE</strong></p>
+
 # BoundedCode
 
-**Code generation on an 8 GB GPU. Typed decisions inside the control loop.<br>
-Nothing accepted without verification.**
+<p><strong>OpenCode's local control plane.</strong></p>
+
+<p><em>A coding model that can propose changes, inside a runtime that decides what is allowed to happen.</em></p>
 
 [![CI](https://github.com/akynte/boundedcode/actions/workflows/ci.yml/badge.svg)](https://github.com/akynte/boundedcode/actions/workflows/ci.yml)
-[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-[![Go 1.27.1](https://img.shields.io/badge/go-1.27.1-00ADD8.svg?logo=go&logoColor=white)](go.mod)
-[![Platform](https://img.shields.io/badge/platform-Linux%20x86--64%20%C2%B7%20CUDA-555.svg)](docs/how-to/install.md)
-[![Status: pre-1.0](https://img.shields.io/badge/status-pre--1.0-orange.svg)](#hardware-and-measured-performance)
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-111827.svg?style=flat-square)](LICENSE)
+[![Go 1.27](https://img.shields.io/badge/go-1.27-00ADD8.svg?logo=go&logoColor=white)](go.mod)
+[![OpenCode 2](https://img.shields.io/badge/OpenCode-2-111827.svg?style=flat-square)](https://opencode.ai/)
+[![Status: pre-1.0](https://img.shields.io/badge/status-pre--1.0-f59e0b.svg?style=flat-square)](#limits--transparency)
 
-[Get started](#get-started) ·
-[The 8 GB stack](#the-8-gb-stack) ·
-[Architecture](docs/explanation/architecture.md) ·
-[Verification](docs/explanation/verification.md) ·
-[Trust boundaries](docs/explanation/trust-boundaries.md) ·
-[Measurements](docs/benchmarks/results/2026-09-21-bonsai-runtime.md) ·
-[Documentation](docs/index.md)
+[Quick start](#the-short-version) · [Architecture](#architecture) · [Setup](#install-boundedcode) · [Daily use](#use-boundedcode-from-any-project) · [Docs](#documentation)
 
 </div>
 
 ---
 
-BoundedCode adds repository intelligence, durable task records and deterministic
-verification to OpenCode running a local model. OpenCode investigates and edits;
-the Go supervisor records the work and checks the resulting candidate.
+> [!TIP]
+> **The shortest path to a governed coding session:** install `bcode`, run
+> `bcode setup` once, then run `bcode opencode` from any project.
 
-**OpenCode 2 is the supported user interface.** BoundedCode supplies its tools,
-durable supervised task state and verification. OpenCode owns the conversation
-and model requests. See [context management](docs/explanation/opencode-context.md)
-for the measured 32K behavior and current continuity limits.
-
-| Aspect | Summary |
-|---|---|
-| **Generation** | Local. Every token of code comes from your GPU; no prompt, file or conversation leaves the machine. |
-| **Decisions** | Narrow, typed judgments about work in progress go to a hosted decision model, [TypeSafe Jev](#why-a-hosted-decision-model) — a required component, not an optional integration. [Exactly what leaves the machine](docs/explanation/judgment-data-flow.md). |
-| **Acceptance** | Deterministic. Only the Go supervisor, from verification results, scope and candidate identity, can accept work. |
-| **Hardware** | An **8 GB NVIDIA GPU and 64 GB system RAM**, running **Ternary Bonsai 2 27B (PTQ1_0)** for OpenCode model requests through PrismML's llama.cpp fork. |
-
-It is **not** a fully offline system, and does not claim to be. The engineering
-goal is useful repository work on consumer hardware: spend the GPU budget on
-generating a change; let software handle lookup, permissions, state, and checks.
-
-> [!IMPORTANT]
-> **Pre-1.0.** The task pipeline is implemented. The current reference model has
-> been measured on an RTX 4060 Laptop GPU; broad task effectiveness on this stack
-> is not yet established. Historical task evaluations use a different model and
-> include false acceptances. Passing checks is evidence, not proof of correctness.
-
-## Why an 8 GB budget changes the design
-
-Running a coding model is only one part of running a coding agent. Repository
-search, long conversations, repeated prompt ingestion, verification tools, and
-competing inference processes all consume resources. A model that fits can still
-produce a slow or unreliable workflow.
-
-BoundedCode gives the model smaller, explicit problems:
-
-- **Find relevant code.** SQLite FTS5, typed relationships, signature inspection,
-  and targeted file reads support localization. The repository stays on disk.
-- **Describe a bounded change.** A structured plan names exact writable files,
-  tests, risks, and affected consumers. Code validates it before editing.
-- **Act through a small tool surface.** Reads, exact edits, searches, impact
-  queries, and predefined verification recipes. The native agent has no shell tool.
-- **Use observable feedback.** Compiler errors, test failures, scope violations,
-  and review findings feed bounded repair attempts.
-- **Carry state outside the conversation.** A SQLite journal and persisted
-  workflow state retain what ran, what changed, and what remains uncertain.
-
-This is how the system seeks capability through architecture. It does not make a
-local model equivalent to a frontier model, and the graph's benefit still needs
-stronger experimental evidence.
-[Read the design argument →](docs/explanation/why-small-models.md)
-
-## What you can do
-
-Ask for a bounded bug fix with a regression test, change a function signature and
-investigate its consumers, or inspect configuration and service relationships.
-You can also index a repository, query impact, and verify existing changes
-without running inference.
-
-```bash
-bcode opencode
-```
-
-Ask OpenCode to open a supervised task with `bc_task_start`, including the
-acceptance criteria and constraints, then to edit and call `bc_verify` and
-`bc_task_finish`. [OpenCode setup and lifecycle →](docs/how-to/use-with-opencode.md)
-
-The request is an example of a task, not a published success result. Narrowing a
-large audit to one demonstrable defect usually gives a clearer completion
-criterion.
-
-| Language / source | Evidence |
-|---|---|
-| Go | Compiler-backed analysis |
-| TypeScript | Compiler relationships through a Node sidecar |
-| Python | Optional SCIP indexing |
-| Rust, SQL, protobuf/Avro, deployment manifests, Terraform, git history | Tree-sitter and format-specific analyzers, at differing levels of evidence |
-
-[Language coverage and limits →](docs/explanation/repository-intelligence.md)
-
-## The 8 GB stack
-
-| Component | Job | Resource placement |
-|---|---|---|
-| **Ternary Bonsai 2 27B — PTQ1_0** | OpenCode coding requests | Local llama-server; 32,768-token context, Q8 KV cache |
-| **Deterministic Go subsystems** | Indexing, scope enforcement, workflow state, verification, evidence | CPU, system RAM, SQLite, repository toolchains |
-| **TypeSafe Jev — `jev-1.13.0`** (required) | Typed judgments inside the control loop | Hosted API; needs a credential; no local model allocation |
-| **Qwen3-Embedding-0.6B — Q8_0** (experimental) | Embedding-cosine evaluation control | CPU-only reference service; not used by ordinary task retrieval |
-
-Bonsai's language-model file is **5.95 GB on disk**. That is not its total runtime
-VRAM requirement: KV cache, compute buffers, runtime overhead, and your desktop
-also need memory. PTQ1_0 uses the Prism runtime's ternary kernels; the stock
-llama.cpp binary in the shipped CUDA image is not the documented Bonsai runtime.
-
-The local model stays resident for OpenCode requests. Older native-runner
-measurements reported editing at about 27 tokens/s; current OpenCode numbers
-are in the [context benchmark](docs/explanation/opencode-context.md). EDIT was once routed to a
-second model because Bonsai looked unable to drive the tool loop. That was
-BoundedCode's fault, not the model's: the edit prompt carried no code, because
-qualified symbol names in plans matched nothing in the index.
-[What was found, fixed and measured →](docs/reference/model-stack.md#why-edit-runs-on-bonsai)
-
-**No hosted account is needed for generation.** A TypeSafe credential *is*
-required, for the decision plane only: it sends a structured `state` object —
-under the default `redact: strict`, repository metadata with no source in it —
-and returns typed probabilities. It neither writes the patch nor supplies a
-passing test result. The code and vendor call it **Jev**, not GEV.
-[Exact models, roles, and evidence](docs/reference/model-stack.md) ·
-[Jev's integration](docs/explanation/judgments.md)
-
-## Why a hosted decision model
-
-A coding agent makes two very different kinds of decision. Generating a change
-is one; judging work in progress is the other, and for a long time this codebase
-made the second kind with keyword lists and magic constants.
+## The short version
 
 ```text
-SYSTEM TWO      Local coding model        Generates candidate solutions.
-SYSTEM ONE      TypeSafe Jev              Fast typed judgments inside the loop.
-DETERMINISTIC   Go supervisor + tools     State, policy, side effects, evidence,
-                                          and the completion gate.
+┌──────────────────────────────────────────────────────────────┐
+│  ONE-TIME                                                    │
+│  bcode setup        discover · configure · validate           │
+└──────────────────────────────┬───────────────────────────────┘
+                               │
+                               ▼
+┌──────────────────────────────────────────────────────────────┐
+│  EVERY SESSION                                               │
+│  bcode opencode     prepare · launch · supervise · clean up  │
+└──────────────────────────────────────────────────────────────┘
 ```
 
-The bottom layer owns every decision that can accept work. That ordering is the
-product.
+There is one official installation and configuration flow: **`bcode setup`**.
+The old host installer, manual model-server recipes, and alternate setup
+sequences are not part of the supported workflow.
 
-| Question | Answer |
-|---|---|
-| **What goes to Jev** | Eleven narrow, typed questions over bounded, structured state the supervisor already has: an objective, a plan's waivers, a window of tool-call evidence, a set of diff hunks. Never a transcript, never free text, never a whole file. |
-| **What leaves** | One HTTPS request per consultation, carrying a `state` object whose contents the `redact` mode bounds. [The full data flow](docs/explanation/judgment-data-flow.md). |
-| **What stays local** | Generation, the code graph, retrieval, the sandbox, every verification command, the ledger, telemetry. |
-| **What stays deterministic** | Acceptance. Scope enforcement. What a verification command reports. |
-| **Low confidence** | Not treated as an answer. The operator's `min_confidence` floor is applied to every choice and score a routing-capable site reads; below it the site reports `JEV_LOW_CONFIDENCE` rather than acting on a guess. |
-| **Unavailable** | Explicit failure, never a silent default. A task run will not start without a usable decision plane, and a site configured to act on a decision it could not get stops the task in a resumable `blocked` state naming the class — `JEV_UNAVAILABLE`, `JEV_AUTH_FAILED`, `JEV_TIMEOUT` and the rest — rather than assuming the benign answer. |
+## Why BoundedCode
 
-A judgment may reorder evidence, raise a concern, taint a result, or send a plan
-back for correction inside budgets the supervisor already enforces. It may not
-accept work, reject work, or change what counts as success. This is enforced,
-not documented: `internal/policy`, `internal/firewall`, `internal/broker` and
-`internal/recipe` cannot import the judgment package at all, and a test fails the
-build if that changes.
+BoundedCode is an open-source development environment for **OpenCode**. It keeps
+the coding model, repository state, tools, and verification inside one supervised
+boundary instead of asking developers to start a collection of services by hand.
 
-<details>
-<summary><b>Why not ask the coding model, or keep the heuristics?</b></summary>
-<br>
+| ✦ Local generation | ◈ Repository intelligence | ⚙ Deterministic control |
+|---|---|---|
+| Run the coding model on your machine with an OpenAI-compatible runtime. | Compiler-backed index, symbol relationships, targeted retrieval, and durable task memory. | Scoped edits, sandboxed verification, evidence, and completion decisions the model cannot grant itself. |
+| **Your source stays local.** | **Context is assembled from the code, not vibes.** | **A passing check is evidence—not a model's claim of success.** |
 
-**Why not ask the coding model?** Because a generative model asked to judge its
-own work is a model voting on itself, and because the answer needed is a
-calibrated number, not prose. `Router.For(role)` falls through to the default
-provider for any unrouted role — so putting a judge behind a generator role
-would mean that when no judge is configured, the local coding model silently
-answers classification questions instead. That is the failure this design
-exists to remove.
-
-**Why not heuristics?** They are still there, and they still run. The point is
-that some of the decisions code was left holding are *semantic* — "does this
-stated reason actually justify leaving that consumer alone", "is this diff hunk
-weakening the test or legitimately updating it" — and a regex over prose is a
-bad instrument for them. Nearly every such site in this repository carries a
-comment admitting the heuristic. Honesty is not accuracy.
-
-**Why this helps an 8 GB machine.** The scarce resource is GPU seconds. Every
-semantic question answered by a small typed request is a question that does not
-become another pass through a 27B model on a card that holds one model at a
-time.
-
-</details>
+The local model generates code on the developer's machine. A hosted
+[TypeSafe Jev](https://typesafe.ai/) decision plane is a separate, narrow
+control-plane component; setup configures it and explains the data boundary
+before it is used. It can stop or redirect work, but it cannot turn a failed
+check into an accepted change.
 
 > [!NOTE]
-> **What is not yet established.** The six routing-capable sites route by
-> default, bounded by `redact` — under the shipped `strict` that is
-> `intake_profile` and `obligation_reason`, the two whose questions are
-> metadata-only. That is a product decision, not a measured one: no site has
-> yet been shown to improve a decision in this system on real tasks, because
-> its calibration on this kind of work has not been measured. `bcode judgment
-> calibrate` exists to make that assessment from ordinary runs, and any site
-> can be turned down to `logged` in `judgment.yaml` with one line.
+> The normal supported path uses an **embedded** model owned by the session.
+> An explicitly configured external endpoint remains operator-owned and is
+> never killed by BoundedCode.
 
-<sub>TypeSafe and Jev are products of TypeSafe; this project is not affiliated
-with or endorsed by them.</sub>
-
-## How a task works
-
-Eight persisted phases, with every transition checked against an allow-list
-(`internal/workflow/state.go`). The model proposes; the supervisor decides where
-the task goes next.
+## Architecture
 
 ```mermaid
-flowchart TD
-    REQ(["Request + operator scope"])
+flowchart TB
+    OC["OpenCode<br/><small>interactive client</small>"]
+    S["BoundedCode supervisor<br/><small>one session owner</small>"]
+    W["Workspace + SQLite ledger<br/><small>durable task state</small>"]
+    P["Scoped worktree + policy<br/><small>least-privilege edits</small>"]
+    V["Sandbox + verification<br/><small>repeatable evidence</small>"]
+    M["Local model gateway<br/><small>llama-server + GGUF</small>"]
+    T["Temporary services<br/><small>API · broker · session state</small>"]
 
-    subgraph UNDERSTAND["① Understand — nothing is edited"]
-        direction TB
-        INTAKE["<b>INTAKE</b><br/>freeze verification presets<br/>baseline run · fresh index"]
-        LOCALIZE["<b>LOCALIZE</b><br/>structure → signatures → bodies<br/>root-cause hypothesis"]
-        IMPACT["<b>IMPACT</b><br/>consumers and obligations<br/>bounded context rescue"]
-        PLAN["<b>PLAN</b><br/>exact file grants · named tests<br/>validated against the repository"]
-    end
+    OC -->|"MCP tools + authenticated broker"| S
+    S --> W
+    S --> P
+    S --> V
+    S --> M
+    S --> T
 
-    subgraph PROVE["② Change and prove"]
-        direction TB
-        EDIT["<b>EDIT</b><br/>local model · mediated tools<br/>writes only the allowlist"]
-        VERIFY["<b>VERIFY</b><br/>sandboxed checks vs. baseline<br/>scope check · flaky rerun"]
-        REVIEW["<b>REVIEW</b><br/>fresh-context model review"]
-    end
-
-    subgraph SHIP["③ Finalize"]
-        direction TB
-        FINAL["<b>FINALIZE</b><br/>candidate re-check · secret scan"]
-        GATE{{"Human gate"}}
-    end
-
-    ACCEPTED(["<b>accepted</b><br/>committed on the task branch"])
-    AWAITING(["<b>review</b><br/>awaiting approval"])
-    FAILED(["<b>failed</b>"])
-
-    REQ ==> INTAKE ==> LOCALIZE ==> IMPACT ==> PLAN
-    PLAN -. "rejected: corrected, ≤ 2×" .-> PLAN
-    PLAN ==> EDIT ==> VERIFY
-    VERIFY -- "checks fail: repair" --> EDIT
-    VERIFY -. "same failure 3×: reset" .-> LOCALIZE
-    VERIFY -. "unplanned impact" .-> PLAN
-    EDIT -. "context exhausted" .-> PLAN
-    VERIFY == "verified, in scope" ==> REVIEW
-    REVIEW -- "findings" --> EDIT
-    REVIEW == "accept" ==> FINAL ==> GATE
-    GATE == "approve" ==> ACCEPTED
-    GATE -- "pending" --> AWAITING
-    GATE -- "reject" --> FAILED
-
-    classDef det fill:#eef2f7,stroke:#57606a,color:#1f2328
-    classDef model fill:#ddf4ff,stroke:#0969da,color:#0a3069
-    classDef human fill:#fff8c5,stroke:#9a6700,color:#4d2d00
-    classDef ok fill:#dafbe1,stroke:#1a7f37,color:#0f3d1f
-    classDef wait fill:#fff8c5,stroke:#9a6700,color:#4d2d00
-    classDef bad fill:#ffebe9,stroke:#cf222e,color:#5c0b0b
-    class REQ,INTAKE,IMPACT,VERIFY,FINAL det
-    class LOCALIZE,PLAN,EDIT,REVIEW model
-    class GATE human
-    class ACCEPTED ok
-    class AWAITING wait
-    class FAILED bad
+    classDef client fill:#f8fafc,stroke:#64748b,color:#0f172a
+    classDef owner fill:#eef2ff,stroke:#4f46e5,color:#1e1b4b,stroke-width:2px
+    classDef local fill:#ecfdf5,stroke:#059669,color:#064e3b
+    class OC client
+    class S owner
+    class W,P,V,M,T local
 ```
 
-<sub>Blue phases call the local model; grey phases are deterministic Go; the
-hexagon is a person. Thick arrows are the path to acceptance; dotted arrows are
-bounded recovery routes.</sub>
+The supervisor owns every process it starts. OpenCode launches only after the
+runtime is ready. On exit, the supervisor closes the OpenCode process tree,
+stops the model and API children, checkpoints storage, removes the broker
+capability and temporary session directory, and waits for process groups to
+disappear.
 
-**The model's `done` call cannot accept its own work.** The supervisor checks
-verification results, scope, and candidate identity. Model review is an
-additional fallible gate: it can request repairs; it cannot turn failed checks
-into passes, and `VERIFY → FINALIZE` is a forbidden transition — review is never
-skipped. Final approval commits on the task branch. Applying that commit to your
-branch is a separate git operation.
-[Verification contract →](docs/explanation/verification.md)
+### Ownership at a glance
 
-Any phase can also stop the task. Every stop is persisted with its reason:
-
-| End state | When | Next |
+| Layer | Responsibility | Lifetime |
 |---|---|---|
-| **accepted** | The gate approved; the change is committed on the task branch | Merge the branch yourself |
-| **review** | Verified and reviewed, waiting at the gate | `bcode gate show`, approve, `bcode task retry` |
-| **blocked** | A budget ran out, the environment failed, the decision plane was unusable, or the code changed underneath the task | Fix the named cause, then `bcode task retry` |
-| **failed** | Repair, re-plan or re-localization budgets are exhausted, or the work was rejected | Start a new task |
+| **OpenCode** | Conversation and interactive work surface | One editor session |
+| **Supervisor** | Readiness, policy, process ownership, and shutdown | One editor session |
+| **Model runtime** | Local generation and OpenAI-compatible endpoint | Started and stopped by the session |
+| **Workspace data** | Indexes, ledger, evidence, and durable OpenCode state | Across sessions |
+| **External endpoint** | Operator-provided inference service | Operator-owned |
 
-<details>
-<summary><b>Where Jev is consulted along the way</b></summary>
-<br>
+## System requirements
 
-| Phase | Site | What it may do, at the routing tier |
-|---|---|---|
-| INTAKE | intake profile | Stop a task that needs a new dependency or a migration before any model call |
-| PLAN | obligation reasons | Send back a plan whose `no_change_needed` waiver looks unsupported |
-| EDIT | progress | Draw a context boundary when the loop circles (at most 3); flag drift as a risk |
-| EDIT → VERIFY | test integrity, diff conformance | Taint results whose diff weakens a test; return an off-objective diff to EDIT once |
-| VERIFY | triage | Pause on a judged environmental failure; re-localize a recurring cause |
-| REVIEW | review rubric | Change the order the reviewer reads hunks in — nothing else |
-| Context assembly | hypothesis, fact relevance, injection, note relevance | Shape what a model call is shown |
+The measured reference is **Linux x86-64 with an NVIDIA CUDA GPU**.
 
-Under the shipped `redact: strict`, only intake profile and obligation reasons
-act; the rest run and journal. None of them can accept or reject work.
+| Requirement | Reference target |
+|---|---|
+| **GPU** | NVIDIA CUDA, 8 GB VRAM (RTX 4060 Laptop is the measured reference) |
+| **System RAM** | 64 GB recommended; allow at least 32 GB for smaller profiles |
+| **Disk** | 20 GB free for the runtime, model, build caches, and project data |
+| **OS** | Linux x86-64 |
+| **Tools** | Git, ripgrep, a C compiler when building from source, and OpenCode 2 |
+| **Optional CUDA build** | CMake, Ninja, `nvcc`, and an NVIDIA driver |
+| **Runtime** | A CUDA-compatible `llama-server` and a GGUF model; setup can build the pinned Prism runtime after confirmation |
+| **Decision plane** | A TypeSafe Jev credential for task execution |
 
-</details>
+The setup TUI reports the actual host, dependency, GPU, disk, and sandbox
+checks. A CPU-only or Apple-silicon machine can use a measured profile or a
+local OpenAI-compatible external endpoint, but it is not silently treated as
+the CUDA reference machine.
 
-## Get started
+> [!WARNING]
+> The reference configuration is measured, not universal. Treat the published
+> profile as a starting point and use `bcode doctor` to inspect what is actually
+> active on your host.
 
-The reference path is **Linux x86-64 + NVIDIA CUDA**, with host inference and the
-native `bcode` CLI. Setup includes a runtime build and a model download; it is not a
-one-command installation.
+## Install BoundedCode
 
-### 1. Install the prerequisites
+The canonical installation has two parts: install the `bcode` executable, then
+run its setup TUI. The TUI is the only supported way to install and configure
+the runtime, model, sandbox, and initial settings.
 
-Go **1.27.1** or newer, a C compiler (the build uses cgo), git, and ripgrep.
-Distribution `golang` packages are usually too old, so install Go from the
-official release:
+### 1. Install the executable
 
-```bash
-sudo apt install build-essential git ripgrep   # or your distribution's equivalent
-curl -LO https://go.dev/dl/go1.27.1.linux-amd64.tar.gz
-sudo rm -rf /usr/local/go && sudo tar -C /usr/local -xzf go1.27.1.linux-amd64.tar.gz
-echo 'export PATH="$PATH:/usr/local/go/bin"' >> ~/.bashrc && source ~/.bashrc
-go version   # must print go1.27.1 or newer
-```
-
-> [!TIP]
-> If `make build` fails with `go: command not found`, Go is not installed or
-> `/usr/local/go/bin` is not on your `PATH`.
-
-### 2. Build the CLI
+From a checkout:
 
 ```bash
 git clone https://github.com/akynte/boundedcode.git
 cd boundedcode
 make build
-export PATH="$PWD/bin:$PATH"
-export BC_DATA="$HOME/.local/share/boundedcode"
-bcode config init
+install -Dm755 bin/bcode "$HOME/.local/bin/bcode"
+export PATH="$HOME/.local/bin:$PATH"
 ```
 
-### 3. Install the runtime and models
-
-Follow the [8 GB installation guide](docs/how-to/install.md) for the **pinned
-Prism runtime, exact GGUF download, checksum, and configuration files**. Host
-mode has a narrower isolation boundary than a container.
-
-### 4. Configure the decision plane
-
-`bcode task run` refuses to start without one:
+### 2. Run the guided setup
 
 ```bash
-cat > "$BC_DATA/config/judgment.yaml" <<'YAML'
-enabled: true
-model: jev-1.13.0
-api_key_env: TYPESAFE_API_KEY
-redact: strict
-min_confidence: 0.75
-cache: true
-YAML
-export TYPESAFE_API_KEY="…"
+bcode setup
 ```
 
-`redact: strict` is the default and sends no source. Read [what leaves the
-machine](docs/explanation/judgment-data-flow.md) before loosening it.
+The TUI is safe to run again after an update or a hardware change. It detects
+existing configuration, asks before replacing values, and writes an installation
+marker only after validation succeeds. For automation, the same state-changing
+path is available with explicit flags such as `--non-interactive`,
+`--install-runtime`, `--yes`, `--runtime`, `--model`, and `--external-url`;
+there is no second installation script or hand-written runtime recipe.
 
-### 5. Run your first task
+### What setup configures
 
-Once the model server is running, use a clean, committed repository with its
-dependencies already available:
-
-```bash
-cd /path/to/your/repository
-bcode workspace init
-bcode index
-bcode models health
-bcode doctor
-bcode task create --title "Fix the failing parser test without changing its expected behavior" \
-  --scope "internal/parser/**" --verify standard
-bcode task run <task-id> --diff
-```
-
-Replace the paths and task with ones that exist in your repository.
-
-- **`bcode doctor`** exits 0 when clean, 1 on warnings, and 2 on failures. It is the
-  command that diagnoses a broken decision plane, and it keeps working when the
-  plane is down — a missing credential, an unreachable endpoint, or a site
-  promoted to a tier its `redact` mode forbids are each reported by name.
-- **If work reaches a gate,** inspect it with `bcode gate list` and
-  `bcode gate show <gate-id>`, approve explicitly, then `bcode task retry <task-id>`.
-
-**Next:** the [first coding task tutorial](docs/tutorials/first-task.md) is a
-self-contained example. For editor integration, see
-[OpenCode and MCP](docs/how-to/use-with-opencode.md); editor-driven sessions have
-a different working-tree boundary.
-
-## Hardware and measured performance
-
-| Reference observation, 2026-09-21 | Value |
+| Step | What happens |
 |---|---|
-| GPU | RTX 4060 Laptop, 8,188 MiB |
-| Host | Intel i7-13620H, 64 GB installed RAM |
-| Model / server | Bonsai PTQ1_0 / Prism llama.cpp `1a07bfa5` |
-| Context / concurrent server slots | 32,768 / 1 |
-| Prompt processing / generation | **264.4 / 27.7 tokens/s** |
-| Highest post-request whole-device memory sample | 7,691 MiB |
+| **01 · Requirements** | Checks platform, Git, ripgrep, compiler, OpenCode, sandbox tools, NVIDIA driver, optional CMake/Ninja/`nvcc`, memory, and filesystem. |
+| **02 · Data directory** | Selects `$BC_DATA` or a user-local data directory and creates it with durable permissions. |
+| **03 · Hardware profile** | Selects a shipped profile or preserves an existing measured profile, and explains mismatches. |
+| **04 · Runtime** | Discovers or accepts `llama-server`; can build the pinned Prism source after confirmation. |
+| **05 · Model** | Discovers a GGUF or offers an atomic, resumable reference-model download. |
+| **06 · Providers** | Creates the local OpenAI-compatible mapping used by both the supervisor and OpenCode. |
+| **07 · Decision plane** | Configures Jev and stores supplied credentials outside YAML with owner-only permissions. |
+| **08 · Validation** | Checks the strongest available isolation layer, validates generated files, and refuses false success. |
 
-Three synthetic requests; approximately 2K prompt tokens and a 256-token output
-cap, with thinking disabled. These are server throughput observations, not coding
-task timings, continuous peak-memory measurements, or a success rate.
-[Raw data, flags, caveats, reproduction →](docs/benchmarks/results/2026-09-21-bonsai-runtime.md)
+For unattended first-time setup, authorize the optional runtime build and model
+download explicitly:
 
-The [8 GB runtime guide](docs/explanation/8gb-runtime.md) explains RAM, disk,
-context budgets, caching, process ownership, and untested hardware. The
-[benchmark index](docs/benchmarks/results/README.md) keeps older Qwen/MoE task
-results separate from the current Bonsai measurement.
+```bash
+bcode setup --non-interactive --yes
+```
 
-## When a task stops
+Or, when the model already exists:
 
-A task stops for reasons unrelated to the code it was changing: a wall-clock
-budget expires, an operator interrupts, a deadline fires. Three things have to
-be true at once, and the obvious implementation of the first breaks the second.
+```bash
+bcode setup --non-interactive --install-runtime --model /path/to/model.gguf
+```
 
-1. **Work stops.** The task's context reaches the subprocesses an evaluation
-   runs — `git clone`, `docker run`, `docker exec`, the Python interpreter —
-   through `exec.CommandContext`, rather than leaving a clone cloning and a
-   container sleeping while only the Go code gives up.
-2. **Cleanup still runs.** If that same context reached `docker stop`, every
-   cancelled run would leak the container it started. Cleanup detaches from the
-   cancellation and keeps a 30-second ceiling of its own, so stopping the work
-   does not mean abandoning it.
-3. **The evidence survives.** The record explaining why a task stopped is most
-   useful at exactly the moment the budget kills everything else, so the final
-   write detaches too — under a bound matching the ledger's, because a
-   diagnostic must never be able to hang the thing it is observing. Budget
-   exhaustion says so by name instead of surfacing as whatever call happened to
-   be in flight.
+A runtime that is already discovered is reused. A generic pre-existing
+`llama-server` is operator state: setup does not claim that an arbitrary binary
+is the pinned Prism build, so use the approved build or pass the path of a
+runtime you trust for your model.
 
-Evaluation writes that leave the tool's own directory are resolved through
-every symlink and refused if they land outside the run root. That is a check on
-those writes, not a general filesystem sandbox.
-[How cancellation, cleanup and evidence fit together →](docs/explanation/reliability.md)
+> [!SUCCESS]
+> After setup, no model server, API process, sandbox helper, or environment
+> process needs to be started separately. `bcode opencode` owns that startup and
+> shutdown boundary.
 
-## Safety and limits
+## Use BoundedCode from any project
 
-Native edits happen in a separate task worktree, with path and policy checks.
-Verification runs repository code under the available sandbox. Evidence is
-stored by content hash. Verification runs in a disposable snapshot (base commit
-plus the task's diff, verification config from the base), not the task
-worktree; the snapshot is **writable**, not immutable.
+After setup, the only command needed for normal use is:
 
-Container mounts, Landlock, and optional bubblewrap provide different
-boundaries. Landlock alone is not complete network isolation. Treat the
-supervisor, runtime, toolchains, and verification configuration as trusted.
+```bash
+cd /path/to/your/project
+bcode opencode
+```
 
-> [!WARNING]
-> The HTTP API has no built-in authentication and should remain on loopback.
+BoundedCode automatically:
 
-The decision plane is a network dependency, so it is also a trust boundary:
-BoundedCode sends a bounded, structured description of your work to a third
-party, and what that description may contain is set by `redact` and enforced by
-the state type, the egress-sensitivity check and a credential scan on every
-field. [What leaves the machine](docs/explanation/judgment-data-flow.md) ·
-[Security boundaries](docs/explanation/trust-boundaries.md) ·
-[Report a vulnerability](SECURITY.md)
+- finds or creates the workspace marker for the current project;
+- creates private per-session OpenCode state and temporary directories;
+- starts the configured local model runtime and supervisor/API services;
+- waits for model and service readiness;
+- registers the BoundedCode MCP tools and supervised agent;
+- selects and prepares the strongest safe sandbox available on the host;
+- launches OpenCode with the model and tools already wired;
+- tears down everything it owns when OpenCode exits.
 
-The current limits include multi-minute reasoning calls, incomplete language
-relationships, manual setup, and no representative success-rate result for
-Bonsai. GPU serialization is local to a `bcode` process; it cannot stop another
-program consuming VRAM. [Full limitations →](docs/explanation/known-limitations.md)
+The explicit spelling `bcode opencode run` remains available for scripts, but
+it has the same lifecycle as the short command. `bcode opencode setup` only
+refreshes project-side registration; it is not a required installation step.
 
-## Contribute
+Arguments after `--` are passed to OpenCode unchanged:
 
-The most useful contributions improve this coherent 8 GB system: reproducible
-hardware reports, real regression tasks, analyzer correctness, verification
-coverage, and installation reliability.
-[Development and contribution guide →](CONTRIBUTING.md)
+```bash
+bcode opencode -- --continue
+```
 
-If you try it on an 8 GB GPU, a report with the exact runtime, checks, timings,
-and failure cases is especially valuable. Star the repository to follow the
-runtime work and upcoming reproducible end-to-end evaluations.
+## Automatic lifecycle
 
-## License and acknowledgements
+```mermaid
+flowchart LR
+    A["bcode opencode"] --> B["Prepare workspace"]
+    B --> C["Start owned services"]
+    C --> D["Validate readiness + context"]
+    D --> E["OpenCode runs"]
+    E --> F["Stop in reverse order"]
+    F --> G["Close storage + remove session state"]
+    G --> H["Idle resource state"]
 
-[Apache-2.0](LICENSE). Built with Go, SQLite, llama.cpp, tree-sitter, compiler
-tooling, Linux sandboxing, and Docker. The reference models come from
-[Prism ML](https://huggingface.co/prism-ml/Ternary-Bonsai-2-27B-gguf) and
-[Qwen](https://huggingface.co/Qwen), and the required hosted judgments from
-[TypeSafe](https://typesafe.ai/).
+    classDef action fill:#eef2ff,stroke:#4f46e5,color:#1e1b4b
+    classDef terminal fill:#ecfdf5,stroke:#059669,color:#064e3b
+    class A,B,C,D,F,G action
+    class E,H terminal
+```
+
+### Automatic cleanup
+
+The session boundary is a lifecycle boundary, not a best-effort convention.
+When OpenCode exits normally, returns an error, or receives an interrupt,
+BoundedCode performs an ordered shutdown:
+
+1. stop the OpenCode process and its descendants;
+2. stop the session broker and remove its bearer capability;
+3. ask the supervisor to stop its model child and other services in reverse
+   dependency order;
+4. terminate the supervisor process group if graceful shutdown exceeds its
+   grace period;
+5. checkpoint and close SQLite storage;
+6. remove the session's XDG state, temporary files, logs, and broker data.
+
+The result is the important part: the LLM process is gone, GPU VRAM is released,
+temporary runtime resources are removed, and BoundedCode-owned CPU and RAM
+consumers stop. The launcher waits for termination rather than merely returning
+to the shell, so a second `bcode opencode` starts from a clean session boundary.
+
+> [!IMPORTANT]
+> A process explicitly configured as **external** is not BoundedCode-owned and
+> is not killed. The supported setup configures an embedded model precisely so
+> the usual workflow has an unambiguous cleanup owner. `bcode doctor` reports
+> the active ownership and isolation layers.
+
+## Maintain with confidence
+
+| Task | Command | What it does |
+|---|---|---|
+| **Update** | `bcode setup` | Preserves the data directory, runs forward-only schema migration, and refreshes generated configuration. |
+| **Reconfigure** | `bcode setup` | Reopens the same guided flow for hardware, model, runtime, or decision-plane changes. |
+| **Inspect** | `bcode config show` · `bcode doctor` | Shows effective settings and a structured health report without repository content. |
+| **Troubleshoot** | `bcode doctor --json` | Produces a machine-readable report suitable for a bug report. |
+
+Keep a backup before an update because downgrades across database schema
+versions are not supported. The [troubleshooting guide](docs/how-to/troubleshooting.md)
+covers missing runtimes, model download failures, sandbox availability, stale
+workspaces, provider health, and interrupted sessions.
+
+### Uninstall
+
+First make sure no BoundedCode session is running. Then remove the executable
+and the data directory you selected during setup:
+
+```bash
+rm -f "$HOME/.local/bin/bcode"
+rm -rf "${BC_DATA:-$HOME/.local/share/boundedcode}"
+```
+
+Removing the data directory deletes workspace indexes, ledgers, evidence, cached
+models, runtime build data, and setup credentials. Export or back up anything
+you need before removing it. Project-side generated files (`opencode.json` and
+the managed `AGENTS.md` block) are left in the repository for review; remove
+only the managed block if you no longer use BoundedCode.
+
+## Documentation
+
+| Start here | Go deeper |
+|---|---|
+| [Setup and daily use](docs/how-to/install.md) | [Architecture](docs/explanation/architecture.md) |
+| [OpenCode integration](docs/how-to/use-with-opencode.md) | [Trust boundaries](docs/explanation/trust-boundaries.md) |
+| [CLI reference](docs/reference/cli.md) | [Verification](docs/explanation/verification.md) |
+| [Storage layout](docs/reference/storage-layout.md) | [Known limitations](docs/explanation/known-limitations.md) |
+
+## Limits & transparency
+
+BoundedCode is pre-1.0. The reference model and hardware have measurements, but
+broad task effectiveness and every language relationship are not equally
+established. A passing verification is evidence, not proof that a change is
+correct. The project reports uncertainty rather than turning it into a
+confidence score.
+
+> [!NOTE]
+> Source and repository state stay local. The hosted decision plane receives
+> only the bounded metadata permitted by its redaction policy; it cannot accept
+> a change or turn a failed verification into a passed one.
+
+## License
+
+[Apache-2.0](LICENSE). Built with Go, SQLite, llama.cpp-compatible runtimes,
+tree-sitter, compiler tooling, and Linux sandboxing. Reference model and
+decision-plane names belong to their respective projects; BoundedCode is not
+affiliated with or endorsed by them.

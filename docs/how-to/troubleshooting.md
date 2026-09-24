@@ -1,181 +1,117 @@
-# Troubleshooting
+# Troubleshooting BoundedCode
 
-**Run `bcode doctor` first.** Most problems here are named directly by it, with
-the fix. Exit status is 0 clean, 1 warnings, 2 failures.
+Start with the setup TUI when installation is incomplete and with `bcode
+doctor` when a configured session fails.
 
-```console
-$ docker exec boundedcode bcode doctor
-$ docker exec boundedcode bcode doctor --deep   # adds a full integrity check
-$ docker exec boundedcode bcode doctor --json   # for a bug report
+```bash
+bcode doctor
+bcode doctor --json
 ```
 
-The JSON output contains no repository content, so it is safe to attach to an
-issue.
+The JSON report contains no repository content and is suitable for a bug
+report. Exit status is `0` for clean, `1` for warnings, and `2` for failures.
 
----
+## Setup does not complete
 
-## The container starts but nothing responds on 7777
+- Read the last TUI step. It names the failed dependency, runtime, model,
+  provider, credential, or validation check.
+- Re-run the same canonical command after fixing it:
 
-Almost always the bind address. Inside the container the API must bind every
-interface, because Docker's port publishing cannot reach a loopback bind there.
-The published port is what restricts exposure.
+  ```bash
+  bcode setup
+  ```
 
-The image sets `BC_API_ADDR=0.0.0.0:7777` for you. If you overrode it:
+- A model download interrupted by a network failure leaves a `.part` file,
+  not a usable model. Re-run setup; the completed file is reused.
+- If the optional Prism build stops, check that you are on Linux x86-64 with
+  Git, CMake, Ninja, `nvcc`, an NVIDIA driver, and enough free disk. Re-run
+  `bcode setup`; the pinned source checkout is reused, while a partial build is
+  never reported as a ready runtime. Use `--install-runtime` only when the
+  build was explicitly authorized.
+- A source checkout with local edits is refused rather than compiled. Restore
+  or remove `$BC_DATA/runtime/src` and rerun setup; setup will fetch the pinned
+  revision again. A failed compute-capability query, an existing runtime build
+  lock, or a non-Linux/x86-64 host is likewise reported before configuration is
+  marked complete.
+- A decision-plane credential is required for task execution. Prefer
+  `TYPESAFE_API_KEY` or the owner-only credential written by the TUI; never
+  put the secret in `bcode.yaml`.
 
-```console
-$ docker exec boundedcode sh -c 'echo $BC_API_ADDR'
-0.0.0.0:7777
+## `bcode opencode` cannot start
+
+1. Confirm setup completed:
+
+   ```bash
+   bcode setup
+   ```
+
+2. Confirm the configured runtime and model are present:
+
+   ```bash
+   bcode config show
+   bcode doctor
+   ```
+
+3. Confirm OpenCode 2 is on `PATH`:
+
+   ```bash
+   opencode --version
+   ```
+
+4. Start from the project directory. The command is intended to be usable from
+   any project and creates the workspace marker on the first run.
+
+## Runtime or model health
+
+`bcode opencode` waits for the supervisor and model readiness endpoint before
+launching OpenCode. A long first start can be normal while a GGUF is loaded.
+If readiness fails, the session supervisor log is removed during cleanup; run
+`bcode doctor` and rerun setup to validate the files. Do not start a second
+copy of the model server to work around a failed session.
+
+## Sandbox unavailable
+
+BoundedCode refuses to start a confined session when no real isolation layer is
+available. `bcode doctor` explains whether Landlock, bubblewrap, or the
+container boundary is active. The explicit `--unconfined` escape hatch is for
+diagnostics only and should not be part of a normal workflow.
+
+A host installation does not gain a container boundary merely because the
+binary is installed. Use a trusted project and read
+[trust boundaries](../explanation/trust-boundaries.md) before weakening
+sandbox settings.
+
+## Workspace or index problems
+
+```bash
+cd /path/to/project
+bcode workspace show
+bcode doctor
+bcode index
 ```
 
-And check you published it correctly — `-p 127.0.0.1:7777:7777`, not `-p 7777`.
+If a workspace was moved, use `bcode workspace adopt`; do not delete its
+`.bc/workspace.yaml` pin unless you intend to create a new workspace. If a
+session was interrupted, use `bcode task recover` before retrying a task.
 
-## `/data is not writable by uid 10001`
+## OpenCode tools are missing
 
-A fresh named volume is created owned by root; the container is not root.
+Run `bcode opencode` again from the project root. Setup merges the BoundedCode
+MCP entry into `opencode.json` and refreshes the managed `AGENTS.md` block
+without replacing unrelated settings. An existing `opencode.jsonc` is refused
+because comments cannot be safely rewritten; merge the printed block by hand.
 
-```console
-$ docker run --rm -v bc-data:/data alpine chown -R 10001:10001 /data
-```
+## Resource usage after exit
 
-Or run as yourself: `--user "$(id -u):$(id -g)"`.
-
-## `data directory … is on overlayfs`
-
-You did not mount a volume. Everything would be lost when the container is
-removed, and SQLite's durability guarantees would not hold. This is a failure,
-not a warning.
-
-```console
-$ docker run -d -v bc-data:/data …
-```
-
-Network shares (NFS, SMB, sshfs) fail for a different reason: SQLite's locking
-is unreliable on them.
-
-## `bubblewrap … No permissions to create new namespace`
-
-Expected, and not a problem. Unprivileged user namespaces are usually
-unavailable inside a container, so the optional third isolation layer is off.
-You still have the container boundary and per-task Landlock rules.
-
-What you lose: concurrent tasks can see each other's processes.
-
-To enable it anyway:
-
-```console
-$ docker run --security-opt seccomp=unconfined --security-opt apparmor=unconfined …
-```
-
-That weakens the container's own restrictions, so it is a trade, not a
-straight win. On an Ubuntu host, `kernel.apparmor_restrict_unprivileged_userns`
-is 1 by default and blocks this even outside a container.
-
-## `landlock … probe failed`
-
-The runtime's seccomp profile is blocking the three Landlock syscalls. Docker's
-default profile permits them. If yours does not, layer 2 is unavailable and
-`bcode doctor` says so rather than pretending otherwise.
-
-```console
-$ docker exec boundedcode bcode doctor --json | jq '.checks[] | select(.name|contains("landlock"))'
-```
-
-## `network containment` always warns
-
-By design. Landlock's TCP rules do not cover Multipath TCP sockets, and Go's
-`net.Listen` uses MPTCP by default, so a sandboxed Go program can still listen
-on an unlisted port. The port rules are augmentation; **the container's network
-configuration is the boundary** — run with `--network none` plus an
-in-container inference route, or on a user-defined bridge that reaches only
-your inference endpoint. The warning is permanent so nobody builds a guarantee
-on top of the port rules alone.
-
-## `egress refused: <host> is not in the deps lane's allowlist`
-
-The §6.1 proxy did its job. Add the host to `egress.allowlist` in `bcode.yaml`
-with a `why`, or decide you did not want that fetch. The reason field is
-required precisely so that this decision is legible later.
-
-A refusal is logged by the supervisor as `egress refused` with the host, the
-lane and the reason — check there first when a fetch fails in a way that looks
-like DNS.
-
-## `no .bc/workspace.yaml found`
-
-You are not inside a workspace.
-
-```console
-$ cd /work/myproject && bcode workspace init
-```
-
-## The workspace id changed after I moved the directory
-
-It should not have, if `.bc/workspace.yaml` is committed. That file pins the
-id. If it is present and you moved the directory:
-
-```console
-$ bcode workspace adopt
-workspace … re-bound
-  was: /old/path
-  now: /new/path
-```
-
-The id never changes; adopt only refreshes the recorded derivation. If the file
-was *absent*, `bcode workspace init` created a genuinely new workspace, which is
-the documented behaviour — moving without the pin means "this is a new
-project".
-
-## `… belongs to workspace X but was opened as Y`
-
-A database file is in the wrong workspace directory — usually a backup restored
-into the wrong place. This is the isolation contract working: the file carries
-the id of the workspace that created it, and serving you another project's code
-would be worse than failing.
-
-Restore into the right workspace, or re-index from scratch.
-
-## Retrieval is missing something I expected
-
-Look at what it actually returned before raising the packet budget:
-
-```console
-$ bcode graph search "the symbol you expected" --expand 2 --json
-```
-
-Check the index is current:
-
-```console
-$ bcode doctor --json | jq '.checks[] | select(.name=="index freshness")'
-$ bcode index
-```
-
-If the symbol is indexed but not retrieved, that is a retrieval problem, not a
-budget problem, and a bigger packet costs prefill time on every step without
-fixing it.
-
-## Impact analysis reports fewer consumers than I expect
-
-The report is a lower bound and says so. A missing edge means the analysis did
-not discover the relationship — dynamic dispatch, reflection, generated code,
-string-built SQL, a language with no analyzer yet. Consumers reached by
-`inferred` or `unknown` evidence *are* included and labelled; they are never
-filtered out.
-
-```console
-$ bcode graph impact MySymbol --change signature --json | jq '.consumers[].evidence'
-```
-
-## A task will not resume after a crash
-
-```console
-$ bcode task recover
-```
-
-`safe: false` means an operation was partially applied and the worktree needs a
-human look before anything replays. That is deliberate: replaying an edit whose
-outcome is uncertain is how a half-applied change becomes a corrupted one.
+A normal `bcode opencode` session owns its model, API, broker, and temporary
+state and removes them before returning. If a process remains, first determine
+whether it was launched through this command. A process configured as an
+external inference endpoint is intentionally not owned. For a suspected stale
+session, stop the editor, rerun `bcode doctor`, and include the JSON report and
+`bcode version` in an issue.
 
 ## Still stuck
 
-Open an issue with `bcode doctor --json`, `bcode version`, the image digest, and what
-you expected. See [SUPPORT.md](https://github.com/akynte/boundedcode/blob/main/SUPPORT.md).
+Include `bcode version`, `bcode doctor --json`, the selected data-directory
+path, the runtime revision, and the exact command you ran. Do not attach model
+files, credentials, or repository source.

@@ -10,6 +10,7 @@ import (
 	"github.com/akynte/boundedcode/internal/recipe"
 	"github.com/akynte/boundedcode/internal/session"
 	"github.com/akynte/boundedcode/internal/supervisor"
+	"github.com/akynte/boundedcode/internal/task"
 	"github.com/akynte/boundedcode/internal/workspace"
 )
 
@@ -80,5 +81,45 @@ func TestBrokerPinsWorkspaceAndPrompt(t *testing.T) {
 	body, err = brokerCall(ctx, brokerRequest{Kind: "context", Session: "ses_unbound"})
 	if err != nil || strings.Contains(body, otherTask.Title) {
 		t.Fatalf("cross-workspace state exposed: %q %v", body, err)
+	}
+}
+
+func TestBrokerOwnsTheWorkerGenerationBudget(t *testing.T) {
+	ctx := context.Background()
+	repo := t.TempDir()
+	if err := os.WriteFile(filepath.Join(repo, "go.mod"), []byte("module x\n\ngo 1.26\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := workspace.Init(repo, workspace.InitOptions{Name: "budget"}); err != nil {
+		t.Fatal(err)
+	}
+	s, err := session.Open(ctx, t.TempDir(), repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	taskInfo := task.Task{
+		ID: "oc-budget", Title: "bounded worker", Kind: "supervised", Verification: recipe.Standard,
+		Budget: task.Budget{MaxGenerationRequests: 1, MaxWallTime: 0},
+	}
+	if err := task.NewStore(s.Store).Create(ctx, taskInfo); err != nil {
+		t.Fatal(err)
+	}
+	if err := supervisor.RecordEvent(ctx, s.Store, taskInfo.ID, "session_start", map[string]any{
+		"executor": "opencode", "phase": "EDITOR", "session_id": "ses_budget",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	socket, stop, err := startOpenCodeBroker(ctx, s.Store, s.Root.Layout().Root(), repo, t.TempDir(), "/bin/false")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stop()
+	t.Setenv(brokerEnv, socket)
+	if _, err := brokerCall(ctx, brokerRequest{Kind: "authorize", Session: "ses_budget", Model: "test-model"}); err != nil {
+		t.Fatalf("first bounded worker request was refused: %v", err)
+	}
+	if _, err := brokerCall(ctx, brokerRequest{Kind: "authorize", Session: "ses_budget", Model: "test-model"}); err == nil || !strings.Contains(err.Error(), "exhausted") {
+		t.Fatalf("worker exceeded supervisor budget: %v", err)
 	}
 }

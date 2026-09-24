@@ -223,13 +223,18 @@ func (s *Store) TaskDirs() (TaskDirs, error) {
 // Only paths inside this workspace are created; anything else is left alone,
 // so a caller cannot use this to reach outside its own directory.
 func (s *Store) EnsureSandboxDirs(paths []string) error {
-	root := s.Dir()
+	root := filepath.Clean(s.Dir())
 	for _, p := range paths {
-		if p == "" || !strings.HasPrefix(filepath.Clean(p), root) {
+		if p == "" {
 			continue
 		}
-		if err := os.MkdirAll(p, 0o750); err != nil {
-			return fmt.Errorf("store: create %s: %w", p, err)
+		clean := filepath.Clean(p)
+		rel, err := filepath.Rel(root, clean)
+		if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) || filepath.IsAbs(rel) {
+			continue
+		}
+		if err := os.MkdirAll(clean, 0o750); err != nil {
+			return fmt.Errorf("store: create %s: %w", clean, err)
 		}
 	}
 	return nil

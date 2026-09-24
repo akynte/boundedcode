@@ -34,6 +34,10 @@ const (
 	KindApproval     Kind = "approval"
 	KindSessionStart Kind = "session_start"
 	KindSessionEnd   Kind = "session_end"
+	// KindGeneration records one supervisor-authorized generative worker request.
+	// It is distinct from a tool operation: the request can fail before it
+	// produces a proposal, and the supervisor still owns the budget either way.
+	KindGeneration Kind = "generation"
 	// KindMemory records typed claims and evidence references. A model hypothesis
 	// remains a hypothesis even when later context cards are reconstructed.
 	KindMemory Kind = "memory"
@@ -50,7 +54,7 @@ const (
 func AllKinds() []Kind {
 	return []Kind{KindInspectFile, KindSearch, KindRetrieval, KindDecision, KindEdit,
 		KindRecipeRun, KindReview, KindCheckpoint, KindApproval, KindSessionStart, KindSessionEnd,
-		KindJudgment, KindMemory}
+		KindJudgment, KindMemory, KindGeneration}
 }
 
 // Ledger is the journal for one workspace.

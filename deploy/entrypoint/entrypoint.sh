@@ -48,8 +48,8 @@ if [ "${BC_SKIP_PREFLIGHT:-0}" != "1" ]; then
 fi
 
 if [ ! -f "$BC_DATA/config/bcode.yaml" ]; then
-  log "no configuration found; writing defaults to $BC_DATA/config"
-  bcode config init >/dev/null
+  log "no guided setup found; run 'bcode setup' in the mounted data directory before starting this service"
+  exit 1
 fi
 
 log "starting: bcode $*"

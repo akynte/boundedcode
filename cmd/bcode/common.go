@@ -17,7 +17,8 @@ import (
 	"github.com/akynte/boundedcode/internal/workspace"
 )
 
-// openRoot opens the data directory named by --data, $BC_DATA, or /data.
+// openRoot opens the data directory named by --data, $BC_DATA, or the
+// platform default (the user-local data root on a host, /data in a container).
 func openRoot() (*store.Root, error) {
 	return store.OpenRoot(g.dataDir)
 }

@@ -49,7 +49,8 @@ const globalToolGuidance = globalBegin + "\n" +
 	"## Tool execution (BoundedCode)\n\n" +
 	"- OpenCode's `execute` tool runs JavaScript in Code Mode to call and combine tools. It is not a shell, Python, Go, or SQL runtime. Follow its JavaScript interface when using it.\n" +
 	"- Code Mode's JavaScript is a restricted sandbox, not Node.js: there is no `require`, no `import`/`import()`, no filesystem or process access, and no npm packages. The only things available inside `execute` are the tool functions its own `search()` catalog returns, plus plain JS built-ins (Array, Object, Math, JSON, Date, RegExp, Map, Set, URL, plain and async functions, standard control flow, `await`). If `execute` answers `ReferenceError: Unknown identifier 'require'` (or `import`), the fix is to delete that line and call the tool function directly — never to look for a different way to import something.\n" +
-	"- Use OpenCode's `shell` tool for host commands and language runtimes. Check whether optional command-line tools are installed before relying on them; a missing CLI does not mean the application library is missing.\n" +
+	"- In a BoundedCode-supervised OpenCode session, use only the `boundedcode_bc_*` tools for repository reads, edits, verification and task state. OpenCode's shell, direct file tools and network tools are denied; a model request is only a proposal until the BoundedCode supervisor authorizes it.\n" +
+	"- Outside a `bcode opencode` session (or its explicit `run` alias), do not assume BoundedCode supervision is present; use the managed entry point before changing code.\n" +
 	"- When a tool call fails, read the error and retry with a tool that supports the required language or operation. Do not treat one tool error as a disconnected session, and provide a concise final answer after completing the work.\n" +
 	globalEnd + "\n"
 
@@ -100,9 +101,10 @@ func Render(f Facts) string {
 		"send the user a concise final answer; reasoning without a final response is not a result.\n\n")
 
 	b.WriteString("Any task that changes code runs under supervision: open it with " +
-		"`bc_task_start`, do the work with your own tools, ask the user anything you cannot " +
-		"safely infer, then `bc_verify` and `bc_task_finish`. You edit and you talk to the " +
-		"user; BoundedCode records what happened and judges the result.\n\n")
+		"`bc_task_start`, use the task-bound `bc_read` and `bc_edit` tools to work inside the " +
+		"authoritative task worktree, then `bc_verify` and `bc_task_finish`. You propose the next " +
+		"operation; BoundedCode authorizes it, records it, and decides whether the task may continue " +
+		"or finish. You do not complete, retry, route, or verify a task by saying so in conversation.\n\n")
 	b.WriteString("Prefer these over text search when the question is structural, because they " +
 		"answer from the type checker instead of from string matching:\n\n")
 	b.WriteString("- **`bc_graph_impact`** before changing any signature, exported name or schema. " +
@@ -117,8 +119,8 @@ func Render(f Facts) string {
 		"Include the user's explicit requirements in `requirements`, verbatim acceptance criteria in " +
 		"`acceptance_criteria`, scope or security limits in `constraints`, and anything the user " +
 		"explicitly ruled out in `non_goals`; these survive OpenCode compaction and session recreation. " +
-		"It opens a supervised task, journals the intent before the work, and tells you which " +
-		"paths this repository protects — which is cheaper to learn before editing than after.\n")
+		"It creates the task's authoritative Git worktree, records the initial candidate, and tells you " +
+		"which paths this repository protects.\n")
 	b.WriteString("- **`bc_task_resume`** when a new OpenCode session must continue one of several " +
 		"active supervised tasks. Pass the existing task id; the supervisor binds this session " +
 		"to its durable objective, requirements, decisions and verification.\n")
@@ -147,12 +149,12 @@ func Render(f Facts) string {
 		"infer from the codebase — a business rule, an architectural choice, a limit. Pass the " +
 		"task id and record the rationale when the user gave one. The answer and its rationale " +
 		"become part of this project's record instead of being lost with the conversation.\n")
-	b.WriteString("- **`bc_task_finish`** once verification is ACCEPTED. It produces the final " +
-		"review — what was asked, what the user decided, which files changed, what was checked " +
-		"— and you should show that to the user. No approval is needed: the change is already " +
-		"in the working tree and `git diff` is the authoritative view of it.\n")
+	b.WriteString("- **`bc_task_finish`** once verification is ACCEPTED. It asks the BoundedCode " +
+		"supervisor to re-evaluate the current candidate and completion contract; only that " +
+		"evaluation can persist a terminal success. The final review names the task worktree, " +
+		"candidate and evidence, and is safe to show to the user.\n")
 	b.WriteString("- **`bc_read`** and **`bc_edit`** to read and change files when the session " +
-		"was started by `bcode opencode run`. That session runs with the editor's own read and " +
+		"was started by `bcode opencode` (or its explicit `run` alias). That session runs with the editor's own read and " +
 		"edit tools denied, because these apply the repository's path policy: secrets are " +
 		"refused rather than returned, generated files are refused with the generator to run " +
 		"instead, and a write outside the scope the task declared is refused rather than found " +
@@ -256,7 +258,7 @@ func applyManagedBlock(path, begin, end, block string, mode os.FileMode) (string
 	if updated == string(existing) {
 		return path, false, nil
 	}
-	if err := os.WriteFile(path, []byte(updated), mode); err != nil { //nolint:gosec // instructions are read by OpenCode
+	if err := writeAtomic(path, []byte(updated), mode); err != nil { //nolint:gosec // instructions are read by OpenCode
 		return path, false, err
 	}
 	return path, true, nil

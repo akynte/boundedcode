@@ -33,10 +33,25 @@ type Session struct {
 	Binary string
 	// Repo is the worktree root: the only writable repository path.
 	Repo string
-	// StateDir is this workspace's private XDG home, so one workspace's
-	// session never reads another's history, credentials or caches (§2.2).
+	// StateDir is the session's private HOME/config/cache root. It is
+	// ephemeral; callers that want durable OpenCode data and state should set
+	// DataHome and StateHome below.
 	StateDir string
-	// TmpDir is the per-workspace tmp the sandbox exposes as the only tmp.
+	// HomeDir optionally overrides the HOME location. It defaults to StateDir
+	// for compatibility with older callers.
+	HomeDir string
+	// DataHome and StateHome are the workspace-persistent XDG locations.
+	// Keeping them outside StateDir preserves conversations and budget state
+	// across sessions without making credentials or temporary files durable.
+	DataHome  string
+	StateHome string
+	// ControlDir holds the broker capability and bcode shim. It is readable
+	// and executable by OpenCode but deliberately not writable.
+	ControlDir string
+	// PluginDir is the installed context adapter. It is read-only to the
+	// editor process even though it lives under persistent workspace state.
+	PluginDir string
+	// TmpDir is the session tmp the sandbox exposes as the only tmp.
 	TmpDir string
 	// BrokerCapability authenticates access to this run's workspace-pinned
 	// loopback supervisor, without exposing the ledger data root.
@@ -68,7 +83,18 @@ func (s Session) Confine(base sandbox.Spec) (sandbox.Spec, error) {
 	// /dev/null is written to constantly. Without them an interpreted runtime
 	// does not report a denied open — it faults, which reads as the
 	// interpreter being broken rather than as a missing grant.
-	write := append([]string{s.Repo, s.StateDir, s.TmpDir}, base.ReadWrite...)
+	//
+	// Do not copy base.ReadWrite wholesale here. That set belongs to the
+	// supervisor's task workers and includes every task worktree. The editor
+	// reaches task worktrees through the broker's authorized tools, so granting
+	// them directly would turn a convenience path into a boundary bypass.
+	write := []string{s.Repo, s.homeDir(), s.TmpDir}
+	if s.DataHome != "" {
+		write = append(write, s.DataHome)
+	}
+	if s.StateHome != "" {
+		write = append(write, s.StateHome)
+	}
 	spec.ReadWrite = dedupe(append(write, recipe.DeviceFiles()...))
 
 	// The interpreter's own tree has to be readable or the exec fails with the
@@ -78,6 +104,12 @@ func (s Session) Confine(base sandbox.Spec) (sandbox.Spec, error) {
 	read := append([]string(nil), base.ReadOnly...)
 	read = append(read, installRoots(s.Binary)...)
 	read = append(read, runtimeReadPaths...)
+	if s.PluginDir != "" {
+		read = append(read, s.PluginDir)
+	}
+	if s.ControlDir != "" {
+		read = append(read, s.ControlDir)
+	}
 	if self, err := os.Executable(); err == nil {
 		// `bcode mcp` is started by the session over stdio: the supervisor's tools
 		// are reachable from inside the sandbox, and are the only route to a
@@ -99,16 +131,25 @@ func (s Session) Confine(base sandbox.Spec) (sandbox.Spec, error) {
 // only about variables the session then does without, which is a bug report
 // rather than a disclosure.
 func (s Session) Env() []string {
+	home := s.homeDir()
+	dataHome := s.DataHome
+	if dataHome == "" {
+		dataHome = filepath.Join(home, "data")
+	}
+	stateHome := s.StateHome
+	if stateHome == "" {
+		stateHome = filepath.Join(home, "state")
+	}
 	env := []string{
-		"HOME=" + s.StateDir,
+		"HOME=" + home,
 		"TMPDIR=" + s.TmpDir,
-		// OpenCode resolves its config, sessions, logs and credential store
-		// through these. Pointing them at the workspace's own directory is
-		// what keeps two workspaces' sessions apart (§2.2, §13).
-		"XDG_CONFIG_HOME=" + filepath.Join(s.StateDir, "config"),
-		"XDG_DATA_HOME=" + filepath.Join(s.StateDir, "data"),
-		"XDG_STATE_HOME=" + filepath.Join(s.StateDir, "state"),
-		"XDG_CACHE_HOME=" + filepath.Join(s.StateDir, "cache"),
+		// OpenCode's durable data/state live under the workspace. Its home,
+		// config and cache are ephemeral for this session, so credentials and
+		// temporary artifacts do not become the next session's history.
+		"XDG_CONFIG_HOME=" + filepath.Join(home, "config"),
+		"XDG_DATA_HOME=" + dataHome,
+		"XDG_STATE_HOME=" + stateHome,
+		"XDG_CACHE_HOME=" + filepath.Join(home, "cache"),
 	}
 	if s.BrokerCapability != "" {
 		env = append(env, "BC_OPENCODE_BROKER_CAPABILITY="+s.BrokerCapability)
@@ -127,6 +168,13 @@ func (s Session) Env() []string {
 		}
 	}
 	return env
+}
+
+func (s Session) homeDir() string {
+	if s.HomeDir != "" {
+		return s.HomeDir
+	}
+	return s.StateDir
 }
 
 // runtimeReadPaths are what a managed runtime reads about itself and the

@@ -109,8 +109,10 @@ type supervised struct {
 	spec   Child
 	status Status
 
-	mu  sync.Mutex
-	cmd *exec.Cmd
+	mu      sync.Mutex
+	cmd     *exec.Cmd
+	done    chan struct{}
+	waitErr error
 }
 
 // New builds a manager. logf may be nil.
@@ -257,21 +259,31 @@ func (m *Manager) runOnce(ctx context.Context, s *supervised) error {
 		cmd.SysProcAttr = &syscall.SysProcAttr{}
 	}
 	cmd.SysProcAttr.Setpgid = true
+	setParentDeathSignal(cmd)
 
 	if err := cmd.Start(); err != nil {
 		m.setState(s, StateStarting, err)
 		return err
 	}
+	done := make(chan struct{})
 	s.mu.Lock()
 	s.cmd = cmd
+	s.done = done
+	s.waitErr = nil
 	s.mu.Unlock()
 
 	m.mu.Lock()
 	s.status.PID = cmd.Process.Pid
 	m.mu.Unlock()
 
-	done := make(chan error, 1)
-	go func() { done <- cmd.Wait() }()
+	go func() {
+		err := cmd.Wait()
+		s.mu.Lock()
+		s.waitErr = err
+		s.cmd = nil
+		s.mu.Unlock()
+		close(done)
+	}()
 
 	if err := m.waitReady(ctx, s, done); err != nil {
 		m.stopChild(s)
@@ -288,9 +300,9 @@ func (m *Manager) runOnce(ctx context.Context, s *supervised) error {
 			m.stopChild(s)
 			<-done
 			return ctx.Err()
-		case err := <-done:
-			m.setState(s, StateStopped, err)
-			return err
+		case <-done:
+			m.setState(s, StateStopped, s.waitError())
+			return s.waitError()
 		case <-ticker.C:
 			if s.spec.Health == nil {
 				continue
@@ -307,7 +319,7 @@ func (m *Manager) runOnce(ctx context.Context, s *supervised) error {
 	}
 }
 
-func (m *Manager) waitReady(ctx context.Context, s *supervised, exited <-chan error) error {
+func (m *Manager) waitReady(ctx context.Context, s *supervised, exited <-chan struct{}) error {
 	if s.spec.Health == nil {
 		m.setState(s, StateReady, nil)
 		return nil
@@ -321,8 +333,8 @@ func (m *Manager) waitReady(ctx context.Context, s *supervised, exited <-chan er
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case err := <-exited:
-			return fmt.Errorf("procman: child %s exited before becoming ready: %w", s.spec.Name, err)
+		case <-exited:
+			return fmt.Errorf("procman: child %s exited before becoming ready: %w", s.spec.Name, s.waitError())
 		case <-deadline:
 			return fmt.Errorf("procman: child %s did not become ready within %s (last probe: %w)",
 				s.spec.Name, s.spec.StartTimeout, last)
@@ -336,6 +348,12 @@ func (m *Manager) waitReady(ctx context.Context, s *supervised, exited <-chan er
 			}
 		}
 	}
+}
+
+func (s *supervised) waitError() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.waitErr
 }
 
 // stopChild signals the child's process group, then escalates after the grace
@@ -352,12 +370,13 @@ func (m *Manager) stopChild(s *supervised) {
 	pgid := -cmd.Process.Pid // negative pid signals the whole group
 	_ = syscall.Kill(pgid, s.spec.StopSignal)
 
-	deadline := time.After(s.spec.StopGrace)
+	deadline := time.NewTimer(s.spec.StopGrace)
+	defer deadline.Stop()
 	tick := time.NewTicker(100 * time.Millisecond)
 	defer tick.Stop()
 	for {
 		select {
-		case <-deadline:
+		case <-deadline.C:
 			m.logf("procman: child %s did not exit within %s; sending SIGKILL", s.spec.Name, s.spec.StopGrace)
 			_ = syscall.Kill(pgid, syscall.SIGKILL)
 			return

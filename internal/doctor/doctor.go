@@ -118,9 +118,9 @@ func checkContainer() Check {
 		Name:   "container boundary (DR-3 layer 1)",
 		Level:  Warn,
 		Detail: why,
-		Fix: "The documented default is a container (§4.1). Host installs are supported for development " +
-			"via scripts/install-bare-metal.sh (§13), but the host-isolation guarantees of §6.2 rest on " +
-			"layer 1 and do not apply without it: nothing bounds the supervisor to the repositories you meant.",
+		Fix: "The documented default is a container (§4.1). A host installation is supported for " +
+			"development, but the host-isolation guarantees of §6.2 rest on layer 1 and do not " +
+			"apply without it: nothing bounds the supervisor to the repositories you meant.",
 	}
 }
 

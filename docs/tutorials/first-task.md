@@ -4,8 +4,8 @@ Run a bounded change against a disposable copy of the included payment service.
 This exercise demonstrates setup and the task lifecycle; its outcome depends on
 the model and is not a benchmark result.
 
-Complete the [8 GB installation](../how-to/install.md) first. Keep the local
-Bonsai server running, and use the same `BC_DATA` and `PATH` in both terminals.
+Complete [`bcode setup`](../how-to/install.md) first. The TUI prepares the local
+runtime; you do not need to keep a model server running in another terminal.
 
 ## Prepare a disposable repository
 

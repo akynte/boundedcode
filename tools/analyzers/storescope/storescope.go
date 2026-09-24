@@ -49,6 +49,22 @@ var exemptions = map[string]string{
 	"internal/config": "writes operator configuration under /data/config",
 	// Writes providers.yaml through the same operator-configuration path.
 	"internal/llm": "writes operator provider configuration",
+	// Owns the one-time installation/configuration state under BC_DATA:
+	// generated operator config, credentials, downloaded models, and the
+	// optional pinned runtime checkout/build. None of these paths is workspace
+	// state; they are installation inputs shared by later sessions.
+	"internal/setup": "writes installation data and the optional runtime build outside workspaces",
+	// Owns the ephemeral OpenCode session directory and supervisor log. The
+	// path is derived from the workspace store and is removed on every exit;
+	// persistent OpenCode data/state remain separate.
+	"internal/session": "creates and removes private per-session runtime state",
+	// Owns the verifier signing key under the data root's key directory. The
+	// key is deliberately outside every workspace and is created before a
+	// workspace store exists, so it cannot be routed through a workspace API.
+	"internal/attest": "owns the data-root verifier signing key",
+	// Evaluation fixtures and judge workspaces are scratch data outside any
+	// workspace and are removed after each candidate run.
+	"internal/judgebench": "owns evaluation scratch fixtures and judge workspaces",
 	// Manages git checkouts of the user's own code. Every path it touches is
 	// inside a worktree whose location internal/store chose, and a checkout is
 	// source being edited rather than workspace state — which is what this
@@ -75,7 +91,7 @@ var exemptions = map[string]string{
 	// somewhere the editor does not look — the same reasoning as the identity
 	// pin and the memory notes. Both writes are to paths derived from a
 	// workspace root, never from a caller-supplied string.
-	"internal/opencode": "writes the repository's AGENTS.md and editor configuration",
+	"internal/opencode": "writes the repository's AGENTS.md/editor configuration and private per-session capability state",
 	// Writes notes under `.bc/memory/` inside the user's repository. §2.2
 	// places them there on purpose so they travel with the repository, which
 	// makes them repository files rather than data-directory state — the same

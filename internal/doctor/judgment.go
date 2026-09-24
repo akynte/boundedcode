@@ -60,7 +60,7 @@ func checkJudgment(ctx context.Context, cfg *config.Config, configDir string) Ch
 			Detail: "disabled: the decision plane is a required runtime component, so " +
 				"`bcode task run` will refuse to start. No question about your code leaves " +
 				"this machine in this state, and no task runs either",
-			Fix: fmt.Sprintf("Run scripts/configure-judgment.sh, or set enabled: true in %s and "+
+			Fix: fmt.Sprintf("Run `bcode setup` to configure the decision plane, or set enabled: true in %s and "+
 				"export the credential. Every other command works without it, including this one.",
 				judgment.ConfigFile)}
 	}
@@ -74,8 +74,8 @@ func checkJudgment(ctx context.Context, cfg *config.Config, configDir string) Ch
 		return Check{Name: name, Level: Fail,
 			Detail: detail + fmt.Sprintf("; %s is unset, so no judgment can be requested and "+
 				"`bcode task run` will refuse to start", jcfg.APIKeyEnv),
-			Fix: fmt.Sprintf("Run scripts/configure-judgment.sh to store the key in an owner-only "+
-				"shell environment file, or export %s in this shell. Never put it in judgment.yaml.",
+			Fix: fmt.Sprintf("Run `bcode setup` to store the key in an owner-only "+
+				"credential file, or export %s in this shell. Never put it in judgment.yaml.",
 				jcfg.APIKeyEnv)}
 	}
 

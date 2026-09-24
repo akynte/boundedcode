@@ -62,6 +62,10 @@ func OpenCodeContext(ctx context.Context, st *store.Store, repoRoot, sessionID s
 	if err != nil {
 		return "", err
 	}
+	candidateRoot := repoRoot
+	if wt, wtErr := TaskWorktree(ctx, st, taskID); wtErr == nil {
+		candidateRoot = wt.Path
+	}
 	// Only a recent page is needed for the hot context; the ledger retains
 	// older decisions for bc_task_history.
 	var decisionCount int
@@ -92,12 +96,16 @@ func OpenCodeContext(ctx context.Context, st *store.Store, repoRoot, sessionID s
 	var b strings.Builder
 	fmt.Fprintf(&b, "BoundedCode authoritative task state (task %s; %s).\n", t.ID, t.State)
 	fmt.Fprintf(&b, "Current phase: %s\n", phase)
+	fmt.Fprintf(&b, "Authoritative task worktree: %s\n", candidateRoot)
 	if candidate == "" {
 		b.WriteString("Current candidate: not recorded; no controlled edit or verification has run yet.\n")
 	} else {
 		fmt.Fprintf(&b, "Current candidate last recorded by BoundedCode: %s (recompute/reverify after any checkout change).\n", candidate)
 	}
 	fmt.Fprintf(&b, "Verification level: %s (required checks: %s)\n", t.Verification, requiredChecks(t.Verification))
+	if used, limit, budgetErr := WorkerGenerationUsage(ctx, st, taskID); budgetErr == nil {
+		fmt.Fprintf(&b, "Supervisor worker-generation budget: %d/%d authorized requests used\n", used, limit)
+	}
 	fmt.Fprintf(&b, "Original objective: %s\n", boundedText(t.Title, 1500))
 	var promptHash string
 	_ = st.Ledger().SQL().QueryRowContext(ctx, `SELECT json_extract(intent,'$.original_prompt_hash') FROM operations WHERE task_id=? AND kind='session_start' AND json_extract(intent,'$.original_prompt_hash') != '' ORDER BY id LIMIT 1`, taskID).Scan(&promptHash)
@@ -198,7 +206,7 @@ func OpenCodeContext(ctx context.Context, st *store.Store, repoRoot, sessionID s
 	if shown < decisionCount {
 		fmt.Fprintf(&b, "%d earlier user decisions remain in the task ledger. Call bc_task_history with task_id=%s to retrieve them.\n", decisionCount-shown, t.ID)
 	}
-	if changed, err := changedFiles(ctx, repoRoot); err == nil && len(changed) > 0 {
+	if changed, err := changedFiles(ctx, candidateRoot); err == nil && len(changed) > 0 {
 		const maxChangedBytes = 2000
 		var listed []string
 		used := 0

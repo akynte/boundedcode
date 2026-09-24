@@ -1,13 +1,18 @@
 # Storage layout
 
 ```
-/data/
+# host default: ~/.local/share/boundedcode/
+# container default: /data/
   config/
     bcode.yaml            supervisor configuration
     providers.yaml     providers and role routing
     profiles/          profiles you generated (shipped ones are embedded)
     policies/
   models/              GGUF files, or a bind mount to an existing directory
+  runtime/             optional pinned Prism source and CUDA llama-server build
+    src/               pinned checkout (local edits are refused)
+    build/             CMake output (`bin/llama-server` or `llama-server`)
+    .install.lock/     transient single-builder lock; not a session process
   workspaces/<workspace_id>/
     workspace.json     the data-side record: name, root, last opened
     index.db           files, nodes, edges, chunks, FTS, embeddings, index keys
@@ -15,16 +20,32 @@
     telemetry.db       events, GPU samples
     artifacts/<xx>/<hash>   content-addressed evidence, read-only once written
     cache/analysis/    keyed by workspace and content manifest
-    opencode/          the engine's XDG data, config and cache
+    opencode/
+      data/             persistent OpenCode XDG data and conversations
+      state/            persistent OpenCode state and request budget
+      opencode-plugin/  installed context adapter, read-only to the editor
+      sessions/<id>/
+        home/           ephemeral HOME/config/cache
+        control/        broker capability and bcode shim, read-only to editor
+        tmp/            ephemeral session temporary files
     slots/             saved prompt-cache slots, cleared on workspace switch
-    tmp/               wiped at task end; the only tmp a sandboxed task sees
+    tmp/               task temporary files, wiped at task end
   backups/<timestamp>/<workspace_id>/{index,ledger,telemetry}.db
   keys/                    verifier signing key (0700; private key 0600) and its public half
   provisioning/<lane>/     §6.1 lane caches: go-mod, go-build, tmp
   telemetry-aggregate.db   §2.2's optional cross-workspace counters
 ```
 
-## The things outside a workspace directory
+## OpenCode session state
+
+A managed `bcode opencode` session keeps durable OpenCode data and state under
+`opencode/data` and `opencode/state`, so a later session can continue the same
+workspace. It creates a new `opencode/sessions/<id>` directory for HOME,
+configuration, cache, temporary files, the broker capability, and the private
+`bcode` shim. The session directory is removed on every exit path; the
+persistent data/state directories are retained. The control and plugin paths
+are readable/executable but not writable by the editor.
+
 
 Everything above is per workspace except `config/`, `models/`, and these,
 and each is outside for a stated reason rather than by omission.

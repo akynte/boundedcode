@@ -1,9 +1,10 @@
 # Configuration reference
 
 Configuration lives under `$BC_DATA/config` (`/data/config` when `BC_DATA` is
-unset). Run `bcode config init` to create initial files and `bcode config show` to
-inspect effective settings. Initialization does not install weights or select
-the Bonsai profile: use the [reference install](../how-to/install.md).
+unset). The supported way to create and validate it is the
+[`bcode setup` TUI](../how-to/install.md). Use `bcode config show` to inspect
+effective settings after setup; the low-level `config` commands are for
+inspection and advanced maintenance, not a second installation flow.
 
 | File | Responsibility |
 |---|---|

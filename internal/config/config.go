@@ -173,7 +173,7 @@ type IndexConfig struct {
 }
 
 // DefaultExcludes are the directories the indexer prunes. They are here
-// rather than only in internal/index so that `bcode config init` writes them into
+// rather than only in internal/index so that `bcode setup` writes them into
 // bcode.yaml, where an operator can see and change them.
 func DefaultExcludes() []string {
 	return []string{
@@ -212,7 +212,7 @@ func Default() Config {
 		},
 		Egress: EgressConfig{
 			// Off by default: see EgressConfig. The ports and the allowlist
-			// are written anyway so `bcode config init` produces a file an
+			// are written anyway so `bcode setup` produces a file an
 			// operator can read and enable, rather than one that hides the
 			// feature until they find the documentation.
 			Enabled:   false,
@@ -344,11 +344,29 @@ func Save(configDir string, cfg Config) error {
 	}
 	header := "# boundedcode configuration. See docs/reference/configuration.md.\n" +
 		"# Values here are defaults; per-hardware tuning belongs in the active profile (§9.2).\n"
-	tmp := Path(configDir) + ".tmp"
-	if err := os.WriteFile(tmp, append([]byte(header), body...), 0o640); err != nil {
+	path := Path(configDir)
+	tmp, err := os.CreateTemp(configDir, filepath.Base(path)+".*.tmp")
+	if err != nil {
 		return err
 	}
-	return os.Rename(tmp, Path(configDir))
+	tmpName := tmp.Name()
+	defer os.Remove(tmpName)
+	if err := tmp.Chmod(0o640); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if _, err := tmp.Write(append([]byte(header), body...)); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Sync(); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	return os.Rename(tmpName, path)
 }
 
 // Validate rejects configurations that would start a container in a state the

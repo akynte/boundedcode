@@ -86,19 +86,21 @@ proof.
 **Editor/MCP:** OpenCode can call repository, editing and supervision tools.
 These can operate on the editor's existing checkout. A recorded `VERIFIED`
 review does not retroactively gate edits already made there.
-`bcode opencode run` adds process confinement; `bcode opencode setup` only
-configures integration. See [OpenCode](../how-to/use-with-opencode.md).
+`bcode opencode` owns the session runtime and adds process confinement; its
+`run` alias has identical behavior. `bcode opencode setup` only configures
+project integration. See [OpenCode](../how-to/use-with-opencode.md).
 OpenCode is not the native task engine. The optional ACP bridge is a byte
 transport for an explicitly configured external agent, not an implementation of
 the native workflow.
 
 ## Runtime lifecycle
 
-The reference walkthrough starts Prism's server separately and uses
-`inference.mode: external`. The server stays resident until its operator stops
-it. `bcode api` is optional for native CLI tasks.
+The setup TUI configures an embedded runtime for the normal session. The
+session launcher starts `bcode api` as a short-lived supervisor, waits for
+readiness, and stops it when OpenCode exits. An external endpoint is an
+advanced, operator-owned alternative and is never terminated by the session.
 
-With `embedded`, `bcode api` starts the configured executable using
+With `embedded`, the supervisor starts the configured executable using
 profile-derived arguments, waits for health, applies restart/backoff budgets,
 and terminates owned process groups on shutdown.
 

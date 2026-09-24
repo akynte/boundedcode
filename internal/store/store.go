@@ -30,7 +30,8 @@ type Root struct {
 	active workspace.ID
 }
 
-// OpenRoot opens the data directory at dir (or $BC_DATA, or /data).
+// OpenRoot opens the data directory at dir (or $BC_DATA, or the platform's
+// default user/container data root).
 func OpenRoot(dir string) (*Root, error) {
 	l, err := NewLayout(dir)
 	if err != nil {

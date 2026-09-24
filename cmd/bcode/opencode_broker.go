@@ -16,7 +16,10 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"syscall"
 
+	"github.com/akynte/boundedcode/internal/session"
+	"github.com/akynte/boundedcode/internal/setup"
 	"github.com/akynte/boundedcode/internal/store"
 	"github.com/akynte/boundedcode/internal/supervisor"
 )
@@ -25,11 +28,13 @@ const brokerEnv = "BC_OPENCODE_BROKER_CAPABILITY"
 const brokerCapabilityFile = ".bcode-broker"
 
 type brokerRequest struct {
-	Token   string `json:"token"`
-	Kind    string `json:"kind"`
-	Session string `json:"session,omitempty"`
-	Message string `json:"message,omitempty"`
-	Body    string `json:"body,omitempty"`
+	Token    string `json:"token"`
+	Kind     string `json:"kind"`
+	Session  string `json:"session,omitempty"`
+	Message  string `json:"message,omitempty"`
+	Provider string `json:"provider,omitempty"`
+	Model    string `json:"model,omitempty"`
+	Body     string `json:"body,omitempty"`
 }
 type brokerReply struct {
 	Body  string `json:"body,omitempty"`
@@ -40,6 +45,13 @@ type brokerReply struct {
 // bearer capability. The confined process receives neither the ledger path
 // nor authority over any sibling workspace.
 func startOpenCodeBroker(ctx context.Context, st *store.Store, dataRoot, repo, _, binary string) (string, func(), error) {
+	return startOpenCodeBrokerWithRoute(ctx, st, dataRoot, repo, "", binary, "", "")
+}
+
+// startOpenCodeBrokerWithRoute is the production broker constructor. The
+// allowed route is supplied by bcode opencode run from the Supervisor's
+// configured provider/model, not by the worker.
+func startOpenCodeBrokerWithRoute(ctx context.Context, st *store.Store, dataRoot, repo, _, binary, allowedProvider, allowedModel string) (string, func(), error) {
 	var nonce [32]byte
 	if _, err := rand.Read(nonce[:]); err != nil {
 		return "", nil, err
@@ -50,26 +62,43 @@ func startOpenCodeBroker(ctx context.Context, st *store.Store, dataRoot, repo, _
 		return "", nil, err
 	}
 	endpoint := "tcp://" + listener.Addr().String() + "/" + token
+	brokerCtx, cancel := context.WithCancel(ctx)
 	var wg sync.WaitGroup
+	var connections sync.Map
 	go func() {
 		for {
 			conn, err := listener.Accept()
 			if err != nil {
 				return
 			}
+			connections.Store(conn, struct{}{})
 			wg.Add(1)
-			go func() {
+			go func(conn net.Conn) {
 				defer wg.Done()
+				defer connections.Delete(conn)
 				defer conn.Close()
-				handleOpenCodeBroker(ctx, conn, st, dataRoot, repo, binary, token)
-			}()
+				handleOpenCodeBroker(brokerCtx, conn, st, dataRoot, repo, binary, token, allowedProvider, allowedModel)
+			}(conn)
 		}
 	}()
-	stop := func() { listener.Close(); wg.Wait() }
+	var stopOnce sync.Once
+	stop := func() {
+		stopOnce.Do(func() {
+			cancel()
+			_ = listener.Close()
+			connections.Range(func(key, _ any) bool {
+				if conn, ok := key.(net.Conn); ok {
+					_ = conn.Close()
+				}
+				return true
+			})
+			wg.Wait()
+		})
+	}
 	return endpoint, stop, nil
 }
 
-func handleOpenCodeBroker(ctx context.Context, conn net.Conn, st *store.Store, dataRoot, repo, binary, token string) {
+func handleOpenCodeBroker(ctx context.Context, conn net.Conn, st *store.Store, dataRoot, repo, binary, token, allowedProvider, allowedModel string) {
 	r := bufio.NewReaderSize(conn, 4096)
 	var request brokerRequest
 	if err := json.NewDecoder(r).Decode(&request); err != nil {
@@ -81,6 +110,10 @@ func handleOpenCodeBroker(ctx context.Context, conn net.Conn, st *store.Store, d
 	}
 	reply := brokerReply{}
 	switch request.Kind {
+	case "authorize":
+		if err := supervisor.AuthorizeModelRequestOnRoute(ctx, st, request.Session, request.Provider, request.Model, allowedProvider, allowedModel); err != nil {
+			reply.Error = err.Error()
+		}
 	case "context":
 		reply.Body, reply.Error = brokerContext(ctx, st, repo, request.Session)
 	case "prompt":
@@ -99,6 +132,13 @@ func handleOpenCodeBroker(ctx context.Context, conn net.Conn, st *store.Store, d
 		child := exec.CommandContext(ctx, binary, "--data", dataRoot, "mcp")
 		child.Dir = repo
 		child.Env = removeEnv(os.Environ(), brokerEnv)
+		if os.Getenv("TYPESAFE_API_KEY") == "" {
+			if key, keyErr := setup.LoadCredential(dataRoot); keyErr == nil && key != "" {
+				child.Env = append(child.Env, "TYPESAFE_API_KEY="+key)
+			}
+		}
+		child.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+		session.SetParentDeathSignal(child)
 		stdin, err := child.StdinPipe()
 		if err != nil {
 			return

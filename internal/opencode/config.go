@@ -51,7 +51,7 @@ func InstallPlugin(stateDir string) (dir string, changed bool, err error) {
 		if existing, err := os.ReadFile(target); err == nil && bytes.Equal(existing, body) {
 			continue
 		}
-		if err := os.WriteFile(target, body, 0o644); err != nil { //nolint:gosec // the plugin's own source, not a secret
+		if err := writeAtomic(target, body, 0o644); err != nil { //nolint:gosec // the plugin's own source, not a secret
 			return dir, false, fmt.Errorf("writing %s: %w", target, err)
 		}
 		changed = true
@@ -68,14 +68,27 @@ func InstallPlugin(stateDir string) (dir string, changed bool, err error) {
 // result in that exchange. A model can therefore return one large answer and
 // the next request can be over the trigger again even when keep.tokens is 4K.
 // The local tool-output limit is part of the same policy: it keeps several
-// parallel reads from recreating that oversized exchange. It is applied only
-// to the reference Bonsai model, whose 32K physical window is known here.
+// parallel reads from recreating an oversized exchange for the active local
+// model, whatever its artifact is called.
 //
 // pluginDir is the absolute path InstallPlugin returned; the caller extracts
 // once and passes it in, rather than this function reaching into the
 // filesystem on its own, so a test can register a policy against a plugin
 // path it fully controls.
 func RegisterContextPolicy(repoRoot, pluginDir string) (string, bool, error) {
+	return RegisterContextPolicyWithLimits(repoRoot, pluginDir, 32768, 8192)
+}
+
+// RegisterContextPolicyWithLimits is the profile-aware form used by the
+// managed launcher. Compaction is a property of the active local runtime, not
+// of a model filename; keeping the old filename check here made every
+// non-Bonsai local provider fail runtime validation with zero compaction
+// values.
+func RegisterContextPolicyWithLimits(repoRoot, pluginDir string, contextTokens, _ int) (string, bool, error) {
+	if contextTokens <= 0 {
+		contextTokens = 32768
+	}
+	buffer, keep := compactionPolicy(contextTokens)
 	return mergeConfig(repoRoot, func(doc map[string]any) bool {
 		changed := false
 		existing, _ := doc["plugins"].([]any)
@@ -103,10 +116,10 @@ func RegisterContextPolicy(repoRoot, pluginDir string) (string, bool, error) {
 			doc["plugins"] = plugins
 		}
 		model, _ := doc["model"].(string)
-		if strings.HasPrefix(model, ProviderName+"/") && strings.Contains(strings.ToLower(model), "bonsai") {
+		if strings.HasPrefix(model, ProviderName+"/") {
 			want := map[string]any{
-				"auto": true, "buffer": 12000,
-				"keep": map[string]any{"tokens": 4000},
+				"auto": true, "buffer": buffer,
+				"keep": map[string]any{"tokens": keep},
 			}
 			if !equalJSON(doc["compaction"], want) {
 				doc["compaction"] = want
@@ -128,6 +141,30 @@ func RegisterContextPolicy(repoRoot, pluginDir string) (string, bool, error) {
 		}
 		return changed
 	})
+}
+
+func compactionPolicy(contextTokens int) (buffer, keep int) {
+	// Keep the measured 32K Bonsai policy stable. Other local windows get a
+	// proportional tail and a buffer that leaves the same safety margin used by
+	// runtime validation.
+	if contextTokens == 32768 {
+		return 12000, 4000
+	}
+	keep = contextTokens / 8
+	if keep < 1024 {
+		keep = 1024
+	}
+	buffer = contextTokens / 3
+	if buffer < 12000 {
+		buffer = 12000
+	}
+	if contextTokens-buffer-keep < 8000 {
+		buffer = contextTokens - keep - 8000
+	}
+	if buffer <= keep {
+		buffer = contextTokens / 2
+	}
+	return buffer, keep
 }
 
 // verifyTimeoutMillis bounds one MCP request. Twenty minutes is the task budget
@@ -234,10 +271,38 @@ func mergeConfig(repoRoot string, apply func(doc map[string]any) bool) (path str
 	if err != nil {
 		return path, false, err
 	}
-	if err := os.WriteFile(path, append(out, '\n'), 0o644); err != nil { //nolint:gosec // a committed editor config
+	if err := writeAtomic(path, append(out, '\n'), 0o644); err != nil { //nolint:gosec // a committed editor config
 		return path, false, err
 	}
 	return path, true, nil
+}
+
+func writeAtomic(path string, body []byte, mode os.FileMode) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	tmp, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".*.tmp")
+	if err != nil {
+		return err
+	}
+	name := tmp.Name()
+	defer os.Remove(name)
+	if err := tmp.Chmod(mode); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if _, err := tmp.Write(body); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Sync(); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	return os.Rename(name, path)
 }
 
 func exists(p string) bool { _, err := os.Stat(p); return err == nil }
@@ -289,6 +354,18 @@ func RegisterModel(repoRoot, baseURL, model string) (path string, changed bool, 
 // OpenCode must advertise those same values or its compaction threshold is
 // calculated against a window the server does not have.
 func RegisterModelWithLimits(repoRoot, baseURL, model string, contextTokens, outputTokens int) (path string, changed bool, err error) {
+	return registerModelWithLimits(repoRoot, baseURL, model, contextTokens, outputTokens, false)
+}
+
+// RegisterManagedModelWithLimits is used by the one-command session launcher.
+// A managed session must not silently fall back to an unrelated model left in
+// a developer's OpenCode config; the project-level setup command retains the
+// preserving behavior for users who intentionally manage that file themselves.
+func RegisterManagedModelWithLimits(repoRoot, baseURL, model string, contextTokens, outputTokens int) (path string, changed bool, err error) {
+	return registerModelWithLimits(repoRoot, baseURL, model, contextTokens, outputTokens, true)
+}
+
+func registerModelWithLimits(repoRoot, baseURL, model string, contextTokens, outputTokens int, force bool) (path string, changed bool, err error) {
 	if contextTokens <= 0 {
 		contextTokens = 32768
 	}
@@ -307,10 +384,12 @@ func RegisterModelWithLimits(repoRoot, baseURL, model string, contextTokens, out
 		// means the editor to follow. A model chosen any other way is a
 		// decision, and replacing it would be the kind of helpfulness that
 		// loses somebody's configuration.
-		if existing, ok := doc["model"].(string); ok {
-			existing = strings.TrimSpace(existing)
-			if existing != "" && !strings.HasPrefix(existing, ProviderName+"/") {
-				return false
+		if !force {
+			if existing, ok := doc["model"].(string); ok {
+				existing = strings.TrimSpace(existing)
+				if existing != "" && !strings.HasPrefix(existing, ProviderName+"/") {
+					return false
+				}
 			}
 		}
 		providers, _ := doc["providers"].(map[string]any)
@@ -327,17 +406,21 @@ func RegisterModelWithLimits(repoRoot, baseURL, model string, contextTokens, out
 		// by what they loaded rather than by this field — a single-model
 		// llama-server answers to any name — so the alias costs nothing.
 		id := shortModelName(model)
-		modelConfig := map[string]any{"name": id}
-		// The reference Bonsai setup serves a text-only model with a 32K
-		// context. These are known facts about that artifact, not safe defaults
-		// to impose on every OpenAI-compatible endpoint.
-		if strings.Contains(strings.ToLower(id), "bonsai") {
-			modelConfig["capabilities"] = map[string]any{
+		modelConfig := map[string]any{
+			"name": id,
+			// The local provider is the coding boundary configured by setup.
+			// Declare the capabilities BoundedCode actually requires instead
+			// of making runtime validation depend on a model filename containing
+			// "bonsai". A differently named local coding model must receive the
+			// same honest limits and tool contract.
+			"capabilities": map[string]any{
 				"tools":  true,
 				"input":  []any{"text"},
 				"output": []any{"text"},
-			}
-			modelConfig["limit"] = map[string]any{"context": contextTokens, "output": outputTokens}
+			},
+			"limit": map[string]any{"context": contextTokens, "output": outputTokens},
+		}
+		if strings.Contains(strings.ToLower(id), "bonsai") {
 			// Bonsai defaults to an xhigh thinking mode. In OpenCode that mode
 			// can spend the complete output allowance before emitting a tool
 			// call or a final answer; the native BoundedCode loop detects that,
@@ -380,6 +463,10 @@ func RegisterModelWithLimits(repoRoot, baseURL, model string, contextTokens, out
 		return changed
 	})
 }
+
+// ModelID is the stable model identifier BoundedCode registers with OpenCode.
+// The broker uses it to enforce the provider route chosen by the Supervisor.
+func ModelID(model string) string { return shortModelName(model) }
 
 // shortModelName renders a file path as something readable in a model picker.
 func shortModelName(model string) string {

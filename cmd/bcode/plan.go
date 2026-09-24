@@ -43,7 +43,7 @@ func newPlanCmd() *cobra.Command {
 			}
 			f, err := llm.LoadProvidersFile(root.Layout().ConfigDir())
 			if err != nil {
-				return fmt.Errorf("planning needs a model: run `bcode config init` and configure a provider (%w)", err)
+				return fmt.Errorf("planning needs a model: run `bcode setup` and complete the guided configuration (%w)", err)
 			}
 			router, err := llm.NewRouter(f)
 			if err != nil {

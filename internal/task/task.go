@@ -62,9 +62,13 @@ type Task struct {
 // Budget bounds a task. A task that cannot finish inside its budget is blocked
 // for a human rather than allowed to run indefinitely.
 type Budget struct {
-	MaxAttempts int           `json:"max_attempts"`
-	MaxWallTime time.Duration `json:"max_wall_time"`
-	MaxTokens   int           `json:"max_tokens,omitempty"`
+	MaxAttempts int `json:"max_attempts"`
+	// MaxGenerationRequests bounds supervisor-authorized requests to an external
+	// worker. It is separate from engine attempts because an editor model may
+	// need several bounded turns to propose one next operation.
+	MaxGenerationRequests int           `json:"max_generation_requests,omitempty"`
+	MaxWallTime           time.Duration `json:"max_wall_time"`
+	MaxTokens             int           `json:"max_tokens,omitempty"`
 	// Scope authorizes native editor writes before execution. Empty grants
 	// no native writes. The final diff is checked independently for all engines.
 	Scope []string `json:"scope,omitempty"`

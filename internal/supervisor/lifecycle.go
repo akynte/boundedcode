@@ -295,6 +295,19 @@ func ControlledChangedFiles(ctx context.Context, st *store.Store, taskID string)
 // executor's opinion of its own work: a caller that never verified gets a review
 // saying so rather than one saying the work is fine.
 func FinishTask(ctx context.Context, st *store.Store, repoRoot, taskID string) (Review, error) {
+	return finishTask(ctx, st, repoRoot, repoRoot, taskID)
+}
+
+// FinishTaskWithPolicyRoot is the editor/native shared completion entry point
+// when the candidate lives in a task worktree but repository policy files live
+// at the operator workspace root. The candidate and the policy source are
+// deliberately separate: an uncommitted policy file must not disappear merely
+// because it was not part of the candidate commit.
+func FinishTaskWithPolicyRoot(ctx context.Context, st *store.Store, repoRoot, policyRoot, taskID string) (Review, error) {
+	return finishTask(ctx, st, repoRoot, policyRoot, taskID)
+}
+
+func finishTask(ctx context.Context, st *store.Store, repoRoot, policyRoot, taskID string) (Review, error) {
 	ts := task.NewStore(st)
 	t, err := ts.Get(ctx, taskID)
 	if err != nil {
@@ -402,7 +415,7 @@ func FinishTask(ctx context.Context, st *store.Store, repoRoot, taskID string) (
 		}
 	}
 
-	violations, policyErr := protectedViolations(repoRoot, rev.FilesChanged)
+	violations, policyErr := protectedViolations(policyRoot, rev.FilesChanged)
 	if policyErr != nil {
 		rev.Verdict = "NOT VERIFIED"
 		rev.Warnings = append(rev.Warnings, "repository policy could not be evaluated: "+policyErr.Error())

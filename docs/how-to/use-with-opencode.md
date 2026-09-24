@@ -1,122 +1,89 @@
-# OpenCode integration
+# Use OpenCode with BoundedCode
 
-OpenCode 2 is the supported BoundedCode user interface. The Go supervisor
-supplies tools, a task ledger and verification; OpenCode owns the model session.
-The [context architecture and measured compaction defect](../explanation/opencode-context.md)
-explain the boundary in detail.
+OpenCode is the supported interactive client. BoundedCode owns the session
+lifecycle around it: project registration, local model startup, required
+services, sandbox preparation, and cleanup.
 
-## Start OpenCode
+## Start
 
-Install OpenCode separately, build BoundedCode, and add the build directory to
-your shell's `PATH` as shown in the [installation guide](install.md). Then move
-to a project directory and run:
+After the one-time [`bcode setup`](install.md), use one command from any
+project:
 
 ```bash
+cd /path/to/your/project
 bcode opencode
 ```
 
-On the first run, this creates a workspace marker if the current directory is
-not already in a workspace, registers BoundedCode's MCP server, and writes its
-managed context into `AGENTS.md`. It then launches OpenCode. Later runs check
-that generated setup and update it only when something changed. The command
-also makes the `bcode` executable that launched OpenCode available to its MCP
-process, so a stale binary elsewhere on `PATH` is not used.
+The command is safe to run from a new project. It creates the workspace marker
+when needed, refreshes generated project configuration, starts the configured
+runtime, waits for readiness, and launches OpenCode. It does not require a
+separate `bcode api`, model server, or environment command.
 
-The MCP entry uses OpenCode 2's `mcp.servers` configuration. If the project has
-the older flat `mcp` server map, setup moves those server entries under
-`mcp.servers` while preserving MCP-wide settings and the other project config.
-See [OpenCode's MCP configuration](https://opencode.ai/v2/docs/mcp-servers/).
-BoundedCode sets `codemode: false`, so its MCP tools are exposed as direct tools
-instead of being routed through OpenCode's JavaScript `execute` Code Mode. This
-avoids asking the model to encode ordinary tool inputs as JavaScript.
+`bcode opencode run` is the explicit spelling for scripts and has identical
+behavior. `bcode opencode setup` is only a project-registration refresh.
 
-Setup also manages a small block in `~/.config/opencode/AGENTS.md` (or the
-platform's OpenCode config directory). OpenCode loads global `AGENTS.md`
-guidance in every project, so the instructions distinguish JavaScript Code Mode
-from the shell and language runtimes across repositories. Only the managed
-block is refreshed; your other global instructions are preserved. See
-[OpenCode's instruction scope](https://opencode.ai/v2/docs/instructions/).
+## What is prepared automatically
 
-Setup also installs the BoundedCode OpenCode plugin and the Bonsai compaction
-policy in `opencode.json`. The plugin reads the Go ledger before each model
-request. For the active 32K Bonsai profile, the policy uses a 12K buffer and
-retains 4K recent tokens, avoiding OpenCode 2's oversized retained-tail loop.
-The OpenCode context and output limits are copied from the active hardware
-profile, and `bcode doctor` fails closed if they drift. Restart OpenCode after
-changing these settings.
+For every session BoundedCode creates private OpenCode XDG directories and a
+temporary directory, starts the supervisor and configured local model, waits
+for `/readyz`, validates the model context and compaction policy, registers
+the BoundedCode MCP server, installs the context plugin, selects the strongest
+available sandbox, and starts the restricted `bc-editor` agent.
 
-When BoundedCode has a local inference endpoint configured, setup also registers
-it using OpenCode 2's custom provider format. For the reference Bonsai model, it
-declares tool support, text-only input, a 32K context, and an 8K output limit.
-Bonsai's optional vision projector is not loaded by the reference text-coding
-setup, so OpenCode cannot send screenshots to that model. Use a vision-capable
-model for image questions.
+The OpenCode process receives only the environment and paths needed for that
+workspace. Its direct shell, file, web, and Code Mode routes are denied; the
+supervised `bc_*` tools are the supported path for repository reads, edits,
+verification, and task state.
 
-The workspace marker, `opencode.json`, and managed `AGENTS.md` block are local
-project setup; review them before committing. `bcode opencode` does not build
-the source index. Run `bcode index` when you want graph-backed retrieval, and
-run `bcode opencode` again to refresh the generated context.
+## What happens when OpenCode exits
 
-For manual setup without launching the editor, use `bcode opencode setup`.
+Cleanup is part of the command, not a separate operator step. BoundedCode:
+
+1. stops OpenCode and its process group;
+2. stops the broker and removes the per-session capability;
+3. stops the model and other BoundedCode-owned services through the supervisor;
+4. closes storage cleanly;
+5. removes the session XDG directory, temporary files, and logs.
+
+It waits for termination, so the local LLM is stopped, VRAM is released, and
+temporary CPU/RAM consumers are gone before the shell prompt returns. An
+inference endpoint explicitly configured as external is not BoundedCode-owned
+and is left alone.
 
 ## Tool surface
 
-| Tools | Responsibility |
+| Tool | Responsibility |
 |---|---|
-| `bc_status`, `bc_graph_impact`, `bc_search`, `bc_reindex` | Workspace status, reverse-dependency evidence, retrieval, indexing |
-| `bc_note_add` | Persist a bounded repository note |
-| `bc_task_start`, `bc_task_resume`, `bc_task_answer`, `bc_task_history`, `bc_task_verification` | Begin or resume supervised work; preserve requirements, acceptance criteria, decisions, and candidate-bound verification history |
-| `bc_read`, `bc_edit` | Mediated file access in the opened repository |
-| `bc_verify`, `bc_task_finish` | Collect checks and record a completion verdict |
+| `bc_status`, `bc_graph_impact`, `bc_search`, `bc_reindex` | Repository status, relationships, retrieval, and index refresh |
+| `bc_task_start`, `bc_task_resume`, `bc_task_answer` | Durable task intent, requirements, constraints, and decisions |
+| `bc_task_history`, `bc_task_verification` | Candidate-bound historical evidence |
+| `bc_read`, `bc_edit` | Supervisor-mediated repository access and task worktree edits |
+| `bc_verify`, `bc_task_finish` | Sandboxed verification and completion verdict |
+| `bc_task_memory*`, `bc_task_fact`, `bc_note_add` | Typed memory and durable repository notes |
 
-The BoundedCode tools are registered in
-[`internal/mcp/tools.go`](https://github.com/akynte/boundedcode/blob/main/internal/mcp/tools.go) and
-[`supervise.go`](https://github.com/akynte/boundedcode/blob/main/internal/mcp/supervise.go). They call shared Go
-subsystems; this is not a read-only four-tool bridge.
+Start a supervised task with explicit requirements, acceptance criteria,
+constraints, and non-goals. The model proposes operations; BoundedCode
+authorizes them, records them, and decides whether the task may continue or
+finish. Passing checks are evidence, not a model's claim of success.
 
-Editor edits affect the opened checkout. They do not automatically acquire the
-native task runner's separate-worktree lifecycle. A finish verdict evaluates
-available evidence; it cannot undo an earlier edit made by another editor tool.
+## Configuration and reconfiguration
 
-At task start, pass explicit requirements in `requirements`, verbatim
-acceptance criteria in `acceptance_criteria`, and scope, security and
-performance limits in `constraints`. When a new OpenCode session has several
-unfinished tasks, call `bc_task_resume` with the intended task ID. The original
-objective, these fields, user decisions and rationales, candidate-bound
-verification history, and typed evidence are reconstructed from the ledger
-after compaction and restart. Read/search output that was never recorded as
-durable task state remains queryable as repository evidence and may need to be
-retrieved again.
+The first launch refreshes `opencode.json`, the managed block in `AGENTS.md`,
+and the context plugin without replacing unrelated user settings. Re-running
+`bcode opencode` is idempotent. To change the installation-level runtime or
+model, rerun [`bcode setup`](install.md), then start a new session.
 
-## Confinement status
-
-`bcode opencode run` is validated end to end: a loopback broker
-(`cmd/bcode/opencode_broker.go`), authenticated by a random per-run capability
-and pinned to one workspace's store, gives the sandboxed session's context hook
-a narrow state channel without mounting the BoundedCode data root — the
-sandbox never sees another workspace's ledger, artifacts or signing keys. See
-[the context architecture doc](../explanation/opencode-context.md) for the
-end-to-end confined run this was validated against, including the real,
-measured VRAM ceiling on an 8 GB card. Review
-[trust boundaries](../explanation/trust-boundaries.md) for the regular
-editor's security limits.
+If tools do not appear, run `bcode doctor` and confirm the command came from
+the same `bcode` executable used for setup. An existing `opencode.jsonc` is
+refused rather than rewritten because comments cannot be preserved safely.
 
 ## Troubleshooting
 
-If tools do not appear, run OpenCode with `bcode opencode` from the project
-directory so its MCP process uses the same binary. Check `bcode version`, and
-confirm the workspace marker exists at `.bc/workspace.yaml`. Refresh stale
-graph evidence with `bc_reindex` or `bcode index`.
-
-If a task reports `Unknown identifier 'None'` from an `execute` tool, the model
-sent Python syntax to a JavaScript execution tool (`None` is Python syntax; use
-`null` in JavaScript). That individual tool call failed; it does not mean the
-BoundedCode MCP connection or inference server stopped. Run Python through the
-shell tool instead. If the assistant then ends after extended reasoning without
-a final answer, continue the conversation and ask it to summarize the result.
-For image input rejected by the local endpoint, switch to a vision-capable
-model; the local Bonsai model is text-only.
-
-Tool paths are confined to the opened repository, including symlink resolution.
-This does not confine unrelated tools supplied by another MCP server or an
-unconfined editor.
+- **Runtime does not start:** run `bcode setup`; it validates the executable,
+  model, profile, provider, and data directory.
+- **Model context mismatch:** rerun `bcode setup` and start a fresh session so
+  OpenCode receives the new limits.
+- **No supervised tools:** rerun `bcode opencode` from the project root and
+  inspect the reported `opencode.json` path.
+- **Unexpected resource use after exit:** run `bcode doctor`; a session that
+  was not launched through this command is not owned by this lifecycle.

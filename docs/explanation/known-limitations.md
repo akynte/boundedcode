@@ -33,8 +33,11 @@ local reference succeeds on those tasks.
 ## Installation and platforms
 
 The reference requires Prism's llama.cpp fork for PTQ1_0. The shipped CUDA image
-uses stock llama.cpp, so it is not a turnkey Bonsai image. Configuration is
-manual and the generated defaults still select an older hardware profile.
+uses stock llama.cpp, so it is not a turnkey Bonsai image. The host
+[`bcode setup`](../how-to/install.md) TUI can discover a trusted runtime or
+build the pinned Prism revision after confirmation, but it cannot turn the
+stock image into the reference runtime. Other hardware and container layouts
+still need separate validation.
 
 Linux/NVIDIA is the measured path. CPU-only, Apple Silicon, integrated GPUs,
 ROCm, Windows and other 8 GB cards need separate validation. Toolchains,

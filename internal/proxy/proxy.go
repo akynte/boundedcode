@@ -171,7 +171,7 @@ func ruleCoversLane(r Rule, lane Lane) bool {
 	return false
 }
 
-// DefaultAllowlist is what `bcode config init` writes.
+// DefaultAllowlist is what `bcode setup` writes.
 //
 // It is short on purpose. Every entry is a host this project's own documented
 // workflows reach, and an operator adding to it is making a deliberate choice

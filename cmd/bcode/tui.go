@@ -22,38 +22,23 @@ import (
 	"github.com/akynte/boundedcode/internal/task"
 )
 
-// `bcode tui` — design v3 §4.1's "docker exec -it boundedcode bcode tui".
-//
-// Deliberately not a full-screen application. §4.1 asks for a way to watch the
-// system from inside the container, and the thing an operator actually needs
-// there is: are the children up, what is running, and is anything waiting for
-// me. A cursor-addressed UI would add a dependency, break under `docker exec`
-// without a TTY, and make the output impossible to pipe — and the web
-// dashboard already exists for anyone who wants charts.
-//
-// So this is a repainting status view: it clears and redraws on an interval,
-// degrades to plain appended output when stdout is not a terminal, and exits
-// on Ctrl-C or after --once.
-//
-// What it will never do is act. Approving a gate is `bcode gate approve`, with the
-// diff and the impact report in front of you (§3.3). A key that approved from a
-// status screen would be a way to approve without reading, which is the failure
-// the gates exist to prevent.
+// `bcode tui` is a read-only status view. Installation and initial
+// configuration use the separate `bcode setup` TUI; this command only answers
+// "what is running right now?". It deliberately remains a repainting text
+// view so it works over SSH, in a terminal without a full-screen library, and
+// in redirected logs.
 
 func newTUICmd() *cobra.Command {
 	var interval time.Duration
 	var once bool
 	c := &cobra.Command{
 		Use:   "tui",
-		Short: "Watch the supervisor: children, tasks and waiting gates",
-		Long: "A repainting status view for use inside the container (§4.1):\n\n" +
-			"    docker exec -it boundedcode bcode tui\n\n" +
-			"It shows what `bcode doctor` cannot — what is happening right now — and it is\n" +
-			"read-only on purpose. Approving a gate is `bcode gate approve`, with the diff and\n" +
-			"the impact report in front of you; a key that approved from a status screen\n" +
-			"would be a way to approve without reading.\n\n" +
-			"Without a terminal it appends plain blocks instead of repainting, so it can\n" +
-			"be piped or redirected to a log.",
+		Short: "Watch active BoundedCode services, tasks, and gates",
+		Long: "A read-only status view of the active supervisor and workspace.\n\n" +
+			"Use `bcode setup` for installation and initial configuration. This command\n" +
+			"shows what is happening right now and never approves or mutates anything.\n\n" +
+			"Without a terminal it appends plain blocks instead of repainting, so it can be\n" +
+			"piped or redirected to a log.",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)

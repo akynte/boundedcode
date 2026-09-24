@@ -58,10 +58,13 @@ Released sections are generated from Conventional Commits at release time.
   adding a column is exactly how "counters, never content" would stop holding.
   Built on demand rather than continuously, so nothing accumulates across your
   projects while you are not looking.
-- **`scripts/install-bare-metal.sh`** (§13) and a how-to page for it. It reports
-  every prerequisite at once, installs the sidecar with the same probe the image
-  build runs, and says plainly what a host install gives up: DR-3 layer 1, the
-  boundary that bounds the whole system to the repositories you mounted.
+- **The guided `bcode setup` TUI** replaces the old host installation helper
+  and manual runtime recipe. It reports every prerequisite at once, configures
+  the runtime and model, and says plainly what a host install gives up: the
+  outer isolation boundary is not present on a host. When a CUDA runtime is
+  absent, the TUI can explicitly confirm and build the pinned Prism source;
+  `--install-runtime` and `--yes` provide the corresponding unattended
+  authorization.
 - **The remaining §4.2 image tools**: `gosec`, `gitleaks`, `osv-scanner`,
   `buf`, `oasdiff` (pinned `go install`) and `squawk` (pinned npm). Playwright
   and trivy stay out, each with a reason recorded rather than left as an

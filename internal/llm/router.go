@@ -293,9 +293,26 @@ func SaveProvidersFile(configDir string, f ProvidersFile) error {
 		"# routing per role only with Stage E evidence that it helps.\n" +
 		"# Never put a secret here: use api_key_env to name an environment variable.\n"
 	path := filepath.Join(configDir, "providers.yaml")
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, append([]byte(header), body...), 0o640); err != nil {
+	tmp, err := os.CreateTemp(configDir, filepath.Base(path)+".*.tmp")
+	if err != nil {
 		return err
 	}
-	return os.Rename(tmp, path)
+	tmpName := tmp.Name()
+	defer os.Remove(tmpName)
+	if err := tmp.Chmod(0o640); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if _, err := tmp.Write(append([]byte(header), body...)); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Sync(); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	return os.Rename(tmpName, path)
 }

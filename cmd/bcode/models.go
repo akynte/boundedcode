@@ -56,7 +56,7 @@ func newModelsBenchCmd() *cobra.Command {
 			}
 			f, err := llm.LoadProvidersFile(root.Layout().ConfigDir())
 			if err != nil {
-				return fmt.Errorf("no providers.yaml: run `bcode config init` first (%w)", err)
+				return fmt.Errorf("no providers.yaml: run `bcode setup` first (%w)", err)
 			}
 			router, err := llm.NewRouter(f)
 			if err != nil {
@@ -142,7 +142,7 @@ func newModelsHealthCmd() *cobra.Command {
 			_, _ = loadConfig(root)
 			f, err := llm.LoadProvidersFile(root.Layout().ConfigDir())
 			if err != nil {
-				return fmt.Errorf("no providers.yaml: run `bcode config init` first (%w)", err)
+				return fmt.Errorf("no providers.yaml: run `bcode setup` first (%w)", err)
 			}
 			router, err := llm.NewRouter(f)
 			if err != nil {
@@ -198,7 +198,7 @@ func newModelsConformanceCmd() *cobra.Command {
 			_, _ = loadConfig(root)
 			f, err := llm.LoadProvidersFile(root.Layout().ConfigDir())
 			if err != nil {
-				return fmt.Errorf("no providers.yaml: run `bcode config init` first (%w)", err)
+				return fmt.Errorf("no providers.yaml: run `bcode setup` first (%w)", err)
 			}
 			router, err := llm.NewRouter(f)
 			if err != nil {
@@ -281,7 +281,7 @@ func newModelsNeedleCmd() *cobra.Command {
 			}
 			f, err := llm.LoadProvidersFile(root.Layout().ConfigDir())
 			if err != nil {
-				return fmt.Errorf("no providers.yaml: run `bcode config init` first (%w)", err)
+				return fmt.Errorf("no providers.yaml: run `bcode setup` first (%w)", err)
 			}
 			router, err := llm.NewRouter(f)
 			if err != nil {

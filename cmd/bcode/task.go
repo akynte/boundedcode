@@ -53,12 +53,21 @@ func engineFor(cmd *cobra.Command, root *store.Root, st *store.Store, ws *worksp
 	}
 	f, err := llm.LoadProvidersFile(root.Layout().ConfigDir())
 	if err != nil {
-		return nil, fmt.Errorf("no providers.yaml: a change task cannot run without a coding model; run `bcode config init`, configure a model, and retry (use `bcode task verify` for verification-only work): %w", err)
+		return nil, fmt.Errorf("no providers.yaml: a change task cannot run without a coding model; run `bcode setup`, complete model configuration, and retry (use `bcode task verify` for verification-only work): %w", err)
 	}
 	router, err := llm.NewRouter(f)
 	if err != nil {
 		return nil, fmt.Errorf("providers.yaml is invalid: %w", err)
 	}
+	// The native engine takes ownership of the provider on success. Until
+	// then this function still owns the router, so every early return closes
+	// any managed process it may have started.
+	routerOwned := true
+	defer func() {
+		if routerOwned {
+			_ = router.Close()
+		}
+	}()
 	provider, err := router.For(llm.RoleCoding)
 	if err != nil {
 		return nil, err
@@ -117,6 +126,7 @@ func engineFor(cmd *cobra.Command, root *store.Root, st *store.Store, ws *worksp
 		return nil, fmt.Errorf("provider %q cannot drive edits: %w; a change task cannot be downgraded to verification-only", provider.Name(), err)
 	}
 	fmt.Fprintf(cmd.ErrOrStderr(), "engine: %s\n", eng.Name())
+	routerOwned = false
 	return eng, nil
 }
 
@@ -492,10 +502,10 @@ func newTaskRecoverCmd() *cobra.Command {
 				return err
 			}
 			states, err := ledger.New(st).Recover(ctx, func(taskID string) string {
-				// Native tasks edit a private worktree. Editor/MCP tasks have
-				// no WorktreeID and intentionally operate on the checkout. Never
-				// hash the repository root for a task that has a recorded
-				// worktree: recovery must inspect the same bytes the task edited.
+				// Every supervised task, including OpenCode/MCP tasks, records
+				// its authoritative checkout before work begins. Never hash the
+				// operator root for a task that has a WorktreeID: recovery must
+				// inspect the same bytes the task edited.
 				t, err := task.NewStore(st).Get(ctx, taskID)
 				if err != nil || t.WorktreeID == "" {
 					return ws.Root

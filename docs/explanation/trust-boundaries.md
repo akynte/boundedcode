@@ -34,7 +34,8 @@ writable, not immutable. See [verification](verification.md).
 
 The optional MCP/OpenCode tools can edit the opened checkout. Running
 `bcode opencode setup` configures tools and instructions; it does not confine
-OpenCode's own tools. `bcode opencode run` is a separate, explicit launch path.
+OpenCode's own tools. `bcode opencode` is the supported launch path; `bcode opencode run` is its
+explicit alias.
 An MCP completion verdict cannot retroactively isolate edits already made by
 the editor. See [OpenCode](../how-to/use-with-opencode.md).
 

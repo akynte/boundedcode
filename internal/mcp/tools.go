@@ -286,6 +286,14 @@ func (s *Server) reindex(ctx context.Context, _ *mcp.CallToolRequest, in reindex
 	var total reindexOut
 	start := time.Now()
 	for _, r := range repos {
+		// The workspace manifest is the source of repository identity, while
+		// the index tables enforce that identity as a foreign key. Register the
+		// manifest row before walking it; otherwise a fresh workspace's first
+		// bc_reindex fails on the first file with a misleading FOREIGN KEY
+		// error instead of building the index the worker asked for.
+		if err := ix.RegisterRepository(ctx, r); err != nil {
+			return fail("registering %s for reindex: %v", r.Name, err), total, nil
+		}
 		st, err := ix.Repository(ctx, r.ID, sess.Workspace.Root)
 		if err != nil {
 			// Partial progress is kept: the scopes that were re-analysed are

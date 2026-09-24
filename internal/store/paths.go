@@ -20,8 +20,28 @@ import (
 // container this is /data, backed by the persistent volume (§4.1).
 const EnvDataDir = "BC_DATA"
 
-// DefaultDataDir is used when BC_DATA is unset.
+// DefaultDataDir is the conventional container data root. On a host the
+// effective default is the per-user path returned by DefaultDataDirPath, so a
+// setup TUI and a later `bcode opencode` agree without requiring BC_DATA in
+// every new shell.
 const DefaultDataDir = "/data"
+
+// DefaultDataDirPath returns the platform-aware default data root.
+func DefaultDataDirPath() string {
+	if os.Getenv("BC_IN_CONTAINER") == "1" {
+		return DefaultDataDir
+	}
+	if _, err := os.Stat("/.dockerenv"); err == nil {
+		return DefaultDataDir
+	}
+	if _, err := os.Stat("/run/.containerenv"); err == nil {
+		return DefaultDataDir
+	}
+	if home, err := os.UserHomeDir(); err == nil && home != "" {
+		return filepath.Join(home, ".local", "share", "boundedcode")
+	}
+	return filepath.Join(os.TempDir(), "boundedcode")
+}
 
 // Layout resolves every path under the data root. Nothing outside these
 // functions may compose a path into a workspace directory.
@@ -33,7 +53,7 @@ func NewLayout(root string) (*Layout, error) {
 		root = os.Getenv(EnvDataDir)
 	}
 	if root == "" {
-		root = DefaultDataDir
+		root = DefaultDataDirPath()
 	}
 	abs, err := filepath.Abs(root)
 	if err != nil {

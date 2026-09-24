@@ -1,52 +1,40 @@
 # BoundedCode documentation
 
-A local software-engineering environment built around **OpenCode** and an
-**8 GB VRAM budget**. OpenCode is the supported client. BoundedCode supplies
-repository evidence, durable supervised task state and verification around a
-local ternary Bonsai model.
+BoundedCode is a supervised local coding environment built around OpenCode.
+The supported user path is deliberately short:
+
+1. install the `bcode` executable;
+2. run the [`bcode setup` TUI](how-to/install.md) once;
+3. run [`bcode opencode`](how-to/use-with-opencode.md) from any project.
+
+The TUI owns dependency checks, runtime/model configuration, provider wiring,
+decision-plane setup, sandbox validation, and initial data preparation. A
+normal `bcode opencode` session starts the required services automatically and
+cleans them up when OpenCode exits.
 
 ## Start here
 
-1. [Install the exact reference stack](how-to/install.md).
-2. [Start OpenCode with BoundedCode](how-to/use-with-opencode.md).
-3. [Understand the architecture](explanation/architecture.md).
-4. [Read the hardware evidence and limits](explanation/8gb-runtime.md).
+- [Install and use BoundedCode](how-to/install.md)
+- [OpenCode integration and session lifecycle](how-to/use-with-opencode.md)
+- [CLI reference](reference/cli.md)
+- [Architecture](explanation/architecture.md)
+- [Trust boundaries and isolation](explanation/trust-boundaries.md)
 
 ## Understand the system
 
-- [Reference model stack](reference/model-stack.md): Bonsai and the EDIT
-  generator, optional hosted Jev,
-  and the experimental CPU embedding control.
-- [Repository intelligence](explanation/repository-intelligence.md): language
-  analysis, graph evidence, retrieval and context budgets.
-- [OpenCode context and task memory](explanation/opencode-context.md): the
-  measured compaction loop, durable state, and current limits.
-- [Verification](explanation/verification.md): checks, repair, review and gates.
-- [Why small/local models can work here](explanation/why-small-models.md):
-  capability through decomposition, without a claim of frontier-model parity.
-- [Trust boundaries](explanation/trust-boundaries.md) and
-  [isolation](explanation/isolation-model.md): protections and deployment limits.
-- [Jev judgments](explanation/judgments.md): narrow semantic decisions, required
-- [What leaves the machine](explanation/judgment-data-flow.md): the data flow to Jev
-  egress, deterministic fallbacks and unproven domain calibration.
-- [Known limitations](explanation/known-limitations.md) and
-  [related work](explanation/related-work.md).
+- [Repository intelligence](explanation/repository-intelligence.md)
+- [OpenCode context and durable task memory](explanation/opencode-context.md)
+- [Verification and evidence](explanation/verification.md)
+- [Judgments and what leaves the machine](explanation/judgment-data-flow.md)
+- [Reliability, cancellation, and cleanup](explanation/reliability.md)
+- [Known limitations](explanation/known-limitations.md)
 
 ## Operate and contribute
 
-Use the [CLI](reference/cli.md), [configuration](reference/configuration.md),
-[storage layout](reference/storage-layout.md), [troubleshooting](how-to/troubleshooting.md)
-and [recovery](explanation/crash-recovery.md) references.
-The [OpenCode bridge](how-to/use-with-opencode.md) is optional.
+Use the [configuration reference](reference/configuration.md),
+[troubleshooting guide](how-to/troubleshooting.md), [recovery notes](explanation/crash-recovery.md),
+and [contribution guide](https://github.com/akynte/boundedcode/blob/main/CONTRIBUTING.md).
 
-[Contributing](https://github.com/akynte/boundedcode/blob/main/CONTRIBUTING.md) maps packages to responsibilities and checks.
-[ADRs](adr/README.md) preserve design history; they do not override current code.
-[Measurements](benchmarks/results/README.md) distinguish current inference
-throughput from historical task evaluations.
-
-[Presentation recommendations](maintainers/github-presentation.md) contain
-repository metadata and a reproducible demo plan.
-
-Only command blocks explicitly marked `<!-- test:run -->` execute in
-`make docs-test`. GPU downloads and live coding examples require separate
-manual validation.
+Only the TUI-based setup page is the supported installation workflow. Pages
+under benchmarks, architecture, and evidence describe evidence and design; they
+are not alternate installers.

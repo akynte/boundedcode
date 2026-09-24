@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -74,6 +76,22 @@ func newAPICmd() *cobra.Command {
 			if err := procs.Start(ctx); err != nil {
 				return err
 			}
+			// Every return path after Start owns the children. In particular,
+			// an optional ACP/egress listener can fail before the normal
+			// Serve path reaches its explicit shutdown block.
+			var stopOnce sync.Once
+			stopChildren := func() {
+				stopOnce.Do(func() {
+					grace := time.Duration(cfg.API.ShutdownGraceSeconds) * time.Second
+					if grace <= 0 {
+						grace = 30 * time.Second
+					}
+					if err := procs.Stop(grace); err != nil {
+						log.Warn("children did not stop cleanly", "error", err)
+					}
+				})
+			}
+			defer stopChildren()
 
 			// §3.4: the file watcher marks scopes dirty so `bcode doctor` can
 			// report index drift. It is started only when the supervisor is
@@ -128,9 +146,7 @@ func newAPICmd() *cobra.Command {
 
 			// §4.4 shutdown order: stop children, then flush WALs, then exit.
 			log.Info("shutting down", "grace", grace)
-			if err := procs.Stop(grace); err != nil {
-				log.Warn("children did not stop cleanly", "error", err)
-			}
+			stopChildren()
 			shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 			defer cancel()
 			_ = shutdownCtx
@@ -169,12 +185,19 @@ func registerChildren(m *procman.Manager, cfg config.Config, p *config.Profile, 
 	return m.Add(procman.Child{
 		Name:      "llama-server",
 		Essential: true,
-		Build: func(ctx context.Context) (*exec.Cmd, error) {
+		Build: func(_ context.Context) (*exec.Cmd, error) {
 			// The binary and arguments come from bcode.yaml and the active
 			// profile, both operator configuration under /data/config — the
 			// same trust level as the supervisor itself. An operator who can
 			// edit them can already run anything in this container.
-			return exec.CommandContext(ctx, cfg.Inference.Binary, args...), nil //nolint:gosec // see above
+			//
+			// The process manager, rather than a request context, owns this
+			// child's lifetime. Tying it to CommandContext would SIGKILL the
+			// model before procman could stop its process group and flush the
+			// supervisor on shutdown.
+			cmd := exec.Command(cfg.Inference.Binary, args...) //nolint:gosec // see above
+			cmd.Env = inferenceEnvironment()
+			return cmd, nil
 		},
 		Health: func(ctx context.Context) error {
 			req, err := http.NewRequestWithContext(ctx, http.MethodGet, base+"/health", nil)
@@ -195,6 +218,27 @@ func registerChildren(m *procman.Manager, cfg config.Config, p *config.Profile, 
 		// configurable rather than a global guess (§9.3).
 		StartTimeout: time.Duration(cfg.Inference.StartTimeoutSeconds) * time.Second,
 	})
+}
+
+// inferenceEnvironment is the small environment a model runtime needs. The
+// supervisor may hold a Jev credential, but the local inference process must
+// not inherit it (nor cloud credentials, SSH agents, or the user's shell
+// state). Runtime discovery libraries still receive their normal CUDA and
+// dynamic-loader variables.
+func inferenceEnvironment() []string {
+	allowed := map[string]bool{
+		"PATH": true, "LD_LIBRARY_PATH": true, "CUDA_PATH": true, "CUDA_HOME": true,
+		"CUDA_VISIBLE_DEVICES": true, "NVIDIA_DRIVER_CAPABILITIES": true,
+		"LANG": true, "LC_ALL": true, "LC_CTYPE": true, "TERM": true,
+	}
+	var out []string
+	for _, entry := range os.Environ() {
+		key, _, ok := strings.Cut(entry, "=")
+		if ok && allowed[key] {
+			out = append(out, entry)
+		}
+	}
+	return out
 }
 
 // startIndexWatcher starts the §3.4 watcher for the workspace the supervisor

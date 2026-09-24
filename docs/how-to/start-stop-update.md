@@ -1,69 +1,76 @@
-# Start, stop and update
+# Start, stop, update, and uninstall
 
-## Native reference workflow
+The supported lifecycle is session-oriented. There is no separate model-server
+or API start step.
 
-Start the pinned Bonsai server as shown in [Install](install.md). It is an
-operator-owned external process. Then run CLI tasks directly; `bcode api` is not
-required for `bcode index` or `bcode task run`.
-
-For the optional status service:
+## Start
 
 ```bash
-bcode api
+cd /path/to/your/project
+bcode opencode
 ```
 
-In another terminal:
+BoundedCode starts the runtime and services required for that session and
+stops them when OpenCode exits. See [Install and use BoundedCode](install.md)
+for the complete flow.
+
+## Stop
+
+Exit OpenCode normally. The launcher performs ordered cleanup before returning.
+For an interrupted process, send `Ctrl-C` once and allow the configured grace
+period to elapse. `bcode doctor` can identify a stale lease or an interrupted
+workspace, but it is not a substitute for stopping an active editor.
+
+Do not start an independently managed model process and expect
+`bcode opencode` to stop it. The setup TUI's embedded mode gives the session a
+single owner; an explicitly external endpoint is intentionally outside that
+ownership boundary.
+
+## Reconfigure
+
+Run the canonical setup TUI again:
 
 ```bash
-curl -fsS http://127.0.0.1:7777/healthz
-curl -fsS http://127.0.0.1:7777/readyz
+bcode setup
 ```
 
-`healthz` reports service liveness; `readyz` reports essential-child readiness.
-Neither proves that an independently running CLI task has completed, nor that
-the reference model passes a coding evaluation.
+It preserves the data directory, refreshes generated configuration, and
+validates the result. Use `bcode config show` for a read-only view of the
+effective configuration.
 
-With `inference.mode: embedded`, the API's process manager starts and monitors
-the configured server. With `external`, it does not own or stop the server.
+## Update
 
-## Stop and recover
-
-Interrupt the foreground CLI/service cleanly. A container receives SIGTERM
-through `docker stop`; its grace period should exceed
-`api.shutdown_grace_seconds` (30 by default). The shipped Compose configuration
-uses 40 seconds.
-
-Managed children are stopped through the process manager. Independently launched
-CLI tasks and external inference servers have their own lifecycles; stopping the
-status API is not a machine-wide task/GPU shutdown.
-
-After a crash or interruption, inspect persisted state:
-
-```bash
-bcode task list
-bcode task recover
-bcode task show TASK_ID
-```
-
-Recovery inspects uncertain operations and stale evidence rather than assuming a
-side effect succeeded. A hard kill is not a promise of safe external side effects
-or uncorrupted repository logic. See [recovery](../explanation/crash-recovery.md).
-
-## Update deliberately
-
-Back up workspace state before upgrading; schemas migrate forward:
+Back up persistent data before changing a binary or schema:
 
 ```bash
 bcode backup --all
 ```
 
-Stop active tasks, inspect the release/change log, update source and rebuild with
-`make build`. Keep the Bonsai runtime revision, artifact checksum and profile
-recorded separately from the BoundedCode version.
+Install the new `bcode` executable using the project's normal release/source
+process, then run:
 
-For a container deployment, review image provenance and recreate the container
-with the same data/repository mounts and network restrictions. Do not copy a
-`latest`-tag command and assume it reproduces the measured Bonsai installation.
+```bash
+bcode setup
+bcode doctor
+```
 
-Downgrades across database schema versions are unsupported. Restore a compatible
-backup or upgrade the binary. See [backups](backup-and-restore.md).
+Schemas migrate forward when the data directory opens. Database downgrades
+across schema versions are unsupported; restore a compatible backup or keep
+upgrading. Model and runtime artifacts are separate from the BoundedCode
+version, so record the runtime revision and model checksum when comparing
+results.
+
+## Uninstall
+
+Stop all sessions and back up anything you want to keep. Then remove the
+executable and selected data directory:
+
+```bash
+rm -f "$HOME/.local/bin/bcode"
+rm -rf "${BC_DATA:-$HOME/.local/share/boundedcode}"
+```
+
+This removes indexes, ledgers, evidence, cached models, keys, and setup
+credentials. Project-side generated files remain in each repository; remove
+the managed BoundedCode block from `AGENTS.md` and the BoundedCode MCP entry
+from `opencode.json` by hand if the project no longer uses it.
