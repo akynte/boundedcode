@@ -143,6 +143,19 @@ func (s *Store) TmpDir() string       { return s.layout.TmpDir(s.id) }
 func (s *Store) DBs() []*DB { return []*DB{s.index, s.ledger, s.telemetry} }
 
 // RecordWorkspace writes the data-side note for `bcode workspace list`.
+//
+// Every call that binds to this workspace calls this (session.Open runs it on
+// each MCP tool call), and callers routinely run concurrently — an agent
+// dispatching several tool calls "in parallel" is the ordinary case, not an
+// edge case. The temp file used to be a single fixed name (path+".tmp") for
+// every caller: two concurrent writers both wrote it, the first to reach
+// os.Rename moved it out from under the second, and the second's rename then
+// failed with ENOENT even though nothing was actually wrong. os.CreateTemp
+// gives each caller its own uniquely-named file in the same directory, so
+// concurrent writers never share one to race over; the loser of the race is
+// simply the one whose content does not end up on disk, which is the ordinary
+// last-writer-wins outcome this file already tolerates (it is a status note,
+// not a source of truth — that is the workspace pin itself).
 func (s *Store) RecordWorkspace(ws *workspace.Workspace) error {
 	rec := Record{
 		ID:         ws.ID(),
@@ -156,11 +169,30 @@ func (s *Store) RecordWorkspace(ws *workspace.Workspace) error {
 		return err
 	}
 	path := s.layout.RecordPath(s.id)
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, append(body, '\n'), 0o640); err != nil {
+	tmp, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".*.tmp")
+	if err != nil {
 		return err
 	}
-	return os.Rename(tmp, path)
+	tmpName := tmp.Name()
+	_, writeErr := tmp.Write(append(body, '\n'))
+	closeErr := tmp.Close()
+	if writeErr != nil {
+		os.Remove(tmpName)
+		return writeErr
+	}
+	if closeErr != nil {
+		os.Remove(tmpName)
+		return closeErr
+	}
+	if err := os.Chmod(tmpName, 0o640); err != nil {
+		os.Remove(tmpName)
+		return err
+	}
+	if err := os.Rename(tmpName, path); err != nil {
+		os.Remove(tmpName)
+		return err
+	}
+	return nil
 }
 
 // ClearSlots removes llama-server saved slots. §2.2 requires this on every

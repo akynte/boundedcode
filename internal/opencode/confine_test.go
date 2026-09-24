@@ -173,6 +173,14 @@ func TestRegisterAgentDeniesTheShellAndKeepsTheDeveloperConfig(t *testing.T) {
 			t.Fatalf("%s is %q, want deny", tool, agent.Permission[tool])
 		}
 	}
+	// boundedcode tools are all codemode:false and called directly; a small
+	// reference model repeatedly reached for Code Mode's `execute` for one
+	// anyway and then wrote require()/import inside it, which the sandbox
+	// does not support. Denying the tool removes the mistake rather than
+	// relying on the model reading a paragraph about it.
+	if agent.Permission["execute"] != "deny" {
+		t.Fatalf("execute is %q, want deny", agent.Permission["execute"])
+	}
 	// The built-in file tools are denied so the firewall-proxied ones are the
 	// only route: the sandbox bounds the session to the worktree, and a
 	// committed .env or a generated file is inside the worktree too.
@@ -197,12 +205,12 @@ func TestRegisterAgentDeniesTheShellAndKeepsTheDeveloperConfig(t *testing.T) {
 
 func TestDeniedSummaryNamesEveryRefusalWithItsReason(t *testing.T) {
 	summary := opencode.DeniedSummary()
-	for _, tool := range []string{"bash", "webfetch", "websearch", "task", "external_directory"} {
+	for _, tool := range []string{"bash", "webfetch", "websearch", "task", "external_directory", "execute"} {
 		if !strings.Contains(summary, tool) {
 			t.Fatalf("%s is refused but not reported: %s", tool, summary)
 		}
 	}
-	if got, want := strings.Count(summary, "\n"), 7; got != want {
+	if got, want := strings.Count(summary, "\n"), 8; got != want {
 		t.Fatalf("summary is %d lines, want one per refusal (%d): %q", got, want, summary)
 	}
 }

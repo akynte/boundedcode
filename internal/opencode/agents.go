@@ -48,6 +48,7 @@ const (
 const globalToolGuidance = globalBegin + "\n" +
 	"## Tool execution (BoundedCode)\n\n" +
 	"- OpenCode's `execute` tool runs JavaScript in Code Mode to call and combine tools. It is not a shell, Python, Go, or SQL runtime. Follow its JavaScript interface when using it.\n" +
+	"- Code Mode's JavaScript is a restricted sandbox, not Node.js: there is no `require`, no `import`/`import()`, no filesystem or process access, and no npm packages. The only things available inside `execute` are the tool functions its own `search()` catalog returns, plus plain JS built-ins (Array, Object, Math, JSON, Date, RegExp, Map, Set, URL, plain and async functions, standard control flow, `await`). If `execute` answers `ReferenceError: Unknown identifier 'require'` (or `import`), the fix is to delete that line and call the tool function directly — never to look for a different way to import something.\n" +
 	"- Use OpenCode's `shell` tool for host commands and language runtimes. Check whether optional command-line tools are installed before relying on them; a missing CLI does not mean the application library is missing.\n" +
 	"- When a tool call fails, read the error and retry with a tool that supports the required language or operation. Do not treat one tool error as a disconnected session, and provide a concise final answer after completing the work.\n" +
 	globalEnd + "\n"

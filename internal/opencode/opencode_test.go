@@ -404,3 +404,28 @@ func TestTheBlockExplainsDirectToolsAreNotInCodeMode(t *testing.T) {
 		}
 	}
 }
+
+// Observed failure: `execute` answered `ReferenceError: Unknown identifier
+// 'require'. (line 1, col 12)` — the model treated Code Mode's JavaScript as
+// ordinary Node.js and reached for `require`, which the sandbox does not
+// support (no filesystem, no npm, no module system at all). This is a global
+// OpenCode fact, not something specific to this project, so it belongs in the
+// instructions every repository gets, not the per-project block.
+func TestGlobalGuidanceExplainsCodeModeIsNotNodeJS(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	path, changed, err := opencode.ApplyGlobalInstructions()
+	if err != nil || !changed {
+		t.Fatalf("changed=%v err=%v", changed, err)
+	}
+	body, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(body)
+	for _, want := range []string{"no `require`", "no npm packages", "Unknown identifier 'require'"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("global guidance does not address the observed require() confusion (%q):\n%s", want, got)
+		}
+	}
+}

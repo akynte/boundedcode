@@ -183,6 +183,17 @@ var deniedPermissions = map[string]string{
 	"websearch":          "same, and an edit loop that searches the web is not reproducible",
 	"task":               "one model, two roles: a subagent on one GPU costs a full prefill and answers with less context",
 	"external_directory": "the worktree is the task's world; anything outside it is out of scope by construction",
+	// Every boundedcode_* tool is codemode:false (registered directly, see
+	// RegisterMCP), so this agent never needs Code Mode to reach one of them,
+	// and nothing else in a supervised edit needs Code Mode either. Prompting
+	// around Code Mode's restricted JavaScript was tried first — telling the
+	// model these tools are direct, and separately that Code Mode has no
+	// require/import — and the reference model still reached for `execute`
+	// for a boundedcode tool and still wrote `require(...)` inside it on
+	// repeated, separate occasions. A denied permission does not depend on a
+	// small model reading and retaining a paragraph of prose; it removes the
+	// tool the mistake needs.
+	"execute": "boundedcode tools are called directly, never through Code Mode, and nothing else here needs a JavaScript sandbox",
 	// The built-in file tools are denied so the proxied ones are the only
 	// route. The sandbox already keeps the session inside the worktree; what
 	// it cannot express is the rest of §9's path policy, and a committed .env
