@@ -40,8 +40,6 @@ func (e *SmokeEngine) Step(ctx context.Context, req engine.Request) (*engine.Res
 	path := req.Worktree
 	if e.Path != "" {
 		path = filepath.Join(req.Worktree, filepath.FromSlash(e.Path))
-	} else {
-		path = req.Worktree
 	}
 	body, err := os.ReadFile(path) //nolint:gosec // path is the task worktree supplied by production Runner
 	if err != nil {
@@ -55,7 +53,7 @@ func (e *SmokeEngine) Step(ctx context.Context, req engine.Request) (*engine.Res
 		return nil, err
 	}
 	e.LastTaskID = req.TaskID
-	_, _ = ledger.ContentManifest(req.Worktree) // keep the production candidate path check explicit
+	_, _ = ledger.ContentManifestContext(ctx, req.Worktree) // keep the production candidate path check explicit
 	return &engine.Response{Summary: "non-official deterministic smoke edit", ClaimsDone: true,
 		Edited: true, TokensUsed: e.Tokens}, nil
 }

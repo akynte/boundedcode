@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 
@@ -65,8 +66,10 @@ func profileDir(root *store.Root) string {
 }
 
 // emitJSON writes a value as indented JSON to stdout.
-func emitJSON(v any) error {
-	enc := json.NewEncoder(os.Stdout)
+func emitJSON(v any) error { return emitJSONTo(os.Stdout, v) }
+
+func emitJSONTo(w io.Writer, v any) error {
+	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
 	return enc.Encode(v)
 }

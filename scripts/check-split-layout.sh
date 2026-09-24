@@ -34,6 +34,20 @@ cleanup() {
 }
 trap cleanup EXIT
 
+echo "preparing the split data volume for the unprivileged supervisor"
+docker volume create bc-data-split >/dev/null
+docker run --rm -v bc-data-split:/data alpine:3 chown -R 10001:10001 /data
+# Seed the same persisted configuration the operator's one-time setup creates;
+# the image entrypoint intentionally refuses to start without it, and the
+# environment below then supplies the split deployment's route.
+docker run --rm \
+  --entrypoint /usr/local/bin/bcode \
+  -v bc-data-split:/data \
+  -e BC_DATA=/data \
+  "$BC_IMAGE" \
+  setup --non-interactive --external-url http://127.0.0.1:9090 \
+    --profile external-inference --skip-judgment
+
 echo "bringing up the split layout with a stub inference service"
 "${compose[@]}" up -d --wait
 
@@ -51,8 +65,8 @@ echo "$ready" | grep -Eq '"ready"[[:space:]]*:[[:space:]]*true' || {
 #    alone. Both variables were set by the compose file and read by nothing,
 #    which left a supervisor deployed this way in mode "none" with no base URL.
 cfg=$("${compose[@]}" exec -T supervisor bcode config show)
-mode=$(echo "$cfg" | sed -n 's/.*"Mode": *"\([^"]*\)".*/\1/p' | head -1)
-base=$(echo "$cfg" | sed -n 's/.*"BaseURL": *"\([^"]*\)".*/\1/p' | head -1)
+mode=$(printf '%s' "$cfg" | jq -r '.config.Inference.Mode // ""')
+base=$(printf '%s' "$cfg" | jq -r '.config.Inference.BaseURL // ""')
 
 echo "inference mode: ${mode:-<empty>}"
 echo "base URL:       ${base:-<empty>}"

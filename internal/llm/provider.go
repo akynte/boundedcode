@@ -259,6 +259,26 @@ func (e *UnsupportedError) Error() string {
 
 func (e *UnsupportedError) Is(target error) bool { return target == ErrUnsupported }
 
+// ServedModelIdentity is the identity a provider reports after a generation
+// request. A configured route and a served route are different claims: the
+// former says what the operator selected, while only this record says what the
+// endpoint returned. Empty Model means the provider did not expose an
+// independently observable identity.
+type ServedModelIdentity struct {
+	Provider      string
+	Model         string
+	Runtime       string
+	ContextTokens int
+}
+
+// ServedModelIdentityProvider is an optional provider capability used by
+// reproducibility-sensitive callers. It is deliberately separate from
+// Provider so ordinary providers do not have to claim more than their wire
+// response proves.
+type ServedModelIdentityProvider interface {
+	ServedModelIdentity() ServedModelIdentity
+}
+
 // Provider is the §9.1 interface. Adding a provider is one Go file
 // implementing this plus a Capabilities declaration (§9.1).
 type Provider interface {

@@ -7,22 +7,26 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/akynte/boundedcode/internal/policy"
 	"github.com/akynte/boundedcode/internal/sandbox"
-	"github.com/akynte/boundedcode/internal/sandbox/bwrap"
-	"github.com/akynte/boundedcode/internal/sandbox/container"
-	"github.com/akynte/boundedcode/internal/sandbox/landlock"
 )
 
 // WorkerRequest is the complete task-facing surface of a benchmark worker.
 // Evaluator, oracle, hidden files, expected labels, and benchmark metadata are
 // not fields and therefore cannot be passed by a careless adapter.
 type WorkerRequest struct {
-	RunID       string            `json:"run_id"`
+	RunID string `json:"run_id"`
+	// ExecutionID identifies this physical attempt. RunID remains the stable
+	// schedule identity used for pairing; a rerun gets a fresh value so its
+	// production store cannot reopen the previous attempt's ledger/cache.
+	ExecutionID string            `json:"execution_id"`
 	PairID      string            `json:"pair_id"`
 	Task        TaskConfig        `json:"task"`
 	Workspace   string            `json:"workspace"`
@@ -34,20 +38,38 @@ type WorkerRequest struct {
 	// WorkerName identifies the executable/runtime for audit. It contains no
 	// provider credential.
 	WorkerName string `json:"worker_name"`
+	// Smoke is harness-only routing metadata. It is deliberately omitted from
+	// the serialized worker request so a worker cannot infer evaluator mode.
+	Smoke bool `json:"-"`
 }
 
 // ValidateRequest is a final boundary check used before every adapter call.
 func (r WorkerRequest) ValidateRequest() error {
+	if strings.TrimSpace(r.RunID) == "" || strings.TrimSpace(r.ExecutionID) == "" || strings.TrimSpace(r.PairID) == "" {
+		return errors.New("bench: worker request identity is incomplete")
+	}
 	if strings.TrimSpace(r.Workspace) == "" {
 		return errors.New("bench: worker workspace is empty")
 	}
 	if strings.TrimSpace(r.Task.ID) == "" {
 		return errors.New("bench: worker task id is empty")
 	}
-	if strings.Contains(strings.ToLower(string(mustJSON(r))), "oracle") {
-		// This is intentionally a structural smoke check. The request type has
-		// no oracle field; a future field named Oracle must fail this test
-		// rather than silently becoming a channel.
+	if err := r.Limits.Validate(); err != nil {
+		return fmt.Errorf("bench: worker limits: %w", err)
+	}
+	if err := validateEnvironment("worker", r.Environment); err != nil {
+		return err
+	}
+	if err := validateModel(r.Model); err != nil {
+		return fmt.Errorf("bench: worker model: %w", err)
+	}
+	if r.Network != "" && r.Network != "none" && r.Network != "allowlist" && r.Network != "host" {
+		return fmt.Errorf("bench: worker network policy %q is invalid", r.Network)
+	}
+	if requestHasForbiddenKey(r) {
+		// This is intentionally a structural check. A path or task description
+		// may legitimately contain the word "oracle"; a forbidden JSON key is
+		// the actual metadata leak.
 		return errors.New("bench: worker request contains evaluator/oracle metadata")
 	}
 	return nil
@@ -55,19 +77,56 @@ func (r WorkerRequest) ValidateRequest() error {
 
 func mustJSON(v any) []byte { b, _ := json.Marshal(v); return b }
 
+func requestHasForbiddenKey(value any) bool {
+	body, err := json.Marshal(value)
+	if err != nil {
+		return true
+	}
+	var decoded any
+	if json.Unmarshal(body, &decoded) != nil {
+		return true
+	}
+	var walk func(any) bool
+	walk = func(v any) bool {
+		switch x := v.(type) {
+		case map[string]any:
+			for key, child := range x {
+				lk := strings.ToLower(key)
+				if lk == "oracle" || lk == "evaluator" || strings.Contains(lk, "hidden") || strings.Contains(lk, "expected") {
+					return true
+				}
+				if walk(child) {
+					return true
+				}
+			}
+		case []any:
+			for _, child := range x {
+				if walk(child) {
+					return true
+				}
+			}
+		}
+		return false
+	}
+	return walk(decoded)
+}
+
 // WorkerResult is the system's self-report and measured execution metadata. It
 // is not the benchmark correctness decision.
 type WorkerResult struct {
-	ReportedSuccess bool    `json:"reported_success"`
-	ReportedStatus  string  `json:"reported_status"`
-	FailureReason   string  `json:"failure_reason,omitempty"`
-	TaskID          string  `json:"bounded_task_id,omitempty"`
-	CandidateDir    string  `json:"candidate_dir,omitempty"`
-	Stdout          string  `json:"-"`
-	Stderr          string  `json:"-"`
-	Events          []Event `json:"events,omitempty"`
-	Metrics         Metrics `json:"metrics"`
-	Termination     string  `json:"termination_reason,omitempty"`
+	Model           ModelConfig `json:"model,omitempty"`
+	WorkerStarted   bool        `json:"worker_started"`
+	ModelVerified   bool        `json:"model_identity_verified,omitempty"`
+	ReportedSuccess bool        `json:"reported_success"`
+	ReportedStatus  string      `json:"reported_status"`
+	FailureReason   string      `json:"failure_reason,omitempty"`
+	TaskID          string      `json:"bounded_task_id,omitempty"`
+	CandidateDir    string      `json:"candidate_dir,omitempty"`
+	Stdout          string      `json:"-"`
+	Stderr          string      `json:"-"`
+	Events          []Event     `json:"events,omitempty"`
+	Metrics         Metrics     `json:"metrics"`
+	Termination     string      `json:"termination_reason,omitempty"`
 }
 
 // Event is an adapter-neutral recovery/interruption event. It is data, not a
@@ -103,6 +162,20 @@ type Worker interface {
 	Run(context.Context, WorkerRequest) (WorkerResult, error)
 }
 
+// ModelIdentityAttestor is an optional worker capability for official runs.
+// A worker that cannot attest the provider-reported model identity must not be
+// used to manufacture an apparently fair official pair.
+type ModelIdentityAttestor interface {
+	ModelIdentityAttestable() bool
+}
+
+// LimitAttestor is an explicit claim that an adapter enforces the frozen
+// generation/token/verification admission limits, rather than merely passing
+// them as environment hints. Official paired runs require this capability.
+type LimitAttestor interface {
+	LimitsAttestable() bool
+}
+
 // RawAdapter is the baseline arm. It intentionally has no Supervisor in its
 // call path; it only receives a WorkerRequest and the isolated workspace.
 type RawAdapter struct {
@@ -133,6 +206,10 @@ type BoundedExecutorFactory func(context.Context, WorkerRequest) (BoundedExecuto
 
 type BoundedAdapter struct {
 	Factory BoundedExecutorFactory
+	// RequireProduction rejects fake/programmatic executors in an official
+	// paired run. The production adapter is the only implementation that can
+	// satisfy this boundary.
+	RequireProduction bool
 }
 
 func (a BoundedAdapter) Run(ctx context.Context, req WorkerRequest) (WorkerResult, error) {
@@ -149,8 +226,19 @@ func (a BoundedAdapter) Run(ctx context.Context, req WorkerRequest) (WorkerResul
 	if executor == nil {
 		return WorkerResult{}, errors.New("bench: BOUNDED executor factory returned nil")
 	}
+	if a.RequireProduction {
+		if _, ok := executor.(*ProductionBounded); !ok {
+			return WorkerResult{}, errors.New("bench: official BOUNDED run requires the production executor")
+		}
+	}
+	var out WorkerResult
+	var executeErr error
 	if closer, ok := executor.(interface{ Close() error }); ok {
-		defer func() { _ = closer.Close() }()
+		out, executeErr = executor.Execute(ctx, req)
+		if closeErr := closer.Close(); executeErr == nil && closeErr != nil {
+			executeErr = fmt.Errorf("bench: close bounded executor: %w", closeErr)
+		}
+		return out, executeErr
 	}
 	return executor.Execute(ctx, req)
 }
@@ -164,6 +252,7 @@ type CommandWorker struct {
 	Command      []string
 	Shell        bool
 	Network      sandbox.Network
+	networkSet   bool
 	ReadOnly     []string
 	ExtraEnv     map[string]string
 	ClaimPattern *regexp.Regexp
@@ -173,27 +262,79 @@ type CommandWorker struct {
 }
 
 func NewCommandWorker(command []string, opts ...CommandWorkerOption) (*CommandWorker, error) {
-	if len(command) == 0 {
+	if len(command) == 0 || strings.TrimSpace(command[0]) == "" {
 		return nil, errors.New("bench: worker command is empty")
+	}
+	for i, arg := range command {
+		if strings.TrimSpace(arg) == "" {
+			return nil, fmt.Errorf("bench: worker command argument %d is empty", i)
+		}
+		if strings.ContainsRune(arg, '\x00') {
+			return nil, fmt.Errorf("bench: worker command argument %d contains NUL", i)
+		}
 	}
 	w := &CommandWorker{Command: append([]string(nil), command...), SuccessExit: 0, Name: "command"}
 	for _, opt := range opts {
 		opt(w)
 	}
 	if w.Runner == nil {
-		ll, _ := landlock.New()
-		candidates := make([]sandbox.Runner, 0, 3)
-		if ll != nil {
-			candidates = append(candidates, bwrap.New(ll), ll)
-		}
-		candidates = append(candidates, &container.Runner{})
-		r, _ := sandbox.Select(context.Background(), candidates)
-		if r == nil {
-			return nil, errors.New("bench: no filesystem sandbox is available for a command worker")
-		}
-		w.Runner = r
+		w.Runner = SelectCommandSandbox(context.Background())
+	}
+	network := sandbox.NetworkNone
+	if w.networkSet {
+		network = w.Network
+	}
+	if err := RequireConfinedRunner(w.Runner, network); err != nil {
+		return nil, err
 	}
 	return w, nil
+}
+
+type cappedBuffer struct {
+	bytes.Buffer
+	mu       sync.Mutex
+	limit    int
+	overflow bool
+}
+
+func newCappedBuffer(limit int) *cappedBuffer {
+	if limit <= 0 {
+		limit = 1 << 20
+	}
+	return &cappedBuffer{limit: limit}
+}
+
+func (b *cappedBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	original := len(p)
+	if remaining := b.limit - b.Buffer.Len(); remaining > 0 {
+		if len(p) > remaining {
+			p = p[:remaining]
+			b.overflow = true
+		}
+		if len(p) > 0 {
+			_, _ = b.Buffer.Write(p)
+		}
+	} else if original > 0 {
+		b.overflow = true
+	}
+	return original, nil
+}
+
+func (b *cappedBuffer) Overflowed() bool {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.overflow
+}
+
+func (b *cappedBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.Buffer.Len() < b.limit {
+		return b.Buffer.String()
+	}
+	return b.Buffer.String() + "\n… (truncated)"
 }
 
 type CommandWorkerOption func(*CommandWorker)
@@ -202,7 +343,7 @@ func WithCommandSandbox(r sandbox.Runner) CommandWorkerOption {
 	return func(w *CommandWorker) { w.Runner = r }
 }
 func WithCommandNetwork(n sandbox.Network) CommandWorkerOption {
-	return func(w *CommandWorker) { w.Network = n }
+	return func(w *CommandWorker) { w.Network, w.networkSet = n, true }
 }
 func WithCommandReadOnly(paths ...string) CommandWorkerOption {
 	return func(w *CommandWorker) { w.ReadOnly = append(w.ReadOnly, paths...) }
@@ -225,6 +366,11 @@ func WithClaimPattern(pattern string) CommandWorkerOption {
 	}
 }
 
+func (w *CommandWorker) ModelIdentityAttestable() bool { return false }
+func (w *CommandWorker) LimitsAttestable() bool        { return false }
+
+var errWorkerOutputLimit = errors.New("bench: worker output exceeded the configured limit")
+
 func (w *CommandWorker) Run(ctx context.Context, req WorkerRequest) (WorkerResult, error) {
 	if err := req.ValidateRequest(); err != nil {
 		return WorkerResult{}, err
@@ -243,14 +389,31 @@ func (w *CommandWorker) Run(ctx context.Context, req WorkerRequest) (WorkerResul
 		}
 	}
 	defer os.RemoveAll(tmp)
+	network, err := w.networkFor(req.Network)
+	if err != nil {
+		return WorkerResult{}, err
+	}
+	if req.Network == "none" && network == sandbox.NetworkHost {
+		return WorkerResult{}, errors.New("bench: worker network override cannot widen network_policy=none")
+	}
 	readOnly := append([]string(nil), w.ReadOnly...)
-	readOnly = append(readOnly,
-		"/usr", "/bin", "/sbin", "/lib", "/lib64", "/etc/ssl", "/etc/ca-certificates",
-		"/usr/local/go", "/opt/bcode", "/proc", "/sys", "/etc/hosts", "/etc/resolv.conf")
+	readOnly = append(readOnly, benchmarkReadOnlyPaths()...)
+	requestPath := filepath.Join(tmp, "request.json")
+	body, marshalErr := json.Marshal(req)
+	if marshalErr != nil {
+		return WorkerResult{}, fmt.Errorf("bench: encode worker request: %w", marshalErr)
+	}
+	if err := os.WriteFile(requestPath, body, 0o600); err != nil { //nolint:gosec // private worker request
+		return WorkerResult{}, fmt.Errorf("bench: write worker request: %w", err)
+	}
+	writable, err := commandWritablePaths(req.Workspace, req.Task.MutableScope, tmp)
+	if err != nil {
+		return WorkerResult{}, err
+	}
 	spec := sandbox.Spec{
-		Network: w.Network, ReadOnly: uniqueSorted(readOnly),
-		ReadWrite: []string{req.Workspace, tmp}, Dir: req.Workspace, TmpDir: tmp,
-		Env: commandEnv(w.ExtraEnv, req, tmp),
+		Network: network, ReadOnly: uniqueSorted(append(readOnly, req.Workspace)),
+		ReadWrite: writable, Dir: req.Workspace, TmpDir: tmp,
+		Env: append(commandEnv(w.ExtraEnv, req, tmp), "BENCH_TASK_FILE="+requestPath),
 	}
 	if err := spec.Validate(); err != nil {
 		return WorkerResult{}, err
@@ -268,14 +431,20 @@ func (w *CommandWorker) Run(ctx context.Context, req WorkerRequest) (WorkerResul
 	if err != nil {
 		return WorkerResult{}, err
 	}
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout, cmd.Stderr = &stdout, &stderr
-	runErr := cmd.Run()
-	res := WorkerResult{Stdout: stdout.String(), Stderr: stderr.String()}
+	stdout := newCappedBuffer(w.MaxOutput)
+	stderr := newCappedBuffer(w.MaxOutput)
+	cmd.Stdout, cmd.Stderr = stdout, stderr
+	started, runErr := runProcessStarted(ctx, cmd)
+	res := WorkerResult{Model: req.Model, WorkerStarted: started, Stdout: RedactText(stdout.String()), Stderr: RedactText(stderr.String())}
 	if ctx.Err() != nil {
 		res.Termination = "timeout"
 		res.ReportedStatus = "timeout"
 		return res, ctx.Err()
+	}
+	if stdout.Overflowed() || stderr.Overflowed() {
+		res.ReportedStatus = "output_limit"
+		res.FailureReason = errWorkerOutputLimit.Error()
+		return res, errWorkerOutputLimit
 	}
 	code := exitCode(runErr)
 	res.ReportedSuccess = runErr == nil || code == w.SuccessExit
@@ -288,7 +457,33 @@ func (w *CommandWorker) Run(ctx context.Context, req WorkerRequest) (WorkerResul
 		res.ReportedStatus = "reported_failure"
 		res.FailureReason = strings.TrimSpace(res.Stderr)
 	}
-	return res, runErr
+	if runErr != nil {
+		var exitErr *exec.ExitError
+		if !errors.As(runErr, &exitErr) {
+			return res, runErr
+		}
+	}
+	return res, nil
+}
+
+func (w *CommandWorker) networkFor(policy string) (sandbox.Network, error) {
+	if w.networkSet {
+		return w.Network, nil
+	}
+	switch strings.ToLower(strings.TrimSpace(policy)) {
+	case "":
+		// An omitted policy follows the harness-wide no-network default. A
+		// model endpoint must be selected explicitly with `host`.
+		return sandbox.NetworkNone, nil
+	case "host":
+		return sandbox.NetworkHost, nil
+	case "none":
+		return sandbox.NetworkNone, nil
+	case "allowlist":
+		return "", errors.New("bench: network_policy=allowlist needs a task-specific sandbox policy; refusing to silently grant host networking")
+	default:
+		return "", fmt.Errorf("bench: unsupported network policy %q", policy)
+	}
 }
 
 func commandEnv(extra map[string]string, req WorkerRequest, tmp string) []string {
@@ -301,17 +496,122 @@ func commandEnv(extra map[string]string, req WorkerRequest, tmp string) []string
 	if req.Seed != 0 {
 		env = append(env, fmt.Sprintf("BENCH_SEED=%d", req.Seed))
 	}
-	keys := make([]string, 0, len(extra))
-	for k := range extra {
+	if req.Limits.MaxGenerationRequests > 0 {
+		env = append(env, fmt.Sprintf("BENCH_MAX_GENERATION_REQUESTS=%d", req.Limits.MaxGenerationRequests))
+	}
+	if req.Limits.MaxVerificationAttempts > 0 {
+		env = append(env, fmt.Sprintf("BENCH_MAX_VERIFICATION_ATTEMPTS=%d", req.Limits.MaxVerificationAttempts))
+	}
+	if req.Limits.MaxTokens > 0 {
+		env = append(env, fmt.Sprintf("BENCH_MAX_TOKENS=%d", req.Limits.MaxTokens))
+	}
+	values := make(map[string]string, len(req.Environment)+len(extra))
+	for k, v := range req.Environment {
+		values[k] = v
+	}
+	for k, v := range extra {
+		values[k] = v
+	}
+	keys := make([]string, 0, len(values))
+	for k := range values {
 		keys = append(keys, k)
 	}
 	sortStrings(keys)
 	for _, k := range keys {
-		if validEnvName(k) {
-			env = append(env, k+"="+extra[k])
+		if !safeWorkerEnvName(k) || strings.ContainsRune(values[k], '\x00') {
+			continue
 		}
+		env = append(env, k+"="+values[k])
 	}
 	return env
+}
+
+// AppendSafeEnvironment adds validated task variables to a production
+// sandbox environment without allowing them to replace harness-owned paths or
+// runtime controls. It is used by the BOUNDED adapter so setup/verification
+// commands see the same declared environment as RAW.
+func AppendSafeEnvironment(base []string, extra map[string]string) []string {
+	out := append([]string(nil), base...)
+	values := make(map[string]string, len(extra))
+	keys := make([]string, 0, len(extra))
+	for key, value := range extra {
+		if !safeWorkerEnvName(key) || strings.ContainsRune(value, '\x00') {
+			continue
+		}
+		if _, exists := values[key]; !exists {
+			keys = append(keys, key)
+		}
+		values[key] = value
+	}
+	sortStrings(keys)
+	for _, key := range keys {
+		out = append(out, key+"="+values[key])
+	}
+	return out
+}
+
+func safeWorkerEnvName(name string) bool {
+	if !validEnvName(name) || reservedEnvName(name) {
+		return false
+	}
+	lk := strings.ToLower(name)
+	if strings.HasPrefix(lk, "bench_") || strings.HasPrefix(lk, "xdg_") ||
+		lk == "home" || lk == "tmpdir" || lk == "path" || lk == "lang" || lk == "lc_all" ||
+		lk == "no_color" || lk == "term" {
+		return false
+	}
+	return !strings.Contains(lk, "key") && !strings.Contains(lk, "token") && !strings.Contains(lk, "secret") &&
+		!strings.Contains(lk, "password") && !strings.Contains(lk, "credential") && !strings.Contains(lk, "authorization") &&
+		!strings.Contains(lk, "oracle") && !strings.Contains(lk, "evaluator") && !strings.Contains(lk, "hidden")
+}
+
+func commandWritablePaths(root string, scope []string, tmp string) ([]string, error) {
+	if len(scope) == 0 {
+		return nil, errors.New("bench: RAW command requires an explicit mutable_scope")
+	}
+	paths := make([]string, 0, len(scope)+1)
+	if policy.Covers(scope, ".") {
+		paths = append(paths, root)
+	}
+	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(root, path)
+		if err != nil {
+			return err
+		}
+		rel = filepath.ToSlash(rel)
+		if rel == "." {
+			return nil
+		}
+		if d.Name() == ".git" {
+			if d.IsDir() {
+				return filepath.SkipDir
+			}
+			return errors.New("bench: candidate .git is not a directory")
+		}
+		if d.Type()&os.ModeSymlink != 0 {
+			return fmt.Errorf("bench: candidate contains symlink %s", rel)
+		}
+		if !policy.Covers(scope, rel) {
+			return nil
+		}
+		paths = append(paths, path)
+		if d.IsDir() {
+			return filepath.SkipDir
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	paths = append(paths, tmp)
+	paths = uniqueSorted(paths)
+	if len(paths) == 0 {
+		return nil, errors.New("bench: mutable_scope matches no candidate path")
+	}
+	return paths, nil
 }
 
 func uniqueSorted(in []string) []string {
@@ -349,19 +649,21 @@ func (w ScriptedWorker) Run(ctx context.Context, req WorkerRequest) (WorkerResul
 		defer t.Stop()
 		select {
 		case <-ctx.Done():
-			return WorkerResult{ReportedStatus: "timeout", Termination: "timeout"}, ctx.Err()
+			return WorkerResult{WorkerStarted: true, ReportedStatus: "timeout", Termination: "timeout"}, ctx.Err()
 		case <-t.C:
 		}
 	}
 	if w.Apply != nil {
 		if err := w.Apply(ctx, req); err != nil {
-			return WorkerResult{ReportedStatus: "error", FailureReason: err.Error()}, err
+			return WorkerResult{WorkerStarted: true, ReportedStatus: "error", FailureReason: err.Error()}, err
 		}
 	}
 	return WorkerResult{
+		Model:           req.Model,
+		WorkerStarted:   true,
 		ReportedSuccess: w.ClaimSuccess, ReportedStatus: statusForClaim(w.ClaimSuccess),
 		FailureReason: w.Stderr, Events: append([]Event(nil), w.Events...), Metrics: w.Metrics,
-		Stdout: w.Stdout, Stderr: w.Stderr,
+		Stdout: RedactText(w.Stdout), Stderr: RedactText(w.Stderr),
 	}, nil
 }
 

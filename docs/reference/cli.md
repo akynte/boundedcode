@@ -731,11 +731,12 @@ it is not a performance result.
 | `freeze` | Write a manifest containing suite, task, evaluator, model, limits, code, and seed identities |
 
 `run` flags: `--suite`, `--mode raw,bounded`, `--tasks`, `--runs`, `--seed`,
-`--timeout`, `--output`, `--rerun`, and `--raw-command`. A real run refuses to
-invent a RAW worker; use `--raw-command` for the standalone OpenCode command.
-`--smoke` selects only the deterministic fixture adapter and is rejected for an
-official suite. The scheduler is sequential by default so a local model/GPU is
-not contended by benchmark arms.
+`--timeout`, `--output`, `--manifest`, `--rerun`, `--rerun-id`, and
+`--raw-command`. A real run refuses to invent a RAW worker; use
+`--raw-command` for the standalone OpenCode command. `--smoke` selects only
+the deterministic fixture adapter and is rejected for an official suite. The
+scheduler is sequential by default so a local model/GPU is not contended by
+benchmark arms.
 
 Every run directory is `suite/task/mode/run`. It contains the result, sanitized
 configuration/task snapshots, stdout/stderr, candidate patch, evaluator evidence,
@@ -743,7 +744,7 @@ and timing/usage fields. Unknown measurements are JSON `null`, not zero. The
 independent evaluator runs after the worker and receives hidden material in a
 separate copy; neither worker request nor candidate workspace contains it.
 
-`bcode bench report results/smoke` writes `report.json` and `report.md`.
+`bcode bench report <data-dir>/benchmarks/results/smoke` writes `report.json` and `report.md`.
 `--json` prints the report instead. Rates are descriptive and paired intervals
 resample tasks; a small smoke result must not be read as evidence that one
 architecture is better.

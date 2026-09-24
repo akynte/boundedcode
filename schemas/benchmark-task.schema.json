@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/akynte/boundedcode/schemas/benchmark-task.schema.json",
+  "title": "BoundedCode benchmark task",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "id", "title", "description", "repository", "base_commit", "evaluator", "limits"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "id": {"type": "string", "minLength": 1},
+    "title": {"type": "string", "minLength": 1},
+    "description": {"type": "string", "minLength": 1},
+    "repository": {"type": "string", "minLength": 1},
+    "base_commit": {"type": "string", "minLength": 1},
+    "fixture": {"type": "string"},
+    "languages": {"type": "array", "items": {"type": "string"}},
+    "setup": {"$ref": "#/$defs/command"},
+    "visible_validation": {"type": "array", "items": {"$ref": "#/$defs/command"}},
+    "verification": {"enum": ["low", "standard", "high"]},
+    "evaluator": {"$ref": "#/$defs/evaluator"},
+    "limits": {"$ref": "#/$defs/limits"},
+    "network_policy": {"enum": ["none", "allowlist", "host"]},
+    "environment": {"type": "object", "propertyNames": {"pattern": "^[A-Za-z_][A-Za-z0-9_]*$", "not": {"pattern": "(?i)(key|token|secret|password|credential|authorization|oracle|evaluator|hidden)"}}, "additionalProperties": {"type": "string"}},
+    "mutable_scope": {"type": "array", "items": {"type": "string"}},
+    "tags": {"type": "array", "items": {"type": "string"}},
+    "category": {"type": "string"},
+    "difficulty": {"type": "object", "additionalProperties": {"type": "string"}},
+    "provenance": {"type": "object", "additionalProperties": {"type": "string"}},
+    "worker_driver": {"enum": ["smoke"]}
+  },
+  "$defs": {
+    "command": {
+      "oneOf": [
+        {"type": "string", "minLength": 1},
+        {"type": "array", "minItems": 1, "items": {"type": "string"}}
+      ]
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "wall_clock_seconds": {"type": "integer", "minimum": 0},
+        "max_generation_requests": {"type": "integer", "minimum": 0},
+        "max_verification_attempts": {"type": "integer", "minimum": 0},
+        "max_tokens": {"type": "integer", "minimum": 0},
+        "concurrency": {"type": "integer", "minimum": 0}
+      }
+    },
+    "evaluator": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "oracle": {"type": "string"},
+        "files": {"type": "array", "items": {"type": "string"}},
+        "inline_files": {"type": "object", "additionalProperties": {"type": "string"}},
+        "command": {"$ref": "#/$defs/command"},
+        "steps": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["name", "command"], "properties": {"name": {"type": "string"}, "command": {"$ref": "#/$defs/command"}, "timeout_seconds": {"type": "integer", "minimum": 0}, "required": {"type": "boolean"}}}},
+        "timeout_seconds": {"type": "integer", "minimum": 0},
+        "must_not_change": {"type": "array", "items": {"type": "string"}},
+        "canaries": {"type": "array", "items": {"type": "string", "minLength": 12}},
+        "environment": {"type": "object", "propertyNames": {"pattern": "^[A-Za-z_][A-Za-z0-9_]*$", "not": {"pattern": "(?i)(key|token|secret|password|credential|authorization|oracle|evaluator|hidden)"}}, "additionalProperties": {"type": "string"}},
+        "required": {"type": "boolean"},
+        "version": {"type": "string"}
+      },
+      "anyOf": [
+        {"required": ["command"]},
+        {"required": ["steps"]}
+      ]
+    }
+  }
+}

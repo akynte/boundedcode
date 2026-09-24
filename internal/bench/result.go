@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -22,6 +24,7 @@ const (
 	RunInfrastructure      RunStatus = "infrastructure_error"
 	RunProviderUnavailable RunStatus = "provider_unavailable"
 	RunEvaluatorError      RunStatus = "evaluator_error"
+	RunEvaluatorTimeout    RunStatus = "evaluator_timeout"
 	RunInvalid             RunStatus = "invalid"
 	RunCancelled           RunStatus = "cancelled"
 )
@@ -29,8 +32,26 @@ const (
 // Evidence reports whether a run is eligible for the primary completion rate.
 // A timeout with a meaningful candidate remains eligible; infrastructure and
 // evaluator errors do not become ordinary task failures.
+func (s RunStatus) Valid() bool {
+	switch s {
+	case RunCompleted, RunTaskFailed, RunTimeout, RunInfrastructure, RunProviderUnavailable,
+		RunEvaluatorError, RunEvaluatorTimeout, RunInvalid, RunCancelled:
+		return true
+	default:
+		return false
+	}
+}
+
 func (s RunStatus) Evidence() bool {
 	return s == RunCompleted || s == RunTaskFailed || s == RunTimeout
+}
+
+// Retryable reports whether a result represents a transient harness/provider
+// fault that a later resume may safely attempt again. Invalid runs are held
+// for explicit operator review, while an ordinary completed/failed/timeout
+// cell is already complete evidence.
+func (s RunStatus) Retryable() bool {
+	return s == RunInfrastructure || s == RunProviderUnavailable || s == RunEvaluatorError || s == RunEvaluatorTimeout || s == RunCancelled
 }
 
 type TaskReference struct {
@@ -40,6 +61,7 @@ type TaskReference struct {
 	TaskHash      string   `json:"task_hash"`
 	EvaluatorHash string   `json:"evaluator_hash"`
 	BaseCommit    string   `json:"base_commit"`
+	FixtureHash   string   `json:"fixture_hash,omitempty"`
 	Languages     []string `json:"languages,omitempty"`
 	Limits        Limits   `json:"limits"`
 	Verification  string   `json:"verification,omitempty"`
@@ -69,7 +91,9 @@ type RepositoryResult struct {
 	ConfiguredBase       string    `json:"configured_base_commit"`
 	BaseCommit           string    `json:"base_commit"`
 	BaseTree             string    `json:"base_tree"`
+	FixtureHash          string    `json:"fixture_hash,omitempty"`
 	StartingCandidate    string    `json:"starting_candidate_hash"`
+	SetupCandidate       string    `json:"setup_candidate_hash,omitempty"`
 	FinalCandidate       string    `json:"final_candidate_hash"`
 	ChangedFiles         []string  `json:"changed_files"`
 	DiffStats            DiffStats `json:"diff_stats"`
@@ -150,6 +174,7 @@ type ArtifactResult struct {
 	EvaluatorOutputPath string `json:"evaluator_output_path,omitempty"`
 	CandidatePath       string `json:"candidate_path,omitempty"`
 	SchedulePath        string `json:"schedule_path,omitempty"`
+	ManifestPath        string `json:"manifest_path,omitempty"`
 }
 
 // Result is the durable machine-readable record for one execution. The schema
@@ -158,12 +183,16 @@ type ArtifactResult struct {
 type Result struct {
 	SchemaVersion       int                 `json:"schema_version"`
 	BenchmarkSuite      string              `json:"benchmark_suite"`
+	Official            bool                `json:"official"`
+	Smoke               bool                `json:"smoke"`
 	SuiteVersion        string              `json:"suite_version"`
 	SuiteHash           string              `json:"suite_hash"`
+	ManifestHash        string              `json:"manifest_hash,omitempty"`
 	TaskID              string              `json:"task_id"`
 	Mode                Mode                `json:"mode"`
 	RunIndex            int                 `json:"run_index"`
 	RunID               string              `json:"run_id"`
+	ExecutionID         string              `json:"execution_id,omitempty"`
 	PairID              string              `json:"pair_id"`
 	Repetition          int                 `json:"repetition"`
 	Seed                int64               `json:"benchmark_seed"`
@@ -187,12 +216,13 @@ type Result struct {
 // NewResult initializes fields whose zero value would otherwise mean measured
 // zero. The caller fills execution-specific values after the run.
 func NewResult(s Suite, t Task, spec RunSpec, env EnvironmentSnapshot) Result {
-	limits := t.Limits
-	if limits.WallClockSeconds == 0 {
-		limits.WallClockSeconds = int(10 * time.Minute / time.Second)
-	}
+	limits := EffectiveLimits(t.Limits)
+	runner := s.Runner.effective()
 	model := s.Model
-	verified := model.Provider != "" && model.Model != "" && model.ContextTokens > 0
+	// A configured route is an input, not proof of what a provider served.
+	// The runner upgrades this only when the adapter can observe the actual
+	// model identity.
+	verified := false
 	limitations := []string{}
 	if model.ModelFileSHA256 == "" {
 		limitations = append(limitations, "model file hash unavailable")
@@ -200,18 +230,30 @@ func NewResult(s Suite, t Task, spec RunSpec, env EnvironmentSnapshot) Result {
 	if model.Runtime == "" {
 		limitations = append(limitations, "runtime identity unavailable")
 	}
+	if model.Temperature == nil {
+		limitations = append(limitations, "sampling temperature unavailable")
+	}
+	if model.TopP == nil {
+		limitations = append(limitations, "sampling top_p unavailable")
+	}
+	if model.TopK == nil {
+		limitations = append(limitations, "sampling top_k unavailable")
+	}
+	if model.Seed == nil {
+		limitations = append(limitations, "sampling seed unavailable")
+	}
 	return Result{
-		SchemaVersion: ResultSchemaVersion, BenchmarkSuite: s.ID, SuiteVersion: s.Version,
+		SchemaVersion: ResultSchemaVersion, BenchmarkSuite: s.ID, Official: s.Official, Smoke: s.Smoke, SuiteVersion: s.Version,
 		SuiteHash: s.Hash(), TaskID: t.ID, Mode: spec.Mode, RunIndex: spec.RunIndex,
 		RunID: spec.RunID, PairID: spec.PairID, Repetition: spec.Repetition, Seed: spec.Seed, Timestamp: time.Now().UTC(),
 		Task: TaskReference{ID: t.ID, Title: t.Title, Description: t.Description,
-			TaskHash: taskHash(t), EvaluatorHash: t.hiddenHash, BaseCommit: t.BaseCommit,
-			Languages: append([]string(nil), t.Languages...), Limits: t.Limits, Verification: t.Verification,
+			TaskHash: taskHash(t), EvaluatorHash: t.hiddenHash, BaseCommit: t.BaseCommit, FixtureHash: t.FixtureHash,
+			Languages: append([]string(nil), t.Languages...), Limits: limits, Verification: t.Verification,
 			Tags: append([]string(nil), t.Tags...), Category: t.Category, Fixture: t.Fixture,
 			Repository: t.Repository},
 		Configuration: RunConfiguration{SuiteID: s.ID, SuiteVersion: s.Version, SuiteHash: s.Hash(),
 			TaskHash: taskHash(t), Model: model, Limits: limits, Network: t.NetworkPolicy,
-			Environment: RedactSecrets(t.Environment), Runner: s.Runner, Seed: spec.Seed},
+			Environment: RedactSecrets(mergeStrings(s.Environment, t.Environment)), Runner: runner, Seed: spec.Seed},
 		Model: ModelResult{Provider: model.Provider, Model: model.Model, Runtime: model.Runtime,
 			ModelFile: model.ModelFile, ModelFileSHA256: model.ModelFileSHA256,
 			Quantization: model.Quantization, ContextTokens: intPtr(model.ContextTokens),
@@ -229,6 +271,14 @@ func intPtr(v int) *int {
 		return nil
 	}
 	return &v
+}
+
+// measuredInt preserves a real zero measurement. intPtr is reserved for
+// configuration values where zero means "not declared"; a budget counter that
+// was installed and admitted no requests is different and must serialize as 0.
+func measuredInt(v int) *int {
+	x := v
+	return &x
 }
 func cloneInt(v *int) *int {
 	if v == nil {
@@ -255,17 +305,26 @@ func cloneInt64(v *int64) *int64 {
 // Derive computes the benchmark semantics from independent evaluator output.
 // It never consults the evaluator's opinion of the system's self-report.
 func (r *Result) Derive() {
-	pass := r.Evaluator.Status == EvaluatorPass
+	pass := r.Evaluator.Status == EvaluatorPass && r.Evaluator.Independent
+	fail := r.Evaluator.Status == EvaluatorFail
 	r.Derived.IndependentVerifiedSuccess = pass
-	r.Derived.FalseSuccess = r.System.ReportedSuccess && !pass
+	r.Derived.FalseSuccess = r.System.ReportedSuccess && fail
 	r.Derived.FalseFailure = !r.System.ReportedSuccess && pass
 }
 
 // Classify applies explicit status precedence. Evaluator ERROR and provider/
 // harness errors are not converted into task failures.
 func (r *Result) Classify(workerErr error, timedOut bool) {
+	if r.Evaluator.Status == EvaluatorPass && !r.Evaluator.Independent {
+		r.Status = RunInfrastructure
+		return
+	}
 	if r.System.ReportedStatus == "provider_unavailable" || strings.Contains(strings.ToLower(r.InfrastructureError), "provider") {
 		r.Status = RunProviderUnavailable
+		return
+	}
+	if r.Evaluator.Status == EvaluatorTimeout {
+		r.Status = RunEvaluatorTimeout
 		return
 	}
 	if r.Evaluator.Status == EvaluatorError {
@@ -280,11 +339,12 @@ func (r *Result) Classify(workerErr error, timedOut bool) {
 		r.Status = RunInfrastructure
 		return
 	}
-	if r.Evaluator.Status == EvaluatorPass {
+	switch r.Evaluator.Status {
+	case EvaluatorPass:
 		r.Status = RunCompleted
-	} else if r.Evaluator.Status == EvaluatorFail {
+	case EvaluatorFail:
 		r.Status = RunTaskFailed
-	} else {
+	default:
 		r.Status = RunInfrastructure
 	}
 }
@@ -294,25 +354,43 @@ func WriteResult(path string, result Result) error {
 	if path == "" {
 		return errors.New("bench: result path is empty")
 	}
+	return withOutputLock(context.Background(), filepath.Dir(path), func() error {
+		return writeResultUnlocked(path, result)
+	})
+}
+
+func writeResultUnlocked(path string, result Result) error {
+	result.Derive()
 	result = RedactResult(result)
 	body, err := json.MarshalIndent(result, "", "  ")
 	if err != nil {
 		return err
 	}
+	return writeAtomicFile(path, append(body, '\n'), 0o600)
+}
+
+// writeAtomicFile is shared by every small benchmark control artifact. A
+// process killed during a write must leave either the previous complete file or
+// no file, never a JSON prefix that looks resumable.
+func writeAtomicFile(path string, body []byte, mode os.FileMode) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
 		return err
 	}
-	tmp, err := os.CreateTemp(filepath.Dir(path), ".result-*.tmp")
+	tmp, err := os.CreateTemp(filepath.Dir(path), ".bench-*.tmp")
 	if err != nil {
 		return err
 	}
 	name := tmp.Name()
 	defer os.Remove(name)
-	if err := tmp.Chmod(0o600); err != nil {
+	if err := tmp.Chmod(mode); err != nil {
 		_ = tmp.Close()
 		return err
 	}
-	if _, err := tmp.Write(append(body, '\n')); err != nil {
+	if _, err := tmp.Write(body); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Sync(); err != nil {
 		_ = tmp.Close()
 		return err
 	}
@@ -333,21 +411,83 @@ func LoadResult(path string) (Result, error) {
 	if err := dec.Decode(&r); err != nil {
 		return Result{}, fmt.Errorf("bench: parse result %s: %w", path, err)
 	}
+	var extra any
+	if err := dec.Decode(&extra); err != io.EOF {
+		if err == nil {
+			return Result{}, fmt.Errorf("bench: result %s contains multiple JSON values", path)
+		}
+		return Result{}, fmt.Errorf("bench: parse result %s: %w", path, err)
+	}
 	if r.SchemaVersion != ResultSchemaVersion {
 		return Result{}, fmt.Errorf("bench: result schema %d is unsupported (want %d)", r.SchemaVersion, ResultSchemaVersion)
+	}
+	if strings.TrimSpace(r.RunID) == "" || strings.TrimSpace(r.PairID) == "" || strings.TrimSpace(r.TaskID) == "" {
+		return Result{}, fmt.Errorf("bench: result %s has incomplete run identity", path)
+	}
+	if !r.Mode.Valid() || !r.Status.Valid() {
+		return Result{}, fmt.Errorf("bench: result %s has invalid mode or status", path)
+	}
+	if err := validateResultSemantics(r); err != nil {
+		return Result{}, fmt.Errorf("bench: result %s is semantically invalid: %w", path, err)
 	}
 	return r, nil
 }
 
+func validateResultSemantics(r Result) error {
+	derived := r.Derived
+	r.Derive()
+	if body, err := CanonicalJSON(derived); err != nil {
+		return err
+	} else if actual, err := CanonicalJSON(r.Derived); err != nil {
+		return err
+	} else if string(body) != string(actual) {
+		return errors.New("derived success/failure fields do not match evaluator and system results")
+	}
+	if r.Status == RunCompleted && (r.Evaluator.Status != EvaluatorPass || !r.Evaluator.Independent) {
+		return errors.New("completed result has no independent evaluator pass")
+	}
+	if r.Status == RunTaskFailed && r.Evaluator.Status != EvaluatorFail {
+		return errors.New("task_failed result has no evaluator failure")
+	}
+	for name, value := range map[string]*int{
+		"generation_requests": r.Execution.GenerationRequests, "assistant_turns": r.Execution.AssistantTurns,
+		"tool_calls": r.Execution.ToolCalls, "reads": r.Execution.Reads, "edits": r.Execution.Edits,
+		"verification_attempts": r.Execution.VerificationAttempts, "retries": r.Execution.Retries,
+	} {
+		if value != nil && *value < 0 {
+			return fmt.Errorf("%s cannot be negative", name)
+		}
+	}
+	for name, value := range map[string]*int64{
+		"input_tokens": r.Execution.InputTokens, "output_tokens": r.Execution.OutputTokens,
+		"cached_input_tokens": r.Execution.CachedInputTokens, "total_tokens": r.Execution.TotalTokens,
+	} {
+		if value != nil && *value < 0 {
+			return fmt.Errorf("%s cannot be negative", name)
+		}
+	}
+	return nil
+}
+
 // RedactResult is defense in depth for future fields. It walks JSON keys and
 // redacts credential-looking values before any artifact is persisted.
+var credentialValuePattern = regexp.MustCompile(`(?i)(api[_-]?key|access[_-]?token|secret|password|authorization)([=:][[:space:]]*)[^[:space:],;]+`)
+var bearerPattern = regexp.MustCompile(`(?i)(bearer[[:space:]]+)[A-Za-z0-9._~+/=-]+`)
+
+func RedactText(in string) string {
+	in = credentialValuePattern.ReplaceAllString(in, `${1}${2}[REDACTED]`)
+	return bearerPattern.ReplaceAllString(in, `${1}[REDACTED]`)
+}
+
 func RedactResult(in Result) Result {
 	body, err := json.Marshal(in)
 	if err != nil {
 		return in
 	}
 	var value any
-	if json.Unmarshal(body, &value) != nil {
+	decoder := json.NewDecoder(strings.NewReader(string(body)))
+	decoder.UseNumber()
+	if decoder.Decode(&value) != nil {
 		return in
 	}
 	value = redactJSON(value)
@@ -368,10 +508,12 @@ func redactJSON(value any) any {
 		out := make(map[string]any, len(v))
 		for k, child := range v {
 			lk := strings.ToLower(k)
-			if strings.Contains(lk, "password") || strings.Contains(lk, "secret") || strings.Contains(lk, "api_key") || strings.Contains(lk, "token") && k != "input_tokens" && k != "output_tokens" && k != "total_tokens" && k != "cached_input_tokens" {
+			if strings.Contains(lk, "password") || strings.Contains(lk, "secret") || strings.Contains(lk, "api_key") ||
+				strings.Contains(lk, "credential") || strings.Contains(lk, "authorization") || strings.Contains(lk, "database") || strings.Contains(lk, "dsn") ||
+				strings.Contains(lk, "token") && k != "input_tokens" && k != "output_tokens" && k != "total_tokens" && k != "cached_input_tokens" {
 				// Do not redact count fields; redact only string values or
 				// explicitly credential-named fields.
-				if _, ok := child.(string); ok || strings.Contains(lk, "key") || strings.Contains(lk, "secret") || strings.Contains(lk, "password") {
+				if _, ok := child.(string); ok || strings.Contains(lk, "key") || strings.Contains(lk, "secret") || strings.Contains(lk, "password") || strings.Contains(lk, "credential") || strings.Contains(lk, "authorization") {
 					out[k] = "[REDACTED]"
 					continue
 				}
@@ -384,6 +526,8 @@ func redactJSON(value any) any {
 			v[i] = redactJSON(v[i])
 		}
 		return v
+	case string:
+		return RedactText(v)
 	default:
 		return value
 	}
@@ -395,6 +539,12 @@ func ResultExists(path string) bool {
 	return err == nil && r.RunID != "" && r.Status != ""
 }
 
+// cloneMetrics is retained for callers that used the old value-copy helper.
+//
+//nolint:unused
 func cloneMetrics(m Metrics) Metrics { return m }
 
+// resultContext is retained for adapters that used the old context helper.
+//
+//nolint:unused
 func resultContext(ctx context.Context, r Result) context.Context { return ctx }

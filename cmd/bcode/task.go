@@ -47,6 +47,10 @@ func newTaskCmd() *cobra.Command {
 // and the caller is told which it got. Silently falling back would let someone
 // believe a model had looked at their code when nothing had.
 func engineFor(cmd *cobra.Command, root *store.Root, st *store.Store, ws *workspace.Workspace) (engine.Engine, error) {
+	return engineForContext(cmd.Context(), cmd, root, st, ws)
+}
+
+func engineForContext(ctx context.Context, cmd *cobra.Command, root *store.Root, st *store.Store, ws *workspace.Workspace) (engine.Engine, error) {
 	cfg, err := loadConfig(root)
 	if err != nil {
 		return nil, err
@@ -85,7 +89,7 @@ func engineFor(cmd *cobra.Command, root *store.Root, st *store.Store, ws *worksp
 			probeBudget = d
 		}
 	}
-	probe, cancel := context.WithTimeout(cmd.Context(), probeBudget)
+	probe, cancel := context.WithTimeout(ctx, probeBudget)
 	defer cancel()
 	if err := provider.Health(probe); err != nil {
 		// A configured EDIT provider that cannot be reached is a fault, not a

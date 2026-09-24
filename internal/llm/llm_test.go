@@ -16,6 +16,25 @@ import (
 	"github.com/akynte/boundedcode/internal/llm"
 )
 
+func TestServedModelIdentityRequiresAResponseModel(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"model":"served-m","choices":[{"finish_reason":"stop","message":{"role":"assistant","content":"ok"}}]}`))
+	}))
+	defer srv.Close()
+	p := llm.NewOpenAICompatible(llm.Options{Name: "p", BaseURL: srv.URL, Model: "configured-m"})
+	if got := p.ServedModelIdentity().Model; got != "" {
+		t.Fatalf("configured route was reported as served identity: %q", got)
+	}
+	if _, err := p.Chat(context.Background(), llm.ChatRequest{Messages: []llm.Message{{Role: "user", Content: "hi"}}}); err != nil {
+		t.Fatal(err)
+	}
+	identity := p.ServedModelIdentity()
+	if identity.Model != "served-m" || identity.Provider != "p" {
+		t.Fatalf("served identity = %+v", identity)
+	}
+}
+
 func TestStructuredOutputIsRefusedWhenNotDeclared(t *testing.T) {
 	p := llm.NewOpenAICompatible(llm.Options{
 		Name: "plain", BaseURL: "http://127.0.0.1:1",

@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -23,6 +24,9 @@ type OpenAICompatible struct {
 	model   string
 	caps    Capabilities
 	client  *http.Client
+
+	identityMu  sync.RWMutex
+	servedModel string
 }
 
 // Options configures a provider instance.
@@ -82,16 +86,35 @@ func NewLlamaCPP(o Options) *OpenAICompatible {
 }
 
 func (p *OpenAICompatible) Name() string               { return p.name }
+func (p *OpenAICompatible) ModelName() string          { return p.model }
 func (p *OpenAICompatible) Capabilities() Capabilities { return p.caps }
 func (p *OpenAICompatible) Close() error               { p.client.CloseIdleConnections(); return nil }
 
+// ServedModelIdentity reports only the model name returned by the endpoint,
+// never the configured request default. A missing response model remains
+// unverified rather than silently borrowing p.model.
+func (p *OpenAICompatible) ServedModelIdentity() ServedModelIdentity {
+	p.identityMu.RLock()
+	model := p.servedModel
+	p.identityMu.RUnlock()
+	return ServedModelIdentity{Provider: p.name, Model: model, ContextTokens: p.caps.MaxContext}
+}
+
+func (p *OpenAICompatible) recordServedModel(model string) {
+	p.identityMu.Lock()
+	p.servedModel = strings.TrimSpace(model)
+	p.identityMu.Unlock()
+}
+
 func (p *OpenAICompatible) Chat(ctx context.Context, req ChatRequest) (*ChatResponse, error) {
+	p.recordServedModel("")
 	return p.chat(ctx, req, nil)
 }
 
 // ChatStructured refuses when the provider does not declare structured output,
 // as DR-4 requires.
 func (p *OpenAICompatible) ChatStructured(ctx context.Context, req ChatRequest, schema json.RawMessage) (*ChatResponse, error) {
+	p.recordServedModel("")
 	if !p.caps.StructuredOutput {
 		return nil, &UnsupportedError{Provider: p.name, Capability: "structured output"}
 	}
@@ -102,6 +125,7 @@ func (p *OpenAICompatible) ChatStructured(ctx context.Context, req ChatRequest, 
 }
 
 func (p *OpenAICompatible) chat(ctx context.Context, req ChatRequest, schema json.RawMessage) (*ChatResponse, error) {
+	p.recordServedModel("")
 	if len(req.Tools) > 0 && !p.caps.ToolCalling {
 		return nil, &UnsupportedError{Provider: p.name, Capability: "tool calling"}
 	}
@@ -222,6 +246,7 @@ func (p *OpenAICompatible) chat(ctx context.Context, req ChatRequest, schema jso
 	if cached == 0 {
 		cached = out.Timings.CacheN
 	}
+	p.recordServedModel(out.Model)
 	resp := &ChatResponse{
 		Content: out.Choices[0].Message.Content, FinishReason: out.Choices[0].FinishReason,
 		Reasoning:    out.Choices[0].Message.ReasoningContent,
@@ -290,6 +315,7 @@ func openAIMessages(msgs []Message) []map[string]any {
 }
 
 func (p *OpenAICompatible) Embed(ctx context.Context, req EmbedRequest) (*EmbedResponse, error) {
+	p.recordServedModel("")
 	if !p.caps.Embeddings {
 		return nil, &UnsupportedError{Provider: p.name, Capability: "embeddings"}
 	}
@@ -317,6 +343,7 @@ func (p *OpenAICompatible) Embed(ctx context.Context, req EmbedRequest) (*EmbedR
 }
 
 func (p *OpenAICompatible) Infill(ctx context.Context, req InfillRequest) (*ChatResponse, error) {
+	p.recordServedModel("")
 	if !p.caps.Infill {
 		return nil, &UnsupportedError{Provider: p.name, Capability: "infill"}
 	}

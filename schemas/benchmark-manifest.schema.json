@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/akynte/boundedcode/schemas/benchmark-manifest.schema.json",
+  "title": "BoundedCode frozen benchmark manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "suite_id", "suite_version", "suite_hash", "tasks", "model", "runner", "limits", "network_policies", "execution_seed", "created_at", "official"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "suite_id": {"type": "string", "minLength": 1},
+    "suite_version": {"type": "string", "minLength": 1},
+    "suite_hash": {"type": "string", "minLength": 1},
+    "tasks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "task_hash", "evaluator_hash", "base_commit"],
+        "properties": {
+          "id": {"type": "string", "minLength": 1},
+          "task_hash": {"type": "string", "minLength": 1},
+          "evaluator_hash": {"type": "string", "minLength": 1},
+          "base_commit": {"type": "string", "minLength": 1},
+          "fixture_hash": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "model": {"type": "object"},
+    "runner": {"type": "object"},
+    "limits": {"type": "object", "additionalProperties": {"type": "object"}},
+    "network_policies": {"type": "object", "additionalProperties": {"type": "string"}},
+    "boundedcode_commit": {"type": "string"},
+    "execution_seed": {"type": "integer"},
+    "created_at": {"type": "string", "format": "date-time"},
+    "official": {"type": "boolean"}
+  }
+}

@@ -42,6 +42,20 @@ type processSlot struct {
 var localSlot = processSlot{gate: make(chan struct{}, 1)}
 var externalSlots sync.Map
 
+func (p *managedProvider) ModelName() string {
+	if named, ok := p.Provider.(interface{ ModelName() string }); ok {
+		return named.ModelName()
+	}
+	return ""
+}
+
+func (p *managedProvider) ServedModelIdentity() ServedModelIdentity {
+	if identified, ok := p.Provider.(ServedModelIdentityProvider); ok {
+		return identified.ServedModelIdentity()
+	}
+	return ServedModelIdentity{}
+}
+
 func newManaged(p Provider, spec ProviderSpec) (Provider, error) {
 	u, err := url.Parse(spec.BaseURL)
 	if err != nil {
@@ -280,6 +294,20 @@ func (p *serializedProvider) lock(ctx context.Context) error {
 		return ctx.Err()
 	}
 }
+func (p *serializedProvider) ModelName() string {
+	if named, ok := p.Provider.(interface{ ModelName() string }); ok {
+		return named.ModelName()
+	}
+	return ""
+}
+
+func (p *serializedProvider) ServedModelIdentity() ServedModelIdentity {
+	if identified, ok := p.Provider.(ServedModelIdentityProvider); ok {
+		return identified.ServedModelIdentity()
+	}
+	return ServedModelIdentity{}
+}
+
 func (p *serializedProvider) Chat(ctx context.Context, req ChatRequest) (*ChatResponse, error) {
 	if err := p.lock(ctx); err != nil {
 		return nil, err

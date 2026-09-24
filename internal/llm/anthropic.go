@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -35,6 +36,9 @@ type Anthropic struct {
 	model   string
 	caps    Capabilities
 	client  *http.Client
+
+	identityMu  sync.RWMutex
+	servedModel string
 }
 
 // AnthropicVersion is the required API version header value.
@@ -72,24 +76,45 @@ func NewAnthropic(o Options) *Anthropic {
 }
 
 func (p *Anthropic) Name() string               { return p.name }
+func (p *Anthropic) ModelName() string          { return p.model }
 func (p *Anthropic) Capabilities() Capabilities { return p.caps }
 func (p *Anthropic) Close() error               { p.client.CloseIdleConnections(); return nil }
+
+// ServedModelIdentity reports the model returned by Anthropic, not merely the
+// configured request default. An omitted response model is intentionally
+// unverified.
+func (p *Anthropic) ServedModelIdentity() ServedModelIdentity {
+	p.identityMu.RLock()
+	model := p.servedModel
+	p.identityMu.RUnlock()
+	return ServedModelIdentity{Provider: p.name, Model: model, ContextTokens: p.caps.MaxContext}
+}
+
+func (p *Anthropic) recordServedModel(model string) {
+	p.identityMu.Lock()
+	p.servedModel = strings.TrimSpace(model)
+	p.identityMu.Unlock()
+}
 
 // Embed and Infill are not offered by this API. Declaring the gap is DR-4's
 // requirement; silently emulating it would hide the difference.
 func (p *Anthropic) Embed(context.Context, EmbedRequest) (*EmbedResponse, error) {
+	p.recordServedModel("")
 	return nil, &UnsupportedError{Provider: p.name, Capability: "embeddings"}
 }
 
 func (p *Anthropic) Infill(context.Context, InfillRequest) (*ChatResponse, error) {
+	p.recordServedModel("")
 	return nil, &UnsupportedError{Provider: p.name, Capability: "infill"}
 }
 
 func (p *Anthropic) Chat(ctx context.Context, req ChatRequest) (*ChatResponse, error) {
+	p.recordServedModel("")
 	return p.messages(ctx, req, nil)
 }
 
 func (p *Anthropic) ChatStructured(ctx context.Context, req ChatRequest, schema json.RawMessage) (*ChatResponse, error) {
+	p.recordServedModel("")
 	if !p.caps.StructuredOutput {
 		return nil, &UnsupportedError{Provider: p.name, Capability: "structured output"}
 	}
@@ -113,6 +138,7 @@ func (e *RefusalError) Error() string {
 }
 
 func (p *Anthropic) messages(ctx context.Context, req ChatRequest, schema json.RawMessage) (*ChatResponse, error) {
+	p.recordServedModel("")
 	model := req.Model
 	if model == "" {
 		model = p.model
@@ -296,6 +322,7 @@ func (p *Anthropic) messages(ctx context.Context, req ChatRequest, schema json.R
 			calls = append(calls, ToolCall{ID: c.ID, Name: c.Name, Arguments: input})
 		}
 	}
+	p.recordServedModel(out.Model)
 	return &ChatResponse{
 		Content: sb.String(), FinishReason: out.StopReason, ToolCalls: calls,
 		PromptTokens: out.Usage.InputTokens + out.Usage.CacheReadTokens + out.Usage.CacheCreationTokens,

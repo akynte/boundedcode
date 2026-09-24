@@ -38,6 +38,7 @@ import (
 	"github.com/akynte/boundedcode/internal/critic"
 	"github.com/akynte/boundedcode/internal/engine"
 	"github.com/akynte/boundedcode/internal/index"
+	"github.com/akynte/boundedcode/internal/judgment"
 	"github.com/akynte/boundedcode/internal/ledger"
 	"github.com/akynte/boundedcode/internal/llm"
 	"github.com/akynte/boundedcode/internal/oracle"
@@ -62,6 +63,16 @@ type Options struct {
 	Warnf func(format string, args ...any)
 	// OracleDir overrides the configured hidden acceptance suite.
 	OracleDir string
+	// DisableOracle prevents the operator's ordinary hidden acceptance suite
+	// from entering a benchmark task. Benchmarks have their own evaluator,
+	// which must remain outside the production model path; without this
+	// explicit boundary a configured production oracle could be fed into the
+	// BOUNDED arm while the RAW arm never saw it.
+	DisableOracle bool
+	// DisableJudgment prevents an enabled operator judgment plane from making
+	// unbudgeted model calls during a benchmark task. The independent
+	// benchmark evaluator remains the only correctness decision.
+	DisableJudgment bool
 }
 
 // Runner builds a task runner with every control in place.
@@ -111,7 +122,11 @@ func Runner(ctx context.Context, root *store.Root, st *store.Store, eng engine.E
 	}
 	r.Policies = policies
 
-	suite, err := loadOracle(firstNonEmpty(o.OracleDir, cfg.Oracle.Dir), o.RepoRoot)
+	oracleDir := ""
+	if !o.DisableOracle {
+		oracleDir = firstNonEmpty(o.OracleDir, cfg.Oracle.Dir)
+	}
+	suite, err := loadOracle(oracleDir, o.RepoRoot)
 	if err != nil {
 		return nil, err
 	}
@@ -196,9 +211,14 @@ func Runner(ctx context.Context, root *store.Root, st *store.Store, eng engine.E
 	// Constructing one is still not an error here. Every command that is not
 	// a task run — `bcode doctor` above all — has to keep working precisely when
 	// the plane is broken, because that is when an operator needs it.
-	judge, err := Judge(root, st, logf)
-	if err != nil {
-		return nil, err
+	var judge judgment.Judge
+	if o.DisableJudgment {
+		judge = judgment.Off()
+	} else {
+		judge, err = Judge(root, st, logf)
+		if err != nil {
+			return nil, err
+		}
 	}
 	r.Judge = judge
 	r.Retriever = r.Retriever.WithJudge(judge, logf)
@@ -337,6 +357,39 @@ func PlanningProvider(root *store.Root) (llm.Provider, error) {
 	return RoleProvider(root, llm.RolePlanning)
 }
 
+type ownedRoleProvider struct {
+	llm.Provider
+	router *llm.Router
+}
+
+func (p *ownedRoleProvider) Close() error {
+	if p == nil || p.router == nil {
+		return nil
+	}
+	return p.router.Close()
+}
+
+func (p *ownedRoleProvider) ModelName() string {
+	if named, ok := p.Provider.(interface{ ModelName() string }); ok {
+		return named.ModelName()
+	}
+	return ""
+}
+
+func (p *ownedRoleProvider) ServedModelIdentity() llm.ServedModelIdentity {
+	if identified, ok := p.Provider.(llm.ServedModelIdentityProvider); ok {
+		return identified.ServedModelIdentity()
+	}
+	return llm.ServedModelIdentity{}
+}
+
+func (p *ownedRoleProvider) BenchmarkGenerationRequests() int {
+	if counted, ok := p.Provider.(interface{ BenchmarkGenerationRequests() int }); ok {
+		return counted.BenchmarkGenerationRequests()
+	}
+	return 0
+}
+
 // RoleProvider resolves one role through providers.yaml. No providers file is
 // not a fault: it means this installation routes nothing.
 func RoleProvider(root *store.Root, role llm.Role) (llm.Provider, error) {
@@ -354,7 +407,16 @@ func RoleProvider(root *store.Root, role llm.Role) (llm.Provider, error) {
 	if err != nil {
 		return nil, err
 	}
-	return router.For(role)
+	provider, err := router.For(role)
+	if err != nil {
+		_ = router.Close()
+		return nil, err
+	}
+	if provider == nil {
+		_ = router.Close()
+		return nil, nil
+	}
+	return &ownedRoleProvider{Provider: provider, router: router}, nil
 }
 
 // ServicePorts lists the ports this installation's own services listen on, so

@@ -13,6 +13,10 @@ description of the same thing is a second thing to keep in step.
 | [`providers.schema.json`](providers.schema.json) | `/data/config/providers.yaml`, provider and role routing |
 | [`profile.schema.json`](profile.schema.json) | a hardware profile under `profiles/` |
 | [`task.schema.json`](task.schema.json) | an evaluation task under `evals/tasks/` |
+| [`benchmark-suite.schema.json`](benchmark-suite.schema.json) | a versioned benchmark suite manifest |
+| [`benchmark-task.schema.json`](benchmark-task.schema.json) | a versioned benchmark task and evaluator declaration |
+| [`benchmark-result.schema.json`](benchmark-result.schema.json) | a durable RAW/BOUNDED run result |
+| [`benchmark-manifest.schema.json`](benchmark-manifest.schema.json) | a frozen benchmark suite/task/evaluator identity |
 | [`workspace.schema.json`](workspace.schema.json) | `.bc/workspace.yaml`, the identity pin |
 | [`judgment.schema.json`](judgment.schema.json) | `/data/config/judgment.yaml`, the optional judgment service |
 

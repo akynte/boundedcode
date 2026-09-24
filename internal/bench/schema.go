@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"sort"
@@ -79,6 +80,14 @@ func (c Command) Validate() error {
 	if c.Empty() {
 		return fmt.Errorf("command is empty")
 	}
+	for i, arg := range c.Argv {
+		if strings.TrimSpace(arg) == "" {
+			return fmt.Errorf("command argument %d is empty", i)
+		}
+		if strings.ContainsRune(arg, '\x00') {
+			return fmt.Errorf("command argument %d contains NUL", i)
+		}
+	}
 	return nil
 }
 
@@ -110,9 +119,34 @@ type Limits struct {
 	Concurrency             int `yaml:"concurrency,omitempty" json:"concurrency"`
 }
 
+const (
+	DefaultWallClockSeconds  = 10 * 60
+	DefaultVerificationTries = 3
+)
+
+// EffectiveLimits makes the harness defaults explicit before they cross an
+// adapter boundary. A zero in a task file means "use the production default",
+// not an unlimited BOUNDED run paired with a RAW process that happens to have
+// its own default.
+func EffectiveLimits(l Limits) Limits {
+	if l.WallClockSeconds <= 0 {
+		l.WallClockSeconds = DefaultWallClockSeconds
+	}
+	if l.MaxGenerationRequests <= 0 {
+		l.MaxGenerationRequests = DefaultGenerationRequests
+	}
+	if l.MaxVerificationAttempts <= 0 {
+		l.MaxVerificationAttempts = DefaultVerificationTries
+	}
+	if l.Concurrency <= 0 {
+		l.Concurrency = 1
+	}
+	return l
+}
+
 func (l Limits) WallClock() time.Duration {
 	if l.WallClockSeconds <= 0 {
-		return 10 * time.Minute
+		return time.Duration(DefaultWallClockSeconds) * time.Second
 	}
 	return time.Duration(l.WallClockSeconds) * time.Second
 }
@@ -123,6 +157,79 @@ func (l Limits) Validate() error {
 	}
 	if l.Concurrency < 0 {
 		return fmt.Errorf("limits.concurrency cannot be negative")
+	}
+	return nil
+}
+
+func validateEnvironment(label string, values map[string]string) error {
+	for key, value := range values {
+		if !validEnvName(key) {
+			return fmt.Errorf("%s variable %q has an invalid name", label, key)
+		}
+		if reservedEnvName(key) {
+			return fmt.Errorf("%s variable %q is reserved by the benchmark harness", label, key)
+		}
+		lk := strings.ToLower(key)
+		if strings.Contains(lk, "key") || strings.Contains(lk, "token") || strings.Contains(lk, "secret") ||
+			strings.Contains(lk, "password") || strings.Contains(lk, "credential") || strings.Contains(lk, "authorization") ||
+			strings.Contains(lk, "oracle") || strings.Contains(lk, "evaluator") || strings.Contains(lk, "hidden") || strings.Contains(lk, "database") || strings.Contains(lk, "dsn") || (strings.Contains(lk, "url") && strings.Contains(value, "@")) {
+			return fmt.Errorf("%s variable %q is credential- or evaluator-shaped and cannot cross the benchmark boundary", label, key)
+		}
+		if strings.ContainsRune(value, '\x00') {
+			return fmt.Errorf("%s variable %q contains NUL", label, key)
+		}
+	}
+	return nil
+}
+
+func safeSuiteID(id string) bool {
+	if id == "" || id == "." || id == ".." {
+		return false
+	}
+	for _, r := range id {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '.' || r == '_' || r == '-' {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
+func reservedEnvName(name string) bool {
+	upper := strings.ToUpper(name)
+	if strings.HasPrefix(upper, "BENCH_") || strings.HasPrefix(upper, "XDG_") || strings.HasPrefix(upper, "BC_") || strings.HasPrefix(upper, "GIT_") {
+		return true
+	}
+	switch upper {
+	case "HOME", "TMPDIR", "GOTMPDIR", "PATH", "LANG", "LC_ALL", "NO_COLOR", "TERM",
+		"GOCACHE", "GOMODCACHE", "GOPATH", "GOPROXY", "GOTOOLCHAIN", "GOFLAGS", "GOENV", "GO111MODULE",
+		"HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY", "LD_PRELOAD", "LD_AUDIT", "LD_LIBRARY_PATH",
+		"DYLD_INSERT_LIBRARIES", "DYLD_LIBRARY_PATH", "BASH_ENV", "ENV", "CDPATH", "PYTHONPATH", "PYTHONSTARTUP",
+		"NODE_OPTIONS", "NODE_PATH", "RUBYOPT", "RUBYLIB", "PERL5LIB", "PERL5OPT", "JAVA_TOOL_OPTIONS", "_JAVA_OPTIONS":
+		return true
+	default:
+		return false
+	}
+}
+
+func validateModel(m ModelConfig) error {
+	if m.ContextTokens < 0 {
+		return fmt.Errorf("model.context_tokens cannot be negative")
+	}
+	if m.Temperature != nil && (math.IsNaN(*m.Temperature) || math.IsInf(*m.Temperature, 0) || *m.Temperature < 0 || *m.Temperature > 2) {
+		return fmt.Errorf("model.temperature must be finite and between 0 and 2")
+	}
+	if m.TopP != nil && (math.IsNaN(*m.TopP) || math.IsInf(*m.TopP, 0) || *m.TopP < 0 || *m.TopP > 1) {
+		return fmt.Errorf("model.top_p must be finite and between 0 and 1")
+	}
+	if m.TopK != nil && *m.TopK < 0 {
+		return fmt.Errorf("model.top_k cannot be negative")
+	}
+	if m.Seed != nil {
+		maxInt := int64(^uint(0) >> 1)
+		if *m.Seed > maxInt || *m.Seed < -maxInt-1 {
+			return fmt.Errorf("model.seed does not fit the provider's integer seed type")
+		}
 	}
 	return nil
 }
@@ -146,6 +253,7 @@ type Evaluator struct {
 	Steps            []StepSpec        `yaml:"steps,omitempty" json:"steps,omitempty"`
 	TimeoutSeconds   int               `yaml:"timeout_seconds,omitempty" json:"timeout_seconds,omitempty"`
 	MustNotChange    []string          `yaml:"must_not_change,omitempty" json:"must_not_change,omitempty"`
+	Canaries         []string          `yaml:"canaries,omitempty" json:"canaries,omitempty"`
 	Environment      map[string]string `yaml:"environment,omitempty" json:"-"`
 	Required         bool              `yaml:"required,omitempty" json:"required,omitempty"`
 	EvaluatorVersion string            `yaml:"version,omitempty" json:"version,omitempty"`
@@ -179,9 +287,14 @@ type Task struct {
 	// is refused for an official manifest; real runs use the configured raw or
 	// bounded adapter instead.
 	WorkerDriver string `yaml:"worker_driver,omitempty" json:"worker_driver,omitempty"`
+	// FixtureHash is the loader-computed identity of the immutable fixture
+	// bytes. It is persisted in manifests/results but never crosses the
+	// worker boundary.
+	FixtureHash string `yaml:"-" json:"fixture_hash,omitempty"`
 
 	path        string
 	oracleRoot  string
+	oracleFiles map[string][]byte
 	hiddenFiles map[string][]byte
 	hiddenHash  string
 }
@@ -206,7 +319,10 @@ func (t Task) EvaluatorHashForDisplay() string {
 // value into a worker request.
 func (t Task) HiddenFile(name string) ([]byte, bool) {
 	body, ok := t.hiddenFiles[filepath.ToSlash(name)]
-	return body, ok
+	if !ok {
+		return nil, false
+	}
+	return append([]byte(nil), body...), true
 }
 
 func (t Task) Validate() error {
@@ -229,32 +345,103 @@ func (t Task) Validate() error {
 	if strings.TrimSpace(t.Repository) == "" {
 		problems = append(problems, "repository is required")
 	}
-	if strings.TrimSpace(t.BaseCommit) == "" {
+	base := strings.TrimSpace(t.BaseCommit)
+	if base == "" {
 		problems = append(problems, "base_commit is required")
 	}
-	if t.Fixture == "" && t.BaseCommit == "fixture" {
+	if t.Fixture == "" && base == "fixture" {
 		problems = append(problems, "base_commit=fixture requires fixture")
+	}
+	if t.Fixture != "" && base != "fixture" && !strings.HasPrefix(base, "content-sha256:") && !isHexObjectID(base) {
+		problems = append(problems, "fixture base_commit must be fixture, content-sha256:<hash>, or a git object id")
+	}
+	if t.Fixture == "" && !isHexObjectID(base) {
+		problems = append(problems, "repository base_commit must be a git object id")
+	}
+	if strings.HasPrefix(base, "content-sha256:") {
+		hash := strings.TrimPrefix(base, "content-sha256:")
+		if len(hash) != 32 && len(hash) != 64 {
+			problems = append(problems, "content-sha256 base_commit must contain a 32 or 64 character hash")
+		} else if _, err := hex.DecodeString(hash); err != nil {
+			problems = append(problems, "content-sha256 base_commit is not hexadecimal")
+		}
 	}
 	if t.Evaluator.Command.Empty() && len(t.Evaluator.Steps) == 0 {
 		problems = append(problems, "evaluator.command or evaluator.steps is required")
 	}
-	for _, step := range t.Evaluator.Steps {
-		if strings.TrimSpace(step.Name) == "" || step.Command.Empty() {
-			problems = append(problems, "every evaluator step needs a name and command")
+	if !t.Evaluator.Command.Empty() && len(t.Evaluator.Steps) > 0 {
+		problems = append(problems, "declare evaluator.command or evaluator.steps, not both")
+	}
+	if !t.Evaluator.Command.Empty() {
+		if err := t.Evaluator.Command.Validate(); err != nil {
+			problems = append(problems, "evaluator.command: "+err.Error())
 		}
 	}
-	if len(t.Evaluator.Files) == 0 && len(t.Evaluator.InlineFiles) == 0 && t.Evaluator.Oracle == "" {
-		// A command-only oracle is valid for projects whose tests are already
-		// hidden by the evaluator image, but a benchmark with no declared
-		// hidden material is almost always a visible-test benchmark by
-		// accident. Keep it possible while making the omission explicit.
-		t.Evaluator.Required = false
+	if !t.Setup.Empty() {
+		if err := t.Setup.Validate(); err != nil {
+			problems = append(problems, "setup: "+err.Error())
+		}
+	}
+	for i, command := range t.VisibleValidation {
+		if err := command.Validate(); err != nil {
+			problems = append(problems, fmt.Sprintf("visible_validation[%d]: %s", i, err))
+		}
+	}
+	for i, step := range t.Evaluator.Steps {
+		if strings.TrimSpace(step.Name) == "" || step.Command.Empty() {
+			problems = append(problems, fmt.Sprintf("evaluator step %d needs a name and command", i))
+			continue
+		}
+		if err := step.Command.Validate(); err != nil {
+			problems = append(problems, fmt.Sprintf("evaluator step %q: %s", step.Name, err))
+		}
+		if step.TimeoutSeconds < 0 {
+			problems = append(problems, fmt.Sprintf("evaluator step %q timeout_seconds cannot be negative", step.Name))
+		}
+	}
+	if t.Evaluator.TimeoutSeconds < 0 {
+		problems = append(problems, "evaluator.timeout_seconds cannot be negative")
+	}
+	canaries := map[string]bool{}
+	for _, canary := range t.Evaluator.Canaries {
+		canary = strings.TrimSpace(canary)
+		if len(canary) < 12 {
+			problems = append(problems, "evaluator canaries must be at least 12 characters")
+		}
+		if canaries[canary] {
+			problems = append(problems, "evaluator canaries must be unique")
+		}
+		canaries[canary] = true
+	}
+	for _, name := range t.Evaluator.Files {
+		if _, err := safeRelative(name); err != nil {
+			problems = append(problems, fmt.Sprintf("evaluator file %q: %s", name, err))
+		}
+	}
+	for name := range t.Evaluator.InlineFiles {
+		if _, err := safeRelative(name); err != nil {
+			problems = append(problems, fmt.Sprintf("inline evaluator file %q: %s", name, err))
+		}
+	}
+	for _, path := range t.Evaluator.MustNotChange {
+		if _, err := safeRelative(path); err != nil {
+			problems = append(problems, fmt.Sprintf("evaluator must_not_change %q: %s", path, err))
+		}
+	}
+	if err := validateEnvironment("task", t.Environment); err != nil {
+		problems = append(problems, err.Error())
+	}
+	if err := validateEnvironment("evaluator", t.Evaluator.Environment); err != nil {
+		problems = append(problems, err.Error())
 	}
 	if err := t.Limits.Validate(); err != nil {
 		problems = append(problems, err.Error())
 	}
 	if t.NetworkPolicy != "" && t.NetworkPolicy != "none" && t.NetworkPolicy != "allowlist" && t.NetworkPolicy != "host" {
 		problems = append(problems, fmt.Sprintf("network_policy %q is not none, allowlist, or host", t.NetworkPolicy))
+	}
+	if t.Verification != "" && t.Verification != "low" && t.Verification != "standard" && t.Verification != "high" {
+		problems = append(problems, fmt.Sprintf("verification %q is not low, standard, or high", t.Verification))
 	}
 	if t.WorkerDriver != "" && t.WorkerDriver != "smoke" {
 		problems = append(problems, fmt.Sprintf("unknown worker_driver %q", t.WorkerDriver))
@@ -278,10 +465,19 @@ type Suite struct {
 	Model         ModelConfig       `yaml:"model" json:"model"`
 	Runner        RunnerConfig      `yaml:"runner,omitempty" json:"runner,omitempty"`
 	Environment   map[string]string `yaml:"environment,omitempty" json:"environment,omitempty"`
-	Tasks         []Task            `yaml:"-" json:"tasks,omitempty"`
+	Tasks         []Task            `yaml:"-" json:"-"`
 
 	path string
 	hash string
+}
+
+const UnattendedGatePolicyPermissive = "permissive"
+
+func (r RunnerConfig) effective() RunnerConfig {
+	if r.UnattendedGatePolicy == "" {
+		r.UnattendedGatePolicy = UnattendedGatePolicyPermissive
+	}
+	return r
 }
 
 type RunnerConfig struct {
@@ -291,6 +487,11 @@ type RunnerConfig struct {
 	OpenCodeVersion string            `yaml:"opencode_version,omitempty" json:"opencode_version,omitempty"`
 	Concurrency     int               `yaml:"concurrency,omitempty" json:"concurrency,omitempty"`
 	CachePolicy     string            `yaml:"cache_policy,omitempty" json:"cache_policy,omitempty"`
+	// UnattendedGatePolicy is the explicit broker policy used when no human
+	// operator is present. Benchmarks currently support only the permissive
+	// policy; recording it prevents a future gate change from silently altering
+	// an experiment's identity.
+	UnattendedGatePolicy string `yaml:"unattended_gate_policy,omitempty" json:"unattended_gate_policy,omitempty"`
 }
 
 func (s Suite) Validate() error {
@@ -303,11 +504,40 @@ func (s Suite) Validate() error {
 	if strings.TrimSpace(s.ID) == "" || strings.TrimSpace(s.Version) == "" {
 		return fmt.Errorf("bench suite: id and version are required")
 	}
+	if !safeSuiteID(s.ID) {
+		return fmt.Errorf("bench suite %q: id may contain only letters, digits, '.', '_' and '-'", s.ID)
+	}
 	if s.Official && s.Smoke {
 		return fmt.Errorf("bench suite %q: a smoke suite cannot be official", s.ID)
 	}
+	if err := validateModel(s.Model); err != nil {
+		return fmt.Errorf("bench suite %q: %w", s.ID, err)
+	}
+	if err := validateEnvironment("suite", s.Environment); err != nil {
+		return fmt.Errorf("bench suite %q: %w", s.ID, err)
+	}
+	if err := validateEnvironment("runner", s.Runner.Config); err != nil {
+		return fmt.Errorf("bench suite %q: %w", s.ID, err)
+	}
+	if s.Model.ModelFileSHA256 != "" {
+		hash := strings.TrimPrefix(s.Model.ModelFileSHA256, "sha256:")
+		if len(hash) != 64 {
+			return fmt.Errorf("bench suite %q: model_file_sha256 must be a SHA-256 digest", s.ID)
+		}
+		if _, err := hex.DecodeString(hash); err != nil {
+			return fmt.Errorf("bench suite %q: model_file_sha256 is not hexadecimal", s.ID)
+		}
+	}
+	if s.Official {
+		if s.Model.Provider == "" || s.Model.Model == "" || s.Model.ContextTokens <= 0 {
+			return fmt.Errorf("bench suite %q: official runs require provider, model, and context_tokens", s.ID)
+		}
+	}
 	if s.Runner.Concurrency < 0 {
 		return fmt.Errorf("bench suite %q: runner.concurrency cannot be negative", s.ID)
+	}
+	if s.Runner.UnattendedGatePolicy != "" && s.Runner.UnattendedGatePolicy != UnattendedGatePolicyPermissive {
+		return fmt.Errorf("bench suite %q: runner.unattended_gate_policy %q is not supported", s.ID, s.Runner.UnattendedGatePolicy)
 	}
 	if len(s.Tasks) == 0 {
 		return fmt.Errorf("bench suite %q: no tasks", s.ID)
@@ -316,6 +546,27 @@ func (s Suite) Validate() error {
 	for i := range s.Tasks {
 		if err := s.Tasks[i].Validate(); err != nil {
 			return err
+		}
+		if s.Official && s.Tasks[i].WorkerDriver != "" {
+			return fmt.Errorf("bench suite %q: official task %q cannot select worker_driver", s.ID, s.Tasks[i].ID)
+		}
+		if s.Official && len(s.Tasks[i].Evaluator.Files) == 0 && len(s.Tasks[i].Evaluator.InlineFiles) == 0 && s.Tasks[i].Evaluator.Oracle == "" {
+			return fmt.Errorf("bench suite %q: official task %q must declare hidden evaluator material", s.ID, s.Tasks[i].ID)
+		}
+		if s.Official && len(s.Tasks[i].Evaluator.Canaries) == 0 {
+			return fmt.Errorf("bench suite %q: official task %q must declare an evaluator canary", s.ID, s.Tasks[i].ID)
+		}
+		if s.Official && len(s.Tasks[i].Evaluator.Steps) > 0 {
+			required := false
+			for _, step := range s.Tasks[i].Evaluator.Steps {
+				if step.Required == nil || *step.Required {
+					required = true
+					break
+				}
+			}
+			if !required {
+				return fmt.Errorf("bench suite %q: official task %q needs at least one required evaluator step", s.ID, s.Tasks[i].ID)
+			}
 		}
 		if seen[s.Tasks[i].ID] {
 			return fmt.Errorf("bench suite %q: duplicate task id %q", s.ID, s.Tasks[i].ID)
@@ -391,15 +642,22 @@ func hashDirectory(root string, skip func(string) bool) (string, error) {
 		if rel == "." {
 			return nil
 		}
-		if skip != nil && skip(rel) {
-			if d.IsDir() {
-				return filepath.SkipDir
+		if d.Type()&os.ModeSymlink != 0 {
+			return fmt.Errorf("fixture contains symlink %s", rel)
+		}
+		if filepath.Base(rel) == ".git" {
+			if !d.IsDir() {
+				return fmt.Errorf("fixture .git is not a directory")
 			}
+			return filepath.SkipDir
+		}
+		if !d.Type().IsRegular() {
+			return fmt.Errorf("fixture contains non-regular file %s", rel)
+		}
+		if skip != nil && skip(rel) {
 			return nil
 		}
-		if d.Type().IsRegular() {
-			paths = append(paths, rel)
-		}
+		paths = append(paths, rel)
 		return nil
 	})
 	if err != nil {
@@ -412,7 +670,11 @@ func hashDirectory(root string, skip func(string) bool) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		fmt.Fprintf(h, "%d:%s=%d:", len(rel), rel, len(body))
+		info, infoErr := os.Stat(filepath.Join(root, filepath.FromSlash(rel)))
+		if infoErr != nil {
+			return "", infoErr
+		}
+		fmt.Fprintf(h, "%d:%s=%d:%o:", len(rel), rel, len(body), info.Mode().Perm())
 		h.Write(body)
 	}
 	return hex.EncodeToString(h.Sum(nil)), nil

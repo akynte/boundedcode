@@ -41,8 +41,13 @@ type Engine struct {
 	// MaxTools caps the tool surface; it comes from the hardware profile
 	// (§9.3), because a small model given too many tools picks badly.
 	MaxTools int
-	// Temperature and friends come from the profile too.
+	// Temperature and friends come from the profile too. The pointer fields
+	// preserve the distinction between an explicitly pinned sampling value and
+	// an unmeasured/default provider value.
 	Temperature float64
+	TopP        *float64
+	TopK        *int
+	Seed        *int64
 	MaxTokens   int
 	Thinking    string
 
@@ -71,6 +76,9 @@ type Options struct {
 	MaxSteps      int
 	MaxTools      int
 	Temperature   float64
+	TopP          *float64
+	TopK          *int
+	Seed          *int64
 	MaxTokens     int
 	Thinking      string
 	ContextTokens int
@@ -106,7 +114,7 @@ func New(o Options) (*Engine, error) {
 	e := &Engine{
 		Provider: o.Provider, Retriever: o.Retriever, Graph: o.Graph, Recipes: o.Recipes,
 		MaxSteps: o.MaxSteps, MaxTools: o.MaxTools, Temperature: o.Temperature,
-		MaxTokens: o.MaxTokens, Thinking: o.Thinking, ContextTokens: o.ContextTokens,
+		TopP: o.TopP, TopK: o.TopK, Seed: o.Seed, MaxTokens: o.MaxTokens, Thinking: o.Thinking, ContextTokens: o.ContextTokens,
 		Logf: o.Logf, fence: fence,
 	}
 	if e.MaxSteps <= 0 {
@@ -129,6 +137,58 @@ func (e *Engine) refreshTools() {
 
 func (e *Engine) WorkflowProvider() llm.Provider { return e.Provider }
 
+// BenchmarkModelIdentity exposes only provider-reported identity to an
+// external harness. It is deliberately a small optional interface rather
+// than a benchmark dependency in the production engine; callers that cannot
+// obtain a served model name must leave their result identity unverified.
+func (e *Engine) BenchmarkModelIdentity() (provider, model, runtime string, contextTokens int) {
+	if e == nil || e.Provider == nil {
+		return "", "", "", 0
+	}
+	identityProvider, ok := e.Provider.(llm.ServedModelIdentityProvider)
+	if ok {
+		identity := identityProvider.ServedModelIdentity()
+		contextTokens := identity.ContextTokens
+		if contextTokens <= 0 {
+			contextTokens = e.ContextTokens
+		}
+		return identity.Provider, identity.Model, identity.Runtime, contextTokens
+	}
+	return "", "", "", 0
+}
+
+// BenchmarkGenerationRequests exposes the optional provider-side admission
+// counter installed by a benchmark adapter. It is not a production task
+// feature; ordinary engines simply do not implement it.
+func (e *Engine) BenchmarkGenerationRequests() int {
+	if e == nil || e.Provider == nil {
+		return 0
+	}
+	if counted, ok := e.Provider.(interface{ BenchmarkGenerationRequests() int }); ok {
+		return counted.BenchmarkGenerationRequests()
+	}
+	return 0
+}
+
+// BenchmarkModelRoute reports the configured route before a generation call.
+// It is intentionally distinct from BenchmarkModelIdentity: the former can be
+// checked during admission, while the latter requires a response from the
+// endpoint and is only evidence after the run.
+func (e *Engine) BenchmarkModelRoute() (provider, model string, contextTokens int) {
+	if e == nil || e.Provider == nil {
+		return "", "", 0
+	}
+	provider = e.Provider.Name()
+	if named, ok := e.Provider.(interface{ ModelName() string }); ok {
+		model = named.ModelName()
+	}
+	contextTokens = e.ContextTokens
+	if contextTokens <= 0 {
+		contextTokens = e.Provider.Capabilities().MaxContext
+	}
+	return provider, model, contextTokens
+}
+
 // WrapProvider replaces the engine's provider with wrap(provider). The
 // supervisor uses it to put a guard in front of every model call the engine
 // makes; the engine has exactly one call site, so nothing can go around it.
@@ -146,6 +206,18 @@ func (e *Engine) Close() error {
 		return nil
 	}
 	return e.Provider.Close()
+}
+
+func benchmarkSeedInt(seed *int64) *int {
+	if seed == nil {
+		return nil
+	}
+	maxInt := int(^uint(0) >> 1)
+	if *seed > int64(maxInt) || *seed < -int64(maxInt)-1 {
+		return nil
+	}
+	value := int(*seed)
+	return &value
 }
 
 func (e *Engine) logf(format string, args ...any) {
@@ -301,6 +373,9 @@ func (e *Engine) Step(ctx context.Context, req engine.Request) (*engine.Response
 			Tools:                 e.tools,
 			ToolChoice:            "auto",
 			Temperature:           &temp,
+			TopP:                  e.TopP,
+			TopK:                  e.TopK,
+			Seed:                  benchmarkSeedInt(e.Seed),
 			MaxTokens:             outputLimit,
 			Thinking:              e.Thinking,
 			ReasoningBudgetTokens: clock.reasoning(min(req.Budget.ReasoningTokens, max(1, outputLimit-1))),
