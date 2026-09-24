@@ -18,6 +18,14 @@
       }
     }
   },
+  "compaction": {
+    "auto": true,
+    "buffer": 12000,
+    "keep": {
+      "tokens": 4000
+    }
+  },
+  "default_agent": "bc-editor",
   "mcp": {
     "servers": {
       "boundedcode": {
@@ -34,6 +42,9 @@
     }
   },
   "model": "boundedcode-local/boundedcode-bonsai",
+  "plugins": [
+    "./internal/opencode/plugin"
+  ],
   "provider": {
     "boundedcode-local": {
       "models": {

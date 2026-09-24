@@ -34,6 +34,9 @@ const (
 	KindApproval     Kind = "approval"
 	KindSessionStart Kind = "session_start"
 	KindSessionEnd   Kind = "session_end"
+	// KindMemory records typed claims and evidence references. A model hypothesis
+	// remains a hypothesis even when later context cards are reconstructed.
+	KindMemory Kind = "memory"
 	// KindJudgment is a question answered by a service outside this machine.
 	//
 	// It is its own kind rather than a decision with a discriminator field so
@@ -47,7 +50,7 @@ const (
 func AllKinds() []Kind {
 	return []Kind{KindInspectFile, KindSearch, KindRetrieval, KindDecision, KindEdit,
 		KindRecipeRun, KindReview, KindCheckpoint, KindApproval, KindSessionStart, KindSessionEnd,
-		KindJudgment}
+		KindJudgment, KindMemory}
 }
 
 // Ledger is the journal for one workspace.

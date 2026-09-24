@@ -1,14 +1,14 @@
 # BoundedCode documentation
 
-A local software-engineering agent built around an **8 GB VRAM budget**.
-The Go supervisor supplies repository evidence, scoped execution and verification
-around local inference: a ternary Bonsai model for the structured phases and
-a second generator for editing.
+A local software-engineering environment built around **OpenCode** and an
+**8 GB VRAM budget**. OpenCode is the supported client. BoundedCode supplies
+repository evidence, durable supervised task state and verification around a
+local ternary Bonsai model.
 
 ## Start here
 
 1. [Install the exact reference stack](how-to/install.md).
-2. [Run a first task in a disposable repository](tutorials/first-task.md).
+2. [Start OpenCode with BoundedCode](how-to/use-with-opencode.md).
 3. [Understand the architecture](explanation/architecture.md).
 4. [Read the hardware evidence and limits](explanation/8gb-runtime.md).
 
@@ -19,6 +19,8 @@ a second generator for editing.
   and the experimental CPU embedding control.
 - [Repository intelligence](explanation/repository-intelligence.md): language
   analysis, graph evidence, retrieval and context budgets.
+- [OpenCode context and task memory](explanation/opencode-context.md): the
+  measured compaction loop, durable state, and current limits.
 - [Verification](explanation/verification.md): checks, repair, review and gates.
 - [Why small/local models can work here](explanation/why-small-models.md):
   capability through decomposition, without a claim of frontier-model parity.

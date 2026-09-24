@@ -136,8 +136,9 @@ func TestRegisterAgentDeniesTheShellAndKeepsTheDeveloperConfig(t *testing.T) {
 	}
 
 	var doc struct {
-		Model string `json:"model"`
-		Agent map[string]struct {
+		Model        string `json:"model"`
+		DefaultAgent string `json:"default_agent"`
+		Agent        map[string]struct {
 			Mode       string            `json:"mode"`
 			Permission map[string]string `json:"permission"`
 		} `json:"agent"`
@@ -151,6 +152,9 @@ func TestRegisterAgentDeniesTheShellAndKeepsTheDeveloperConfig(t *testing.T) {
 	}
 	if doc.Model != "local/qwen" {
 		t.Fatalf("the developer's model choice was lost: %q", doc.Model)
+	}
+	if doc.DefaultAgent != opencode.AgentName {
+		t.Fatalf("default agent = %q; OpenCode 2 must select the restricted agent", doc.DefaultAgent)
 	}
 	if _, ok := doc.Agent["mine"]; !ok {
 		t.Fatal("the developer's own agent was dropped")

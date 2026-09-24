@@ -2,18 +2,23 @@ package mcp
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/akynte/boundedcode/internal/artifacts"
 	"github.com/akynte/boundedcode/internal/engine"
 	"github.com/akynte/boundedcode/internal/firewall"
+	"github.com/akynte/boundedcode/internal/ledger"
 	"github.com/akynte/boundedcode/internal/policy"
 	"github.com/akynte/boundedcode/internal/recipe"
 	"github.com/akynte/boundedcode/internal/supervisor"
 	"github.com/akynte/boundedcode/internal/task"
+	"github.com/akynte/boundedcode/internal/worktree"
 )
 
 // registerSupervision adds the tools that put an editor's work under the same
@@ -38,6 +43,19 @@ func (s *Server) registerSupervision(srv *mcp.Server) {
 			"repository protects and the checks that will judge the work. Call this first " +
 			"when asked to implement, fix, refactor or change anything; then edit normally.",
 	}, s.taskStart)
+	mcp.AddTool(srv, &mcp.Tool{
+		Name: "bc_task_resume",
+		Description: "Bind this OpenCode session to an unfinished supervised task by task_id. " +
+			"Use after starting a new OpenCode session when more than one task is active.",
+	}, s.taskResume)
+	mcp.AddTool(srv, &mcp.Tool{
+		Name: "bc_task_history",
+		Description: "Retrieve user decisions from the durable task ledger by task_id, " +
+			"oldest first. Use offset and limit to page through decisions omitted from the active context card.",
+	}, s.taskHistory)
+	mcp.AddTool(srv, &mcp.Tool{Name: "bc_task_memory", Description: "Page typed durable task claims and recover immutable evidence by hash. Older claims remain available outside active context."}, s.taskMemory)
+	mcp.AddTool(srv, &mcp.Tool{Name: "bc_task_memory_add", Description: "Record a model hypothesis, contradiction, pending action, or failure. The editor cannot assert a confirmed fact or supervisor decision."}, s.taskMemoryAdd)
+	mcp.AddTool(srv, &mcp.Tool{Name: "bc_task_fact", Description: "Confirm an exact quote in a permitted repository file and store immutable source evidence. Only this deterministic check can record a repository fact."}, s.taskFact)
 
 	mcp.AddTool(srv, &mcp.Tool{
 		Name: "bc_verify",
@@ -80,7 +98,145 @@ func (s *Server) registerSupervision(srv *mcp.Server) {
 	}, s.editFile)
 }
 
+type factIn struct {
+	TaskID string `json:"task_id"`
+	Path string `json:"path" jsonschema:"repository-relative source path"`
+	Quote string `json:"quote" jsonschema:"exact source text to confirm, at most 300 characters"`
+}
+
+func (s *Server) taskFact(ctx context.Context, _ *mcp.CallToolRequest, in factIn) (*mcp.CallToolResult, any, error) {
+	if in.TaskID=="" || in.Quote=="" || len(in.Quote)>300 {return fail("task_id and a quote of 1..300 bytes are required"),nil,nil}
+	sess,err:=s.resolve(ctx,"")
+	if err!=nil{return fail("%v",err),nil,nil}
+	defer sess.Close()
+	if err:=(firewall.Access{Protected:protectedSet(sess.Workspace.Root)}).Check(sess.Workspace.Root,in.Path,false);err!=nil{return fail("%v",err),nil,nil}
+	body,err:=worktree.ReadWithin(sess.Workspace.Root,in.Path)
+	if err!=nil{return fail("%v",err),nil,nil}
+	if len(body)>maxReadBytes {return fail("file exceeds 256 KiB; confirm a smaller source file"),nil,nil}
+	if !strings.Contains(string(body),in.Quote) {return fail("exact quote is absent from %s",in.Path),nil,nil}
+	hash,err:=artifacts.New(sess.Store).Put(body)
+	if err!=nil{return fail("%v",err),nil,nil}
+	sum:=sha256.Sum256(body)
+	fileHash:=hex.EncodeToString(sum[:])
+	id,err:=supervisor.RecordMemory(ctx,sess.Store,in.TaskID,supervisor.MemoryRecord{
+		Type:"repository_fact",Text:fmt.Sprintf("At observation time, %s contains exact quote %q",in.Path,in.Quote),
+		Evidence:hash,Path:in.Path,FileHash:fileHash,
+	},false)
+	if err!=nil{return fail("%v",err),nil,nil}
+	return text(fmt.Sprintf("Confirmed repository fact #%d; file sha256=%s; evidence=%s",id,fileHash,hash)),map[string]any{"id":id,"file_hash":fileHash,"evidence":hash},nil
+}
+
+type memoryIn struct {
+	TaskID   string `json:"task_id"`
+	Before   int64  `json:"before,omitempty"`
+	Limit    int    `json:"limit,omitempty"`
+	Evidence string `json:"evidence,omitempty"`
+	IncludeObjective bool `json:"include_objective,omitempty"`
+	Path     string `json:"path,omitempty"`
+}
+
+func (s *Server) taskMemory(ctx context.Context, _ *mcp.CallToolRequest, in memoryIn) (*mcp.CallToolResult, any, error) {
+	sess, err := s.resolve(ctx, in.Path)
+	if err != nil {
+		return fail("%v", err), nil, nil
+	}
+	defer sess.Close()
+	taskInfo, err := task.NewStore(sess.Store).Get(ctx, in.TaskID)
+	if err != nil {
+		return fail("%v", err), nil, nil
+	}
+	if in.Evidence != "" {
+		var found int
+		err := sess.Store.Ledger().SQL().QueryRowContext(ctx, `SELECT COUNT(*) FROM operations WHERE task_id=? AND (evidence_id=? OR json_extract(intent,'$.original_prompt_hash')=?)`, in.TaskID, in.Evidence, in.Evidence).Scan(&found)
+		if err != nil || found == 0 {
+			return fail("evidence is not owned by this task"), nil, nil
+		}
+		body, err := artifacts.New(sess.Store).Get(in.Evidence)
+		if err != nil {
+			return fail("%v", err), nil, nil
+		}
+		return text(string(body)), map[string]any{"evidence": in.Evidence, "content": string(body)}, nil
+	}
+	if in.Limit == 0 {
+		in.Limit = 20
+	}
+	rows, err := supervisor.MemoryPage(ctx, sess.Store, in.TaskID, in.Before, in.Limit)
+	if err != nil {
+		return fail("%v", err), nil, nil
+	}
+	var b strings.Builder
+	objective := ""
+	if in.IncludeObjective { objective=taskInfo.Title; fmt.Fprintf(&b,"Original objective: %s\n",objective) }
+	for _, r := range rows {
+		fmt.Fprintf(&b, "#%d [%s] %s evidence=%s candidate=%s supersedes=%d\n", r.ID, r.Type, r.Text, r.Evidence, r.Candidate, r.Supersedes)
+	}
+	if rows == nil {
+		rows = []supervisor.MemoryRecord{}
+	}
+	return text(b.String()), map[string]any{"records": rows,"objective":objective}, nil
+}
+
+type memoryAddIn struct {
+	TaskID     string `json:"task_id"`
+	Type       string `json:"type" jsonschema:"model_hypothesis, contradicted_hypothesis, tool_observation, open_failure, resolved_failure, or pending_action"`
+	Text       string `json:"text"`
+	Evidence   string `json:"evidence,omitempty" jsonschema:"immutable artifact hash returned by bc_read"`
+	Candidate  string `json:"candidate,omitempty"`
+	Supersedes int64  `json:"supersedes,omitempty"`
+	Path       string `json:"path,omitempty"`
+}
+
+func (s *Server) taskMemoryAdd(ctx context.Context, _ *mcp.CallToolRequest, in memoryAddIn) (*mcp.CallToolResult, any, error) {
+	sess, err := s.resolve(ctx, "")
+	if err != nil {
+		return fail("%v", err), nil, nil
+	}
+	defer sess.Close()
+	id, err := supervisor.RecordMemory(ctx, sess.Store, in.TaskID, supervisor.MemoryRecord{Type: in.Type, Text: in.Text, Evidence: in.Evidence, Candidate: in.Candidate, Supersedes: in.Supersedes, Path: in.Path}, true)
+	if err != nil {
+		return fail("%v", err), nil, nil
+	}
+	return text(fmt.Sprintf("Recorded typed task memory #%d (%s).", id, in.Type)), map[string]any{"id": id}, nil
+}
+
 // ----------------------------------------------------------- bc_task_answer
+
+type historyIn struct {
+	TaskID string `json:"task_id" jsonschema:"the supervised task ID"`
+	Offset int    `json:"offset,omitempty" jsonschema:"zero-based decision offset"`
+	Limit  int    `json:"limit,omitempty" jsonschema:"number of decisions, 1 to 20; defaults to 10"`
+	Path   string `json:"path,omitempty" jsonschema:"a subdirectory of the open repository; defaults to its root"`
+}
+
+func (s *Server) taskHistory(ctx context.Context, _ *mcp.CallToolRequest, in historyIn) (*mcp.CallToolResult, any, error) {
+	if in.TaskID == "" || in.Offset < 0 || in.Limit < 0 || in.Limit > 20 {
+		return fail("task_id, nonnegative offset and limit at most 20 are required"), nil, nil
+	}
+	if in.Limit == 0 {
+		in.Limit = 10
+	}
+	sess, err := s.resolve(ctx, in.Path)
+	if err != nil {
+		return fail("%v", err), nil, nil
+	}
+	defer sess.Close() //nolint:contextcheck // cleanup must complete after a cancelled request.
+	if _, err := task.NewStore(sess.Store).Get(ctx, in.TaskID); err != nil {
+		return fail("finding task: %v", err), nil, nil
+	}
+	decisions, total, err := supervisor.DecisionPage(ctx, sess.Store, in.TaskID, in.Offset, in.Limit)
+	if err != nil {
+		return fail("reading task decisions: %v", err), nil, nil
+	}
+	if in.Offset > total {
+		in.Offset = total
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "User decisions %d-%d of %d for task %s:\n", in.Offset, in.Offset+len(decisions), total, in.TaskID)
+	for i, d := range decisions {
+		fmt.Fprintf(&b, "%d. %s → %s\n", in.Offset+i, d.Question, d.Answer)
+	}
+	return text(b.String()), nil, nil
+}
 
 type answerIn struct {
 	TaskID   string `json:"task_id" jsonschema:"the id bc_task_start returned"`
@@ -147,7 +303,9 @@ func (s *Server) taskFinish(ctx context.Context, _ *mcp.CallToolRequest, in fini
 // ------------------------------------------------------------ bc_task_start
 
 type startIn struct {
-	Objective string `json:"objective" jsonschema:"what the user asked for, in one sentence"`
+	Objective    string   `json:"objective" jsonschema:"the user's original objective, concise but faithful"`
+	Requirements []string `json:"requirements,omitempty" jsonschema:"explicit user requirements and acceptance criteria that must survive compaction"`
+	Constraints  []string `json:"constraints,omitempty" jsonschema:"explicit scope, security and performance constraints from the user"`
 	// WriteScope is §9.3's plan-scoped allowlist, declared before the work
 	// rather than discovered from the diff afterwards. An injected instruction
 	// cannot widen it: adding a path means opening another task, which is a
@@ -168,9 +326,12 @@ type startOut struct {
 // bc_verify infers: intent is recorded before the side effect, so an
 // interrupted session leaves a state that can be reconciled rather than
 // guessed at.
-func (s *Server) taskStart(ctx context.Context, _ *mcp.CallToolRequest, in startIn) (*mcp.CallToolResult, startOut, error) {
+func (s *Server) taskStart(ctx context.Context, req *mcp.CallToolRequest, in startIn) (*mcp.CallToolResult, startOut, error) {
 	if strings.TrimSpace(in.Objective) == "" {
 		return fail("objective is required"), startOut{}, nil
+	}
+	if err := validateTaskDetails(in.Requirements, in.Constraints); err != nil {
+		return fail("%v", err), startOut{}, nil
 	}
 	sess, err := s.resolve(ctx, in.Path)
 	if err != nil {
@@ -187,6 +348,15 @@ func (s *Server) taskStart(ctx context.Context, _ *mcp.CallToolRequest, in start
 	}
 	if err := task.NewStore(sess.Store).Create(ctx, t); err != nil {
 		return fail("opening the task: %v", err), startOut{}, nil
+	}
+	promptHash, err := supervisor.OriginalOpenCodePrompt(ctx, sess.Store, openCodeSessionID(req))
+	if err != nil {
+		return fail("finding original user prompt: %v", err), startOut{}, nil
+	}
+	if err := supervisor.RecordEvent(ctx, sess.Store, t.ID, ledger.KindSessionStart,
+		map[string]any{"objective": t.Title, "executor": "opencode", "session_id": openCodeSessionID(req),
+			"requirements": in.Requirements, "constraints": in.Constraints, "original_prompt_hash": promptHash}); err != nil {
+		return fail("recording the OpenCode session: %v", err), startOut{}, nil
 	}
 
 	out := startOut{TaskID: t.ID}
@@ -217,6 +387,68 @@ func (s *Server) taskStart(ctx context.Context, _ *mcp.CallToolRequest, in start
 		"it runs the checks in a sandbox and decides acceptance from the evidence, so " +
 		"there is no need to assert that it works.\n")
 	return text(b.String()), out, nil
+}
+
+func validateTaskDetails(groups ...[]string) error {
+	total := 0
+	for _, group := range groups {
+		if len(group) > 20 {
+			return fmt.Errorf("at most 20 requirements or constraints are allowed per group")
+		}
+		for _, item := range group {
+			if strings.TrimSpace(item) == "" || len(item) > 500 {
+				return fmt.Errorf("each requirement or constraint must have 1 to 500 characters")
+			}
+			total += len(item)
+		}
+	}
+	if total > 6000 {
+		return fmt.Errorf("requirements and constraints exceed the 6000-character context budget")
+	}
+	return nil
+}
+
+type resumeIn struct {
+	TaskID       string   `json:"task_id" jsonschema:"the task ID returned by bc_task_start"`
+	Requirements []string `json:"requirements,omitempty" jsonschema:"explicit user criteria to recover when an older task did not record them at start"`
+	Constraints  []string `json:"constraints,omitempty" jsonschema:"explicit user constraints to recover when an older task did not record them at start"`
+	Path         string   `json:"path,omitempty" jsonschema:"subdirectory of the open repository"`
+}
+
+func openCodeSessionID(req *mcp.CallToolRequest) string {
+	if req == nil {
+		return ""
+	}
+	id, _ := req.Params.Meta["ai.opencode/sessionID"].(string)
+	if strings.HasPrefix(id, "ses_") && len(id) <= 100 {
+		return id
+	}
+	return ""
+}
+
+func (s *Server) taskResume(ctx context.Context, req *mcp.CallToolRequest, in resumeIn) (*mcp.CallToolResult, any, error) {
+	if err := validateTaskDetails(in.Requirements, in.Constraints); err != nil {
+		return fail("%v", err), nil, nil
+	}
+	id := openCodeSessionID(req)
+	if id == "" {
+		return fail("OpenCode session ID is required to resume a task"), nil, nil
+	}
+	sess, err := s.resolve(ctx, in.Path)
+	if err != nil {
+		return fail("%v", err), nil, nil
+	}
+	defer sess.Close()
+	t, err := task.NewStore(sess.Store).Get(ctx, in.TaskID)
+	if err != nil || t.Kind != "supervised" || t.State.Terminal() {
+		return fail("task %q is not an unfinished supervised task", in.TaskID), nil, nil
+	}
+	if err := supervisor.RecordEvent(ctx, sess.Store, t.ID, ledger.KindSessionStart,
+		map[string]any{"objective": t.Title, "executor": "opencode", "session_id": id, "resumed": true,
+			"requirements": in.Requirements, "constraints": in.Constraints}); err != nil {
+		return fail("recording session resume: %v", err), nil, nil
+	}
+	return text("Session bound to task " + t.ID + ". Its durable state will appear in subsequent model requests."), nil, nil
 }
 
 // ----------------------------------------------------------------- bc_verify

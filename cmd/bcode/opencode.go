@@ -1,11 +1,16 @@
 package main
 
 import (
+	"bufio"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -43,6 +48,110 @@ func newOpenCodeCmd() *cobra.Command {
 	}
 	cmd.AddCommand(newOpenCodeSetupCmd())
 	cmd.AddCommand(newOpenCodeRunCmd())
+	cmd.AddCommand(newOpenCodeContextCmd())
+	cmd.AddCommand(newOpenCodePromptCmd())
+	cmd.AddCommand(newOpenCodeBudgetCmd())
+	return cmd
+}
+
+func newOpenCodeBudgetCmd() *cobra.Command {
+	var sessionID string
+	cmd := &cobra.Command{Use: "budget", Short: "Show the latest tokenizer-based OpenCode request budget", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
+		_, root, st, err := openWorkspace(cmd.Context())
+		if err != nil {
+			return err
+		}
+		defer closeRoot(cmd, root)
+		path := filepath.Join(st.OpenCodeDir(), "state", "opencode", "boundedcode-budget.jsonl")
+		f, err := os.Open(path)
+		if err != nil {
+			return fmt.Errorf("OpenCode request accounting is unavailable; start bcode opencode run --budget: %w", err)
+		}
+		defer f.Close()
+		scanner := bufio.NewScanner(f)
+		scanner.Buffer(make([]byte, 4096), 1<<20)
+		var last []byte
+		for scanner.Scan() {
+			line := append([]byte(nil), scanner.Bytes()...)
+			var record struct {
+				SessionID string `json:"session_id"`
+			}
+			if json.Unmarshal(line, &record) == nil && (sessionID == "" || record.SessionID == sessionID) {
+				last = line
+			}
+		}
+		if err := scanner.Err(); err != nil {
+			return err
+		}
+		if len(last) == 0 {
+			return fmt.Errorf("no recorded OpenCode request for session %q", sessionID)
+		}
+		_, err = fmt.Fprintln(cmd.OutOrStdout(), string(last))
+		return err
+	}}
+	cmd.Flags().StringVar(&sessionID, "session", "", "OpenCode session ID")
+	return cmd
+}
+
+func newOpenCodePromptCmd() *cobra.Command {
+	var sessionID, messageID string
+	cmd := &cobra.Command{Use: "record-prompt", Hidden: true, Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
+		body, err := io.ReadAll(io.LimitReader(cmd.InOrStdin(), (1<<20)+1))
+		if err != nil {
+			return err
+		}
+		if brokerSocket() != "" {
+			_, err = brokerCall(cmd.Context(), brokerRequest{Kind: "prompt", Session: sessionID, Message: messageID, Body: string(body)})
+			return err
+		}
+		_, root, st, err := openWorkspace(cmd.Context())
+		if err != nil {
+			return err
+		}
+		defer closeRoot(cmd, root)
+		_, err = supervisor.RecordOpenCodePrompt(cmd.Context(), st, sessionID, messageID, string(body))
+		return err
+	}}
+	cmd.Flags().StringVar(&sessionID, "session", "", "OpenCode session ID")
+	cmd.Flags().StringVar(&messageID, "message", "", "OpenCode message ID")
+	_ = cmd.MarkFlagRequired("session")
+	_ = cmd.MarkFlagRequired("message")
+	return cmd
+}
+
+// The OpenCode plugin calls this at each model-request boundary. A fresh Go
+// process reads the ledger, so neither OpenCode compaction nor either process
+// restarting can silently erase the objective and recorded decisions.
+func newOpenCodeContextCmd() *cobra.Command {
+	var sessionID string
+	cmd := &cobra.Command{
+		Use:   "context",
+		Short: "Render durable task state for one OpenCode session",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if brokerSocket() != "" {
+				body, err := brokerCall(cmd.Context(), brokerRequest{Kind: "context", Session: sessionID})
+				if err != nil {
+					return err
+				}
+				_, err = fmt.Fprint(cmd.OutOrStdout(), body)
+				return err
+			}
+			ws, root, st, err := openWorkspace(cmd.Context())
+			if err != nil {
+				return err
+			}
+			defer closeRoot(cmd, root)
+			body, err := supervisor.OpenCodeContext(cmd.Context(), st, ws.Root, sessionID)
+			if err != nil {
+				return err
+			}
+			_, err = fmt.Fprint(cmd.OutOrStdout(), body)
+			return err
+		},
+	}
+	cmd.Flags().StringVar(&sessionID, "session", "", "OpenCode session ID")
+	_ = cmd.MarkFlagRequired("session")
 	return cmd
 }
 
@@ -114,6 +223,11 @@ func setupOpenCode(cmd *cobra.Command, dataDir string, printNext bool) error {
 			fmt.Fprintf(out, "no local endpoint configured yet — set inference.base_url "+
 				"in bcode.yaml, or choose a model inside OpenCode\n")
 		}
+	}
+	if _, changed, err := opencode.RegisterContextPolicy(ws.Root); err != nil {
+		return err
+	} else if changed {
+		fmt.Fprintln(out, "configured OpenCode task context and compaction policy")
 	}
 
 	// The restricted agent, so `bcode opencode run` has one to select.
@@ -233,6 +347,7 @@ func verb(changed bool) string {
 // environment, this workspace's own XDG directories, and the restricted agent.
 func newOpenCodeRunCmd() *cobra.Command {
 	var unconfined bool
+	var budget bool
 	cmd := &cobra.Command{
 		Use:   "run [-- opencode args...]",
 		Short: "Start OpenCode confined to this workspace",
@@ -262,6 +377,10 @@ func newOpenCodeRunCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			baseURL, _ := inferenceEndpoint(cfg, root)
+			if _, err := opencode.ValidateRuntime(ctx, ws.Root, baseURL); err != nil {
+				return fmt.Errorf("OpenCode runtime mismatch: %w", err)
+			}
 			dirs, err := st.TaskDirs()
 			if err != nil {
 				return err
@@ -275,15 +394,64 @@ func newOpenCodeRunCmd() *cobra.Command {
 			}
 			session := opencode.Session{
 				Binary: binary, Repo: ws.Root,
-				StateDir: st.OpenCodeDir(), TmpDir: dirs.Tmp,
+				StateDir: st.OpenCodeDir(), TmpDir: dirs.Tmp, Budget: budget,
 			}
 			spec, err := session.Confine(supervisor.BaseSandboxSpec(cfg, dirs))
 			if err != nil {
 				return err
 			}
+			if cfg.Inference.Mode == config.ModeExternal {
+				endpoint, err := url.Parse(cfg.Inference.BaseURL)
+				if err != nil {
+					return err
+				}
+				if endpoint.Hostname() != "127.0.0.1" && endpoint.Hostname() != "localhost" && endpoint.Hostname() != "::1" {
+					return fmt.Errorf("confined OpenCode requires a local inference endpoint, got %q", endpoint.Hostname())
+				}
+				port, err := strconv.ParseUint(endpoint.Port(), 10, 16)
+				if err != nil || port == 0 {
+					return fmt.Errorf("confined OpenCode requires an explicit local inference port")
+				}
+				spec.TCPConnect = append(spec.TCPConnect, uint16(port))
+			}
 			if err := st.EnsureSandboxDirs(spec.ReadWrite); err != nil {
 				return err
 			}
+			self, err := os.Executable()
+			if err != nil {
+				return err
+			}
+			binDir := filepath.Join(session.StateDir, "bin")
+			if err := os.MkdirAll(binDir, 0700); err != nil {
+				return err
+			}
+			link := filepath.Join(binDir, "bcode")
+			if info, err := os.Lstat(link); err == nil {
+				if info.Mode()&os.ModeSymlink == 0 {
+					return fmt.Errorf("refusing to replace non-symlink %s", link)
+				}
+				if err := os.Remove(link); err != nil {
+					return err
+				}
+			} else if !os.IsNotExist(err) {
+				return err
+			}
+			if err := os.Symlink(self, link); err != nil {
+				return err
+			}
+			session.BCodeBinDir = binDir
+			brokerPath, stopBroker, err := startOpenCodeBroker(ctx, st, root.Layout().Root(), ws.Root, session.StateDir, self)
+			if err != nil {
+				return err
+			}
+			defer stopBroker()
+			capPath := filepath.Join(session.StateDir, brokerCapabilityFile)
+			if err := os.WriteFile(capPath, []byte(brokerPath), 0600); err != nil {
+				return err
+			}
+			defer os.Remove(capPath)
+			session.BrokerCapability = brokerPath
+			spec.Env = session.Env()
 
 			runner, report := supervisor.SelectSandbox(ctx, cfg)
 			if runner == nil || (len(report.Active) == 1 && report.Active[0] == sandbox.LayerContainer && !inContainer()) {
@@ -299,7 +467,12 @@ func newOpenCodeRunCmd() *cobra.Command {
 				fmt.Fprintf(out, "WARNING: starting unconfined. The shell's own permissions are not a boundary.\n\n")
 			}
 
-			argv := append([]string{binary, "--pure", "--agent", opencode.AgentName}, args...)
+			// OpenCode 2 selects the project default agent from configuration.
+			// The old --pure and global --agent flags are rejected by 2.0.15.
+			argv := append([]string{binary}, args...)
+			if len(args) == 0 {
+				argv = append(argv, "--standalone")
+			}
 			child, err := runner.Command(ctx, spec, argv...)
 			if err != nil {
 				return err
@@ -323,6 +496,7 @@ func newOpenCodeRunCmd() *cobra.Command {
 	}
 	cmd.Flags().BoolVar(&unconfined, "unconfined", false,
 		"start even when no sandbox layer is available, accepting that the session is not confined")
+	cmd.Flags().BoolVar(&budget, "budget", false, "record tokenizer-based OpenCode request budget by category")
 	return cmd
 }
 

@@ -1,7 +1,9 @@
-# Optional OpenCode integration
+# OpenCode integration
 
-The reference task runner is the native Go engine. OpenCode is an optional
-editor/MCP integration, not a required second agent or the default runtime.
+OpenCode 2 is the supported BoundedCode user interface. The Go supervisor
+supplies tools, a task ledger and verification; OpenCode owns the model session.
+The [context architecture and measured compaction defect](../explanation/opencode-context.md)
+explain the boundary in detail.
 
 ## Start OpenCode
 
@@ -35,6 +37,12 @@ from the shell and language runtimes across repositories. Only the managed
 block is refreshed; your other global instructions are preserved. See
 [OpenCode's instruction scope](https://opencode.ai/v2/docs/instructions/).
 
+Setup also installs the BoundedCode OpenCode plugin and the Bonsai compaction
+policy in `opencode.json`. The plugin reads the Go ledger before each model
+request. For a 32K Bonsai slot, the policy uses a 12K buffer and retains 4K
+recent tokens, avoiding OpenCode 2.0.15's 15K-retained/12.8K-trigger loop.
+Restart OpenCode after changing these settings.
+
 When BoundedCode has a local inference endpoint configured, setup also registers
 it using OpenCode 2's custom provider format. For the reference Bonsai model, it
 declares tool support, text-only input, a 32K context, and an 8K output limit.
@@ -55,11 +63,11 @@ For manual setup without launching the editor, use `bcode opencode setup`.
 |---|---|
 | `bc_status`, `bc_graph_impact`, `bc_search`, `bc_reindex` | Workspace status, reverse-dependency evidence, retrieval, indexing |
 | `bc_note_add` | Persist a bounded repository note |
-| `bc_task_start`, `bc_task_answer` | Begin editor supervision and answer its gate |
+| `bc_task_start`, `bc_task_resume`, `bc_task_answer`, `bc_task_history` | Begin or resume supervised work and record or retrieve user decisions |
 | `bc_read`, `bc_edit` | Mediated file access in the opened repository |
 | `bc_verify`, `bc_task_finish` | Collect checks and record a completion verdict |
 
-These eleven tools are registered in
+The BoundedCode tools are registered in
 [`internal/mcp/tools.go`](https://github.com/akynte/boundedcode/blob/main/internal/mcp/tools.go) and
 [`supervise.go`](https://github.com/akynte/boundedcode/blob/main/internal/mcp/supervise.go). They call shared Go
 subsystems; this is not a read-only four-tool bridge.
@@ -68,19 +76,23 @@ Editor edits affect the opened checkout. They do not automatically acquire the
 native task runner's separate-worktree lifecycle. A finish verdict evaluates
 available evidence; it cannot undo an earlier edit made by another editor tool.
 
-## Explicit confinement
+At task start, pass explicit acceptance criteria as `requirements` and scope,
+security and performance limits as `constraints`. When a new OpenCode session
+has several unfinished tasks, call `bc_task_resume` with the intended task ID.
+The original objective, these fields, user decisions and verification are
+reconstructed from the ledger after compaction and restart. Read/search output
+that was never recorded as durable task state may need to be retrieved again.
 
-Inspect the current flags, then launch the editor through the confinement path:
+## Confinement status
 
-```bash
-bcode opencode run --help
-bcode opencode run
-```
-
-This path prepares the sandbox, a scrubbed environment and mediated-tool
-configuration. It denies built-in tools that would bypass mediation. Review
-`bcode doctor` and [trust boundaries](../explanation/trust-boundaries.md);
-kernel availability and the deployment still determine OS protection.
+`bcode opencode run` is not yet a usable production path with the new context
+hook. OpenCode 2's private server needs permission to bind port zero, and the
+hook needs access to the workspace ledger. The port-zero grant is implemented,
+but the sandbox still hides the BoundedCode data root. The next integration
+step is a narrow per-workspace state channel; mounting the whole data root
+would expose unrelated workspaces and signing keys. Use `bcode opencode` for
+the currently validated workflow. Review [trust boundaries](../explanation/trust-boundaries.md)
+for the regular editor's security limits.
 
 ## Troubleshooting
 

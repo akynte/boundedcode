@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"os/exec"
+	"syscall"
 	"testing"
 
 	"github.com/akynte/boundedcode/internal/sandbox"
@@ -43,6 +44,16 @@ func TestEphemeralGrantLetsAnHTTPTestServerWork(t *testing.T) {
 	}
 	if err := landlock.Apply(spec); err != nil {
 		t.Fatalf("apply: %v", err)
+	}
+	// Use a plain TCP socket: Go's net.Listen may use MPTCP, which Landlock
+	// does not currently mediate. OpenCode's Bun server uses plain bind(0).
+	fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_STREAM, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer syscall.Close(fd)
+	if err := syscall.Bind(fd, &syscall.SockaddrInet4{Port: 0, Addr: [4]byte{127, 0, 0, 1}}); err != nil {
+		t.Fatalf("plain TCP bind(0) must work under the ephemeral grant: %v", err)
 	}
 
 	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))

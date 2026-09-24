@@ -105,8 +105,15 @@ func Render(f Facts) string {
 	b.WriteString("- **`bc_status`** when answers look stale. It reports how far the index has " +
 		"drifted from the working tree.\n")
 	b.WriteString("- **`bc_task_start`** before implementing, fixing or refactoring anything. " +
+		"Include the user's explicit acceptance criteria in `requirements` and scope or security " +
+		"limits in `constraints`; these survive OpenCode compaction and session recreation. " +
 		"It opens a supervised task, journals the intent before the work, and tells you which " +
 		"paths this repository protects — which is cheaper to learn before editing than after.\n")
+	b.WriteString("- **`bc_task_resume`** when a new OpenCode session must continue one of several " +
+		"active supervised tasks. Pass the existing task id; the supervisor binds this session " +
+		"to its durable objective, requirements, decisions and verification.\n")
+	b.WriteString("- **`bc_task_history`** to page through older user decisions when the active " +
+		"task card says some decisions were omitted. Use the task id and offset.\n")
 	b.WriteString("- **`bc_verify`** when you believe the change is complete. It runs this " +
 		"repository's checks in a sandbox and applies the completion contract, tying every " +
 		"result to the exact content hash it describes. It decides whether the work is done; " +

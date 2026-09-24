@@ -12,6 +12,39 @@ import (
 // ServerName is the key BoundedCode registers itself under.
 const ServerName = "boundedcode"
 
+// RegisterContextPolicy installs the OpenCode 2 adapter and a compaction
+// policy that fits the reference 32K Bonsai slot. OpenCode 2.0.15 otherwise
+// retains 15K tokens after compacting while its 20K buffer triggers at 12.8K.
+func RegisterContextPolicy(repoRoot string) (string, bool, error) {
+	return mergeConfig(repoRoot, func(doc map[string]any) bool {
+		changed := false
+		plugins, _ := doc["plugins"].([]any)
+		const adapter = "./internal/opencode/plugin"
+		found := false
+		for _, item := range plugins {
+			if item == adapter {
+				found = true
+			}
+		}
+		if !found {
+			doc["plugins"] = append(plugins, adapter)
+			changed = true
+		}
+		model, _ := doc["model"].(string)
+		if strings.HasPrefix(model, ProviderName+"/") && strings.Contains(strings.ToLower(model), "bonsai") {
+			want := map[string]any{
+				"auto": true, "buffer": 12000,
+				"keep": map[string]any{"tokens": 4000},
+			}
+			if !equalJSON(doc["compaction"], want) {
+				doc["compaction"] = want
+				changed = true
+			}
+		}
+		return changed
+	})
+}
+
 // verifyTimeoutMillis bounds one MCP request. Twenty minutes is the task budget
 // a verification runs under, so a client that gives up earlier would abandon a
 // call the supervisor is still honouring.

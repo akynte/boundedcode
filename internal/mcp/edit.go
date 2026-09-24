@@ -2,14 +2,18 @@ package mcp
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/akynte/boundedcode/internal/artifacts"
 	"github.com/akynte/boundedcode/internal/firewall"
 	"github.com/akynte/boundedcode/internal/policy"
+	"github.com/akynte/boundedcode/internal/supervisor"
 	"github.com/akynte/boundedcode/internal/task"
 	"github.com/akynte/boundedcode/internal/trust"
 	"github.com/akynte/boundedcode/internal/worktree"
@@ -34,6 +38,7 @@ import (
 
 // readIn is the proxied read.
 type readIn struct {
+	TaskID    string `json:"task_id,omitempty" jsonschema:"supervised task ID; records immutable evidence when supplied"`
 	Path      string `json:"path" jsonschema:"repository-relative path to read"`
 	StartLine int    `json:"start_line,omitempty" jsonschema:"first line, 1-based; omit for the start"`
 	EndLine   int    `json:"end_line,omitempty" jsonschema:"last line, inclusive; omit for the end"`
@@ -41,6 +46,7 @@ type readIn struct {
 }
 
 type readOut struct {
+	Evidence  string `json:"evidence,omitempty"`
 	Path      string `json:"path"`
 	StartLine int    `json:"start_line"`
 	EndLine   int    `json:"end_line"`
@@ -72,6 +78,8 @@ func (s *Server) readFile(ctx context.Context, _ *mcp.CallToolRequest, in readIn
 		}
 		return fail("reading %s: %v", in.Path, err), readOut{}, nil
 	}
+	fileHashSum := sha256.Sum256(body)
+	fileHash := hex.EncodeToString(fileHashSum[:])
 	out := readOut{Path: in.Path, StartLine: 1}
 	if len(body) > maxReadBytes {
 		body, out.Truncated = body[:maxReadBytes], true
@@ -89,6 +97,23 @@ func (s *Server) readFile(ctx context.Context, _ *mcp.CallToolRequest, in readIn
 	}
 	out.StartLine, out.EndLine = start, end
 	out.Content = strings.Join(lines[start-1:end], "\n")
+	if in.TaskID != "" {
+		if _, err := task.NewStore(sess.Store).Get(ctx, in.TaskID); err != nil {
+			return fail("%v", err), readOut{}, nil
+		}
+		hash, err := artifacts.New(sess.Store).Put([]byte(out.Content))
+		if err != nil {
+			return fail("recording read evidence: %v", err), readOut{}, nil
+		}
+		out.Evidence = hash
+		_, err = supervisor.RecordMemory(ctx, sess.Store, in.TaskID, supervisor.MemoryRecord{
+			Type: "tool_observation", Text: fmt.Sprintf("Read %s lines %d-%d", in.Path, start, end),
+			Evidence: hash, Path: in.Path, FileHash:fileHash,
+		}, false)
+		if err != nil {
+			return fail("recording read observation: %v", err), readOut{}, nil
+		}
+	}
 
 	// Fenced with its provenance, like every other route that puts repository
 	// content in front of a model. A file that says "ignore your instructions"
@@ -97,7 +122,7 @@ func (s *Server) readFile(ctx context.Context, _ *mcp.CallToolRequest, in readIn
 	if err != nil {
 		return fail("%v", err), readOut{}, nil
 	}
-	origin := fmt.Sprintf("source=file path=%s lines=%d-%d", in.Path, start, end)
+	origin := fmt.Sprintf("source=file path=%s lines=%d-%d evidence=%s", in.Path, start, end, out.Evidence)
 	return text(fence.Preamble() + "\n" + fence.Wrap(origin, out.Content)), out, nil
 }
 

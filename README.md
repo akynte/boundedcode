@@ -23,16 +23,21 @@ Nothing accepted without verification.**
 
 ---
 
-BoundedCode investigates repositories, plans scoped changes, edits code, and runs
-verification on your machine. A Go supervisor surrounds local inference with a
-code graph, bounded tools, persistent evidence, and a human approval gate.
+BoundedCode adds repository intelligence, durable task records and deterministic
+verification to OpenCode running a local model. OpenCode investigates and edits;
+the Go supervisor records the work and checks the resulting candidate.
+
+**OpenCode 2 is the supported user interface.** BoundedCode supplies its tools,
+durable supervised task state and verification. OpenCode owns the conversation
+and model requests. See [context management](docs/explanation/opencode-context.md)
+for the measured 32K behavior and current continuity limits.
 
 | Aspect | Summary |
 |---|---|
 | **Generation** | Local. Every token of code comes from your GPU; no prompt, file or conversation leaves the machine. |
 | **Decisions** | Narrow, typed judgments about work in progress go to a hosted decision model, [TypeSafe Jev](#why-a-hosted-decision-model) — a required component, not an optional integration. [Exactly what leaves the machine](docs/explanation/judgment-data-flow.md). |
 | **Acceptance** | Deterministic. Only the Go supervisor, from verification results, scope and candidate identity, can accept work. |
-| **Hardware** | An **8 GB NVIDIA GPU and 64 GB system RAM**, running **Ternary Bonsai 2 27B (PTQ1_0)** for every generation phase (localization, planning, editing and review) through PrismML's llama.cpp fork. |
+| **Hardware** | An **8 GB NVIDIA GPU and 64 GB system RAM**, running **Ternary Bonsai 2 27B (PTQ1_0)** for OpenCode model requests through PrismML's llama.cpp fork. |
 
 It is **not** a fully offline system, and does not claim to be. The engineering
 goal is useful repository work on consumer hardware: spend the GPU budget on
@@ -77,12 +82,12 @@ You can also index a repository, query impact, and verify existing changes
 without running inference.
 
 ```bash
-bcode task create \
-  --title "Check login and refresh-token handling for bugs. Fix the identified issue, add a regression test, and verify the authentication flow." \
-  --scope "internal/auth/**,internal/handler/auth.go" \
-  --verify standard
-bcode task run <task-id> --diff
+bcode opencode
 ```
+
+Ask OpenCode to open a supervised task with `bc_task_start`, including the
+acceptance criteria and constraints, then to edit and call `bc_verify` and
+`bc_task_finish`. [OpenCode setup and lifecycle →](docs/how-to/use-with-opencode.md)
 
 The request is an example of a task, not a published success result. Narrowing a
 large audit to one demonstrable defect usually gives a clearer completion
@@ -101,7 +106,7 @@ criterion.
 
 | Component | Job | Resource placement |
 |---|---|---|
-| **Ternary Bonsai 2 27B — PTQ1_0** | Localization, planning, editing, and a fresh-context review | Local llama-server; every layer resident on the GPU, 32,768-token context, Q8 KV cache |
+| **Ternary Bonsai 2 27B — PTQ1_0** | OpenCode coding requests | Local llama-server; 32,768-token context, Q8 KV cache |
 | **Deterministic Go subsystems** | Indexing, scope enforcement, workflow state, verification, evidence | CPU, system RAM, SQLite, repository toolchains |
 | **TypeSafe Jev — `jev-1.13.0`** (required) | Typed judgments inside the control loop | Hosted API; needs a credential; no local model allocation |
 | **Qwen3-Embedding-0.6B — Q8_0** (experimental) | Embedding-cosine evaluation control | CPU-only reference service; not used by ordinary task retrieval |
@@ -111,8 +116,9 @@ VRAM requirement: KV cache, compute buffers, runtime overhead, and your desktop
 also need memory. PTQ1_0 uses the Prism runtime's ternary kernels; the stock
 llama.cpp binary in the shipped CUDA image is not the documented Bonsai runtime.
 
-One model answers every role, so it stays resident: no phase waits for a model
-swap, and editing runs at Bonsai's ~27 tokens/s. EDIT was once routed to a
+The local model stays resident for OpenCode requests. Older native-runner
+measurements reported editing at about 27 tokens/s; current OpenCode numbers
+are in the [context benchmark](docs/explanation/opencode-context.md). EDIT was once routed to a
 second model because Bonsai looked unable to drive the tool loop. That was
 BoundedCode's fault, not the model's: the edit prompt carried no code, because
 qualified symbol names in plans matched nothing in the index.

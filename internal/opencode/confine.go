@@ -38,6 +38,11 @@ type Session struct {
 	StateDir string
 	// TmpDir is the per-workspace tmp the sandbox exposes as the only tmp.
 	TmpDir string
+	// BrokerCapability authenticates access to this run's workspace-pinned
+	// loopback supervisor, without exposing the ledger data root.
+	BrokerCapability string
+	BCodeBinDir      string
+	Budget           bool
 }
 
 // Confine derives the session's sandbox spec from the supervisor's base spec.
@@ -103,10 +108,19 @@ func (s Session) Env() []string {
 		"XDG_STATE_HOME=" + filepath.Join(s.StateDir, "state"),
 		"XDG_CACHE_HOME=" + filepath.Join(s.StateDir, "cache"),
 	}
+	if s.BrokerCapability != "" {
+		env = append(env, "BC_OPENCODE_BROKER_CAPABILITY="+s.BrokerCapability)
+	}
+	if s.Budget {
+		env = append(env, "BC_OPENCODE_BUDGET=1")
+	}
 	// A terminal UI needs to know what it is drawing on, and a locale it does
 	// not have renders as replacement characters. Neither carries a secret.
 	for _, name := range []string{"PATH", "TERM", "COLORTERM", "LANG", "LC_ALL", "LC_CTYPE"} {
 		if v, ok := os.LookupEnv(name); ok {
+			if name == "PATH" && s.BCodeBinDir != "" {
+				v = s.BCodeBinDir + string(os.PathListSeparator) + v
+			}
 			env = append(env, name+"="+v)
 		}
 	}
@@ -200,15 +214,16 @@ func RegisterAgent(repoRoot string) (path string, changed bool, err error) {
 		}
 		want := map[string]any{
 			"description": "Supervised editing under BoundedCode. Verification, impact and " +
-				"memory come from the le_* tools; this agent has no shell and no network.",
+				"memory come from the bc_* tools; this agent has no shell and no network.",
 			"mode":       "primary",
 			"permission": permission,
 		}
-		if equalJSON(agents[AgentName], want) {
+		if equalJSON(agents[AgentName], want) && doc["default_agent"] == AgentName {
 			return false
 		}
 		agents[AgentName] = want
 		doc["agent"] = agents
+		doc["default_agent"] = AgentName
 		return true
 	})
 }

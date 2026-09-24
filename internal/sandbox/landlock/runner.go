@@ -194,6 +194,10 @@ func Apply(spec sandbox.Spec) error {
 		rules = append(rules, ll.BindTCP(p))
 	}
 	if spec.AllowEphemeralTCP {
+		// bind(0) is checked against port zero by Landlock before the kernel
+		// assigns an ephemeral port. OpenCode 2's private server uses this path.
+		// The kernel still selects from ip_local_port_range.
+		rules = append(rules, ll.BindTCP(0))
 		denied := make(map[uint16]bool, len(spec.TCPDeny))
 		for _, p := range spec.TCPDeny {
 			denied[p] = true

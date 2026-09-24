@@ -145,6 +145,42 @@ func TestRegisterMCPMergesIntoAnExistingConfig(t *testing.T) {
 	}
 }
 
+func TestContextPolicyFitsTheBonsaiWindowAndIsIdempotent(t *testing.T) {
+	repo := t.TempDir()
+	if _, _, err := opencode.RegisterModel(repo, "http://127.0.0.1:8080", "Ternary-Bonsai-2-27B-PTQ1_0.gguf"); err != nil {
+		t.Fatal(err)
+	}
+	if _, changed, err := opencode.RegisterContextPolicy(repo); err != nil || !changed {
+		t.Fatalf("first context setup: changed=%v err=%v", changed, err)
+	}
+	if _, changed, err := opencode.RegisterContextPolicy(repo); err != nil || changed {
+		t.Fatalf("context setup is not idempotent: changed=%v err=%v", changed, err)
+	}
+	body, err := os.ReadFile(filepath.Join(repo, "opencode.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var doc struct {
+		Compaction struct {
+			Auto   bool `json:"auto"`
+			Buffer int  `json:"buffer"`
+			Keep   struct {
+				Tokens int `json:"tokens"`
+			} `json:"keep"`
+		} `json:"compaction"`
+		Plugins []string `json:"plugins"`
+	}
+	if err := json.Unmarshal(body, &doc); err != nil {
+		t.Fatal(err)
+	}
+	if !doc.Compaction.Auto || doc.Compaction.Buffer != 12000 || doc.Compaction.Keep.Tokens != 4000 {
+		t.Fatalf("incorrect 32K compaction policy: %+v", doc.Compaction)
+	}
+	if len(doc.Plugins) != 1 || doc.Plugins[0] != "./internal/opencode/plugin" {
+		t.Fatalf("context adapter not registered: %v", doc.Plugins)
+	}
+}
+
 // A .jsonc may contain comments that marshalling would delete. Refusing and
 // printing the block to paste is better than silently reformatting it away.
 func TestAnExistingJsoncIsNotRewritten(t *testing.T) {

@@ -691,6 +691,8 @@ $ bcode eval runtime --prepare --task SWEBENCH-CADDY-4943
 | *(no subcommand)* | Initialize this directory as a workspace if needed, refresh OpenCode setup, and launch OpenCode |
 | `setup` | Register the MCP server and write AGENTS.md for this repository |
 | `run` | Start OpenCode confined to this workspace |
+| `context --session <id>` | Render ledger-backed task state for the OpenCode request hook |
+| `budget [--session <id>]` | Show tokenizer-based categories for the latest instrumented model request |
 
 Running `bcode opencode` from a project directory initializes its workspace
 marker if one is not already present, applies the setup below, and launches
@@ -731,6 +733,14 @@ nothing rather than filtered. Its shell, web-fetch, web-search, subagent and
 external-directory tools are refused, so verification goes through `bc_verify`,
 where the command is one the operator froze and the result is tied to a content
 hash. Arguments after `--` reach OpenCode unchanged.
+
+`run` checks the live Prism `/props` slot against the project's OpenCode model
+metadata before starting. A mismatched context, model alias, output reserve or
+compaction policy fails clearly. For local external inference it grants Landlock
+only the configured loopback model port. The confined process reaches its own
+workspace state through an authenticated loopback broker; the data root is not
+mounted. `--budget` records token counts for the final OpenCode request by
+category using Prism's `/tokenize` endpoint. `budget` reads the last record.
 
 When no sandbox layer is available the command refuses and says why, because
 reporting a confinement that is not there is worse than not confining. Pass

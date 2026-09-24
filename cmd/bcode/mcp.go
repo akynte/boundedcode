@@ -32,6 +32,9 @@ func newMCPCmd() *cobra.Command {
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			if brokerSocket() != "" {
+				return brokerMCP(cmd.Context(), cmd.InOrStdin(), cmd.OutOrStdout())
+			}
 			cwd, err := os.Getwd()
 			if err != nil {
 				return err
