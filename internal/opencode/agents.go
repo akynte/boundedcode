@@ -86,6 +86,14 @@ func Render(f Facts) string {
 			"`boundedcode` MCP tools: %d symbols and %d relationships, built from the source "+
 			"rather than from search.\n\n", f.Nodes, f.Edges)
 	}
+	b.WriteString("Every tool named `boundedcode_bc_*` below (`boundedcode_bc_status`, " +
+		"`boundedcode_bc_task_start`, `boundedcode_bc_read`, `boundedcode_bc_edit`, " +
+		"`boundedcode_bc_task_memory`, all of them) is a direct tool: call it by name the same " +
+		"way you call `read` or `glob`, never through `execute`. `execute` runs OpenCode's Code " +
+		"Mode JavaScript sandbox for a different set of tools, and these are deliberately not in " +
+		"it. If `execute` ever answers `Unknown tool 'boundedcode_bc_...'`, that is not a missing " +
+		"or broken tool — it means the call belongs outside `execute`, as an ordinary direct tool " +
+		"call with that exact name, and no `search()` or catalog lookup is needed to find it.\n\n")
 	b.WriteString("Use each tool in its documented language: if `execute` evaluates JavaScript, " +
 		"write JavaScript there and run Python through the shell. After the work is complete, " +
 		"send the user a concise final answer; reasoning without a final response is not a result.\n\n")

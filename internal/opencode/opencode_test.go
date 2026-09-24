@@ -388,3 +388,19 @@ func TestTheBlockNamesTheTypedMemoryTools(t *testing.T) {
 		}
 	}
 }
+
+// Observed failure: OpenCode's own Code Mode error is
+// `Unknown tool 'boundedcode_bc_status'. Did you mean tools.browser.trace.analyze?`
+// — the small reference model repeatedly tries a boundedcode_* tool through
+// `execute` (codemode is false for this server, so Code Mode correctly has no
+// such tool) instead of calling it directly, wastes turns, and sometimes never
+// self-corrects. The block must name the exact prefix and the exact error text
+// so a model that hits it can recover from the instructions alone.
+func TestTheBlockExplainsDirectToolsAreNotInCodeMode(t *testing.T) {
+	got := opencode.Render(opencode.Facts{Nodes: 1, Edges: 1})
+	for _, want := range []string{"boundedcode_bc_*", "never through `execute`", "Unknown tool 'boundedcode_bc_...'"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("the block does not address the observed Code Mode confusion (%q):\n%s", want, got)
+		}
+	}
+}

@@ -108,7 +108,7 @@ func (s *Server) readFile(ctx context.Context, _ *mcp.CallToolRequest, in readIn
 		out.Evidence = hash
 		_, err = supervisor.RecordMemory(ctx, sess.Store, in.TaskID, supervisor.MemoryRecord{
 			Type: "tool_observation", Text: fmt.Sprintf("Read %s lines %d-%d", in.Path, start, end),
-			Evidence: hash, Path: in.Path, FileHash:fileHash,
+			Evidence: hash, Path: in.Path, FileHash: fileHash,
 		}, false)
 		if err != nil {
 			return fail("recording read observation: %v", err), readOut{}, nil

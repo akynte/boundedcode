@@ -76,6 +76,26 @@ func TestPathsInsideTheRepositoryAreAccepted(t *testing.T) {
 	}
 }
 
+// Observed failure: a model called bc_task_resume with path set to the
+// repository's own absolute root — the same path it sees everywhere else in
+// its context — and got "path must be relative to the open repository",
+// which does not say what to do about it. The path must still be refused
+// (TestPathsOutsideTheOpenRepositoryAreRefused already covers "absolute, even
+// inside" — this is deliberate, not something this test loosens); what must
+// improve is that the message tells the model to omit the field instead of
+// repeating the rule it already violated.
+func TestAnAbsolutePathNamingTheRepositoryItselfGetsAnActionableMessage(t *testing.T) {
+	base := t.TempDir()
+	s := &Server{opts: Options{DataDir: t.TempDir(), WorkDir: base}}
+	_, err := s.confine(base)
+	if err == nil {
+		t.Fatal("the repository's own absolute path was accepted; it must still be refused")
+	}
+	if !strings.Contains(err.Error(), `omit "path"`) {
+		t.Errorf("the error does not tell the model to omit the field: %v", err)
+	}
+}
+
 // A path that does not exist yet must be judged as written rather than
 // accepted because EvalSymlinks could not resolve it.
 func TestANonexistentEscapeIsStillRefused(t *testing.T) {

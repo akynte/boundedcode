@@ -111,7 +111,19 @@ func (s *Server) confine(path string) (string, error) {
 		return base, nil
 	}
 	if filepath.IsAbs(path) {
-		return "", fmt.Errorf("path must be relative to the open repository, got %q", path)
+		// Observed failure: a model names the repository it already has open by
+		// the same absolute path it sees everywhere else in its context (file
+		// paths, error messages), reasonably assuming that is what "the open
+		// repository" means. It is refused exactly like any other absolute
+		// path — this server, not the caller, decides which directory that is
+		// — but the fix is to omit the field, not to find the "correct"
+		// absolute path, so the message says that rather than repeating the
+		// generic rule.
+		hint := "omit \"path\" entirely, or pass a relative subdirectory such as \"internal/api\""
+		if path == s.opts.WorkDir {
+			hint = "omit \"path\" entirely — it already defaults to the repository root"
+		}
+		return "", fmt.Errorf("path must be relative to the open repository, not the absolute path %q; %s", path, hint)
 	}
 	joined := filepath.Join(base, filepath.FromSlash(path))
 	// EvalSymlinks after joining, so a symlink inside the repository cannot

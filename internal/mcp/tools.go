@@ -71,7 +71,7 @@ func (s *Server) register(srv *mcp.Server) {
 // ---------------------------------------------------------------- bc_status
 
 type statusIn struct {
-	Path string `json:"path,omitempty" jsonschema:"a subdirectory of the open repository; defaults to its root"`
+	Path string `json:"path,omitempty" jsonschema:"a subdirectory of the open repository; defaults to its root. Omit this — do not pass the repository's own absolute path"`
 }
 
 type statusOut struct {
@@ -151,7 +151,7 @@ func renderStatus(o statusOut) string {
 type impactIn struct {
 	Symbol string `json:"symbol" jsonschema:"the symbol whose consumers to report, for example Total"`
 	Change string `json:"change,omitempty" jsonschema:"the kind of change: signature, behaviour, or removal. Defaults to signature"`
-	Path   string `json:"path,omitempty" jsonschema:"a subdirectory of the open repository; defaults to its root"`
+	Path   string `json:"path,omitempty" jsonschema:"a subdirectory of the open repository; defaults to its root. Omit this — do not pass the repository's own absolute path"`
 }
 
 func (s *Server) impact(ctx context.Context, _ *mcp.CallToolRequest, in impactIn) (*mcp.CallToolResult, any, error) {
@@ -213,7 +213,7 @@ func (s *Server) impact(ctx context.Context, _ *mcp.CallToolRequest, in impactIn
 type searchIn struct {
 	Query string `json:"query" jsonschema:"what to look for, in words, for example how payments are reserved"`
 	Depth int    `json:"depth,omitempty" jsonschema:"how far to expand through the graph from each anchor. Defaults to 1"`
-	Path  string `json:"path,omitempty" jsonschema:"a subdirectory of the open repository; defaults to its root"`
+	Path  string `json:"path,omitempty" jsonschema:"a subdirectory of the open repository; defaults to its root. Omit this — do not pass the repository's own absolute path"`
 }
 
 func (s *Server) search(ctx context.Context, _ *mcp.CallToolRequest, in searchIn) (*mcp.CallToolResult, any, error) {
@@ -259,7 +259,7 @@ func (s *Server) search(ctx context.Context, _ *mcp.CallToolRequest, in searchIn
 // -------------------------------------------------------------- bc_reindex
 
 type reindexIn struct {
-	Path string `json:"path,omitempty" jsonschema:"a subdirectory of the open repository; defaults to its root"`
+	Path string `json:"path,omitempty" jsonschema:"a subdirectory of the open repository; defaults to its root. Omit this — do not pass the repository's own absolute path"`
 }
 
 type reindexOut struct {
@@ -311,7 +311,7 @@ func (s *Server) reindex(ctx context.Context, _ *mcp.CallToolRequest, in reindex
 type noteIn struct {
 	Text string `json:"text" jsonschema:"the note, in plain prose, one or two sentences"`
 	Kind string `json:"kind,omitempty" jsonschema:"intent, observation, or advice. Defaults to observation"`
-	Path string `json:"path,omitempty" jsonschema:"a subdirectory of the open repository; defaults to its root"`
+	Path string `json:"path,omitempty" jsonschema:"a subdirectory of the open repository; defaults to its root. Omit this — do not pass the repository's own absolute path"`
 }
 
 type noteOut struct {

@@ -100,39 +100,55 @@ func (s *Server) registerSupervision(srv *mcp.Server) {
 
 type factIn struct {
 	TaskID string `json:"task_id"`
-	Path string `json:"path" jsonschema:"repository-relative source path"`
-	Quote string `json:"quote" jsonschema:"exact source text to confirm, at most 300 characters"`
+	Path   string `json:"path" jsonschema:"repository-relative source path"`
+	Quote  string `json:"quote" jsonschema:"exact source text to confirm, at most 300 characters"`
 }
 
 func (s *Server) taskFact(ctx context.Context, _ *mcp.CallToolRequest, in factIn) (*mcp.CallToolResult, any, error) {
-	if in.TaskID=="" || in.Quote=="" || len(in.Quote)>300 {return fail("task_id and a quote of 1..300 bytes are required"),nil,nil}
-	sess,err:=s.resolve(ctx,"")
-	if err!=nil{return fail("%v",err),nil,nil}
+	if in.TaskID == "" || in.Quote == "" || len(in.Quote) > 300 {
+		return fail("task_id and a quote of 1..300 bytes are required"), nil, nil
+	}
+	sess, err := s.resolve(ctx, "")
+	if err != nil {
+		return fail("%v", err), nil, nil
+	}
 	defer sess.Close()
-	if err:=(firewall.Access{Protected:protectedSet(sess.Workspace.Root)}).Check(sess.Workspace.Root,in.Path,false);err!=nil{return fail("%v",err),nil,nil}
-	body,err:=worktree.ReadWithin(sess.Workspace.Root,in.Path)
-	if err!=nil{return fail("%v",err),nil,nil}
-	if len(body)>maxReadBytes {return fail("file exceeds 256 KiB; confirm a smaller source file"),nil,nil}
-	if !strings.Contains(string(body),in.Quote) {return fail("exact quote is absent from %s",in.Path),nil,nil}
-	hash,err:=artifacts.New(sess.Store).Put(body)
-	if err!=nil{return fail("%v",err),nil,nil}
-	sum:=sha256.Sum256(body)
-	fileHash:=hex.EncodeToString(sum[:])
-	id,err:=supervisor.RecordMemory(ctx,sess.Store,in.TaskID,supervisor.MemoryRecord{
-		Type:"repository_fact",Text:fmt.Sprintf("At observation time, %s contains exact quote %q",in.Path,in.Quote),
-		Evidence:hash,Path:in.Path,FileHash:fileHash,
-	},false)
-	if err!=nil{return fail("%v",err),nil,nil}
-	return text(fmt.Sprintf("Confirmed repository fact #%d; file sha256=%s; evidence=%s",id,fileHash,hash)),map[string]any{"id":id,"file_hash":fileHash,"evidence":hash},nil
+	if err := (firewall.Access{Protected: protectedSet(sess.Workspace.Root)}).Check(sess.Workspace.Root, in.Path, false); err != nil {
+		return fail("%v", err), nil, nil
+	}
+	body, err := worktree.ReadWithin(sess.Workspace.Root, in.Path)
+	if err != nil {
+		return fail("%v", err), nil, nil
+	}
+	if len(body) > maxReadBytes {
+		return fail("file exceeds 256 KiB; confirm a smaller source file"), nil, nil
+	}
+	if !strings.Contains(string(body), in.Quote) {
+		return fail("exact quote is absent from %s", in.Path), nil, nil
+	}
+	hash, err := artifacts.New(sess.Store).Put(body)
+	if err != nil {
+		return fail("%v", err), nil, nil
+	}
+	sum := sha256.Sum256(body)
+	fileHash := hex.EncodeToString(sum[:])
+	id, err := supervisor.RecordMemory(ctx, sess.Store, in.TaskID, supervisor.MemoryRecord{
+		Type: "repository_fact", Text: fmt.Sprintf("At observation time, %s contains exact quote %q", in.Path, in.Quote),
+		Evidence: hash, Path: in.Path, FileHash: fileHash,
+	}, false)
+	if err != nil {
+		return fail("%v", err), nil, nil
+	}
+	return text(fmt.Sprintf("Confirmed repository fact #%d; file sha256=%s; evidence=%s", id, fileHash, hash)), map[string]any{"id": id, "file_hash": fileHash, "evidence": hash}, nil
 }
 
 type memoryIn struct {
-	TaskID   string `json:"task_id"`
-	Before   int64  `json:"before,omitempty"`
-	Limit    int    `json:"limit,omitempty"`
-	Evidence string `json:"evidence,omitempty"`
-	IncludeObjective bool `json:"include_objective,omitempty"`
-	Path     string `json:"path,omitempty"`
+	TaskID           string `json:"task_id"`
+	Before           int64  `json:"before,omitempty"`
+	Limit            int    `json:"limit,omitempty"`
+	Evidence         string `json:"evidence,omitempty"`
+	IncludeObjective bool   `json:"include_objective,omitempty"`
+	Path             string `json:"path,omitempty" jsonschema:"a subdirectory of the open repository; defaults to its root. Omit this — do not pass the repository's own absolute path"`
 }
 
 func (s *Server) taskMemory(ctx context.Context, _ *mcp.CallToolRequest, in memoryIn) (*mcp.CallToolResult, any, error) {
@@ -166,14 +182,17 @@ func (s *Server) taskMemory(ctx context.Context, _ *mcp.CallToolRequest, in memo
 	}
 	var b strings.Builder
 	objective := ""
-	if in.IncludeObjective { objective=taskInfo.Title; fmt.Fprintf(&b,"Original objective: %s\n",objective) }
+	if in.IncludeObjective {
+		objective = taskInfo.Title
+		fmt.Fprintf(&b, "Original objective: %s\n", objective)
+	}
 	for _, r := range rows {
 		fmt.Fprintf(&b, "#%d [%s] %s evidence=%s candidate=%s supersedes=%d\n", r.ID, r.Type, r.Text, r.Evidence, r.Candidate, r.Supersedes)
 	}
 	if rows == nil {
 		rows = []supervisor.MemoryRecord{}
 	}
-	return text(b.String()), map[string]any{"records": rows,"objective":objective}, nil
+	return text(b.String()), map[string]any{"records": rows, "objective": objective}, nil
 }
 
 type memoryAddIn struct {
@@ -183,7 +202,7 @@ type memoryAddIn struct {
 	Evidence   string `json:"evidence,omitempty" jsonschema:"immutable artifact hash returned by bc_read"`
 	Candidate  string `json:"candidate,omitempty"`
 	Supersedes int64  `json:"supersedes,omitempty"`
-	Path       string `json:"path,omitempty"`
+	Path       string `json:"path,omitempty" jsonschema:"a subdirectory of the open repository; defaults to its root. Omit this — do not pass the repository's own absolute path"`
 }
 
 func (s *Server) taskMemoryAdd(ctx context.Context, _ *mcp.CallToolRequest, in memoryAddIn) (*mcp.CallToolResult, any, error) {
@@ -205,7 +224,7 @@ type historyIn struct {
 	TaskID string `json:"task_id" jsonschema:"the supervised task ID"`
 	Offset int    `json:"offset,omitempty" jsonschema:"zero-based decision offset"`
 	Limit  int    `json:"limit,omitempty" jsonschema:"number of decisions, 1 to 20; defaults to 10"`
-	Path   string `json:"path,omitempty" jsonschema:"a subdirectory of the open repository; defaults to its root"`
+	Path   string `json:"path,omitempty" jsonschema:"a subdirectory of the open repository; defaults to its root. Omit this — do not pass the repository's own absolute path"`
 }
 
 func (s *Server) taskHistory(ctx context.Context, _ *mcp.CallToolRequest, in historyIn) (*mcp.CallToolResult, any, error) {
@@ -242,7 +261,7 @@ type answerIn struct {
 	TaskID   string `json:"task_id" jsonschema:"the id bc_task_start returned"`
 	Question string `json:"question" jsonschema:"what you asked the user"`
 	Answer   string `json:"answer" jsonschema:"what they said"`
-	Path     string `json:"path,omitempty" jsonschema:"a subdirectory of the open repository; defaults to its root"`
+	Path     string `json:"path,omitempty" jsonschema:"a subdirectory of the open repository; defaults to its root. Omit this — do not pass the repository's own absolute path"`
 }
 
 // taskAnswer is the division the protocol forces, made useful.
@@ -273,7 +292,7 @@ func (s *Server) taskAnswer(ctx context.Context, _ *mcp.CallToolRequest, in answ
 
 type finishIn struct {
 	TaskID string `json:"task_id" jsonschema:"the id bc_task_start returned"`
-	Path   string `json:"path,omitempty" jsonschema:"a subdirectory of the open repository; defaults to its root"`
+	Path   string `json:"path,omitempty" jsonschema:"a subdirectory of the open repository; defaults to its root. Omit this — do not pass the repository's own absolute path"`
 }
 
 // taskFinish produces the review artifact.
@@ -304,15 +323,15 @@ func (s *Server) taskFinish(ctx context.Context, _ *mcp.CallToolRequest, in fini
 
 type startIn struct {
 	Objective    string   `json:"objective" jsonschema:"the user's original objective, concise but faithful"`
-	Requirements []string `json:"requirements,omitempty" jsonschema:"explicit user requirements and acceptance criteria that must survive compaction"`
-	Constraints  []string `json:"constraints,omitempty" jsonschema:"explicit scope, security and performance constraints from the user"`
-	NonGoals     []string `json:"non_goals,omitempty" jsonschema:"explicit things the user said this task should NOT do, so a later session does not reintroduce them as a missed requirement"`
+	Requirements []string `json:"requirements,omitempty" jsonschema:"explicit user requirements and acceptance criteria that must survive compaction. Up to 20 items, each up to 2000 characters; quote the user's own wording rather than paraphrasing it down to fit"`
+	Constraints  []string `json:"constraints,omitempty" jsonschema:"explicit scope, security and performance constraints from the user. Up to 20 items, each up to 2000 characters; quote the user's own wording rather than paraphrasing it down to fit"`
+	NonGoals     []string `json:"non_goals,omitempty" jsonschema:"explicit things the user said this task should NOT do, so a later session does not reintroduce them as a missed requirement. Up to 20 items, each up to 2000 characters"`
 	// WriteScope is §9.3's plan-scoped allowlist, declared before the work
 	// rather than discovered from the diff afterwards. An injected instruction
 	// cannot widen it: adding a path means opening another task, which is a
 	// decision a person can see.
 	WriteScope []string `json:"write_scope,omitempty" jsonschema:"the repository-relative files you intend to change, including new ones. bc_edit refuses anything outside this. Omit only if you will not use bc_edit"`
-	Path       string   `json:"path,omitempty" jsonschema:"a subdirectory of the open repository; defaults to its root"`
+	Path       string   `json:"path,omitempty" jsonschema:"a subdirectory of the open repository; defaults to its root. Omit this — do not pass the repository's own absolute path"`
 }
 
 type startOut struct {
@@ -391,31 +410,59 @@ func (s *Server) taskStart(ctx context.Context, req *mcp.CallToolRequest, in sta
 	return text(b.String()), out, nil
 }
 
+// maxItemChars, maxItemsPerGroup and maxTotalChars bound one group of
+// requirements, constraints or non-goals.
+//
+// maxItemChars used to be 500: tight enough that a real acceptance criterion
+// or security constraint routinely exceeded it, forcing the model to
+// paraphrase the user's own words down to fit rather than record them
+// faithfully — a model-authored rewording silently standing in for what the
+// user actually said, which is exactly the drift durable memory exists to
+// prevent (see docs/explanation/opencode-context.md). 2000 gives a genuine
+// paragraph room; maxTotalChars is the real bound on how much this can add to
+// every request, matching the scale of the other bounded card fields
+// (the objective is capped at 1500, the write scope at 2000).
+const (
+	maxItemChars     = 2000
+	maxItemsPerGroup = 20
+	maxTotalChars    = 6000
+)
+
 func validateTaskDetails(groups ...[]string) error {
 	total := 0
 	for _, group := range groups {
-		if len(group) > 20 {
-			return fmt.Errorf("at most 20 requirements, constraints or non-goals are allowed per group")
+		if len(group) > maxItemsPerGroup {
+			return fmt.Errorf("at most %d requirements, constraints or non-goals are allowed per group, got %d",
+				maxItemsPerGroup, len(group))
 		}
-		for _, item := range group {
-			if strings.TrimSpace(item) == "" || len(item) > 500 {
-				return fmt.Errorf("each requirement, constraint or non-goal must have 1 to 500 characters")
+		for i, item := range group {
+			if strings.TrimSpace(item) == "" {
+				return fmt.Errorf("item %d is empty; each requirement, constraint or non-goal needs text", i+1)
+			}
+			if len(item) > maxItemChars {
+				return fmt.Errorf(
+					"item %d is %d characters, over the %d-character limit; shorten it without dropping "+
+						"anything the user actually said — do not silently paraphrase away a detail to fit",
+					i+1, len(item), maxItemChars)
 			}
 			total += len(item)
 		}
 	}
-	if total > 6000 {
-		return fmt.Errorf("requirements, constraints and non-goals exceed the 6000-character context budget")
+	if total > maxTotalChars {
+		return fmt.Errorf("requirements, constraints and non-goals together are %d characters, over the "+
+			"%d-character budget across all of them combined; trim redundant wording across items rather "+
+			"than any single one, or split this into a follow-up task for the items that do not fit",
+			total, maxTotalChars)
 	}
 	return nil
 }
 
 type resumeIn struct {
 	TaskID       string   `json:"task_id" jsonschema:"the task ID returned by bc_task_start"`
-	Requirements []string `json:"requirements,omitempty" jsonschema:"explicit user criteria to recover when an older task did not record them at start"`
-	Constraints  []string `json:"constraints,omitempty" jsonschema:"explicit user constraints to recover when an older task did not record them at start"`
-	NonGoals     []string `json:"non_goals,omitempty" jsonschema:"explicit non-goals to recover when an older task did not record them at start"`
-	Path         string   `json:"path,omitempty" jsonschema:"subdirectory of the open repository"`
+	Requirements []string `json:"requirements,omitempty" jsonschema:"explicit user criteria to recover when an older task did not record them at start. Up to 20 items, each up to 2000 characters; quote the user's own wording rather than paraphrasing it down to fit"`
+	Constraints  []string `json:"constraints,omitempty" jsonschema:"explicit user constraints to recover when an older task did not record them at start. Up to 20 items, each up to 2000 characters; quote the user's own wording rather than paraphrasing it down to fit"`
+	NonGoals     []string `json:"non_goals,omitempty" jsonschema:"explicit non-goals to recover when an older task did not record them at start. Up to 20 items, each up to 2000 characters"`
+	Path         string   `json:"path,omitempty" jsonschema:"a subdirectory of the open repository; defaults to its root. Omit this — do not pass the repository's own absolute path"`
 }
 
 func openCodeSessionID(req *mcp.CallToolRequest) string {
@@ -459,7 +506,7 @@ func (s *Server) taskResume(ctx context.Context, req *mcp.CallToolRequest, in re
 type verifyIn struct {
 	TaskID string `json:"task_id,omitempty" jsonschema:"the id bc_task_start returned, so the result is recorded against that task"`
 	Level  string `json:"level,omitempty" jsonschema:"low, standard or high. Defaults to standard"`
-	Path   string `json:"path,omitempty" jsonschema:"a subdirectory of the open repository; defaults to its root"`
+	Path   string `json:"path,omitempty" jsonschema:"a subdirectory of the open repository; defaults to its root. Omit this — do not pass the repository's own absolute path"`
 }
 
 type verifyOut struct {
