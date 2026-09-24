@@ -136,7 +136,7 @@ func (r *Runner) runPhases(ctx context.Context, t *Task, wt *worktree.Worktree) 
 		if t.Budget.MaxTokens > 0 && s.Tokens >= t.Budget.MaxTokens {
 			return stop(StateBlocked, "task token budget exhausted")
 		}
-		s.Candidate, err = wt.Candidate()
+		s.Candidate, err = wt.CandidateContext(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -617,7 +617,7 @@ func (r *Runner) runPhases(ctx context.Context, t *Task, wt *worktree.Worktree) 
 				SaveTranscript: func(ctx context.Context, tr *workflow.Transcript) error {
 					s.Tokens += tr.Tokens - counted
 					counted = tr.Tokens
-					tr.Candidate, err = wt.Candidate()
+					tr.Candidate, err = wt.CandidateContext(ctx)
 					if err != nil {
 						return err
 					}
@@ -1005,7 +1005,7 @@ func (r *Runner) runPhases(ctx context.Context, t *Task, wt *worktree.Worktree) 
 					_ = r.Calibration.RecordOutcome(ctx, t.ID, workflow.TriageSite,
 						"env:"+result.Recipe, result.Passed(), "rerun")
 				}
-				after, candidateErr := wt.Candidate()
+				after, candidateErr := wt.CandidateContext(ctx)
 				if candidateErr != nil {
 					return nil, candidateErr
 				}
@@ -1250,7 +1250,7 @@ func (r *Runner) runPhases(ctx context.Context, t *Task, wt *worktree.Worktree) 
 				if _, err := memory.WriteTaskCard(wt.Path, t.ID, memory.ProjectHeader{RepoID: repoID, UpdatedAt: time.Now().UTC(), Commit: s.Base, Source: "tool", Symbols: s.Plan.Symbols}, card.String()); err != nil {
 					return stop(StateBlocked, err.Error())
 				}
-				s.FinalizationCandidate, err = wt.Candidate()
+				s.FinalizationCandidate, err = wt.CandidateContext(ctx)
 				if err != nil {
 					return nil, err
 				}
@@ -1300,7 +1300,7 @@ func (r *Runner) runPhases(ctx context.Context, t *Task, wt *worktree.Worktree) 
 				out.Gate = &gate
 				return stop(StateReview, "awaiting final approval")
 			}
-			current, candidateErr := wt.Candidate()
+			current, candidateErr := wt.CandidateContext(ctx)
 			if candidateErr != nil {
 				return nil, candidateErr
 			}

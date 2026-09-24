@@ -57,7 +57,7 @@ func (g *leakGuard) check(texts ...string) error {
 					g.onLeak(id)
 				}
 				return fmt.Errorf("%w: content of hidden check %s, request to %s refused",
-					ErrOracleLeak, id, g.Provider.Name())
+					ErrOracleLeak, id, g.Name())
 			}
 		}
 	}

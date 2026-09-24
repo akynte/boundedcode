@@ -53,7 +53,14 @@ func KeyID(pub ed25519.PublicKey) string {
 func (k *Key) ID() string { return k.id }
 
 // Public is the key's verifying half.
-func (k *Key) Public() ed25519.PublicKey { return k.priv.Public().(ed25519.PublicKey) }
+func (k *Key) Public() ed25519.PublicKey { return publicKey(k.priv) }
+
+func publicKey(priv ed25519.PrivateKey) ed25519.PublicKey {
+	if len(priv) != ed25519.PrivateKeySize {
+		return nil
+	}
+	return ed25519.PublicKey(priv[ed25519.SeedSize:])
+}
 
 // Sign signs a chain hash.
 func (k *Key) Sign(hash string) string {
@@ -120,7 +127,7 @@ func Load(dir string) (*Key, error) {
 		return nil, fmt.Errorf("attest: %s is not a verifier key", filepath.Join(dir, privateFile))
 	}
 	priv := ed25519.NewKeyFromSeed(block.Bytes)
-	return &Key{priv: priv, id: KeyID(priv.Public().(ed25519.PublicKey))}, nil
+	return &Key{priv: priv, id: KeyID(publicKey(priv))}, nil
 }
 
 // LoadPublic reads a public key file written by LoadOrCreate.

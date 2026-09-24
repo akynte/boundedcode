@@ -23,7 +23,7 @@ func TestRuntimeWaitsForReadinessAndStopsItsProcessGroup(t *testing.T) {
 	if err := os.WriteFile(script, []byte(body), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	addr, err := ReserveLoopbackAddr()
+	addr, err := ReserveLoopbackAddr(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}

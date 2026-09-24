@@ -244,7 +244,7 @@ func Outside(dir, root string) (bool, error) {
 	}
 	rel, err := filepath.Rel(r, d)
 	if err != nil {
-		return true, nil
+		return false, err
 	}
 	return rel == ".." || strings.HasPrefix(rel, "../"), nil
 }

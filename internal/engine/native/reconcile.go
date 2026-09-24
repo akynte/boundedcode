@@ -23,7 +23,7 @@ func (e *Engine) reconcile(ctx context.Context, req engine.Request) error {
 		return err
 	}
 	e.fence = fence
-	current, err := ledger.ContentManifest(req.Worktree)
+	current, err := ledger.ContentManifestContext(ctx, req.Worktree)
 	if err != nil {
 		return err
 	}

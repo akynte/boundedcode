@@ -64,8 +64,8 @@ type Runtime struct {
 // ReserveLoopbackAddr returns a currently unused loopback TCP address. The
 // listener is closed before the supervisor binds it; a short race remains, so
 // callers should still handle an address collision by retrying Start.
-func ReserveLoopbackAddr() (string, error) {
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
+func ReserveLoopbackAddr(ctx context.Context) (string, error) {
+	listener, err := (&net.ListenConfig{}).Listen(ctx, "tcp", "127.0.0.1:0")
 	if err != nil {
 		return "", err
 	}
@@ -89,7 +89,7 @@ func Start(ctx context.Context, opts RuntimeOptions) (*Runtime, error) {
 	addr := opts.Addr
 	if addr == "" {
 		var err error
-		addr, err = ReserveLoopbackAddr()
+		addr, err = ReserveLoopbackAddr(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("session: reserve supervisor address: %w", err)
 		}
@@ -122,7 +122,7 @@ func Start(ctx context.Context, opts RuntimeOptions) (*Runtime, error) {
 	// context must reach Close, which sends SIGTERM and lets the supervisor
 	// stop its model gracefully; CommandContext would SIGKILL the supervisor
 	// first and could strand the model child.
-	cmd := exec.Command(opts.Binary, "api", "--addr", addr) //nolint:gosec // the binary is the trusted bcode executable
+	cmd := exec.CommandContext(context.WithoutCancel(ctx), opts.Binary, "api", "--addr", addr) //nolint:gosec // the binary is the trusted bcode executable
 	cmd.Dir = opts.Dir
 	cmd.Env = mergeEnvironment(os.Environ(), opts.Env, map[string]string{
 		storeEnvData:  opts.DataDir,
@@ -161,7 +161,7 @@ func Start(ctx context.Context, opts RuntimeOptions) (*Runtime, error) {
 	readyCtx, cancel := context.WithTimeout(ctx, startTimeout)
 	defer cancel()
 	if err := r.waitReady(readyCtx, opts.LogPath); err != nil {
-		_ = r.Close(context.Background())
+		_ = r.Close(context.WithoutCancel(ctx))
 		return nil, err
 	}
 	return r, nil
@@ -225,7 +225,7 @@ func (r *Runtime) waitReady(ctx context.Context, logPath string) error {
 		select {
 		case <-ctx.Done():
 			if last != "" {
-				return fmt.Errorf("session: supervisor did not become ready: %s (last response: %s)", ctx.Err(), last)
+				return fmt.Errorf("session: supervisor did not become ready: %w (last response: %s)", ctx.Err(), last)
 			}
 			return fmt.Errorf("session: supervisor did not become ready: %w", ctx.Err())
 		case <-time.After(200 * time.Millisecond):
@@ -272,7 +272,7 @@ func (r *Runtime) Close(ctx context.Context) error {
 	}
 	r.closing = true
 	wait := r.done
-	children := r.childPIDs()
+	children := r.childPIDs(context.WithoutCancel(ctx))
 	r.mu.Unlock()
 
 	// The supervisor is the owner. Ask it to stop first so procman can drain
@@ -289,7 +289,6 @@ func (r *Runtime) Close(ctx context.Context) error {
 	// Cleanup must not inherit a canceled request context. The caller may have
 	// canceled precisely because the editor exited, and that is when the
 	// bounded detached cleanup is most important.
-	_ = ctx
 	select {
 	case <-wait:
 	case <-time.After(waitTimeout):
@@ -336,8 +335,8 @@ type runtimeStatus struct {
 	} `json:"children"`
 }
 
-func (r *Runtime) childPIDs() []int {
-	req, err := http.NewRequest(http.MethodGet, "http://"+r.addr+"/v1/status", nil)
+func (r *Runtime) childPIDs(ctx context.Context) []int {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://"+r.addr+"/v1/status", nil)
 	if err != nil {
 		return nil
 	}

@@ -24,7 +24,7 @@ func TestPhaseDeadlinesHoldBackForLaterPhases(t *testing.T) {
 		edit := phaseDeadline(tk, s, workflow.Edit)
 		verify := phaseDeadline(tk, s, workflow.Verify)
 		review := phaseDeadline(tk, s, workflow.Review)
-		if !(plan.Before(edit) && edit.Before(verify) && verify.Before(review)) {
+		if !plan.Before(edit) || !edit.Before(verify) || !verify.Before(review) {
 			t.Errorf("%s: deadlines out of order: plan %v edit %v verify %v review %v", total, plan, edit, verify, review)
 		}
 		if !review.Equal(taskDeadline(tk, s)) {

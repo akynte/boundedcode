@@ -264,11 +264,6 @@ func applyManagedBlock(path, begin, end, block string, mode os.FileMode) (string
 	return path, true, nil
 }
 
-// replaceBlock swaps the managed region, or appends one when there is none.
-func replaceBlock(doc, block string) string {
-	return replaceManagedBlock(doc, BeginMarker, EndMarker, block)
-}
-
 func replaceManagedBlock(doc, begin, end string, block string) string {
 	start := strings.Index(doc, begin)
 	endIndex := strings.Index(doc, end)

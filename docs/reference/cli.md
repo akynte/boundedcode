@@ -714,6 +714,40 @@ $ bcode eval runtime --prepare --task SWEBENCH-CADDY-4943
 [ok  ] SWEBENCH-CADDY-4943   bc-runtime/swebench-caddy-4943@sha256:9508b105…
 ```
 
+## `bcode bench`
+
+The benchmark subsystem is separate from the legacy `bcode eval` task-set
+runner. It compares a standalone RAW worker with the real BoundedCode
+Supervisor/task path and scores both only with an independent, hidden
+evaluator. A smoke suite is explicitly non-official infrastructure validation;
+it is not a performance result.
+
+| Command | Meaning |
+|---|---|
+| `validate` | Parse a suite, task manifests, and evaluator/oracle boundaries without starting a model |
+| `plan` | Show the deterministic, interleaved RAW/BOUNDED schedule and pair ids |
+| `run` | Materialize fresh immutable workspaces, execute selected modes, evaluate independently, and write `result.json` artifacts |
+| `report` | Build a paired JSON/Markdown report from durable results |
+| `freeze` | Write a manifest containing suite, task, evaluator, model, limits, code, and seed identities |
+
+`run` flags: `--suite`, `--mode raw,bounded`, `--tasks`, `--runs`, `--seed`,
+`--timeout`, `--output`, `--rerun`, and `--raw-command`. A real run refuses to
+invent a RAW worker; use `--raw-command` for the standalone OpenCode command.
+`--smoke` selects only the deterministic fixture adapter and is rejected for an
+official suite. The scheduler is sequential by default so a local model/GPU is
+not contended by benchmark arms.
+
+Every run directory is `suite/task/mode/run`. It contains the result, sanitized
+configuration/task snapshots, stdout/stderr, candidate patch, evaluator evidence,
+and timing/usage fields. Unknown measurements are JSON `null`, not zero. The
+independent evaluator runs after the worker and receives hidden material in a
+separate copy; neither worker request nor candidate workspace contains it.
+
+`bcode bench report results/smoke` writes `report.json` and `report.md`.
+`--json` prints the report instead. Rates are descriptive and paired intervals
+resample tasks; a small smoke result must not be read as evidence that one
+architecture is better.
+
 ## `bcode opencode`
 
 | Command | |

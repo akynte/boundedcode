@@ -298,6 +298,16 @@ jobs:
           set -euo pipefail
           docker volume create bc-ci-data
           docker run --rm -v bc-ci-data:/data alpine chown -R 10001:10001 /data
+          # The image is intentionally not a second setup flow: seed the same
+          # validated external configuration the canonical TUI writes before
+          # starting the supervisor.
+          docker run --rm \
+            --entrypoint /usr/local/bin/bcode \
+            -v bc-ci-data:/data \
+            -e BC_DATA=/data \
+            boundedcode:ci-${{ matrix.target }} \
+            setup --non-interactive --external-url http://127.0.0.1:9090 \
+              --profile external-inference --skip-judgment
           docker run -d --name bc-ci \
             -v bc-ci-data:/data \
             -p 127.0.0.1:7777:7777 \

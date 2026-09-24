@@ -209,7 +209,7 @@ func (m *Manager) Snapshot(ctx context.Context, wt *Worktree) (*Snapshot, error)
 	sum := sha256.Sum256([]byte(patch))
 	s.PatchSHA256 = hex.EncodeToString(sum[:])
 	s.OldRanges, s.NewRanges = Ranges(patch)
-	if s.Manifest, err = ledger.ContentManifest(path); err != nil {
+	if s.Manifest, err = ledger.ContentManifestContext(ctx, path); err != nil {
 		_ = s.Remove(ctx)
 		return nil, err
 	}
@@ -262,7 +262,12 @@ func (wt *Worktree) Commit(ctx context.Context, message string) (bool, error) {
 // Candidate returns the content manifest of the worktree: the identifier the
 // journal records as candidate_before and candidate_after (§7.1).
 func (wt *Worktree) Candidate() (string, error) {
-	return ledger.ContentManifest(wt.Path)
+	return wt.CandidateContext(context.Background())
+}
+
+// CandidateContext is the cancellable form used by request-scoped task paths.
+func (wt *Worktree) CandidateContext(ctx context.Context) (string, error) {
+	return ledger.ContentManifestContext(ctx, wt.Path)
 }
 
 // ReadBase reads the immutable task-start version of a file. A newly created

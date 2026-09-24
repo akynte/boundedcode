@@ -481,7 +481,7 @@ func apply(ctx context.Context, dir, patch string) error {
 }
 
 func git(ctx context.Context, dir string, args ...string) (string, error) {
-	cmd := exec.CommandContext(ctx, "git", append([]string{"-C", dir}, args...)...)
+	cmd := exec.CommandContext(ctx, "git", append([]string{"-C", dir}, args...)...) //nolint:gosec // judgebench supplies fixed git subcommands and a fixture path
 	cmd.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_SYSTEM=/dev/null",
 		"GIT_AUTHOR_NAME=judgebench", "GIT_AUTHOR_EMAIL=judgebench@localhost",
 		"GIT_COMMITTER_NAME=judgebench", "GIT_COMMITTER_EMAIL=judgebench@localhost")
@@ -492,7 +492,7 @@ func git(ctx context.Context, dir string, args ...string) (string, error) {
 		if errors.As(err, &ee) {
 			stderr = strings.TrimSpace(string(ee.Stderr))
 		}
-		return "", fmt.Errorf("git %s: %v %s", strings.Join(args, " "), err, stderr)
+		return "", fmt.Errorf("git %s: %w %s", strings.Join(args, " "), err, stderr)
 	}
 	return string(out), nil
 }

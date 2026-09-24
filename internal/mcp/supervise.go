@@ -117,7 +117,7 @@ func (s *Server) taskFact(ctx context.Context, req *mcp.CallToolRequest, in fact
 	if err != nil {
 		return fail("%v", err), nil, nil
 	}
-	defer sess.Close()
+	defer sess.Close() //nolint:contextcheck // session storage close is deliberately context-free
 	_, wt, release, err := supervisor.AuthorizeEditorOperation(ctx, sess.Store, sess.Workspace.Root, in.TaskID, openCodeSessionID(req), supervisor.EditorFact)
 	if err != nil {
 		return fail("%v", err), nil, nil
@@ -171,7 +171,7 @@ func (s *Server) taskMemory(ctx context.Context, _ *mcp.CallToolRequest, in memo
 	if err != nil {
 		return fail("%v", err), nil, nil
 	}
-	defer sess.Close()
+	defer sess.Close() //nolint:contextcheck // session storage close is deliberately context-free
 	taskInfo, err := task.NewStore(sess.Store).Get(ctx, in.TaskID)
 	if err != nil {
 		return fail("%v", err), nil, nil
@@ -229,7 +229,7 @@ func (s *Server) taskMemoryAdd(ctx context.Context, req *mcp.CallToolRequest, in
 	if err != nil {
 		return fail("%v", err), nil, nil
 	}
-	defer sess.Close()
+	defer sess.Close() //nolint:contextcheck // session storage close is deliberately context-free
 	_, _, release, err := supervisor.AuthorizeEditorOperation(ctx, sess.Store, sess.Workspace.Root, in.TaskID, openCodeSessionID(req), supervisor.EditorMemory)
 	if err != nil {
 		return fail("%v", err), nil, nil
@@ -477,7 +477,7 @@ func (s *Server) taskStart(ctx context.Context, req *mcp.CallToolRequest, in sta
 	if err != nil {
 		return fail("finding original user prompt: %v", err), startOut{}, nil
 	}
-	initialCandidate, err := ledger.ContentManifest(wt.Path)
+	initialCandidate, err := ledger.ContentManifestContext(ctx, wt.Path)
 	if err != nil {
 		return fail("recording initial candidate: %v", err), startOut{}, nil
 	}
@@ -599,7 +599,7 @@ func (s *Server) taskResume(ctx context.Context, req *mcp.CallToolRequest, in re
 	if err != nil {
 		return fail("%v", err), nil, nil
 	}
-	defer sess.Close()
+	defer sess.Close() //nolint:contextcheck // session storage close is deliberately context-free
 	t, err := task.NewStore(sess.Store).Get(ctx, in.TaskID)
 	if err != nil || t.Kind != "supervised" || t.State.Terminal() {
 		return fail("task %q is not an unfinished supervised task", in.TaskID), nil, nil

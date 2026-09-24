@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"unicode/utf8"
@@ -31,7 +32,7 @@ func OpenCodeContext(ctx context.Context, st *store.Store, repoRoot, sessionID s
 		  AND id = (SELECT MAX(o2.id) FROM operations o2
 		             WHERE o2.task_id = operations.task_id AND o2.kind = 'session_start')
 		ORDER BY id DESC LIMIT 1`, sessionID).Scan(&taskID)
-	if err != nil && err != sql.ErrNoRows {
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return "", err
 	}
 	if taskID == "" {
@@ -69,7 +70,7 @@ func OpenCodeContext(ctx context.Context, st *store.Store, repoRoot, sessionID s
 	// Only a recent page is needed for the hot context; the ledger retains
 	// older decisions for bc_task_history.
 	var decisionCount int
-	decisions, decisionCount, err := DecisionPage(ctx, st, taskID, 0, 0)
+	_, decisionCount, err = DecisionPage(ctx, st, taskID, 0, 0)
 	if err != nil {
 		return "", err
 	}
@@ -77,7 +78,7 @@ func OpenCodeContext(ctx context.Context, st *store.Store, repoRoot, sessionID s
 	if offset < 0 {
 		offset = 0
 	}
-	decisions, _, err = DecisionPage(ctx, st, taskID, offset, 30)
+	decisions, _, err := DecisionPage(ctx, st, taskID, offset, 30)
 	if err != nil {
 		return "", err
 	}

@@ -165,7 +165,7 @@ type editOut struct {
 }
 
 func beginEdit(ctx context.Context, store *store.Store, taskID, root, path string, after []byte) (*ledger.Handle, error) {
-	candidate, err := ledger.ContentManifest(root)
+	candidate, err := ledger.ContentManifestContext(ctx, root)
 	if err != nil {
 		return nil, err
 	}
@@ -186,7 +186,7 @@ func hashBytes(body []byte) string {
 }
 
 func completeEdit(ctx context.Context, h *ledger.Handle, root, path string) (string, error) {
-	candidate, err := ledger.ContentManifest(root)
+	candidate, err := ledger.ContentManifestContext(ctx, root)
 	if err != nil {
 		return "", err
 	}

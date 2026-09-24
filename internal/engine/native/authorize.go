@@ -140,7 +140,7 @@ func (e *Engine) exec(ctx context.Context, req engine.Request, call llm.ToolCall
 	before := ""
 	if req.Journal != nil {
 		var err error
-		before, err = ledger.ContentManifest(req.Worktree)
+		before, err = ledger.ContentManifestContext(ctx, req.Worktree)
 		if err != nil {
 			return Result{}, err
 		}
@@ -184,7 +184,7 @@ func (e *Engine) exec(ctx context.Context, req engine.Request, call llm.ToolCall
 		result = e.execute(ctx, req, call)
 	}
 	if h != nil {
-		after, err := ledger.ContentManifest(req.Worktree)
+		after, err := ledger.ContentManifestContext(ctx, req.Worktree)
 		if err != nil {
 			return result, err
 		}

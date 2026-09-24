@@ -176,7 +176,7 @@ func (l *Ledger) RecoverTask(ctx context.Context, taskID, worktree string) (Work
 
 	current := ""
 	if worktree != "" {
-		current, err = ContentManifest(worktree)
+		current, err = ContentManifestContext(ctx, worktree)
 		if err != nil {
 			return st, fmt.Errorf("ledger: manifest %s: %w", worktree, err)
 		}
@@ -390,6 +390,14 @@ func (l *Ledger) RecordEvidence(ctx context.Context, id, taskID, kind, status, c
 // order, so it is stable across runs and detects any change to any tracked
 // file. `.git` and `.bc` are excluded: neither is part of the candidate.
 func ContentManifest(root string) (string, error) {
+	return ContentManifestContext(context.Background(), root)
+}
+
+// ContentManifestContext is the cancellable form used by request-scoped
+// callers. The compatibility wrapper above keeps the small recovery/test API
+// convenient while allowing supervisor and verification paths to honor
+// cancellation.
+func ContentManifestContext(ctx context.Context, root string) (string, error) {
 	type entry struct{ path, hash string }
 	var entries []entry
 	add := func(rel string) error {
@@ -427,7 +435,7 @@ func ContentManifest(root string) (string, error) {
 	// bin/ or coverage artifact from invalidating verification even though it
 	// cannot be part of the candidate commit. Non-Git test directories retain
 	// the filesystem walk fallback below.
-	listed, err := exec.Command("git", "-C", root, "ls-files", "-co", "--exclude-standard", "-z").Output()
+	listed, err := exec.CommandContext(ctx, "git", "-C", root, "ls-files", "-co", "--exclude-standard", "-z").Output()
 	if err == nil {
 		for _, rel := range strings.Split(string(listed), "\x00") {
 			if rel == "" {

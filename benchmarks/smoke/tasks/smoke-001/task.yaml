@@ -1,0 +1,40 @@
+schema_version: 1
+id: smoke-001
+title: Correct the deterministic calculator
+description: >-
+  Fix Calculator.Add so it returns the sum of its two integer arguments.
+  Preserve the public function signature and do not change the tests.
+repository: fixture
+fixture: fixture
+base_commit: fixture
+languages:
+  - go
+visible_validation:
+  - [go, test, ./...]
+evaluator:
+  oracle: oracle
+  files:
+    - calculator_hidden_test.go
+  command: [go, test, ./...]
+  timeout_seconds: 30
+  must_not_change:
+    - calculator_hidden_test.go
+limits:
+  wall_clock_seconds: 10
+  max_generation_requests: 2
+  max_verification_attempts: 1
+  max_tokens: 1000
+network_policy: none
+mutable_scope:
+  - calculator.go
+tags:
+  - smoke
+  - bug-fix
+  - infrastructure-only
+category: bug_fix
+difficulty:
+  level: trivial
+provenance:
+  kind: deterministic-smoke-fixture
+worker_driver: smoke
+verification: standard

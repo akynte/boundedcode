@@ -57,7 +57,7 @@ func startOpenCodeBrokerWithRoute(ctx context.Context, st *store.Store, dataRoot
 		return "", nil, err
 	}
 	token := hex.EncodeToString(nonce[:])
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	listener, err := (&net.ListenConfig{}).Listen(ctx, "tcp", "127.0.0.1:0")
 	if err != nil {
 		return "", nil, err
 	}
@@ -224,7 +224,7 @@ func brokerSocket() string {
 	}
 	// OpenCode's subprocess driver may filter extension variables. The file
 	// lives only in this workspace's private HOME and is removed on exit.
-	body, err := os.ReadFile(filepath.Join(os.Getenv("HOME"), brokerCapabilityFile))
+	body, err := os.ReadFile(filepath.Join(os.Getenv("HOME"), brokerCapabilityFile)) //nolint:gosec // HOME is the process-owned capability directory
 	if err != nil {
 		return ""
 	}

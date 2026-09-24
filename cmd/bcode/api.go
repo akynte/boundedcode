@@ -185,7 +185,7 @@ func registerChildren(m *procman.Manager, cfg config.Config, p *config.Profile, 
 	return m.Add(procman.Child{
 		Name:      "llama-server",
 		Essential: true,
-		Build: func(_ context.Context) (*exec.Cmd, error) {
+		Build: func(buildCtx context.Context) (*exec.Cmd, error) {
 			// The binary and arguments come from bcode.yaml and the active
 			// profile, both operator configuration under /data/config — the
 			// same trust level as the supervisor itself. An operator who can
@@ -195,7 +195,7 @@ func registerChildren(m *procman.Manager, cfg config.Config, p *config.Profile, 
 			// child's lifetime. Tying it to CommandContext would SIGKILL the
 			// model before procman could stop its process group and flush the
 			// supervisor on shutdown.
-			cmd := exec.Command(cfg.Inference.Binary, args...) //nolint:gosec // see above
+			cmd := exec.CommandContext(context.WithoutCancel(buildCtx), cfg.Inference.Binary, args...) //nolint:gosec // see above
 			cmd.Env = inferenceEnvironment()
 			return cmd, nil
 		},

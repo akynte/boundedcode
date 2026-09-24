@@ -521,7 +521,7 @@ func (r *Runner) Run(ctx context.Context, taskID, repoPath string) (*Outcome, er
 		// checkpoint. Keep it resumable, but make the stop and its evidence
 		// explicit even when the error happened outside the phase stop helper.
 		out = &Outcome{Task: t, Reasons: []string{runErr.Error()}}
-		if candidate, candidateErr := wt.Candidate(); candidateErr == nil {
+		if candidate, candidateErr := wt.CandidateContext(ctx); candidateErr == nil {
 			out.Candidate = candidate
 		}
 		finishCtx, finishCancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
@@ -646,7 +646,7 @@ func (r *Runner) run(ctx context.Context, t *Task, wt *worktree.Worktree) (*Outc
 		}
 		out.Attempts = attempt
 
-		before, err := wt.Candidate()
+		before, err := wt.CandidateContext(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -675,7 +675,7 @@ func (r *Runner) run(ctx context.Context, t *Task, wt *worktree.Worktree) (*Outc
 		}
 		out.TokensUsed += response.TokensUsed
 
-		after, err := wt.Candidate()
+		after, err := wt.CandidateContext(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -868,7 +868,7 @@ func (r *Runner) step(ctx context.Context, t *Task, wt *worktree.Worktree,
 		return nil, fmt.Errorf("task %s: engine step: %w", t.ID, stepErr)
 	}
 
-	after, err := wt.Candidate()
+	after, err := wt.CandidateContext(ctx)
 	if err != nil {
 		return nil, err
 	}

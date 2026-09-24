@@ -1,0 +1,26 @@
+schema_version: 1
+id: bc-smoke
+version: 0.1.0
+title: BoundedCode benchmark infrastructure smoke fixture
+description: >-
+  Non-official infrastructure validation only. This fixture proves fresh
+  workspaces, paired scheduling, hidden-oracle separation, independent
+  evaluation, result persistence, and reporting. It is not a performance
+  benchmark and contains no claim about model or architecture quality.
+official: false
+smoke: true
+tasks:
+  - tasks/smoke-001/task.yaml
+model:
+  provider: deterministic-fixture
+  model: smoke-worker-v1
+  runtime: in-process-scripted
+  context_tokens: 4096
+  temperature: 0.0
+  top_p: 1.0
+  seed: 42
+runner:
+  name: smoke-infrastructure
+  version: 1
+  concurrency: 1
+  cache_policy: fresh-per-run

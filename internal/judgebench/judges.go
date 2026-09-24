@@ -24,9 +24,9 @@ import (
 
 // goEnv is the toolchain environment both judges run checks with, so they
 // differ in what they check, never in how the toolchain behaves.
-func goEnv(workDir string) []string {
+func goEnv(ctx context.Context, workDir string) []string {
 	modCache := filepath.Join(workDir, "gomodcache")
-	if out, err := exec.Command("go", "env", "GOMODCACHE").Output(); err == nil {
+	if out, err := exec.CommandContext(ctx, "go", "env", "GOMODCACHE").Output(); err == nil {
 		modCache = strings.TrimSpace(string(out))
 	}
 	return recipe.GoEnv(filepath.Join(workDir, "gocache"), modCache, filepath.Join(workDir, "tmp"))
@@ -49,7 +49,7 @@ func (j CI) Judge(ctx context.Context, t eval.Task, patch string) Verdict {
 	}
 	tmp := filepath.Join(j.WorkDir, "tmp")
 	_ = os.MkdirAll(tmp, 0o750)
-	env := goEnv(j.WorkDir)
+	env := goEnv(ctx, j.WorkDir)
 	rw, ro := recipe.GoSandboxPaths(filepath.Join(j.WorkDir, "gocache"), "", tmp)
 	runner := &recipe.Runner{Sandbox: sandbox.ContainerRunner{}, Spec: sandbox.Spec{
 		Dir: dir, TmpDir: tmp, Env: env,
@@ -97,7 +97,7 @@ func (j Bcode) Judge(ctx context.Context, t eval.Task, patch string) Verdict {
 	if err != nil {
 		return Verdict{Err: err.Error()}
 	}
-	defer func() { _ = root.CloseAll() }()
+	defer func() { _ = root.CloseAll() }() //nolint:contextcheck // storage close is deliberately context-free
 	st, err := root.OpenWorkspace(ctx, workspace.DeriveID(dir, "", "judgebench-"+t.ID))
 	if err != nil {
 		return Verdict{Err: err.Error()}
@@ -132,7 +132,7 @@ func (j Bcode) Judge(ctx context.Context, t eval.Task, patch string) Verdict {
 	}
 	tmp := filepath.Join(data, "tmp")
 	_ = os.MkdirAll(tmp, 0o750)
-	r.SandboxSpec = sandbox.Spec{TmpDir: tmp, Env: goEnv(j.WorkDir)}
+	r.SandboxSpec = sandbox.Spec{TmpDir: tmp, Env: goEnv(ctx, j.WorkDir)}
 	if r.Policies, err = policy.Load(filepath.Join(dir, "policies")); err != nil {
 		return Verdict{Err: err.Error()}
 	}

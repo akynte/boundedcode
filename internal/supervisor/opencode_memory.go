@@ -162,35 +162,34 @@ func HotMemory(ctx context.Context, st *store.Store, taskID string) ([]MemoryRec
 	}
 	var out []MemoryRecord
 	for _, q := range quotas {
-		rows, err := st.Ledger().SQL().QueryContext(ctx, `SELECT o.id,o.intent FROM operations o
-			WHERE o.task_id=? AND o.kind='memory' AND o.outcome IS NOT NULL
-			AND json_extract(o.intent,'$.type')=?
-			AND NOT EXISTS(SELECT 1 FROM operations n WHERE n.task_id=o.task_id AND n.kind='memory'
-				AND json_extract(n.intent,'$.supersedes')=o.id AND n.outcome IS NOT NULL)
-			ORDER BY o.id DESC LIMIT ?`, taskID, q.kind, q.count)
-		if err != nil {
+		if err := func() error {
+			rows, err := st.Ledger().SQL().QueryContext(ctx, `SELECT o.id,o.intent FROM operations o
+				WHERE o.task_id=? AND o.kind='memory' AND o.outcome IS NOT NULL
+				AND json_extract(o.intent,'$.type')=?
+				AND NOT EXISTS(SELECT 1 FROM operations n WHERE n.task_id=o.task_id AND n.kind='memory'
+					AND json_extract(n.intent,'$.supersedes')=o.id AND n.outcome IS NOT NULL)
+				ORDER BY o.id DESC LIMIT ?`, taskID, q.kind, q.count)
+			if err != nil {
+				return err
+			}
+			defer rows.Close()
+			for rows.Next() {
+				var r MemoryRecord
+				var raw string
+				if err := rows.Scan(&r.ID, &raw); err != nil {
+					return err
+				}
+				id := r.ID
+				if err := json.Unmarshal([]byte(raw), &r); err != nil {
+					return err
+				}
+				r.ID = id
+				out = append(out, r)
+			}
+			return rows.Err()
+		}(); err != nil {
 			return nil, err
 		}
-		for rows.Next() {
-			var r MemoryRecord
-			var raw string
-			if err := rows.Scan(&r.ID, &raw); err != nil {
-				rows.Close()
-				return nil, err
-			}
-			id := r.ID
-			if err := json.Unmarshal([]byte(raw), &r); err != nil {
-				rows.Close()
-				return nil, err
-			}
-			r.ID = id
-			out = append(out, r)
-		}
-		if err := rows.Err(); err != nil {
-			rows.Close()
-			return nil, err
-		}
-		rows.Close()
 	}
 	return out, nil
 }

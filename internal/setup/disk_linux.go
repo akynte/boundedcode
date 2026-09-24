@@ -10,5 +10,13 @@ func availableBytes(path string) (uint64, error) {
 	if err := syscall.Statfs(path, &stat); err != nil {
 		return 0, err
 	}
-	return stat.Bavail * uint64(stat.Bsize), nil
+	if stat.Bavail <= 0 || stat.Bsize <= 0 {
+		return 0, nil
+	}
+	blocks := stat.Bavail
+	blockSize := uint64(stat.Bsize)
+	if blocks > ^uint64(0)/blockSize {
+		return ^uint64(0), nil
+	}
+	return blocks * blockSize, nil
 }

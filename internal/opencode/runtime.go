@@ -87,7 +87,7 @@ func ValidateRuntime(ctx context.Context, repoRoot, baseURL string) (RuntimeBudg
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return result, fmt.Errorf("Prism /props returned %s", resp.Status)
+		return result, fmt.Errorf("prism /props returned %s", resp.Status)
 	}
 	var props struct {
 		DefaultGenerationSettings struct {

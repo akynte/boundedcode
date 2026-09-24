@@ -84,6 +84,11 @@ var exemptions = map[string]string{
 	// exemption stays on one package with one justification, instead of on
 	// the whole CLI.
 	"internal/eval": "evaluation scratch directories and published benchmark artifacts",
+	// Benchmark workspaces, frozen manifests, and result/artifact trees are
+	// operator-selected reproducibility data, not BoundedCode workspace state.
+	// They live outside the data-directory workspace namespace and are kept
+	// with the benchmark run so a result can be audited without a live store.
+	"internal/bench": "benchmark scratch workspaces, manifests, and published run artifacts",
 	// Writes AGENTS.md and opencode.json into the user's repository. Both are
 	// files the developer commits and edits: AGENTS.md is what OpenCode reads
 	// into a session, and opencode.json is their editor configuration. Neither

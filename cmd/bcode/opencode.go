@@ -323,14 +323,6 @@ func newOpenCodeRunCmd() *cobra.Command {
 
 func inContainer() bool { in, _ := sandbox.InContainer(); return in }
 
-func layerList(layers []sandbox.Layer) string {
-	names := make([]string, len(layers))
-	for i, l := range layers {
-		names[i] = string(l)
-	}
-	return strings.Join(names, " + ")
-}
-
 func inactiveReasons(report sandbox.Report) string {
 	var b strings.Builder
 	for _, note := range report.Inactive {

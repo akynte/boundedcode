@@ -93,6 +93,7 @@ func newRootCmd() *cobra.Command {
 		newGateCmd(),
 		newPlanCmd(),
 		newEvalCmd(),
+		newBenchCmd(),
 		newJudgmentCmd(),
 		newEvidenceCmd(),
 		newMemoryCmd(),

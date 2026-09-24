@@ -22,6 +22,8 @@ interval overlaps every other's.
 | [`2026-09-15-packet-cap.md`](docs/benchmarks/results/2026-09-15-packet-cap.md) | Packet cap by needle test — no retrieval ceiling at any size this hardware can serve |
 | [`2026-09-17-graph-contribution.md`](docs/benchmarks/results/2026-09-17-graph-contribution.md) | Graph contribution — 2026-09-17 |
 | [`2026-09-21-bonsai-runtime.md`](docs/benchmarks/results/2026-09-21-bonsai-runtime.md) | Bonsai on an 8 GB laptop GPU — 2026-09-21 |
+| [`2026-09-23-judges.md`](docs/benchmarks/results/2026-09-23-judges.md) | Acceptance judges — 2026-09-23 |
+| [`2026-09-24-bonsai-runtime-matrix.md`](docs/benchmarks/results/2026-09-24-bonsai-runtime-matrix.md) | Bonsai runtime matrix — 2026-09-24 |
 
 ## 2026-09-14-storage.md
 
@@ -64,6 +66,24 @@ measured 264.4 prompt tokens/s and 27.7 generated tokens/s. This is a runtime
 measurement, not an end-to-end coding evaluation.
 
 Full result: [`docs/benchmarks/results/2026-09-21-bonsai-runtime.md`](docs/benchmarks/results/2026-09-21-bonsai-runtime.md)
+
+## 2026-09-23-judges.md
+
+### Acceptance judges — 2026-09-23
+Raw data: [`2026-09-23-judges.json`](2026-09-23-judges.json). Reproduce with
+`bcode eval judges --oracles evals/oracles` from the repository root.
+
+Full result: [`docs/benchmarks/results/2026-09-23-judges.md`](docs/benchmarks/results/2026-09-23-judges.md)
+
+## 2026-09-24-bonsai-runtime-matrix.md
+
+### Bonsai runtime matrix — 2026-09-24
+This is the evidence boundary for the current 8 GB RTX 4060 Laptop GPU
+machine. `loads` is a runtime allocation result, not a product result. An
+OpenCode task result is recorded only when the task reaches a final verified
+review; a timeout is a failure.
+
+Full result: [`docs/benchmarks/results/2026-09-24-bonsai-runtime-matrix.md`](docs/benchmarks/results/2026-09-24-bonsai-runtime-matrix.md)
 
 ---
 

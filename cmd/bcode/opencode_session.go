@@ -171,7 +171,7 @@ func launchOpenCode(cmd *cobra.Command, args []string, opts openCodeLaunchOption
 	if err != nil {
 		return err
 	}
-	defer opencode.RemoveBrokerCapability(capPath)
+	defer func() { _ = opencode.RemoveBrokerCapability(capPath) }()
 	session.BrokerCapability = brokerPath
 	spec.Env = session.Env()
 

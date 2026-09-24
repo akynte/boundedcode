@@ -323,7 +323,7 @@ func finishTask(ctx context.Context, st *store.Store, repoRoot, policyRoot, task
 	if err != nil {
 		return Review{}, err
 	}
-	currentCandidate, candidateErr := ledger.ContentManifest(repoRoot)
+	currentCandidate, candidateErr := ledger.ContentManifestContext(ctx, repoRoot)
 	if candidateErr != nil {
 		return Review{}, fmt.Errorf("supervisor: fingerprint current candidate: %w", candidateErr)
 	}

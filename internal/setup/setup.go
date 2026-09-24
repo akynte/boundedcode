@@ -251,7 +251,7 @@ func DiscoverRuntime(dataDir string) string {
 		if candidate == "" {
 			continue
 		}
-		if info, err := os.Stat(candidate); err == nil && !info.IsDir() && info.Mode()&0o111 != 0 {
+		if info, err := os.Stat(candidate); err == nil && !info.IsDir() && info.Mode()&0o111 != 0 { //nolint:gosec // candidates are fixed runtime locations or an operator-provided root
 			return absoluteRuntimePath(candidate)
 		}
 	}
@@ -261,7 +261,7 @@ func DiscoverRuntime(dataDir string) string {
 			filepath.Join(prism, "build", "llama-server"),
 			filepath.Join(prism, "llama-server"),
 		} {
-			if info, err := os.Stat(candidate); err == nil && !info.IsDir() && info.Mode()&0o111 != 0 {
+			if info, err := os.Stat(candidate); err == nil && !info.IsDir() && info.Mode()&0o111 != 0 { //nolint:gosec // candidates are fixed runtime locations or an operator-provided root
 				return absoluteRuntimePath(candidate)
 			}
 		}
@@ -302,7 +302,7 @@ func DiscoverModels(dataDir string) []string {
 // local setup. It never downloads anything and never changes configuration.
 func DefaultChoice(dataDir string) Choice {
 	dataDir = DataDir(dataDir)
-	choice := Choice{
+	choice := Choice{ //nolint:gosec // JudgmentAPIKeyEnv names the environment variable; it is not a secret
 		DataDir:           dataDir,
 		Profile:           "bonsai-2-27b-8gb-cuda",
 		Mode:              config.ModeEmbedded,
@@ -366,7 +366,7 @@ func Apply(ctx context.Context, dataDir string, choice Choice) (Report, error) {
 	if choice.BaseURL != "" {
 		cfg.Inference.BaseURL = choice.BaseURL
 	}
-	if cfg.Inference.Mode == config.ModeEmbedded {
+	if cfg.Inference.Mode == config.ModeEmbedded { //nolint:staticcheck // the embedded branch is intentionally kept adjacent to its validation
 		if cfg.Inference.Port == 0 {
 			cfg.Inference.Port = DefaultInferencePort
 		}
