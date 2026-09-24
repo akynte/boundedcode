@@ -114,16 +114,18 @@ func Render(f Facts) string {
 	b.WriteString("- **`bc_status`** when answers look stale. It reports how far the index has " +
 		"drifted from the working tree.\n")
 	b.WriteString("- **`bc_task_start`** before implementing, fixing or refactoring anything. " +
-		"Include the user's explicit acceptance criteria in `requirements`, scope or security " +
-		"limits in `constraints`, and anything the user explicitly ruled out in `non_goals`; " +
-		"these survive OpenCode compaction and session recreation. " +
+		"Include the user's explicit requirements in `requirements`, verbatim acceptance criteria in " +
+		"`acceptance_criteria`, scope or security limits in `constraints`, and anything the user " +
+		"explicitly ruled out in `non_goals`; these survive OpenCode compaction and session recreation. " +
 		"It opens a supervised task, journals the intent before the work, and tells you which " +
 		"paths this repository protects — which is cheaper to learn before editing than after.\n")
 	b.WriteString("- **`bc_task_resume`** when a new OpenCode session must continue one of several " +
 		"active supervised tasks. Pass the existing task id; the supervisor binds this session " +
 		"to its durable objective, requirements, decisions and verification.\n")
 	b.WriteString("- **`bc_task_history`** to page through older user decisions when the active " +
-		"task card says some decisions were omitted. Use the task id and offset.\n")
+		"task card says some decisions were omitted. Use the task id and offset. `bc_task_verification` " +
+		"does the same for historical candidate-bound verification runs; never infer an old verification " +
+		"is current after an edit.\n")
 	b.WriteString("- **`bc_task_memory_add`** to record what you have established as you work: a " +
 		"`model_hypothesis`, a `contradicted_hypothesis` when new evidence overturns an earlier " +
 		"one (pass `supersedes`), a `tool_observation`, an `open_failure`, a `resolved_failure`, " +
@@ -143,8 +145,8 @@ func Render(f Facts) string {
 		"again — do not tell the user the work is finished until it says ACCEPTED.\n")
 	b.WriteString("- **`bc_task_answer`** whenever the user resolves something you could not " +
 		"infer from the codebase — a business rule, an architectural choice, a limit. Pass the " +
-		"task id. The answer becomes part of this project's record instead of being lost with " +
-		"the conversation.\n")
+		"task id and record the rationale when the user gave one. The answer and its rationale " +
+		"become part of this project's record instead of being lost with the conversation.\n")
 	b.WriteString("- **`bc_task_finish`** once verification is ACCEPTED. It produces the final " +
 		"review — what was asked, what the user decided, which files changed, what was checked " +
 		"— and you should show that to the user. No approval is needed: the change is already " +

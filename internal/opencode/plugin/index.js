@@ -1,7 +1,8 @@
-// OpenCode 2.0.15 context hook. The Go ledger is authoritative; OpenCode's
+// OpenCode 2.0.16 context hook. The Go ledger is authoritative; OpenCode's
 // compaction summary is a disposable working note. Keep this adapter small so
 // provider requests can be inspected against the matching OpenCode source tag.
 import { appendFileSync, mkdirSync, readFileSync } from "node:fs"
+import { connect } from "node:net"
 import { join } from "node:path"
 
 export default {
@@ -15,8 +16,41 @@ export default {
     // prompt loop.
     const recoveries = new Map()
     const maxRecoveries = 2
+    const brokerCall = (request) => {
+      const endpoint = process.env.BC_OPENCODE_BROKER_CAPABILITY
+      if (!endpoint || !endpoint.startsWith("tcp://127.0.0.1:")) return null
+      return new Promise((resolve, reject) => {
+        const url = new URL(endpoint)
+        const socket = connect({ host: url.hostname, port: Number(url.port) })
+        let buffer = ""
+        const fail = (error) => { socket.destroy(); reject(error) }
+        const timeout = setTimeout(() => fail(new Error("BoundedCode broker timed out")), 3000)
+        socket.once("close", () => clearTimeout(timeout))
+        socket.once("error", fail)
+        socket.once("connect", () => {
+          socket.write(JSON.stringify({ ...request, token: url.pathname.slice(1) }))
+        })
+        socket.on("data", (chunk) => {
+          buffer += chunk.toString()
+          const newline = buffer.indexOf("\n")
+          if (newline < 0) return
+          const line = buffer.slice(0, newline)
+          socket.destroy()
+          try {
+            const reply = JSON.parse(line)
+            if (reply.error) reject(new Error(reply.error))
+            else resolve(reply.body ?? "")
+          } catch (error) { reject(error) }
+        })
+      })
+    }
     await ctx.session.hook("prompt", async (event) => {
       if (!event.prompt.text) return
+      const broker = brokerCall({ kind: "prompt", session: String(event.sessionID), message: String(event.messageID), body: event.prompt.text })
+      if (broker) {
+        await broker
+        return
+      }
       const child = Bun.spawn(["bcode", "opencode", "record-prompt", "--session", String(event.sessionID), "--message", String(event.messageID)], {
         cwd: ctx.location.directory, stdin: "pipe", stdout: "pipe", stderr: "pipe", env: process.env,
       })
@@ -29,6 +63,8 @@ export default {
       } finally { clearTimeout(timeout) }
     })
     const taskState = async (sessionID) => {
+      const broker = brokerCall({ kind: "context", session: String(sessionID) })
+      if (broker) return (await broker).trim()
       const command = ["bcode", "opencode", "context", "--session", String(sessionID)]
       const child = Bun.spawn(command, {
         cwd: ctx.location.directory,
@@ -86,13 +122,15 @@ export default {
           if (message.role === "system" || message.role === "developer") classifySystem(content)
           else if (content.includes("BoundedCode authoritative task state")) groups.boundedcode_context.push(content)
           else if (content.includes("BoundedCode supervised task") && content.includes("continues")) groups.compaction_checkpoint.push(content)
-          else if (message.role === "tool" && (content.includes("source=file") || content.includes("evidence="))) groups.retrieved_evidence.push(content)
+          else if (message.role === "tool" && (content.includes("source=file") || content.includes("evidence=") || content.includes("Repository content in this message"))) groups.retrieved_evidence.push(content)
           else if (message.role === "tool") groups.tool_results.push(content)
           else groups.conversation_tail.push(JSON.stringify(message))
         }
+        const toolNames = []
         for (const tool of request.tools ?? []) {
           const name = tool.function?.name ?? tool.name ?? ""
-          groups[name.startsWith("boundedcode_") ? "mcp_schemas" : "builtin_schemas"].push(JSON.stringify(tool))
+          toolNames.push(name)
+          groups[name.toLowerCase().includes("boundedcode") ? "mcp_schemas" : "builtin_schemas"].push(JSON.stringify(tool))
         }
         const tokenize = async (value) => {
           if (!value) return 0
@@ -118,8 +156,9 @@ export default {
         } catch {}
         const record = {
           at: new Date().toISOString(), session_id: event.sessionID, model: request.model,
-          tokenizer: "Prism /tokenize", categories: counts, full_request_json_tokens: totalJSON,
+          tokenizer: "Prism /tokenize", categories: counts, tool_names: toolNames, full_request_json_tokens: totalJSON,
           serialization_difference: totalJSON - known,
+          other_provider_overhead_tokens: totalJSON - known,
           output_reserve: request.max_tokens ?? request.max_completion_tokens ?? declared.output,
           advertised_context: declared.context, compaction_buffer: declared.buffer,
           retained_tail: declared.keep,

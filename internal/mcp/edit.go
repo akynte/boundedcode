@@ -12,7 +12,9 @@ import (
 
 	"github.com/akynte/boundedcode/internal/artifacts"
 	"github.com/akynte/boundedcode/internal/firewall"
+	"github.com/akynte/boundedcode/internal/ledger"
 	"github.com/akynte/boundedcode/internal/policy"
+	"github.com/akynte/boundedcode/internal/store"
 	"github.com/akynte/boundedcode/internal/supervisor"
 	"github.com/akynte/boundedcode/internal/task"
 	"github.com/akynte/boundedcode/internal/trust"
@@ -101,14 +103,20 @@ func (s *Server) readFile(ctx context.Context, _ *mcp.CallToolRequest, in readIn
 		if _, err := task.NewStore(sess.Store).Get(ctx, in.TaskID); err != nil {
 			return fail("%v", err), readOut{}, nil
 		}
+		phase, err := supervisor.CurrentPhase(ctx, sess.Store, in.TaskID)
+		if err != nil {
+			return fail("recording read phase: %v", err), readOut{}, nil
+		}
 		hash, err := artifacts.New(sess.Store).Put([]byte(out.Content))
 		if err != nil {
 			return fail("recording read evidence: %v", err), readOut{}, nil
 		}
 		out.Evidence = hash
 		_, err = supervisor.RecordMemory(ctx, sess.Store, in.TaskID, supervisor.MemoryRecord{
-			Type: "tool_observation", Text: fmt.Sprintf("Read %s lines %d-%d", in.Path, start, end),
+			Type: "tool_observation", Source: "tool", SourceTool: "bc_read",
+			Text:     fmt.Sprintf("Read %s lines %d-%d", in.Path, start, end),
 			Evidence: hash, Path: in.Path, FileHash: fileHash,
+			StartLine: start, EndLine: end, Repository: string(sess.Workspace.ID()), Phase: phase,
 		}, false)
 		if err != nil {
 			return fail("recording read observation: %v", err), readOut{}, nil
@@ -138,6 +146,24 @@ type editIn struct {
 type editOut struct {
 	Path         string `json:"path"`
 	Replacements int    `json:"replacements"`
+	Candidate    string `json:"candidate,omitempty"`
+}
+
+func recordEditCandidate(ctx context.Context, store *store.Store, taskID, root, path string) (string, error) {
+	candidate, err := ledger.ContentManifest(root)
+	if err != nil {
+		return "", err
+	}
+	phase, err := supervisor.CurrentPhase(ctx, store, taskID)
+	if err != nil {
+		return "", err
+	}
+	if err := supervisor.RecordEvent(ctx, store, taskID, ledger.KindEdit, map[string]any{
+		"path": path, "candidate": candidate, "phase": phase,
+	}); err != nil {
+		return "", err
+	}
+	return candidate, nil
 }
 
 func (s *Server) editFile(ctx context.Context, _ *mcp.CallToolRequest, in editIn) (*mcp.CallToolResult, editOut, error) {
@@ -176,7 +202,11 @@ func (s *Server) editFile(ctx context.Context, _ *mcp.CallToolRequest, in editIn
 			if err := worktree.WriteWithin(root, in.Path, []byte(in.New)); err != nil {
 				return fail("creating %s: %v", in.Path, err), editOut{}, nil
 			}
-			return text(fmt.Sprintf("Created %s.", in.Path)), editOut{Path: in.Path, Replacements: 1}, nil
+			candidate, err := recordEditCandidate(ctx, sess.Store, in.TaskID, root, in.Path)
+			if err != nil {
+				return fail("recording edited candidate: %v", err), editOut{}, nil
+			}
+			return text(fmt.Sprintf("Created %s.", in.Path)), editOut{Path: in.Path, Replacements: 1, Candidate: candidate}, nil
 		}
 		return fail("reading %s: %v", in.Path, err), editOut{}, nil
 	}
@@ -196,8 +226,12 @@ func (s *Server) editFile(ctx context.Context, _ *mcp.CallToolRequest, in editIn
 	if err := worktree.WriteWithin(root, in.Path, []byte(updated)); err != nil {
 		return fail("writing %s: %v", in.Path, err), editOut{}, nil
 	}
-	return text(fmt.Sprintf("Replaced one occurrence in %s. Call bc_verify when the change is complete.", in.Path)),
-		editOut{Path: in.Path, Replacements: 1}, nil
+	candidate, err := recordEditCandidate(ctx, sess.Store, in.TaskID, root, in.Path)
+	if err != nil {
+		return fail("recording edited candidate: %v", err), editOut{}, nil
+	}
+	return text(fmt.Sprintf("Replaced one occurrence in %s. Call bc_verify when the change is complete. Candidate=%s", in.Path, candidate)),
+		editOut{Path: in.Path, Replacements: 1, Candidate: candidate}, nil
 }
 
 // protectedSet loads the repository's own policy rules, so a proxied write

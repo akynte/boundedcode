@@ -787,8 +787,10 @@ Register it with OpenCode in `opencode.jsonc`:
 | `bc_graph_impact` | What a change to a symbol would affect, with evidence category and migration per consumer |
 | `bc_search` | The code most relevant to a question: lexical anchors then graph expansion |
 | `bc_reindex` | Re-analyse the repository so the index matches the working tree |
-| `bc_task_start` | Open a supervised task: journals the intent before the work, returns the repository's protected paths |
-| `bc_task_answer` | Record a question the executor asked the user and the answer given |
+| `bc_task_start` | Open a supervised task: journals the intent before the work, preserves requirements, acceptance criteria, constraints and non-goals, and returns protected paths |
+| `bc_task_answer` | Record a question the executor asked the user, the answer, and its rationale |
+| `bc_task_history` | Page durable user decisions by task ID |
+| `bc_task_verification` | Page candidate-bound verification runs by task ID |
 | `bc_verify` | Run the verification recipes in a sandbox and apply the completion contract |
 | `bc_task_finish` | Close the task and produce its final review |
 | `bc_note_add` | Record something durable the next session should not have to rediscover |

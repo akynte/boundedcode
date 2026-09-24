@@ -57,9 +57,10 @@ type Review struct {
 
 // Decision is one question the executor had to ask, and what it was told.
 type Decision struct {
-	Question string    `json:"question"`
-	Answer   string    `json:"answer"`
-	At       time.Time `json:"at"`
+	Question  string    `json:"question"`
+	Answer    string    `json:"answer"`
+	Rationale string    `json:"rationale,omitempty"`
+	At        time.Time `json:"at"`
 }
 
 // CheckResult is one verification recipe's verdict, flattened for a reader.
@@ -90,7 +91,7 @@ func StartTask(ctx context.Context, st *store.Store, objective string, level rec
 		return task.Task{}, err
 	}
 	if err := RecordEvent(ctx, st, t.ID, ledger.KindSessionStart,
-		map[string]any{"objective": objective, "executor": "opencode"}); err != nil {
+		map[string]any{"objective": objective, "executor": "opencode", "phase": "EDITOR"}); err != nil {
 		return t, err
 	}
 	return t, nil
@@ -120,14 +121,27 @@ func RecordEvent(ctx context.Context, st *store.Store, taskID string, kind ledge
 // the next session. This is where it stops being conversational and becomes part
 // of the record.
 func RecordAnswer(ctx context.Context, st *store.Store, taskID, question, answer string) error {
-	question, answer = strings.TrimSpace(question), strings.TrimSpace(answer)
+	return RecordAnswerWithRationale(ctx, st, taskID, question, answer, "")
+}
+
+// RecordAnswerWithRationale is the lossless form of a user decision. The
+// answer says what the user chose; the rationale says why that choice is
+// binding when a later session reconstructs the task. Keeping them in the
+// same durable operation prevents a future context card from presenting the
+// decision as an unexplained preference.
+func RecordAnswerWithRationale(ctx context.Context, st *store.Store, taskID, question, answer, rationale string) error {
+	question, answer, rationale = strings.TrimSpace(question), strings.TrimSpace(answer), strings.TrimSpace(rationale)
 	if question == "" || answer == "" {
 		return fmt.Errorf("supervisor: a decision needs both the question and the answer")
 	}
+	if len(rationale) > 4000 {
+		return fmt.Errorf("supervisor: decision rationale exceeds 4000 characters")
+	}
 	return RecordEvent(ctx, st, taskID, ledger.KindDecision, map[string]any{
-		"question": question,
-		"answer":   answer,
-		"source":   "user",
+		"question":  question,
+		"answer":    answer,
+		"rationale": rationale,
+		"source":    "user",
 	})
 }
 
@@ -143,27 +157,32 @@ func Decisions(ctx context.Context, st *store.Store, taskID string) ([]Decision,
 			continue
 		}
 		var d struct {
-			Question string `json:"question"`
-			Answer   string `json:"answer"`
-			Source   string `json:"source"`
+			Question  string `json:"question"`
+			Answer    string `json:"answer"`
+			Rationale string `json:"rationale"`
+			Source    string `json:"source"`
 		}
 		if err := json.Unmarshal(op.Intent, &d); err != nil || d.Source != "user" {
 			continue
 		}
 		// The ledger stamps in milliseconds; the index stamps in seconds. Being
 		// explicit here rather than assuming is how the other one was found.
-		out = append(out, Decision{Question: d.Question, Answer: d.Answer, At: time.UnixMilli(op.StartedAt).UTC()})
+		out = append(out, Decision{Question: d.Question, Answer: d.Answer, Rationale: d.Rationale, At: time.UnixMilli(op.StartedAt).UTC()})
 	}
 	return out, nil
 }
 
 // VerificationRecord is a verification result as the journal keeps it.
 type VerificationRecord struct {
+	ID         int64         `json:"id,omitempty"`
 	Accepted   bool          `json:"accepted"`
 	Candidate  string        `json:"candidate"`
+	Level      string        `json:"level,omitempty"`
+	Phase      string        `json:"phase,omitempty"`
 	Reasons    []string      `json:"reasons,omitempty"`
 	OutOfScope []string      `json:"out_of_scope,omitempty"`
 	Checks     []CheckResult `json:"checks,omitempty"`
+	RecordedAt time.Time     `json:"recorded_at,omitempty"`
 }
 
 // RecordVerification journals a verification against the task it judged.
@@ -178,7 +197,11 @@ func RecordVerification(ctx context.Context, st *store.Store, taskID string, o *
 	}
 	rec := VerificationRecord{
 		Accepted: o.Accepted, Candidate: o.Candidate,
+		Phase: "VERIFY", RecordedAt: time.Now().UTC(),
 		Reasons: o.Reasons, OutOfScope: o.OutOfScope,
+	}
+	if t, err := task.NewStore(st).Get(ctx, taskID); err == nil {
+		rec.Level = string(t.Verification)
 	}
 	for _, r := range o.Results {
 		rec.Checks = append(rec.Checks, CheckResult{
@@ -360,6 +383,9 @@ func (r Review) Format() string {
 		b.WriteString("\nUser decisions:\n")
 		for _, d := range r.Decisions {
 			fmt.Fprintf(&b, "  - %s\n    %s\n", d.Question, d.Answer)
+			if d.Rationale != "" {
+				fmt.Fprintf(&b, "    Why: %s\n", d.Rationale)
+			}
 		}
 	}
 	if len(r.Protected) > 0 {

@@ -39,9 +39,11 @@ block is refreshed; your other global instructions are preserved. See
 
 Setup also installs the BoundedCode OpenCode plugin and the Bonsai compaction
 policy in `opencode.json`. The plugin reads the Go ledger before each model
-request. For a 32K Bonsai slot, the policy uses a 12K buffer and retains 4K
-recent tokens, avoiding OpenCode 2.0.15's 15K-retained/12.8K-trigger loop.
-Restart OpenCode after changing these settings.
+request. For the active 32K Bonsai profile, the policy uses a 12K buffer and
+retains 4K recent tokens, avoiding OpenCode 2's oversized retained-tail loop.
+The OpenCode context and output limits are copied from the active hardware
+profile, and `bcode doctor` fails closed if they drift. Restart OpenCode after
+changing these settings.
 
 When BoundedCode has a local inference endpoint configured, setup also registers
 it using OpenCode 2's custom provider format. For the reference Bonsai model, it
@@ -63,7 +65,7 @@ For manual setup without launching the editor, use `bcode opencode setup`.
 |---|---|
 | `bc_status`, `bc_graph_impact`, `bc_search`, `bc_reindex` | Workspace status, reverse-dependency evidence, retrieval, indexing |
 | `bc_note_add` | Persist a bounded repository note |
-| `bc_task_start`, `bc_task_resume`, `bc_task_answer`, `bc_task_history` | Begin or resume supervised work and record or retrieve user decisions |
+| `bc_task_start`, `bc_task_resume`, `bc_task_answer`, `bc_task_history`, `bc_task_verification` | Begin or resume supervised work; preserve requirements, acceptance criteria, decisions, and candidate-bound verification history |
 | `bc_read`, `bc_edit` | Mediated file access in the opened repository |
 | `bc_verify`, `bc_task_finish` | Collect checks and record a completion verdict |
 
@@ -76,12 +78,15 @@ Editor edits affect the opened checkout. They do not automatically acquire the
 native task runner's separate-worktree lifecycle. A finish verdict evaluates
 available evidence; it cannot undo an earlier edit made by another editor tool.
 
-At task start, pass explicit acceptance criteria as `requirements` and scope,
-security and performance limits as `constraints`. When a new OpenCode session
-has several unfinished tasks, call `bc_task_resume` with the intended task ID.
-The original objective, these fields, user decisions and verification are
-reconstructed from the ledger after compaction and restart. Read/search output
-that was never recorded as durable task state may need to be retrieved again.
+At task start, pass explicit requirements in `requirements`, verbatim
+acceptance criteria in `acceptance_criteria`, and scope, security and
+performance limits in `constraints`. When a new OpenCode session has several
+unfinished tasks, call `bc_task_resume` with the intended task ID. The original
+objective, these fields, user decisions and rationales, candidate-bound
+verification history, and typed evidence are reconstructed from the ledger
+after compaction and restart. Read/search output that was never recorded as
+durable task state remains queryable as repository evidence and may need to be
+retrieved again.
 
 ## Confinement status
 

@@ -204,6 +204,34 @@ func TestRegisterModelRemovesAStaleV1EntryEvenWhenV2IsAlreadyCurrent(t *testing.
 	}
 }
 
+func TestRegisterModelUsesTheActiveProfileLimits(t *testing.T) {
+	repo := t.TempDir()
+	if _, _, err := opencode.RegisterModelWithLimits(repo, "http://127.0.0.1:8080", "Ternary-Bonsai-2-27B-PTQ1_0.gguf", 65536, 4096); err != nil {
+		t.Fatal(err)
+	}
+	body, err := os.ReadFile(filepath.Join(repo, "opencode.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var doc struct {
+		Providers map[string]struct {
+			Models map[string]struct {
+				Limit struct {
+					Context int `json:"context"`
+					Output  int `json:"output"`
+				} `json:"limit"`
+			} `json:"models"`
+		} `json:"providers"`
+	}
+	if err := json.Unmarshal(body, &doc); err != nil {
+		t.Fatal(err)
+	}
+	limit := doc.Providers[opencode.ProviderName].Models["Ternary-Bonsai-2-27B-PTQ1_0"].Limit
+	if limit.Context != 65536 || limit.Output != 4096 {
+		t.Fatalf("OpenCode did not inherit the active profile: %+v", limit)
+	}
+}
+
 func TestContextPolicyFitsTheBonsaiWindowAndIsIdempotent(t *testing.T) {
 	repo := t.TempDir()
 	pluginDir, _, err := opencode.InstallPlugin(t.TempDir())
@@ -289,6 +317,9 @@ func TestInstallPluginExtractsRealContentIdempotently(t *testing.T) {
 	}
 	if !strings.Contains(string(body), "finish_reason") || !strings.Contains(string(body), "ctx.session.synthetic") {
 		t.Fatalf("extracted plugin does not recover a length-finished response:\n%s", body)
+	}
+	if !strings.Contains(string(body), "BC_OPENCODE_BROKER_CAPABILITY") || !strings.Contains(string(body), "other_provider_overhead_tokens") {
+		t.Fatalf("extracted plugin is missing broker confinement or request-category accounting:\n%s", body)
 	}
 	if _, err := os.ReadFile(filepath.Join(dir, "package.json")); err != nil {
 		t.Fatalf("package.json was not extracted: %v", err)

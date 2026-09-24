@@ -30,7 +30,9 @@ func TestTypedMemorySurvivesFreshContextWithoutPromotingHypothesis(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _,err:=supervisor.RecordMemory(ctx,s.Store,task.ID,supervisor.MemoryRecord{Type:"repository_fact",Text:"invented confirmation",Evidence:evidence},true);err==nil {t.Fatal("editor promoted its claim to fact")}
+	if _, err := supervisor.RecordMemory(ctx, s.Store, task.ID, supervisor.MemoryRecord{Type: "repository_fact", Text: "invented confirmation", Evidence: evidence}, true); err == nil {
+		t.Fatal("editor promoted its claim to fact")
+	}
 	fact, err := supervisor.RecordMemory(ctx, s.Store, task.ID, supervisor.MemoryRecord{Type: "repository_fact", Text: "retention code is in audit.go", Evidence: evidence, Path: "audit.go"}, false)
 	if err != nil {
 		t.Fatal(err)
@@ -60,7 +62,7 @@ func TestTypedMemorySurvivesFreshContextWithoutPromotingHypothesis(t *testing.T)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !strings.Contains(body, task.Title) || !strings.Contains(body, "Original raw user request") || !strings.Contains(body, "retention code is in audit.go") || !strings.Contains(body, "the old key path is used by archive export") || strings.Contains(body, "Task memory #"+fmt.Sprint(hypothesis)+" [model_hypothesis]") || len(body) > 9000 {
+		if !strings.Contains(body, task.Title) || !strings.Contains(body, "Original raw user request") || !strings.Contains(body, "retention code is in audit.go") || !strings.Contains(body, "source=repository") || !strings.Contains(body, "the old key path is used by archive export") || strings.Contains(body, "Task memory #"+fmt.Sprint(hypothesis)+" [model_hypothesis]") || len(body) > 9000 {
 			t.Fatalf("bad context (%d): %s", len(body), body)
 		}
 	}

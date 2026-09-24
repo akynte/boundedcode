@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/akynte/boundedcode/internal/artifacts"
 	"github.com/akynte/boundedcode/internal/ledger"
@@ -16,15 +17,21 @@ import (
 // MemoryRecord is a typed claim. The artifact hash names the full, immutable
 // supporting observation; the active context contains only the bounded claim.
 type MemoryRecord struct {
-	ID         int64  `json:"id"`
-	Source     string `json:"source"`
-	Type       string `json:"type"`
-	Text       string `json:"text"`
-	Evidence   string `json:"evidence,omitempty"`
-	Path       string `json:"path,omitempty"`
-	FileHash   string `json:"file_hash,omitempty"`
-	Candidate  string `json:"candidate,omitempty"`
-	Supersedes int64  `json:"supersedes,omitempty"`
+	ID         int64     `json:"id"`
+	Source     string    `json:"source"`
+	SourceTool string    `json:"source_tool,omitempty"`
+	Type       string    `json:"type"`
+	Text       string    `json:"text"`
+	Evidence   string    `json:"evidence,omitempty"`
+	Path       string    `json:"path,omitempty"`
+	FileHash   string    `json:"file_hash,omitempty"`
+	StartLine  int       `json:"start_line,omitempty"`
+	EndLine    int       `json:"end_line,omitempty"`
+	Repository string    `json:"repository,omitempty"`
+	Phase      string    `json:"phase,omitempty"`
+	RecordedAt time.Time `json:"recorded_at,omitempty"`
+	Candidate  string    `json:"candidate,omitempty"`
+	Supersedes int64     `json:"supersedes,omitempty"`
 }
 
 var memoryTypes = map[string]bool{
@@ -42,7 +49,14 @@ func RecordMemory(ctx context.Context, st *store.Store, taskID string, r MemoryR
 		return 0, err
 	}
 	r.Type, r.Text = strings.TrimSpace(r.Type), strings.TrimSpace(r.Text)
-	if !memoryTypes[r.Type] || r.Text == "" || len(r.Text) > 1000 || len(r.Path) > 500 {
+	r.Source, r.SourceTool = strings.TrimSpace(r.Source), strings.TrimSpace(r.SourceTool)
+	r.Path, r.Repository, r.Phase = strings.TrimSpace(r.Path), strings.TrimSpace(r.Repository), strings.TrimSpace(r.Phase)
+	if r.RecordedAt.IsZero() {
+		r.RecordedAt = time.Now().UTC()
+	}
+	if !memoryTypes[r.Type] || r.Text == "" || len(r.Text) > 1000 || len(r.Path) > 500 ||
+		len(r.Source) > 80 || len(r.SourceTool) > 80 || len(r.Repository) > 500 || len(r.Phase) > 80 ||
+		r.StartLine < 0 || r.EndLine < 0 {
 		return 0, fmt.Errorf("invalid memory type or claim length")
 	}
 	// tool_observation is the editor's own account of what a tool returned:
@@ -55,7 +69,22 @@ func RecordMemory(ctx context.Context, st *store.Store, taskID string, r MemoryR
 	if editor && (r.Type == "supervisor_decision" || r.Type == "external_judgment" || r.Type == "acceptance_criterion" || r.Type == "repository_fact") {
 		return 0, fmt.Errorf("editor cannot assert %s", r.Type)
 	}
-	if editor {r.Source="model"} else if r.Source=="" {r.Source="supervisor"}
+	if editor {
+		r.Source = "model"
+	} else if r.Source == "" {
+		switch r.Type {
+		case "repository_fact":
+			r.Source = "repository"
+		case "acceptance_criterion":
+			r.Source = "user"
+		case "external_judgment":
+			r.Source = "external"
+		case "tool_observation":
+			r.Source = "tool"
+		default:
+			r.Source = "supervisor"
+		}
+	}
 	if r.Type == "repository_fact" && r.Evidence == "" {
 		return 0, fmt.Errorf("repository fact requires an immutable evidence artifact")
 	}
@@ -128,6 +157,7 @@ func HotMemory(ctx context.Context, st *store.Store, taskID string) ([]MemoryRec
 	}{
 		{"open_failure", 6}, {"resolved_failure", 3}, {"repository_fact", 8},
 		{"contradicted_hypothesis", 4}, {"pending_action", 6}, {"model_hypothesis", 4},
+		{"acceptance_criterion", 6}, {"supervisor_decision", 6}, {"external_judgment", 4},
 		{"tool_observation", 3},
 	}
 	var out []MemoryRecord

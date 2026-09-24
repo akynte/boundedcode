@@ -9,8 +9,10 @@ package doctor
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
@@ -98,6 +100,7 @@ func Run(ctx context.Context, opts Options) Report {
 	for _, c := range checkProfile(ctx, opts.Profile) {
 		add(c)
 	}
+	add(checkOpenCodeLimits(opts.Workspace, opts.Profile))
 	for _, c := range checkWorkspace(ctx, opts) {
 		add(c)
 	}
@@ -329,6 +332,59 @@ func checkRequestBudget(p *config.Profile, providers *llm.ProvidersFile) Check {
 				int(worst.Seconds()))}
 	}
 	return Check{Name: name, Level: OK, Detail: detail}
+}
+
+// checkOpenCodeLimits prevents the editor and the active runtime profile from
+// silently disagreeing. A physical server context is a capacity fact; an
+// OpenCode model limit is an admission fact. If either is stale, compaction can
+// be scheduled against a window the server does not actually have.
+func checkOpenCodeLimits(ws *workspace.Workspace, profile *config.Profile) Check {
+	const name = "OpenCode/runtime limits"
+	if ws == nil || profile == nil {
+		return Check{Name: name, Level: Skipped, Detail: "workspace or active hardware profile unavailable"}
+	}
+	path := filepath.Join(ws.Root, "opencode.json")
+	body, err := os.ReadFile(path) //nolint:gosec // path is rooted in the opened workspace
+	if err != nil {
+		return Check{Name: name, Level: Warn, Detail: "opencode.json is unavailable: " + err.Error(),
+			Fix: "Run `bcode opencode setup` before starting a supervised OpenCode task."}
+	}
+	var doc struct {
+		Model     string `json:"model"`
+		Providers map[string]struct {
+			Models map[string]struct {
+				Limit struct {
+					Context int `json:"context"`
+					Output  int `json:"output"`
+				} `json:"limit"`
+			} `json:"models"`
+		} `json:"providers"`
+	}
+	if err := json.Unmarshal(body, &doc); err != nil {
+		return Check{Name: name, Level: Fail, Detail: "opencode.json is invalid: " + err.Error(),
+			Fix: "Repair the file or run `bcode opencode setup`."}
+	}
+	if doc.Model == "" || !strings.HasPrefix(doc.Model, "boundedcode-local/") {
+		return Check{Name: name, Level: Skipped, Detail: "OpenCode is using an unrelated model selection"}
+	}
+	modelName := strings.TrimPrefix(doc.Model, "boundedcode-local/")
+	provider, ok := doc.Providers["boundedcode-local"]
+	if !ok {
+		return Check{Name: name, Level: Fail, Detail: "boundedcode-local provider is missing",
+			Fix: "Run `bcode opencode setup` to regenerate the provider entry."}
+	}
+	model, ok := provider.Models[modelName]
+	if !ok || model.Limit.Context == 0 || model.Limit.Output == 0 {
+		return Check{Name: name, Level: Fail, Detail: "BoundedCode model has no context/output limits",
+			Fix: "Run `bcode opencode setup` after selecting the BoundedCode model."}
+	}
+	if model.Limit.Context != profile.ContextTokens || model.Limit.Output != profile.ReservedOutput {
+		return Check{Name: name, Level: Fail,
+			Detail: fmt.Sprintf("OpenCode advertises context=%d output=%d; active profile requires context=%d output=%d", model.Limit.Context, model.Limit.Output, profile.ContextTokens, profile.ReservedOutput),
+			Fix:    "Run `bcode opencode setup` so both sides use the active profile limits."}
+	}
+	return Check{Name: name, Level: OK,
+		Detail: fmt.Sprintf("OpenCode and profile agree: context=%d output=%d", model.Limit.Context, model.Limit.Output)}
 }
 
 func checkWorkspace(ctx context.Context, opts Options) []Check {

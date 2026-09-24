@@ -215,7 +215,11 @@ func setupOpenCode(cmd *cobra.Command, dataDir string, printNext bool) error {
 	// immediately when that endpoint is configured.
 	if cfg, err := loadConfig(root); err == nil {
 		base, model := inferenceEndpoint(cfg, root)
-		if _, modelChanged, err := opencode.RegisterModel(ws.Root, base, model); err != nil {
+		contextTokens, outputTokens := 32768, 8192
+		if profile := loadProfile(root, cfg); profile != nil {
+			contextTokens, outputTokens = profile.ContextTokens, profile.ReservedOutput
+		}
+		if _, modelChanged, err := opencode.RegisterModelWithLimits(ws.Root, base, model, contextTokens, outputTokens); err != nil {
 			return err
 		} else if modelChanged {
 			fmt.Fprintf(out, "wired the editor to %s (%s)\n", base, shortName(model))
@@ -443,7 +447,13 @@ func newOpenCodeRunCmd() *cobra.Command {
 			if err := os.Symlink(self, link); err != nil {
 				return err
 			}
-			session.BCodeBinDir = binDir
+			// Keep both the private per-session symlink and the real executable
+			// directory on PATH. The symlink pins the exact binary for the
+			// session; the real directory is a safe fallback if a tool or a
+			// later OpenCode reconnect loses the private state directory. Both
+			// paths are read-only in the sandbox, so this does not grant the
+			// session access to any workspace data.
+			session.BCodeBinDir = binDir + string(os.PathListSeparator) + filepath.Dir(self)
 			brokerPath, stopBroker, err := startOpenCodeBroker(ctx, st, root.Layout().Root(), ws.Root, session.StateDir, self)
 			if err != nil {
 				return err

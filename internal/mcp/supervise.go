@@ -53,6 +53,10 @@ func (s *Server) registerSupervision(srv *mcp.Server) {
 		Description: "Retrieve user decisions from the durable task ledger by task_id, " +
 			"oldest first. Use offset and limit to page through decisions omitted from the active context card.",
 	}, s.taskHistory)
+	mcp.AddTool(srv, &mcp.Tool{
+		Name:        "bc_task_verification",
+		Description: "Page historical verification runs for a task by task_id. The active card shows the latest run; use before and limit to recover older candidate-bound evidence without replaying the conversation.",
+	}, s.taskVerification)
 	mcp.AddTool(srv, &mcp.Tool{Name: "bc_task_memory", Description: "Page typed durable task claims and recover immutable evidence by hash. Older claims remain available outside active context."}, s.taskMemory)
 	mcp.AddTool(srv, &mcp.Tool{Name: "bc_task_memory_add", Description: "Record a model hypothesis, contradiction, pending action, or failure. The editor cannot assert a confirmed fact or supervisor decision."}, s.taskMemoryAdd)
 	mcp.AddTool(srv, &mcp.Tool{Name: "bc_task_fact", Description: "Confirm an exact quote in a permitted repository file and store immutable source evidence. Only this deterministic check can record a repository fact."}, s.taskFact)
@@ -130,11 +134,16 @@ func (s *Server) taskFact(ctx context.Context, _ *mcp.CallToolRequest, in factIn
 	if err != nil {
 		return fail("%v", err), nil, nil
 	}
+	phase, err := supervisor.CurrentPhase(ctx, sess.Store, in.TaskID)
+	if err != nil {
+		return fail("recording fact phase: %v", err), nil, nil
+	}
 	sum := sha256.Sum256(body)
 	fileHash := hex.EncodeToString(sum[:])
 	id, err := supervisor.RecordMemory(ctx, sess.Store, in.TaskID, supervisor.MemoryRecord{
-		Type: "repository_fact", Text: fmt.Sprintf("At observation time, %s contains exact quote %q", in.Path, in.Quote),
-		Evidence: hash, Path: in.Path, FileHash: fileHash,
+		Type: "repository_fact", Source: "repository", SourceTool: "bc_task_fact",
+		Text:     fmt.Sprintf("At observation time, %s contains exact quote %q", in.Path, in.Quote),
+		Evidence: hash, Path: in.Path, FileHash: fileHash, Repository: string(sess.Workspace.ID()), Phase: phase,
 	}, false)
 	if err != nil {
 		return fail("%v", err), nil, nil
@@ -187,7 +196,11 @@ func (s *Server) taskMemory(ctx context.Context, _ *mcp.CallToolRequest, in memo
 		fmt.Fprintf(&b, "Original objective: %s\n", objective)
 	}
 	for _, r := range rows {
-		fmt.Fprintf(&b, "#%d [%s] %s evidence=%s candidate=%s supersedes=%d\n", r.ID, r.Type, r.Text, r.Evidence, r.Candidate, r.Supersedes)
+		recorded := ""
+		if !r.RecordedAt.IsZero() {
+			recorded = r.RecordedAt.UTC().Format(time.RFC3339Nano)
+		}
+		fmt.Fprintf(&b, "#%d [%s; source=%s] %s evidence=%s candidate=%s supersedes=%d path=%s lines=%d-%d phase=%s recorded_at=%s\n", r.ID, r.Type, r.Source, r.Text, r.Evidence, r.Candidate, r.Supersedes, r.Path, r.StartLine, r.EndLine, r.Phase, recorded)
 	}
 	if rows == nil {
 		rows = []supervisor.MemoryRecord{}
@@ -253,15 +266,54 @@ func (s *Server) taskHistory(ctx context.Context, _ *mcp.CallToolRequest, in his
 	fmt.Fprintf(&b, "User decisions %d-%d of %d for task %s:\n", in.Offset, in.Offset+len(decisions), total, in.TaskID)
 	for i, d := range decisions {
 		fmt.Fprintf(&b, "%d. %s → %s\n", in.Offset+i, d.Question, d.Answer)
+		if d.Rationale != "" {
+			fmt.Fprintf(&b, "   Why: %s\n", d.Rationale)
+		}
 	}
 	return text(b.String()), nil, nil
 }
 
+type verificationIn struct {
+	TaskID string `json:"task_id" jsonschema:"the task ID returned by bc_task_start"`
+	Before int64  `json:"before,omitempty" jsonschema:"operation ID cursor; omit for the newest page"`
+	Limit  int    `json:"limit,omitempty" jsonschema:"number of verification runs, 1 to 20; defaults to 10"`
+	Path   string `json:"path,omitempty" jsonschema:"a subdirectory of the open repository; defaults to its root. Omit this — do not pass the repository's own absolute path"`
+}
+
+func (s *Server) taskVerification(ctx context.Context, _ *mcp.CallToolRequest, in verificationIn) (*mcp.CallToolResult, any, error) {
+	if in.TaskID == "" {
+		return fail("task_id is required"), nil, nil
+	}
+	if in.Limit == 0 {
+		in.Limit = 10
+	}
+	sess, err := s.resolve(ctx, in.Path)
+	if err != nil {
+		return fail("%v", err), nil, nil
+	}
+	defer sess.Close() //nolint:contextcheck // cleanup must not use a cancelled request context.
+	if _, err := task.NewStore(sess.Store).Get(ctx, in.TaskID); err != nil {
+		return fail("%v", err), nil, nil
+	}
+	page, total, err := supervisor.VerificationPage(ctx, sess.Store, in.TaskID, in.Before, in.Limit)
+	if err != nil {
+		return fail("reading verification history: %v", err), nil, nil
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "Verification history for task %s: %d run(s) total, %d returned newest first. Use an operation id as before for the next page.\\n", in.TaskID, total, len(page))
+	for _, rec := range page {
+		fmt.Fprintf(&b, "operation %d: accepted=%t candidate=%s level=%s phase=%s checks=%d reasons=%d\\n",
+			rec.ID, rec.Accepted, rec.Candidate, rec.Level, rec.Phase, len(rec.Checks), len(rec.Reasons))
+	}
+	return text(b.String()), map[string]any{"runs": page, "total": total}, nil
+}
+
 type answerIn struct {
-	TaskID   string `json:"task_id" jsonschema:"the id bc_task_start returned"`
-	Question string `json:"question" jsonschema:"what you asked the user"`
-	Answer   string `json:"answer" jsonschema:"what they said"`
-	Path     string `json:"path,omitempty" jsonschema:"a subdirectory of the open repository; defaults to its root. Omit this — do not pass the repository's own absolute path"`
+	TaskID    string `json:"task_id" jsonschema:"the id bc_task_start returned"`
+	Question  string `json:"question" jsonschema:"what you asked the user"`
+	Answer    string `json:"answer" jsonschema:"what they said"`
+	Rationale string `json:"rationale,omitempty" jsonschema:"why the answer is binding; preserve this rationale for later sessions"`
+	Path      string `json:"path,omitempty" jsonschema:"a subdirectory of the open repository; defaults to its root. Omit this — do not pass the repository's own absolute path"`
 }
 
 // taskAnswer is the division the protocol forces, made useful.
@@ -279,10 +331,10 @@ func (s *Server) taskAnswer(ctx context.Context, _ *mcp.CallToolRequest, in answ
 
 	// The answer is durable and is read back in the final review, so it goes
 	// through the same credential check as committed content.
-	if err := firewall.CheckContentSecrets("this answer", in.Question+"\n"+in.Answer); err != nil {
+	if err := firewall.CheckContentSecrets("this answer", in.Question+"\n"+in.Answer+"\n"+in.Rationale); err != nil {
 		return fail("%v", err), nil, nil
 	}
-	if err := supervisor.RecordAnswer(ctx, sess.Store, in.TaskID, in.Question, in.Answer); err != nil {
+	if err := supervisor.RecordAnswerWithRationale(ctx, sess.Store, in.TaskID, in.Question, in.Answer, in.Rationale); err != nil {
 		return fail("recording the decision: %v", err), nil, nil
 	}
 	return text("Recorded. It will appear in the task's final review and in its journal."), nil, nil
@@ -322,10 +374,11 @@ func (s *Server) taskFinish(ctx context.Context, _ *mcp.CallToolRequest, in fini
 // ------------------------------------------------------------ bc_task_start
 
 type startIn struct {
-	Objective    string   `json:"objective" jsonschema:"the user's original objective, concise but faithful"`
-	Requirements []string `json:"requirements,omitempty" jsonschema:"explicit user requirements and acceptance criteria that must survive compaction. Up to 20 items, each up to 2000 characters; quote the user's own wording rather than paraphrasing it down to fit"`
-	Constraints  []string `json:"constraints,omitempty" jsonschema:"explicit scope, security and performance constraints from the user. Up to 20 items, each up to 2000 characters; quote the user's own wording rather than paraphrasing it down to fit"`
-	NonGoals     []string `json:"non_goals,omitempty" jsonschema:"explicit things the user said this task should NOT do, so a later session does not reintroduce them as a missed requirement. Up to 20 items, each up to 2000 characters"`
+	Objective          string   `json:"objective" jsonschema:"the user's original objective, concise but faithful"`
+	Requirements       []string `json:"requirements,omitempty" jsonschema:"explicit user requirements that must survive compaction. Up to 20 items, each up to 2000 characters; quote the user's own wording rather than paraphrasing it down to fit"`
+	AcceptanceCriteria []string `json:"acceptance_criteria,omitempty" jsonschema:"explicit user acceptance criteria, kept distinct from requirements and preserved verbatim across sessions. Up to 20 items, each up to 2000 characters"`
+	Constraints        []string `json:"constraints,omitempty" jsonschema:"explicit scope, security and performance constraints from the user. Up to 20 items, each up to 2000 characters; quote the user's own wording rather than paraphrasing it down to fit"`
+	NonGoals           []string `json:"non_goals,omitempty" jsonschema:"explicit things the user said this task should NOT do, so a later session does not reintroduce them as a missed requirement. Up to 20 items, each up to 2000 characters"`
 	// WriteScope is §9.3's plan-scoped allowlist, declared before the work
 	// rather than discovered from the diff afterwards. An injected instruction
 	// cannot widen it: adding a path means opening another task, which is a
@@ -350,7 +403,7 @@ func (s *Server) taskStart(ctx context.Context, req *mcp.CallToolRequest, in sta
 	if strings.TrimSpace(in.Objective) == "" {
 		return fail("objective is required"), startOut{}, nil
 	}
-	if err := validateTaskDetails(in.Requirements, in.Constraints, in.NonGoals); err != nil {
+	if err := validateTaskDetails(in.Requirements, in.AcceptanceCriteria, in.Constraints, in.NonGoals); err != nil {
 		return fail("%v", err), startOut{}, nil
 	}
 	sess, err := s.resolve(ctx, in.Path)
@@ -374,8 +427,9 @@ func (s *Server) taskStart(ctx context.Context, req *mcp.CallToolRequest, in sta
 		return fail("finding original user prompt: %v", err), startOut{}, nil
 	}
 	if err := supervisor.RecordEvent(ctx, sess.Store, t.ID, ledger.KindSessionStart,
-		map[string]any{"objective": t.Title, "executor": "opencode", "session_id": openCodeSessionID(req),
-			"requirements": in.Requirements, "constraints": in.Constraints, "non_goals": in.NonGoals,
+		map[string]any{"objective": t.Title, "executor": "opencode", "phase": "EDITOR", "session_id": openCodeSessionID(req),
+			"requirements": in.Requirements, "acceptance_criteria": in.AcceptanceCriteria,
+			"constraints": in.Constraints, "non_goals": in.NonGoals,
 			"original_prompt_hash": promptHash}); err != nil {
 		return fail("recording the OpenCode session: %v", err), startOut{}, nil
 	}
@@ -411,7 +465,7 @@ func (s *Server) taskStart(ctx context.Context, req *mcp.CallToolRequest, in sta
 }
 
 // maxItemChars, maxItemsPerGroup and maxTotalChars bound one group of
-// requirements, constraints or non-goals.
+// requirements, acceptance criteria, constraints or non-goals.
 //
 // maxItemChars used to be 500: tight enough that a real acceptance criterion
 // or security constraint routinely exceeded it, forcing the model to
@@ -432,12 +486,12 @@ func validateTaskDetails(groups ...[]string) error {
 	total := 0
 	for _, group := range groups {
 		if len(group) > maxItemsPerGroup {
-			return fmt.Errorf("at most %d requirements, constraints or non-goals are allowed per group, got %d",
+			return fmt.Errorf("at most %d requirements, acceptance criteria, constraints or non-goals are allowed per group, got %d",
 				maxItemsPerGroup, len(group))
 		}
 		for i, item := range group {
 			if strings.TrimSpace(item) == "" {
-				return fmt.Errorf("item %d is empty; each requirement, constraint or non-goal needs text", i+1)
+				return fmt.Errorf("item %d is empty; each requirement, acceptance criterion, constraint or non-goal needs text", i+1)
 			}
 			if len(item) > maxItemChars {
 				return fmt.Errorf(
@@ -449,7 +503,7 @@ func validateTaskDetails(groups ...[]string) error {
 		}
 	}
 	if total > maxTotalChars {
-		return fmt.Errorf("requirements, constraints and non-goals together are %d characters, over the "+
+		return fmt.Errorf("requirements, acceptance criteria, constraints and non-goals together are %d characters, over the "+
 			"%d-character budget across all of them combined; trim redundant wording across items rather "+
 			"than any single one, or split this into a follow-up task for the items that do not fit",
 			total, maxTotalChars)
@@ -458,11 +512,12 @@ func validateTaskDetails(groups ...[]string) error {
 }
 
 type resumeIn struct {
-	TaskID       string   `json:"task_id" jsonschema:"the task ID returned by bc_task_start"`
-	Requirements []string `json:"requirements,omitempty" jsonschema:"explicit user criteria to recover when an older task did not record them at start. Up to 20 items, each up to 2000 characters; quote the user's own wording rather than paraphrasing it down to fit"`
-	Constraints  []string `json:"constraints,omitempty" jsonschema:"explicit user constraints to recover when an older task did not record them at start. Up to 20 items, each up to 2000 characters; quote the user's own wording rather than paraphrasing it down to fit"`
-	NonGoals     []string `json:"non_goals,omitempty" jsonschema:"explicit non-goals to recover when an older task did not record them at start. Up to 20 items, each up to 2000 characters"`
-	Path         string   `json:"path,omitempty" jsonschema:"a subdirectory of the open repository; defaults to its root. Omit this — do not pass the repository's own absolute path"`
+	TaskID             string   `json:"task_id" jsonschema:"the task ID returned by bc_task_start"`
+	Requirements       []string `json:"requirements,omitempty" jsonschema:"explicit user requirements to recover when an older task did not record them at start. Up to 20 items, each up to 2000 characters; quote the user's own wording rather than paraphrasing it down to fit"`
+	AcceptanceCriteria []string `json:"acceptance_criteria,omitempty" jsonschema:"explicit user acceptance criteria to recover when an older task did not record them at start. Up to 20 items, each up to 2000 characters"`
+	Constraints        []string `json:"constraints,omitempty" jsonschema:"explicit user constraints to recover when an older task did not record them at start. Up to 20 items, each up to 2000 characters; quote the user's own wording rather than paraphrasing it down to fit"`
+	NonGoals           []string `json:"non_goals,omitempty" jsonschema:"explicit non-goals to recover when an older task did not record them at start. Up to 20 items, each up to 2000 characters"`
+	Path               string   `json:"path,omitempty" jsonschema:"a subdirectory of the open repository; defaults to its root. Omit this — do not pass the repository's own absolute path"`
 }
 
 func openCodeSessionID(req *mcp.CallToolRequest) string {
@@ -477,7 +532,7 @@ func openCodeSessionID(req *mcp.CallToolRequest) string {
 }
 
 func (s *Server) taskResume(ctx context.Context, req *mcp.CallToolRequest, in resumeIn) (*mcp.CallToolResult, any, error) {
-	if err := validateTaskDetails(in.Requirements, in.Constraints, in.NonGoals); err != nil {
+	if err := validateTaskDetails(in.Requirements, in.AcceptanceCriteria, in.Constraints, in.NonGoals); err != nil {
 		return fail("%v", err), nil, nil
 	}
 	id := openCodeSessionID(req)
@@ -494,8 +549,9 @@ func (s *Server) taskResume(ctx context.Context, req *mcp.CallToolRequest, in re
 		return fail("task %q is not an unfinished supervised task", in.TaskID), nil, nil
 	}
 	if err := supervisor.RecordEvent(ctx, sess.Store, t.ID, ledger.KindSessionStart,
-		map[string]any{"objective": t.Title, "executor": "opencode", "session_id": id, "resumed": true,
-			"requirements": in.Requirements, "constraints": in.Constraints, "non_goals": in.NonGoals}); err != nil {
+		map[string]any{"objective": t.Title, "executor": "opencode", "phase": "EDITOR", "session_id": id, "resumed": true,
+			"requirements": in.Requirements, "acceptance_criteria": in.AcceptanceCriteria,
+			"constraints": in.Constraints, "non_goals": in.NonGoals}); err != nil {
 		return fail("recording session resume: %v", err), nil, nil
 	}
 	return text("Session bound to task " + t.ID + ". Its durable state will appear in subsequent model requests."), nil, nil

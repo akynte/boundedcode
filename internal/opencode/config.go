@@ -60,7 +60,7 @@ func InstallPlugin(stateDir string) (dir string, changed bool, err error) {
 }
 
 // RegisterContextPolicy installs the OpenCode 2 adapter and a compaction
-// policy that fits the reference 32K Bonsai slot. OpenCode 2.0.15 otherwise
+// policy that fits the reference 32K Bonsai slot. OpenCode 2 otherwise
 // retains 15K tokens after compacting while its 20K buffer triggers at 12.8K.
 //
 // The retained-tail setting is not a hard request-size limit in OpenCode: its
@@ -281,6 +281,23 @@ const ProviderName = "boundedcode-local"
 // made a decision, and quietly replacing it with a local endpoint would be the
 // kind of helpfulness that loses someone's configuration.
 func RegisterModel(repoRoot, baseURL, model string) (path string, changed bool, err error) {
+	return RegisterModelWithLimits(repoRoot, baseURL, model, 32768, 8192)
+}
+
+// RegisterModelWithLimits is the profile-aware form of RegisterModel. The
+// active hardware profile owns the physical context and output reservation;
+// OpenCode must advertise those same values or its compaction threshold is
+// calculated against a window the server does not have.
+func RegisterModelWithLimits(repoRoot, baseURL, model string, contextTokens, outputTokens int) (path string, changed bool, err error) {
+	if contextTokens <= 0 {
+		contextTokens = 32768
+	}
+	if outputTokens <= 0 || outputTokens >= contextTokens {
+		outputTokens = 8192
+		if outputTokens >= contextTokens {
+			outputTokens = contextTokens / 2
+		}
+	}
 	if baseURL == "" || model == "" {
 		return filepath.Join(repoRoot, "opencode.json"), false, nil
 	}
@@ -320,7 +337,7 @@ func RegisterModel(repoRoot, baseURL, model string) (path string, changed bool, 
 				"input":  []any{"text"},
 				"output": []any{"text"},
 			}
-			modelConfig["limit"] = map[string]any{"context": 32768, "output": 8192}
+			modelConfig["limit"] = map[string]any{"context": contextTokens, "output": outputTokens}
 			// Bonsai defaults to an xhigh thinking mode. In OpenCode that mode
 			// can spend the complete output allowance before emitting a tool
 			// call or a final answer; the native BoundedCode loop detects that,

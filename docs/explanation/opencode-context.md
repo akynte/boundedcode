@@ -8,8 +8,10 @@ verification, repository indexing and the checkout.
 
 ## Measured failure and cause
 
-The installed OpenCode is **v2.0.15**, source tag
-[`6f3639d82ed0760091792189b78f8eeb44f699b1`](https://github.com/anomalyco/opencode/tree/v2.0.15).
+The installed OpenCode is **v2.0.16** in the current end-to-end harness. The
+original failure was reproduced under v2.0.15, source tag
+[`6f3639d82ed0760091792189b78f8eeb44f699b1`](https://github.com/anomalyco/opencode/tree/v2.0.15);
+the compaction defaults and failure mechanism are unchanged by the adapter.
 The local PrismML fork is `9a9394a895b96003ca842a6041cb28ac49a108f7`.
 In one recorded OpenCode session (`ses_f2f84cd65ffeexMhj9iGFhGTLm`), five
 automatic compactions completed during a short codebase investigation. They
@@ -61,19 +63,26 @@ length-finished answerless response and injects at most two synthetic recovery
 prompts, so a provider or model that still truncates cannot leave the session
 silently idle or create an unbounded prompt loop.
 
-The project OpenCode plugin invokes `bcode opencode context --session <id>` at
-each primary model request. That Go command reconstructs a small card from the
-workspace ledger and current checkout. It contains the original supervised
-objective, explicit requirements, constraints and non-goals passed to
-`bc_task_start`, recorded user decisions, changed files and last verification
-result. The
-active card limits the decision tail to about 3 KB and the changed-path list
-to about 2 KB; it reports omitted counts. `bc_task_history` pages older user
-decisions from the ledger by task ID, and `git status` recovers the full changed
-path list. Other large task fields, especially an unusually long original
-objective or write scope, are not yet subject to a total card limit.
-The
-OpenCode session ID arrives with MCP calls in
+The project OpenCode plugin invokes the workspace broker (or
+`bcode opencode context --session <id>` outside confinement) at each primary
+model request. That Go command reconstructs a small card from the workspace
+ledger and current checkout. It contains the original supervised objective,
+explicit requirements, verbatim acceptance criteria, constraints and non-goals
+passed to `bc_task_start`, the current phase and required verification level,
+recorded user decisions and rationales, changed files, candidate-bound
+verification state, and typed task memory. Evidence-bearing observations carry
+their source tool, repository identity, path, line range, phase, timestamp and
+artifact hash; the full bytes are recoverable with `bc_task_memory`.
+
+The active card has a hard 12 KiB admission limit. It retains the durable
+priority prefix, limits the decision tail and changed-path list, drops older
+noisy observations, and tells the model which paging tool to use for omitted
+state. `bc_task_history` pages older user decisions, and
+`bc_task_verification` pages older candidate-bound verification runs. A
+verification result is never presented as current after a checkout change: the
+card labels it historical and requires a new `bc_verify`.
+
+The OpenCode session ID arrives with MCP calls in
 `_meta["ai.opencode/sessionID"]`; `bc_task_start` records the binding.
 `bc_task_resume` explicitly binds a new session when several unfinished tasks
 exist. When exactly one unfinished task exists, a new session finds it without
@@ -88,25 +97,33 @@ output limit above keeps that exchange bounded. The next primary request
 receives a new ledger card. Current unrecorded reasoning or tool output outside
 that tail still has to be recovered from repository evidence.
 
-The card does **not** yet capture every fact encountered in OpenCode's read and
-search results. Those results remain in OpenCode's stored history and the
-repository can be searched again, but a model may fail to recall that it needs
-to do so. The editor supervision path also does not inherit the native task
-runner's phase cards. A user can record a consequential clarification with
-`bc_task_answer`; the agent should pass explicit acceptance criteria and scope
-limits to `bc_task_start` at the beginning. Therefore the current system should
-not claim lossless memory or guaranteed absence of semantic drift.
+The card does not automatically turn every arbitrary read/search result into
+an authoritative fact. That is intentional: repository facts require
+`bc_task_fact` with an exact quote, while reads remain typed tool observations
+with recoverable evidence hashes. The editor supervision path records its phase
+as `EDITOR`; native workflow tasks retain their `task_workflow` phase. A user
+can record a consequential clarification and rationale with `bc_task_answer`.
+The remaining limitation is model behavior: a model can fail to request old
+evidence, so the system provides bounded, queryable recovery rather than
+claiming guaranteed absence of semantic drift.
 
-The regular `bcode opencode` path was validated. The confined
-`bcode opencode run` path is now also validated end to end, in a disposable
-test repository outside this checkout: a loopback broker
+The regular `bcode opencode` path is unchanged. The confined
+`bcode opencode run` path uses a loopback broker
 (`cmd/bcode/opencode_broker.go`), authenticated by a random per-run capability
-and pinned to one workspace's `Store`, gives the sandboxed `bcode opencode
-context`/`record-prompt` invocations the per-workspace state channel this
-section used to say was missing. `TestBrokerPinsWorkspaceAndPrompt` covers
-capability forgery and cross-workspace isolation; `TestOpenCodeContextSurvivesSessionRecreation`
-covers same-workspace task isolation (an unbound session with two active
-tasks is refused rather than guessed at).
+and pinned to one workspace's `Store`, for the plugin's context and raw-prompt
+operations. This removes the confined process's need to spawn a second `bcode`
+CLI for those operations; the real executable directory remains a read-only PATH
+fallback for reconnects. `TestBrokerPinsWorkspaceAndPrompt` covers capability
+forgery and cross-workspace isolation; `TestOpenCodeContextSurvivesSessionRecreation`
+covers same-workspace task isolation (an unbound session with two active tasks
+is refused rather than guessed at).
+
+The repository now includes `scripts/bench-opencode-continuation.py`, which
+runs a disposable two-session OpenCode task through the confined launcher and
+records session IDs, compactions, turns, tool calls, token usage and completion
+status. A timeout or a task without a final review is a failed run. The current
+Bonsai run is recorded below rather than being presented as a success merely
+because a durable task was created.
 
 **A separate defect masked this for every project other than BoundedCode's own
 checkout.** `RegisterContextPolicy` wrote the context/compaction plugin at
@@ -141,6 +158,37 @@ a foreign-key storage error on this fresh, never-indexed workspace. Recorded
 here rather than investigated; it is an indexing-subsystem bug, not a context
 or confinement one, and the model correctly treated it as non-blocking via a
 recorded `tool_observation` rather than stalling on it.)
+
+## Current harness result — 2026-09-24
+
+The strict continuation harness was run against the current 32K/Q8 Bonsai
+server with a disposable Git repository and the confined launcher:
+
+```text
+python3 scripts/bench-opencode-continuation.py --output /tmp/opencode-continuation-report-420.json --timeout 420
+```
+
+The run succeeded end to end. The first session opened task
+`oc-1790253081-xemw`, inspected both source files, recorded a repository fact,
+a model hypothesis and a pending action, edited only `calc.go`, and verified
+successfully. It was intentionally left unfinished. It used 9 assistant turns,
+12 tool calls, 0 compactions, 20,158 input tokens and 1,097 output tokens in
+119.243 seconds. A fresh OpenCode process then called `bc_task_resume` for the
+same task, recovered the ledger state without replaying the old transcript,
+reverified the current checkout, called `bc_task_finish`, and produced a
+`FINAL REVIEW` with `Status: VERIFIED`. The fresh session used 5 assistant
+turns, 4 tool calls, 0 compactions, 34,324 input tokens and 317 output tokens
+in 135.681 seconds. Time to correct completion was 254.924 seconds; total
+product activity was 14 model turns and 16 tool calls. No reasoning tokens
+were used.
+
+This proves disposable OpenCode session state for this representative task,
+not arbitrary task quality or long-history retention: the run did not trigger
+compaction, and it was not run with the optional tokenizer-category budget
+recording. The deterministic Go tests prove bounded active context, ledger-only
+reconstruction, candidate-bound verification paging and cross-session binding.
+Use `--budget` and `--drift` for the corresponding product measurements; a
+timeout remains a failure rather than a partial success.
 
 ## Effective window
 
@@ -183,15 +231,37 @@ supervised task in this session.
 
 Run `scripts/bench-opencode-context.py --prompt '...'` from the project with
 OpenCode, BoundedCode and the local Prism server configured. The script drives
-`opencode run --standalone` and reads OpenCode's own session database afterward.
-It reports input/output tokens, compaction events, elapsed request time,
-end-to-end output tokens per second, and sampled GPU/RAM use. It never calls the
-model server directly. `--session <id>` analyzes an existing OpenCode session.
+OpenCode and reads OpenCode's own session database afterward. It reports
+input/output tokens, compaction events, elapsed request time, end-to-end output
+tokens per second, and sampled GPU/RAM use. It never calls the model server
+directly. `--session <id>` analyzes an existing OpenCode session.
+
+Run `scripts/bench-opencode-continuation.py --budget --output report.json` for
+product-level two-session test and exact request-category accounting. Add
+`--drift` for the long-history scenario:
+it seeds a noisy history, an old security constraint, an old acceptance
+criterion, a superseded decision, a confirmed repository invariant, an open
+failure, and an explicitly out-of-scope file. It creates a disposable repository,
+performs an initial supervised coding turn without finishing, starts a fresh
+confined OpenCode process, resumes the same task and requires a final verified
+review. It fails on timeout, missing task identity, missing final review, or a
+process that exits unsuccessfully. `--timeout` must be long enough for the local
+model; a short run is diagnostic data, not a completion result.
+
+With `bcode opencode run --budget`, the context plugin writes
+`boundedcode-budget.jsonl` using the runtime `/tokenize` endpoint. It records
+Prism-token counts for OpenCode/system instructions, AGENTS instructions, MCP
+and built-in schemas, BoundedCode context, conversation tail, tool results,
+retrieved repository evidence, compaction checkpoints, and residual
+provider/serialization overhead. This answers both why a request compacted and
+what consumed its window; it is diagnostic accounting, not a claim that
+component counts include chat-template overhead exactly.
+
 For a repeatable compaction check, give a coding prompt that grows the session
-through tool reads and add `--min-compactions 1 --reject-immediate-recompaction`.
-The check fails if OpenCode compacts twice without an intervening assistant
-model step; it does not prove that later compactions cannot recur after more
-tool output.
+through tool reads and add `--min-compactions 1
+--reject-immediate-recompaction`. The check fails if OpenCode compacts twice
+without an intervening assistant model step; it does not prove that later
+compactions cannot recur after more tool output.
 
 The pre-change session above recorded 24.07 and 25.30 end-to-end output
 tokens/s on two 1,000+ token steps, and five compactions. These rates include

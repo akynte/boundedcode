@@ -41,8 +41,10 @@ type Session struct {
 	// BrokerCapability authenticates access to this run's workspace-pinned
 	// loopback supervisor, without exposing the ledger data root.
 	BrokerCapability string
-	BCodeBinDir      string
-	Budget           bool
+	// BCodeBinDir is prepended to PATH. It may contain the private per-session
+	// symlink followed by the real executable directory as a fallback.
+	BCodeBinDir string
+	Budget      bool
 }
 
 // Confine derives the session's sandbox spec from the supervisor's base spec.
