@@ -243,24 +243,30 @@ func RegisterModel(repoRoot, baseURL, model string) (path string, changed bool, 
 			"settings": map[string]any{"baseURL": strings.TrimSuffix(baseURL, "/") + "/v1"},
 			"models":   map[string]any{id: modelConfig},
 		}
-		if equalJSON(providers[ProviderName], want) && doc["model"] == ProviderName+"/"+id {
-			return false
+		changed := false
+		if !equalJSON(providers[ProviderName], want) || doc["model"] != ProviderName+"/"+id {
+			providers[ProviderName] = want
+			doc["providers"] = providers
+			doc["model"] = ProviderName + "/" + id
+			changed = true
 		}
-		providers[ProviderName] = want
-		doc["providers"] = providers
 		// Remove only our generated V1 entry. Other V1 provider entries may
 		// still be used by the developer and remain intact for OpenCode's
-		// compatibility layer.
+		// compatibility layer. This runs even when the V2 entry above was
+		// already current, so a stale V1 duplicate left by an older setup
+		// (or a hand-edited config) still gets cleaned up on the next run.
 		if legacy, ok := doc["provider"].(map[string]any); ok {
-			delete(legacy, ProviderName)
-			if len(legacy) == 0 {
-				delete(doc, "provider")
-			} else {
-				doc["provider"] = legacy
+			if _, has := legacy[ProviderName]; has {
+				delete(legacy, ProviderName)
+				if len(legacy) == 0 {
+					delete(doc, "provider")
+				} else {
+					doc["provider"] = legacy
+				}
+				changed = true
 			}
 		}
-		doc["model"] = ProviderName + "/" + id
-		return true
+		return changed
 	})
 }
 

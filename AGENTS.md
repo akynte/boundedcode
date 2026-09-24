@@ -3,6 +3,8 @@
 
 A compiler-backed index of this repository is available through the `boundedcode` MCP tools: 11259 symbols and 32397 relationships, built from the source rather than from search.
 
+Use each tool in its documented language: if `execute` evaluates JavaScript, write JavaScript there and run Python through the shell. After the work is complete, send the user a concise final answer; reasoning without a final response is not a result.
+
 Any task that changes code runs under supervision: open it with `bc_task_start`, do the work with your own tools, ask the user anything you cannot safely infer, then `bc_verify` and `bc_task_finish`. You edit and you talk to the user; BoundedCode records what happened and judges the result.
 
 Prefer these over text search when the question is structural, because they answer from the type checker instead of from string matching:
@@ -10,7 +12,9 @@ Prefer these over text search when the question is structural, because they answ
 - **`bc_graph_impact`** before changing any signature, exported name or schema. It reports every consumer, how each was discovered, and whether the change breaks it. Grep finds call sites that look alike; this finds the ones that are.
 - **`bc_search`** to locate the code behind a question — "where is X handled", "how does Y work". It returns the files and symbols the supervisor's own retrieval would select, so start there and read the files normally.
 - **`bc_status`** when answers look stale. It reports how far the index has drifted from the working tree.
-- **`bc_task_start`** before implementing, fixing or refactoring anything. It opens a supervised task, journals the intent before the work, and tells you which paths this repository protects — which is cheaper to learn before editing than after.
+- **`bc_task_start`** before implementing, fixing or refactoring anything. Include the user's explicit acceptance criteria in `requirements` and scope or security limits in `constraints`; these survive OpenCode compaction and session recreation. It opens a supervised task, journals the intent before the work, and tells you which paths this repository protects — which is cheaper to learn before editing than after.
+- **`bc_task_resume`** when a new OpenCode session must continue one of several active supervised tasks. Pass the existing task id; the supervisor binds this session to its durable objective, requirements, decisions and verification.
+- **`bc_task_history`** to page through older user decisions when the active task card says some decisions were omitted. Use the task id and offset.
 - **`bc_verify`** when you believe the change is complete. It runs this repository's checks in a sandbox and applies the completion contract, tying every result to the exact content hash it describes. It decides whether the work is done; your own reading of the code does not. If it reports failures, fix them and call it again — do not tell the user the work is finished until it says ACCEPTED.
 - **`bc_task_answer`** whenever the user resolves something you could not infer from the codebase — a business rule, an architectural choice, a limit. Pass the task id. The answer becomes part of this project's record instead of being lost with the conversation.
 - **`bc_task_finish`** once verification is ACCEPTED. It produces the final review — what was asked, what the user decided, which files changed, what was checked — and you should show that to the user. No approval is needed: the change is already in the working tree and `git diff` is the authoritative view of it.

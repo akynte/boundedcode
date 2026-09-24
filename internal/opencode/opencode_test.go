@@ -145,6 +145,65 @@ func TestRegisterMCPMergesIntoAnExistingConfig(t *testing.T) {
 	}
 }
 
+// A stale V1 "provider" entry left behind by an older setup, or restored by a
+// hand edit, must be cleaned up even when the current V2 "providers" entry and
+// "model" are already correct — otherwise OpenCode is left with two
+// conflicting registrations for the same provider indefinitely.
+func TestRegisterModelRemovesAStaleV1EntryEvenWhenV2IsAlreadyCurrent(t *testing.T) {
+	repo := t.TempDir()
+	if _, _, err := opencode.RegisterModel(repo, "http://127.0.0.1:8080", "boundedcode-bonsai.gguf"); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(repo, "opencode.json")
+	body, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var doc map[string]any
+	if err := json.Unmarshal(body, &doc); err != nil {
+		t.Fatal(err)
+	}
+	// Simulate drift: a legacy V1 "provider" block for the same provider name
+	// reappears (e.g. from a hand edit), while V2 is untouched and current.
+	doc["provider"] = map[string]any{
+		opencode.ProviderName: map[string]any{"name": "Local (via boundedcode)", "npm": "@ai-sdk/openai-compatible"},
+	}
+	out, err := json.Marshal(doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, out, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, changed, err := opencode.RegisterModel(repo, "http://127.0.0.1:8080", "boundedcode-bonsai.gguf"); err != nil {
+		t.Fatal(err)
+	} else if !changed {
+		t.Fatal("the stale V1 entry was left in place and reported no change")
+	}
+
+	body, err = os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc = map[string]any{}
+	if err := json.Unmarshal(body, &doc); err != nil {
+		t.Fatal(err)
+	}
+	if legacy, ok := doc["provider"].(map[string]any); ok {
+		if _, has := legacy[opencode.ProviderName]; has {
+			t.Errorf("the stale V1 provider entry survived: %s", body)
+		}
+	}
+	providers, ok := doc["providers"].(map[string]any)
+	if !ok {
+		t.Fatalf("the V2 providers entry was lost:\n%s", body)
+	}
+	if _, ok := providers[opencode.ProviderName]; !ok {
+		t.Errorf("the V2 provider entry was lost:\n%s", body)
+	}
+}
+
 func TestContextPolicyFitsTheBonsaiWindowAndIsIdempotent(t *testing.T) {
 	repo := t.TempDir()
 	if _, _, err := opencode.RegisterModel(repo, "http://127.0.0.1:8080", "Ternary-Bonsai-2-27B-PTQ1_0.gguf"); err != nil {
