@@ -2,6 +2,7 @@ package supervisor
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"os/exec"
@@ -65,9 +66,11 @@ type Decision struct {
 
 // CheckResult is one verification recipe's verdict, flattened for a reader.
 type CheckResult struct {
-	Name     string `json:"name"`
-	Status   string `json:"status"`
-	Headline string `json:"headline"`
+	Name      string      `json:"name"`
+	Kind      recipe.Kind `json:"kind,omitempty"`
+	Status    string      `json:"status"`
+	Headline  string      `json:"headline"`
+	Candidate string      `json:"candidate,omitempty"`
 }
 
 // StartTask opens a supervised task and journals the intent before any work.
@@ -85,7 +88,7 @@ func StartTask(ctx context.Context, st *store.Store, objective string, level rec
 		Title:        objective,
 		Kind:         "supervised",
 		Verification: level,
-		Budget:       task.Budget{MaxAttempts: 1, MaxWallTime: 30 * time.Minute},
+		Budget:       task.Budget{MaxAttempts: 3, MaxWallTime: 30 * time.Minute},
 	}
 	if err := task.NewStore(st).Create(ctx, t); err != nil {
 		return task.Task{}, err
@@ -104,12 +107,35 @@ func StartTask(ctx context.Context, st *store.Store, objective string, level rec
 // protect. What it preserves is the sequence, which is what makes a session
 // reconstructable afterwards.
 func RecordEvent(ctx context.Context, st *store.Store, taskID string, kind ledger.Kind, detail any) error {
+	return RecordEventCandidate(ctx, st, taskID, kind, detail, "")
+}
+
+// RecordEventCandidate is the event form used when a task needs an initial
+// candidate identity. The operation column is part of the recovery chain, not
+// just presentation: without it, an editor task cannot distinguish a clean
+// no-op from changes that predated the task.
+func RecordEventCandidate(ctx context.Context, st *store.Store, taskID string, kind ledger.Kind, detail any, candidate string) error {
 	l := ledger.New(st)
-	h, err := l.Begin(ctx, taskID, kind, detail, "")
+	h, err := l.Begin(ctx, taskID, kind, detail, candidate)
 	if err != nil {
 		return err
 	}
-	return h.Complete(ctx, detail, "", "")
+	return h.Complete(ctx, detail, candidate, "")
+}
+
+// InitialCandidate returns the candidate recorded when an editor task opened.
+// A missing row is possible for tasks created by older builds; callers must
+// apply their compatibility policy rather than treating missing as clean.
+func InitialCandidate(ctx context.Context, st *store.Store, taskID string) (string, error) {
+	var candidate string
+	err := st.Ledger().SQL().QueryRowContext(ctx, `
+		SELECT COALESCE(candidate_before, '') FROM operations
+		WHERE task_id=? AND kind='session_start' AND candidate_before IS NOT NULL AND candidate_before != ''
+		ORDER BY id LIMIT 1`, taskID).Scan(&candidate)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	return candidate, err
 }
 
 // RecordAnswer stores a question the executor asked the user and the answer it
@@ -200,12 +226,14 @@ func RecordVerification(ctx context.Context, st *store.Store, taskID string, o *
 		Phase: "VERIFY", RecordedAt: time.Now().UTC(),
 		Reasons: o.Reasons, OutOfScope: o.OutOfScope,
 	}
-	if t, err := task.NewStore(st).Get(ctx, taskID); err == nil {
+	if o.VerificationLevel != "" {
+		rec.Level = string(o.VerificationLevel)
+	} else if t, err := task.NewStore(st).Get(ctx, taskID); err == nil {
 		rec.Level = string(t.Verification)
 	}
 	for _, r := range o.Results {
 		rec.Checks = append(rec.Checks, CheckResult{
-			Name: r.Recipe, Status: string(r.Status), Headline: r.Summary.Headline,
+			Name: r.Recipe, Kind: r.Kind, Status: string(r.Status), Headline: r.Summary.Headline, Candidate: r.Candidate,
 		})
 	}
 	return RecordEvent(ctx, st, taskID, ledger.KindRecipeRun, rec)
@@ -236,6 +264,31 @@ func LastVerification(ctx context.Context, st *store.Store, taskID string) (Veri
 	return latest, found, nil
 }
 
+// ControlledChangedFiles returns paths changed through the supervisor's
+// intent-first edit operations. Git status also contains workspace setup files
+// and pre-existing operator changes; those are not edits owned by this task.
+func ControlledChangedFiles(ctx context.Context, st *store.Store, taskID string) ([]string, error) {
+	rows, err := st.Ledger().SQL().QueryContext(ctx, `
+		SELECT DISTINCT json_extract(intent, '$.path')
+		FROM operations
+		WHERE task_id=? AND kind='edit' AND outcome IS NOT NULL
+		  AND json_valid(intent) AND json_extract(intent, '$.path') != ''
+		ORDER BY json_extract(intent, '$.path')`, taskID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var path string
+		if err := rows.Scan(&path); err != nil {
+			return nil, err
+		}
+		out = append(out, path)
+	}
+	return out, rows.Err()
+}
+
 // FinishTask closes a supervised task and produces its final review.
 //
 // The verdict comes from the verification that was actually run, not from the
@@ -257,11 +310,31 @@ func FinishTask(ctx context.Context, st *store.Store, repoRoot, taskID string) (
 	if err != nil {
 		return Review{}, err
 	}
+	currentCandidate, candidateErr := ledger.ContentManifest(repoRoot)
+	if candidateErr != nil {
+		return Review{}, fmt.Errorf("supervisor: fingerprint current candidate: %w", candidateErr)
+	}
+	checksOK, checksWhy := verificationChecksSatisfy(verified, t.Verification)
 	switch {
 	case !ok:
 		rev.Verdict = "UNVERIFIED"
 		rev.Warnings = append(rev.Warnings,
 			"this task was finished without a verification run, so nothing checked the work")
+	case verified.Candidate == "" || verified.Candidate != currentCandidate:
+		rev.Verdict = "NOT VERIFIED"
+		rev.Warnings = append(rev.Warnings,
+			fmt.Sprintf("the last verification described candidate %s, but the current checkout is %s; reverify after every edit", shortCandidate(verified.Candidate), shortCandidate(currentCandidate)))
+	case !verificationLevelSatisfies(verified.Level, t.Verification):
+		rev.Verdict = "NOT VERIFIED"
+		rev.Warnings = append(rev.Warnings,
+			fmt.Sprintf("the last verification used level %q, below the task's required level %q", verified.Level, t.Verification))
+	case len(verified.Checks) == 0:
+		rev.Verdict = "NOT VERIFIED"
+		rev.Warnings = append(rev.Warnings,
+			"the last verification record has no objective check results")
+	case !checksOK:
+		rev.Verdict = "NOT VERIFIED"
+		rev.Warnings = append(rev.Warnings, checksWhy)
 	case verified.Accepted:
 		rev.Verdict = "VERIFIED"
 	default:
@@ -271,16 +344,73 @@ func FinishTask(ctx context.Context, st *store.Store, repoRoot, taskID string) (
 	rev.Checks = verified.Checks
 	rev.Protected = verified.OutOfScope
 
-	rev.FilesChanged = changedFiles(ctx, repoRoot)
-	rev.FilesChangedCount = len(rev.FilesChanged)
-	if rev.FilesChangedCount == 0 {
-		rev.Warnings = append(rev.Warnings,
-			"the working tree is unchanged: this task recorded no edits")
+	var statusErr error
+	statusFiles, statusErr := changedFiles(ctx, repoRoot)
+	if statusErr != nil {
+		rev.Verdict = "NOT VERIFIED"
+		rev.Warnings = append(rev.Warnings, "could not inspect the candidate diff: "+statusErr.Error())
+	} else {
+		controlledFiles, controlledErr := ControlledChangedFiles(ctx, st, taskID)
+		if controlledErr != nil {
+			rev.Verdict = "NOT VERIFIED"
+			rev.Warnings = append(rev.Warnings, "could not read the task's controlled edit journal: "+controlledErr.Error())
+		} else if initial, initialErr := InitialCandidate(ctx, st, taskID); initialErr == nil && initial != "" {
+			rev.FilesChanged = controlledFiles
+			if len(controlledFiles) == 0 && currentCandidate != initial {
+				rev.Verdict = "NOT VERIFIED"
+				rev.Warnings = append(rev.Warnings,
+					"the candidate changed outside the controlled edit journal; BoundedCode cannot attribute that change to this task")
+			}
+		} else {
+			// Compatibility for tasks created before initial-candidate journaling
+			// and for native callers that do not use the editor lifecycle.
+			rev.FilesChanged = statusFiles
+		}
+		rev.FilesChangedCount = len(rev.FilesChanged)
+		if rev.FilesChangedCount == 0 {
+			rev.Warnings = append(rev.Warnings,
+				"the working tree has no task-owned edits")
+		}
 	}
-	if violations := protectedViolations(repoRoot, rev.FilesChanged); len(violations) > 0 {
-		rev.Protected = append(rev.Protected, violations...)
+	if t.Budget.MaxWallTime > 0 && time.Since(t.CreatedAt) > t.Budget.MaxWallTime {
+		rev.Verdict = "NOT VERIFIED"
 		rev.Warnings = append(rev.Warnings,
-			"files this repository protects were changed; review them before committing")
+			"the task exceeded its wall-clock budget; the supervisor will not accept a late candidate")
+	}
+
+	initialCandidate, initialErr := InitialCandidate(ctx, st, taskID)
+	if initialErr != nil {
+		rev.Verdict = "NOT VERIFIED"
+		rev.Warnings = append(rev.Warnings, "could not read the task's initial candidate: "+initialErr.Error())
+	} else if t.Kind != "verification" && initialCandidate != "" && currentCandidate == initialCandidate {
+		rev.Verdict = "NOT VERIFIED"
+		rev.Warnings = append(rev.Warnings,
+			"the task changed nothing from the candidate recorded when it opened; verification only describes the baseline")
+	}
+
+	if len(t.Budget.Scope) > 0 {
+		var outside []string
+		for _, path := range rev.FilesChanged {
+			if !policy.Covers(t.Budget.Scope, path) {
+				outside = append(outside, path)
+			}
+		}
+		if len(outside) > 0 {
+			rev.Verdict = "NOT VERIFIED"
+			rev.Warnings = append(rev.Warnings,
+				"files changed outside the task's declared write scope: "+strings.Join(outside, ", "))
+		}
+	}
+
+	violations, policyErr := protectedViolations(repoRoot, rev.FilesChanged)
+	if policyErr != nil {
+		rev.Verdict = "NOT VERIFIED"
+		rev.Warnings = append(rev.Warnings, "repository policy could not be evaluated: "+policyErr.Error())
+	} else if len(violations) > 0 {
+		rev.Protected = append(rev.Protected, violations...)
+		rev.Verdict = "NOT VERIFIED"
+		rev.Warnings = append(rev.Warnings,
+			"files this repository protects were changed; the task cannot be accepted")
 	}
 
 	if err := RecordEvent(ctx, st, taskID, ledger.KindReview, rev); err != nil {
@@ -303,14 +433,14 @@ func FinishTask(ctx context.Context, st *store.Store, repoRoot, taskID string) (
 //
 // git is the source of truth for what changed: the executor's account of which
 // files it touched is a claim, and this is the fact.
-func changedFiles(ctx context.Context, repoRoot string) []string {
+func changedFiles(ctx context.Context, repoRoot string) ([]string, error) {
 	cmd := exec.CommandContext(ctx, "git", "status", "--porcelain=v1") //nolint:gosec // a fixed argv against a workspace root
 	cmd.Dir = repoRoot
 	out, err := cmd.Output()
 	if err != nil {
-		return nil
+		return nil, fmt.Errorf("git status: %w", err)
 	}
-	return parsePorcelain(string(out))
+	return parsePorcelain(string(out)), nil
 }
 
 // parsePorcelain reads `git status --porcelain=v1`.
@@ -345,20 +475,66 @@ func parsePorcelain(out string) []string {
 // protectedViolations reports changed files that the repository's policy
 // protects. It is checked here as well as during verification because a task
 // may be finished without one.
-func protectedViolations(repoRoot string, changed []string) []string {
+func protectedViolations(repoRoot string, changed []string) ([]string, error) {
 	set, err := policy.Load(repoRoot + "/policies")
-	if err != nil || len(set.Policies) == 0 {
-		return nil
+	if err != nil {
+		return nil, err
+	}
+	if len(set.Policies) == 0 {
+		return nil, nil
 	}
 	hits := set.Check(changed)
 	var out []string
 	for _, h := range hits {
 		out = append(out, h.Path)
 	}
-	return out
+	return out, nil
 }
 
 // Format renders a review for a person to read.
+func verificationChecksSatisfy(record VerificationRecord, required recipe.Level) (bool, string) {
+	seen := make(map[recipe.Kind]CheckResult, len(record.Checks))
+	for _, check := range record.Checks {
+		if previous, ok := seen[check.Kind]; !ok || (previous.Status == "pass" && check.Status != "pass") {
+			seen[check.Kind] = check
+		}
+	}
+	for _, kind := range recipe.Required(required) {
+		check, ok := seen[kind]
+		if !ok || check.Status != "pass" {
+			return false, fmt.Sprintf("verification is missing a passing %s result", kind)
+		}
+	}
+	return true, ""
+}
+
+func verificationLevelSatisfies(recorded string, required recipe.Level) bool {
+	level, ok := recipe.ParseLevel(recorded)
+	if !ok {
+		return false
+	}
+	switch required {
+	case recipe.Low:
+		return true
+	case recipe.Standard:
+		return level == recipe.Standard || level == recipe.High
+	case recipe.High:
+		return level == recipe.High
+	default:
+		return false
+	}
+}
+
+func shortCandidate(candidate string) string {
+	if candidate == "" {
+		return "(none)"
+	}
+	if len(candidate) > 12 {
+		return candidate[:12]
+	}
+	return candidate
+}
+
 func (r Review) Format() string {
 	var b strings.Builder
 	b.WriteString("FINAL REVIEW\n\n")

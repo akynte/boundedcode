@@ -1,13 +1,41 @@
 package task_test
 
 import (
+	"context"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/akynte/boundedcode/internal/engine"
 	"github.com/akynte/boundedcode/internal/recipe"
 	"github.com/akynte/boundedcode/internal/task"
 )
+
+// Rule 6 of the completion contract. This is not a hypothetical: a task whose
+// engine read fifteen files and edited nothing was accepted with build, vet,
+// test, race, gofmt and lint all green, because every one of those checks was
+// answering a question about the baseline.
+func TestAChangeTaskCannotUseTheVerificationOnlyEngineToAcceptANoOp(t *testing.T) {
+	requireGo(t)
+	repo := gitRepo(t, map[string]string{"go.mod": goodModule, "a.go": "package a\n"})
+	r, st := newRunner(t, engine.Verify{})
+	r.Judge = nil
+	ctx := context.Background()
+	id := task.NewID("noop")
+	if err := task.NewStore(st).Create(ctx, task.Task{
+		ID: id, Title: "change a file", Kind: "change", Verification: recipe.Low,
+		Budget: task.Budget{MaxAttempts: 1, MaxWallTime: time.Minute},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	out, err := r.Run(ctx, id, repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out.Accepted {
+		t.Fatalf("a change task was accepted by a verification-only no-op: %+v", out)
+	}
+}
 
 // Rule 6 of the completion contract. This is not a hypothetical: a task whose
 // engine read fifteen files and edited nothing was accepted with build, vet,

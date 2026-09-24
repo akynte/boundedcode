@@ -143,9 +143,7 @@ func PersistResult(runRoot string, res Result, patch, evaluatorRaw []byte, judgm
 		if err := atomicWrite(filepath.Join(dir, JudgmentTraceFile), jbuf); err != nil {
 			return ArtifactHashes{}, err
 		}
-		if len(jbuf) > 0 {
-			hashes.JudgmentTraceSHA256 = sha256Hex(jbuf)
-		}
+		hashes.JudgmentTraceSHA256 = sha256Hex(jbuf)
 	}
 
 	res.PatchSHA256 = hashes.PatchSHA256
@@ -227,8 +225,11 @@ func LoadAndVerifyResult(runRoot, suiteHash, taskID string, arm Arm, runID strin
 		return Result{}, fmt.Errorf("evidence: %s: corrupt %s: %w", dir, ArtifactHashesFile, err)
 	}
 
-	check := func(file, wantHash string) error {
+	check := func(file, wantHash string, required bool) error {
 		if wantHash == "" {
+			if required {
+				return fmt.Errorf("%s has no recorded hash", file)
+			}
 			return nil
 		}
 		body, err := os.ReadFile(filepath.Join(dir, file))
@@ -240,16 +241,22 @@ func LoadAndVerifyResult(runRoot, suiteHash, taskID string, arm Arm, runID strin
 		}
 		return nil
 	}
-	if err := check(PatchFile, want.PatchSHA256); err != nil {
+	if res.PatchSHA256 != "" && res.PatchSHA256 != want.PatchSHA256 {
+		return Result{}, fmt.Errorf("evidence: %s: result patch hash does not match artifact manifest", dir)
+	}
+	if res.EvaluatorOutputSHA256 != "" && res.EvaluatorOutputSHA256 != want.EvaluatorRawSHA256 {
+		return Result{}, fmt.Errorf("evidence: %s: result evaluator hash does not match artifact manifest", dir)
+	}
+	if err := check(PatchFile, want.PatchSHA256, res.PatchSHA256 != ""); err != nil {
 		return Result{}, fmt.Errorf("evidence: %s: %w", dir, err)
 	}
-	if err := check(EvaluatorRawFile, want.EvaluatorRawSHA256); err != nil {
+	if err := check(EvaluatorRawFile, want.EvaluatorRawSHA256, res.EvaluatorOutputSHA256 != ""); err != nil {
 		return Result{}, fmt.Errorf("evidence: %s: %w", dir, err)
 	}
-	if err := check(TelemetryFile, want.TelemetrySHA256); err != nil {
+	if err := check(TelemetryFile, want.TelemetrySHA256, true); err != nil {
 		return Result{}, fmt.Errorf("evidence: %s: %w", dir, err)
 	}
-	if err := check(JudgmentTraceFile, want.JudgmentTraceSHA256); err != nil {
+	if err := check(JudgmentTraceFile, want.JudgmentTraceSHA256, false); err != nil {
 		return Result{}, fmt.Errorf("evidence: %s: %w", dir, err)
 	}
 	resultBody, err := os.ReadFile(filepath.Join(dir, ResultJSONFile))

@@ -119,7 +119,16 @@ func Rank(level recipe.Level, candidates []Candidate) Ranking {
 			return a.passing > b.passing
 		}
 		// 4. Smaller diff, as a tiebreak only.
-		return a.c.DiffBytes < b.c.DiffBytes
+		if a.c.DiffBytes != b.c.DiffBytes {
+			return a.c.DiffBytes < b.c.DiffBytes
+		}
+		// Labels and manifests make a complete tie independent of input order.
+		// Without this final key, a stable sort let the caller's order decide
+		// which equally evidenced candidate was called best.
+		if a.c.Label != b.c.Label {
+			return a.c.Label < b.c.Label
+		}
+		return a.c.Manifest < b.c.Manifest
 	})
 
 	best := viable[0]

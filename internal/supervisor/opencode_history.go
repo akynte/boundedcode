@@ -5,11 +5,34 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/akynte/boundedcode/internal/ledger"
 	"github.com/akynte/boundedcode/internal/store"
 )
+
+// TaskBoundToSession reports whether the current OpenCode session has an
+// explicit binding for the task. A task ID alone is not authority: otherwise a
+// model that knows another task's ID could edit or finish it.
+func TaskBoundToSession(ctx context.Context, st *store.Store, taskID, sessionID string) (bool, error) {
+	if taskID == "" || !strings.HasPrefix(sessionID, "ses_") || len(sessionID) > 100 {
+		return false, nil
+	}
+	var bound string
+	err := st.Ledger().SQL().QueryRowContext(ctx, `
+		SELECT COALESCE(json_extract(intent, '$.session_id'), '')
+		FROM operations
+		WHERE task_id=? AND kind='session_start' AND json_valid(intent)
+		ORDER BY id DESC LIMIT 1`, taskID).Scan(&bound)
+	if err == sql.ErrNoRows {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return bound == sessionID, nil
+}
 
 // DecisionPage retrieves a bounded slice without materializing a long task's
 // entire journal on every OpenCode request. offset is oldest first.

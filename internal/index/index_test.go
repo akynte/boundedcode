@@ -88,6 +88,48 @@ func TestExcludedDirectoriesArePruned(t *testing.T) {
 	}
 }
 
+func TestIndexingOneRepositoryPreservesAnotherRepositorysChunks(t *testing.T) {
+	ctx := context.Background()
+	first, second := t.TempDir(), t.TempDir()
+	if err := os.WriteFile(filepath.Join(first, "first.go"), []byte("package first\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(second, "second.go"), []byte("package second\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	root, err := store.OpenRoot(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.CloseAll()
+	st, err := root.OpenWorkspace(ctx, workspace.DeriveID("/index/test", "", "multi-repository"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ix := index.New(st, index.Options{})
+	for _, repo := range []workspace.Repository{
+		{ID: "r1", Name: "first", Path: ".", DefaultBranch: "main"},
+		{ID: "r2", Name: "second", Path: "second", DefaultBranch: "main"},
+	} {
+		if err := ix.RegisterRepository(ctx, repo); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := ix.Repository(ctx, "r1", first); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ix.Repository(ctx, "r2", second); err != nil {
+		t.Fatal(err)
+	}
+	var count int
+	if err := st.Index().SQL().QueryRowContext(ctx, `SELECT COUNT(*) FROM chunks`).Scan(&count); err != nil {
+		t.Fatal(err)
+	}
+	if count != 2 {
+		t.Fatalf("indexing the second repository removed the first repository's chunks: got %d, want 2", count)
+	}
+}
+
 // An empty exclude list is an explicit operator choice and must be honoured,
 // not silently replaced with the defaults.
 func TestAnExplicitlyEmptyExcludeListIsHonoured(t *testing.T) {

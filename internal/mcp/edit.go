@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -61,7 +62,7 @@ type readOut struct {
 // budget is gone.
 const maxReadBytes = 256 << 10
 
-func (s *Server) readFile(ctx context.Context, _ *mcp.CallToolRequest, in readIn) (*mcp.CallToolResult, readOut, error) {
+func (s *Server) readFile(ctx context.Context, req *mcp.CallToolRequest, in readIn) (*mcp.CallToolResult, readOut, error) {
 	sess, err := s.resolve(ctx, in.Root)
 	if err != nil {
 		return fail("%v", err), readOut{}, nil
@@ -100,6 +101,13 @@ func (s *Server) readFile(ctx context.Context, _ *mcp.CallToolRequest, in readIn
 	out.StartLine, out.EndLine = start, end
 	out.Content = strings.Join(lines[start-1:end], "\n")
 	if in.TaskID != "" {
+		// A read with a task id also records an immutable artifact and durable
+		// tool observation. It is therefore a mutation of the task journal, not
+		// a harmless read: require the same session binding as bc_edit and the
+		// other task-mutating tools.
+		if err := requireTaskBinding(req, sess.Store, ctx, in.TaskID); err != nil {
+			return fail("%v", err), readOut{}, nil
+		}
 		if _, err := task.NewStore(sess.Store).Get(ctx, in.TaskID); err != nil {
 			return fail("%v", err), readOut{}, nil
 		}
@@ -149,24 +157,41 @@ type editOut struct {
 	Candidate    string `json:"candidate,omitempty"`
 }
 
-func recordEditCandidate(ctx context.Context, store *store.Store, taskID, root, path string) (string, error) {
+func beginEdit(ctx context.Context, store *store.Store, taskID, root, path string, after []byte) (*ledger.Handle, error) {
+	candidate, err := ledger.ContentManifest(root)
+	if err != nil {
+		return nil, err
+	}
+	phase, err := supervisor.CurrentPhase(ctx, store, taskID)
+	if err != nil {
+		return nil, err
+	}
+	intent := ledger.EditIntent{Path: path, AfterHash: hashBytes(after), Phase: phase}
+	if before, hashErr := ledger.HashFile(filepath.Join(root, filepath.FromSlash(path))); hashErr == nil {
+		intent.BeforeHash = before
+	}
+	return ledger.New(store).Begin(ctx, taskID, ledger.KindEdit, intent, candidate)
+}
+
+func hashBytes(body []byte) string {
+	sum := sha256.Sum256(body)
+	return hex.EncodeToString(sum[:])
+}
+
+func completeEdit(ctx context.Context, h *ledger.Handle, root, path string) (string, error) {
 	candidate, err := ledger.ContentManifest(root)
 	if err != nil {
 		return "", err
 	}
-	phase, err := supervisor.CurrentPhase(ctx, store, taskID)
-	if err != nil {
-		return "", err
-	}
-	if err := supervisor.RecordEvent(ctx, store, taskID, ledger.KindEdit, map[string]any{
-		"path": path, "candidate": candidate, "phase": phase,
-	}); err != nil {
+	if err := h.Complete(ctx, map[string]any{
+		"path": path, "candidate": candidate,
+	}, candidate, ""); err != nil {
 		return "", err
 	}
 	return candidate, nil
 }
 
-func (s *Server) editFile(ctx context.Context, _ *mcp.CallToolRequest, in editIn) (*mcp.CallToolResult, editOut, error) {
+func (s *Server) editFile(ctx context.Context, req *mcp.CallToolRequest, in editIn) (*mcp.CallToolResult, editOut, error) {
 	if strings.TrimSpace(in.TaskID) == "" {
 		return fail("task_id is required: a write outside a supervised task has nothing to bound it. Call bc_task_start first"), editOut{}, nil
 	}
@@ -179,9 +204,23 @@ func (s *Server) editFile(ctx context.Context, _ *mcp.CallToolRequest, in editIn
 	}
 	defer sess.Close() //nolint:contextcheck // cleanup must not take the request context: a cancelled call would then skip closing the databases.
 
+	if err := requireTaskBinding(req, sess.Store, ctx, in.TaskID); err != nil {
+		return fail("%v", err), editOut{}, nil
+	}
 	t, err := task.NewStore(sess.Store).Get(ctx, in.TaskID)
 	if err != nil {
 		return fail("%v", err), editOut{}, nil
+	}
+	if t.State.Terminal() {
+		return fail("task %q is already %s and cannot be edited", in.TaskID, t.State), editOut{}, nil
+	}
+	if t.State == task.StateReview {
+		return fail("task %q is in review; use the supervisor's retry decision before editing again", in.TaskID), editOut{}, nil
+	}
+	if t.State == task.StatePending {
+		if err := task.NewStore(sess.Store).SetState(ctx, in.TaskID, task.StateRunning); err != nil {
+			return fail("recording task start: %v", err), editOut{}, nil
+		}
 	}
 	root := sess.Workspace.Root
 	access := firewall.Access{WriteScope: t.Budget.Scope, Protected: protectedSet(root)}
@@ -199,12 +238,22 @@ func (s *Server) editFile(ctx context.Context, _ *mcp.CallToolRequest, in editIn
 			if in.Old != "" {
 				return fail("%s does not exist; pass an empty old to create it", in.Path), editOut{}, nil
 			}
+			// A new file is a write too, and the scope check above already
+			// decided whether that one is allowed. Journal the intent before
+			// crossing the side-effect boundary, not after the write succeeds.
+			h, err := beginEdit(ctx, sess.Store, in.TaskID, root, in.Path, []byte(in.New))
+			if err != nil {
+				return fail("recording edit intent: %v", err), editOut{}, nil
+			}
 			if err := worktree.WriteWithin(root, in.Path, []byte(in.New)); err != nil {
+				if journalErr := h.Interrupted(ctx, err); journalErr != nil {
+					return fail("creating %s failed (%v) and the edit journal could not record the uncertainty: %v", in.Path, err, journalErr), editOut{}, nil
+				}
 				return fail("creating %s: %v", in.Path, err), editOut{}, nil
 			}
-			candidate, err := recordEditCandidate(ctx, sess.Store, in.TaskID, root, in.Path)
+			candidate, err := completeEdit(ctx, h, root, in.Path)
 			if err != nil {
-				return fail("recording edited candidate: %v", err), editOut{}, nil
+				return fail("%s was written but its edit outcome could not be recorded; reconcile the task: %v", in.Path, err), editOut{}, nil
 			}
 			return text(fmt.Sprintf("Created %s.", in.Path)), editOut{Path: in.Path, Replacements: 1, Candidate: candidate}, nil
 		}
@@ -223,12 +272,19 @@ func (s *Server) editFile(ctx context.Context, _ *mcp.CallToolRequest, in editIn
 		return fail("that text appears %d times in %s. Include enough surrounding context to name one of them", count, in.Path), editOut{}, nil
 	}
 	updated := strings.Replace(string(body), in.Old, in.New, 1)
+	h, err := beginEdit(ctx, sess.Store, in.TaskID, root, in.Path, []byte(updated))
+	if err != nil {
+		return fail("recording edit intent: %v", err), editOut{}, nil
+	}
 	if err := worktree.WriteWithin(root, in.Path, []byte(updated)); err != nil {
+		if journalErr := h.Interrupted(ctx, err); journalErr != nil {
+			return fail("writing %s failed (%v) and the edit journal could not record the uncertainty: %v", in.Path, err, journalErr), editOut{}, nil
+		}
 		return fail("writing %s: %v", in.Path, err), editOut{}, nil
 	}
-	candidate, err := recordEditCandidate(ctx, sess.Store, in.TaskID, root, in.Path)
+	candidate, err := completeEdit(ctx, h, root, in.Path)
 	if err != nil {
-		return fail("recording edited candidate: %v", err), editOut{}, nil
+		return fail("%s was written but its edit outcome could not be recorded; reconcile the task: %v", in.Path, err), editOut{}, nil
 	}
 	return text(fmt.Sprintf("Replaced one occurrence in %s. Call bc_verify when the change is complete. Candidate=%s", in.Path, candidate)),
 		editOut{Path: in.Path, Replacements: 1, Candidate: candidate}, nil

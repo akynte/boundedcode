@@ -151,6 +151,19 @@ func TestStaleEvidenceCannotAcceptATask(t *testing.T) {
 	}
 }
 
+func TestEvidenceWithoutCandidateIdentityCannotAccept(t *testing.T) {
+	ok, reasons := task.Accept(recipe.Standard, []recipe.Result{
+		pass(recipe.KindBuild, ""), pass(recipe.KindVet, "cand-1"),
+		pass(recipe.KindTest, "cand-1"), pass(recipe.KindFormat, "cand-1"),
+	}, "cand-1", nil, task.Effect{Made: true, Expected: true})
+	if ok {
+		t.Fatal("evidence without candidate identity was accepted")
+	}
+	if !containsSubstr(reasons, "without candidate identity") {
+		t.Fatalf("the reason must identify missing provenance: %v", reasons)
+	}
+}
+
 func TestOutOfScopeWritesBlockAcceptance(t *testing.T) {
 	const c = "cand-1"
 	ok, reasons := task.Accept(recipe.Standard, []recipe.Result{

@@ -213,7 +213,7 @@ func (ix *Indexer) Repository(ctx context.Context, repositoryID, absRoot string)
 	st.Nodes += nodes
 	st.Edges += edges
 
-	chunks, err := ix.writeChunks(ctx, files)
+	chunks, err := ix.writeChunks(ctx, repositoryID, files)
 	if err != nil {
 		return st, err
 	}
@@ -532,13 +532,13 @@ func (ix *Indexer) writeFilesystemGraph(ctx context.Context, repositoryID string
 	return len(nodes), len(edges), nil
 }
 
-func (ix *Indexer) writeChunks(ctx context.Context, files []File) (int, error) {
+func (ix *Indexer) writeChunks(ctx context.Context, repositoryID string, files []File) (int, error) {
 	total := 0
 	err := ix.st.Index().Tx(ctx, func(tx *sql.Tx) error {
-		if _, err := tx.ExecContext(ctx, `DELETE FROM chunks_fts`); err != nil {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM chunks_fts WHERE rowid IN (SELECT chunk_id FROM chunks WHERE repository_id = ?)`, repositoryID); err != nil {
 			return err
 		}
-		if _, err := tx.ExecContext(ctx, `DELETE FROM chunks`); err != nil {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM chunks WHERE repository_id = ?`, repositoryID); err != nil {
 			return err
 		}
 		insChunk, err := tx.PrepareContext(ctx, `

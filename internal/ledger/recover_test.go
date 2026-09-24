@@ -8,6 +8,7 @@ import (
 	"context"
 	"database/sql"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
@@ -85,6 +86,71 @@ func TestIntentIsWrittenBeforeOutcome(t *testing.T) {
 	}
 	if ops[0].CandidateAfter != "cand1" {
 		t.Fatalf("candidate_after = %q", ops[0].CandidateAfter)
+	}
+}
+
+func TestContentManifestExcludesIgnoredBuildArtifacts(t *testing.T) {
+	dir := t.TempDir()
+	for _, name := range []string{"tracked.go", ".gitignore"} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte("package x\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(dir, ".gitignore"), []byte("bin/\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if output, err := exec.Command("git", "-C", dir, "init", "-q").CombinedOutput(); err != nil {
+		t.Fatalf("git init: %v: %s", err, output)
+	}
+	if output, err := exec.Command("git", "-C", dir, "add", ".gitignore", "tracked.go").CombinedOutput(); err != nil {
+		t.Fatalf("git add: %v: %s", err, output)
+	}
+	before, err := ledger.ContentManifest(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(dir, "bin"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "bin", "bcode"), []byte("build output"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	after, err := ledger.ContentManifest(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if before != after {
+		t.Fatalf("an ignored build artifact changed the candidate: %s -> %s", before, after)
+	}
+}
+
+func TestContentManifestTracksDeletedTrackedFiles(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "keep.go"), []byte("keep\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "remove.go"), []byte("remove\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if output, err := exec.Command("git", "-C", dir, "init", "-q").CombinedOutput(); err != nil {
+		t.Fatalf("git init: %v: %s", err, output)
+	}
+	if output, err := exec.Command("git", "-C", dir, "add", ".").CombinedOutput(); err != nil {
+		t.Fatalf("git add: %v: %s", err, output)
+	}
+	before, err := ledger.ContentManifest(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(filepath.Join(dir, "remove.go")); err != nil {
+		t.Fatal(err)
+	}
+	after, err := ledger.ContentManifest(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if before == after {
+		t.Fatal("deleting a tracked file must change the candidate manifest")
 	}
 }
 
@@ -226,6 +292,27 @@ func TestRejectedHypothesesSurviveRecovery(t *testing.T) {
 	}
 	if len(ws.Decisions) != 1 {
 		t.Errorf("expected 1 accepted decision, got %d", len(ws.Decisions))
+	}
+}
+
+func TestUncertainVerificationBlocksAutomaticResume(t *testing.T) {
+	ctx := context.Background()
+	l, st := newLedger(t)
+	seedTask(t, st, "t1")
+	dir, _ := worktree(t, "x")
+
+	if _, err := l.Begin(ctx, "t1", ledger.KindRecipeRun, map[string]any{"recipes": []string{"go test"}}, ""); err != nil {
+		t.Fatal(err)
+	}
+	ws, err := l.RecoverTask(ctx, "t1", dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ws.Uncertain) != 1 || ws.Uncertain[0].Applied != ledger.AppliedUnknown {
+		t.Fatalf("uncertain verification was not classified as unknown: %+v", ws.Uncertain)
+	}
+	if ws.SafeToResume() {
+		t.Fatal("a task with an uncertain verification was reported safe to resume")
 	}
 }
 

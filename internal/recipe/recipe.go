@@ -247,7 +247,9 @@ func (r *Runner) Run(ctx context.Context, rec Recipe, worktreePath, candidate st
 		res.Status = Error
 		res.Err = fmt.Sprintf("%s timed out after %s", rec.Name, timeout)
 		res.Summary = Summary{Headline: res.Err}
-		r.persist(&res, stdout.String(), stderr.String())
+		if err := r.persist(&res, stdout.String(), stderr.String()); err != nil {
+			markPersistenceFailure(&res, err)
+		}
 		return res
 	}
 	// A command that could not start says nothing about the code either.
@@ -281,7 +283,9 @@ func (r *Runner) Run(ctx context.Context, rec Recipe, worktreePath, candidate st
 		res.Err = fmt.Sprintf("%s could not run (exit %d): %s: %s",
 			rec.Name, res.ExitCode, hint, truncateLine(stderr.String(), 200))
 		res.Summary = Summary{Headline: res.Err}
-		r.persist(&res, stdout.String(), stderr.String())
+		if err := r.persist(&res, stdout.String(), stderr.String()); err != nil {
+			markPersistenceFailure(&res, err)
+		}
 		return res
 	}
 
@@ -290,7 +294,9 @@ func (r *Runner) Run(ctx context.Context, rec Recipe, worktreePath, candidate st
 		summarize = Generic
 	}
 	res.Status, res.Summary = summarize(res.ExitCode, stdout.String(), stderr.String())
-	r.persist(&res, stdout.String(), stderr.String())
+	if err := r.persist(&res, stdout.String(), stderr.String()); err != nil {
+		markPersistenceFailure(&res, err)
+	}
 	return res
 }
 
@@ -318,16 +324,25 @@ func (r *Runner) RunAll(ctx context.Context, recipes []Recipe, worktreePath, can
 	return out
 }
 
-func (r *Runner) persist(res *Result, stdout, stderr string) {
+func (r *Runner) persist(res *Result, stdout, stderr string) error {
 	if r.Store == nil {
-		return
+		return nil
 	}
 	var b bytes.Buffer
 	fmt.Fprintf(&b, "$ recipe %s (%s)\nexit %d after %s\n\n--- stdout ---\n%s\n--- stderr ---\n%s\n",
 		res.Recipe, res.Kind, res.ExitCode, res.Duration.Round(time.Millisecond), stdout, stderr)
-	if hash, err := r.Store.Put(b.Bytes()); err == nil {
-		res.ArtifactHash = hash
+	hash, err := r.Store.Put(b.Bytes())
+	if err != nil {
+		return err
 	}
+	res.ArtifactHash = hash
+	return nil
+}
+
+func markPersistenceFailure(res *Result, err error) {
+	res.Status = Error
+	res.Err = "could not persist verification evidence: " + err.Error()
+	res.Summary = Summary{Headline: res.Err}
 }
 
 func exitCodeOf(err error) int {

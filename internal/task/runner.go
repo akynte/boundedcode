@@ -331,6 +331,11 @@ type Outcome struct {
 	TokensUsed int `json:"tokens_used"`
 	// Candidate is the worktree content hash the verdict describes.
 	Candidate string `json:"candidate"`
+	// VerificationLevel is the frozen policy level actually used by the
+	// verifier. Keeping it on the outcome prevents a caller that verifies a
+	// supervised task at a different level from recording the task's requested
+	// level as if it were the level that ran.
+	VerificationLevel recipe.Level `json:"verification_level,omitempty"`
 	// OutOfScope lists files changed outside the declared scope.
 	OutOfScope []string `json:"out_of_scope,omitempty"`
 	// PolicyViolations lists changes a repository policy protects, each with
@@ -452,8 +457,35 @@ func (r *Runner) Run(ctx context.Context, taskID, repoPath string) (*Outcome, er
 	if err != nil {
 		return nil, fmt.Errorf("task %s: %w", t.ID, err)
 	}
-	defer func() { _ = r.Ledger.ReleaseLease(ctx, wt.ID, r.Holder) }()
 	_ = lease
+
+	// A task may run for many minutes. Renew well before the default TTL so a
+	// second supervisor cannot take the same worktree while this run is still
+	// writing. Renewal failure cancels the run; it is not safe to continue with
+	// an ownership claim that can no longer be renewed.
+	runCtx, cancelRun := context.WithCancel(ctx)
+	defer cancelRun()
+	renewErr := make(chan error, 1)
+	go func() {
+		ticker := time.NewTicker(20 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-runCtx.Done():
+				return
+			case <-ticker.C:
+				if _, err := r.Ledger.RenewLease(runCtx, wt.ID, r.Holder, 0); err != nil {
+					select {
+					case renewErr <- err:
+					default:
+					}
+					cancelRun()
+					return
+				}
+			}
+		}
+	}()
+	defer func() { _ = r.Ledger.ReleaseLease(ctx, wt.ID, r.Holder) }()
 
 	verified := "the committed state (HEAD)"
 	if r.SyncUncommitted {
@@ -477,7 +509,28 @@ func (r *Runner) Run(ctx context.Context, taskID, repoPath string) (*Outcome, er
 		return nil, err
 	}
 
-	out, runErr := r.run(ctx, &t, wt)
+	out, runErr := r.run(runCtx, &t, wt)
+	cancelRun()
+	select {
+	case leaseErr := <-renewErr:
+		runErr = errors.Join(runErr, fmt.Errorf("task %s: worktree lease renewal failed: %w", t.ID, leaseErr))
+	default:
+	}
+	if runErr != nil && out == nil {
+		// A phase error must not leave a task durably running with no reason or
+		// checkpoint. Keep it resumable, but make the stop and its evidence
+		// explicit even when the error happened outside the phase stop helper.
+		out = &Outcome{Task: t, Reasons: []string{runErr.Error()}}
+		if candidate, candidateErr := wt.Candidate(); candidateErr == nil {
+			out.Candidate = candidate
+		}
+		finishCtx, finishCancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+		_, finishErr := r.finish(finishCtx, &t, wt, out, StateBlocked)
+		finishCancel()
+		if finishErr != nil {
+			runErr = errors.Join(runErr, finishErr)
+		}
+	}
 	if errors.Is(runErr, ErrOracleLeak) {
 		// The request was refused, so nothing reached the model, but the
 		// supervisor was about to send hidden content and the task is not
@@ -582,7 +635,7 @@ func (r *Runner) run(ctx context.Context, t *Task, wt *worktree.Worktree) (*Outc
 		defer cancel()
 	}
 
-	out := &Outcome{Task: *t}
+	out := &Outcome{Task: *t, VerificationLevel: t.Verification}
 	var feedback []recipe.Result
 	var hiddenRejected []string
 
@@ -673,7 +726,7 @@ func (r *Runner) run(ctx context.Context, t *Task, wt *worktree.Worktree) (*Outc
 
 		accepted, reasons := Accept(t.Verification, results, after, scope, Effect{
 			Made:     len(changed) > 0,
-			Expected: engine.Edits(r.Engine),
+			Expected: t.Kind != "verification",
 		})
 		out.Reasons = reasons
 		if accepted {
@@ -1400,7 +1453,10 @@ func Accept(level recipe.Level, results []recipe.Result, candidate string,
 		case res.Status == recipe.Fail:
 			ok = false
 			reasons = append(reasons, fmt.Sprintf("%s failed: %s", kind, res.Summary.Headline))
-		case candidate != "" && res.Candidate != "" && res.Candidate != candidate:
+		case candidate == "" || res.Candidate == "":
+			ok = false
+			reasons = append(reasons, fmt.Sprintf("%s passed without candidate identity; rerun verification on the current checkout", kind))
+		case res.Candidate != candidate:
 			ok = false
 			reasons = append(reasons, fmt.Sprintf(
 				"%s passed, but against an older candidate (%s); the worktree has changed since",
@@ -1430,7 +1486,7 @@ func Accept(level recipe.Level, results []recipe.Result, candidate string,
 		if kind == recipe.KindHidden || kind == recipe.KindImpact || res.Status != recipe.Fail {
 			continue
 		}
-		if candidate != "" && res.Candidate != "" && res.Candidate != candidate {
+		if candidate != "" && res.Candidate != candidate {
 			// A failure against code that has since changed is not a verdict
 			// on the code that is there now.
 			continue

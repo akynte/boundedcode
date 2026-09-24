@@ -135,7 +135,11 @@ func CheckHidden(results []recipe.Result, candidate string) (bool, []string) {
 		case res.Status != recipe.Pass:
 			ok = false
 			reasons = append(reasons, res.Summary.Headline)
-		case candidate != "" && res.Candidate != "" && res.Candidate != candidate:
+		case candidate == "" || res.Candidate == "":
+			ok = false
+			reasons = append(reasons, fmt.Sprintf(
+				"%s passed without candidate identity; rerun hidden acceptance on the current checkout", res.Recipe))
+		case res.Candidate != candidate:
 			ok = false
 			reasons = append(reasons, fmt.Sprintf(
 				"%s passed, but against an older candidate (%s)", res.Recipe, shortHash(res.Candidate)))

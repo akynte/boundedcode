@@ -2,13 +2,19 @@ package native
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"math"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/akynte/boundedcode/internal/engine"
 	"github.com/akynte/boundedcode/internal/ledger"
 	"github.com/akynte/boundedcode/internal/llm"
+	"github.com/akynte/boundedcode/internal/worktree"
 )
 
 // authorize validates the actual advertised schema, not just parseable JSON.
@@ -85,6 +91,48 @@ func (e *Engine) authorize(req engine.Request, call llm.ToolCall) error {
 	return nil
 }
 
+// expectedNativeEdit derives the file-level facts recovery needs before an
+// edit crosses the side-effect boundary. The engine still performs its normal
+// validation and formatting; this is a journal payload, not a second policy.
+// An invalid edit remains inspectable with the path and before-hash, while a
+// valid one gets the exact after-hash the recovery classifier compares.
+func expectedNativeEdit(req engine.Request, call llm.ToolCall, args map[string]any) (ledger.EditIntent, bool) {
+	if call.Name != ToolEditFile && call.Name != ToolWriteFile {
+		return ledger.EditIntent{}, false
+	}
+	rel := str(args, "path")
+	if rel == "" {
+		return ledger.EditIntent{}, false
+	}
+	ei := ledger.EditIntent{Path: rel}
+	full := filepath.Join(req.Worktree, filepath.FromSlash(rel))
+	if before, err := ledger.HashFile(full); err == nil {
+		ei.BeforeHash = before
+	}
+	var after []byte
+	switch call.Name {
+	case ToolWriteFile:
+		if _, err := os.Stat(full); err == nil {
+			return ei, true
+		}
+		after, _ = gofmtOnWrite(rel, []byte(str(args, "content")))
+	case ToolEditFile:
+		body, err := worktree.ReadWithin(req.Worktree, rel)
+		if err != nil {
+			return ei, true
+		}
+		oldText, newText := str(args, "old"), str(args, "new")
+		if oldText != "" && strings.Count(string(body), oldText) == 1 {
+			after, _ = gofmtOnWrite(rel, []byte(strings.Replace(string(body), oldText, newText, 1)))
+		}
+	}
+	if after != nil {
+		sum := sha256.Sum256(after)
+		ei.AfterHash = hex.EncodeToString(sum[:])
+	}
+	return ei, true
+}
+
 // exec records decisions before a tool can have side effects. Journal failure
 // stops the attempt; it must not turn into an unrecorded edit.
 func (e *Engine) exec(ctx context.Context, req engine.Request, call llm.ToolCall) (Result, error) {
@@ -103,12 +151,27 @@ func (e *Engine) exec(ctx context.Context, req engine.Request, call llm.ToolCall
 		if denial != nil {
 			decision, reason = "deny", denial.Error()
 		}
-		var err error
-		h, err = req.Journal.Begin(ctx, req.TaskID, ledger.KindDecision, map[string]any{
+		var args map[string]any
+		_ = json.Unmarshal(call.Arguments, &args)
+		kind := ledger.KindDecision
+		var intent any = map[string]any{
 			"phase": "EDIT", "tool": call.Name, "call_id": call.ID,
 			"arguments": string(call.Arguments), "decision": decision, "reason": reason,
 			"session": e.ensureFence().Token(), "step": req.Transcript.Steps,
-		}, before)
+		}
+		if editIntent, ok := expectedNativeEdit(req, call, args); ok {
+			kind = ledger.KindEdit
+			editIntent.Tool = call.Name
+			editIntent.CallID = call.ID
+			editIntent.Arguments = string(call.Arguments)
+			editIntent.Session = e.ensureFence().Token()
+			editIntent.Step = req.Transcript.Steps
+			editIntent.Decision = decision
+			editIntent.Reason = reason
+			intent = editIntent
+		}
+		var err error
+		h, err = req.Journal.Begin(ctx, req.TaskID, kind, intent, before)
 		if err != nil {
 			return Result{}, err
 		}

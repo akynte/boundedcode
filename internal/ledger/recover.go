@@ -10,6 +10,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -28,6 +29,8 @@ const (
 	// AppliedUnknown is used when the operation has no inspectable side
 	// effect (a search, a retrieval). Such an operation is safe to repeat.
 	AppliedUnknown Applied = "unknown"
+	// AppliedReadOnly means recovery proved there is no side effect to replay.
+	AppliedReadOnly Applied = "read_only"
 )
 
 // EditIntent is the intent payload of a KindEdit operation. Recovery needs a
@@ -40,6 +43,17 @@ type EditIntent struct {
 	// BeforeHash is the sha256 the file held before the edit.
 	BeforeHash string `json:"before_hash"`
 	Summary    string `json:"summary,omitempty"`
+	// The following fields preserve the native tool-call identity so the
+	// engine's own transcript reconciliation can still match an edit after it
+	// has been promoted from a generic decision to an inspectable edit.
+	Tool      string `json:"tool,omitempty"`
+	CallID    string `json:"call_id,omitempty"`
+	Arguments string `json:"arguments,omitempty"`
+	Session   string `json:"session,omitempty"`
+	Step      int    `json:"step,omitempty"`
+	Decision  string `json:"decision,omitempty"`
+	Reason    string `json:"reason,omitempty"`
+	Phase     string `json:"phase,omitempty"`
 }
 
 // Reconciliation is the verdict for one uncertain operation.
@@ -95,7 +109,7 @@ type WorkingState struct {
 // outcome is uncertain without re-checking the candidate.
 func (w WorkingState) SafeToResume() bool {
 	for _, u := range w.Uncertain {
-		if u.Applied == AppliedPartial {
+		if u.Applied == AppliedPartial || u.Applied == AppliedUnknown {
 			return false
 		}
 	}
@@ -291,9 +305,10 @@ func inspect(op Operation, worktree string) (r Reconciliation) {
 	switch op.Kind {
 	case KindEdit:
 	case KindRecipeRun:
-		r.Detail = "recipe run with no recorded outcome; re-check the candidate before replaying (§7.2 step 3)"
+		r.Detail = "recipe run with no recorded outcome; it may have changed build/test state, so do not replay it automatically"
 		return r
 	default:
+		r.Applied = AppliedReadOnly
 		r.Detail = "read-only operation; safe to repeat"
 		return r
 	}
@@ -345,7 +360,7 @@ func (l *Ledger) evidenceFor(ctx context.Context, taskID, candidate string) ([]E
 		if err := rows.Scan(&e.ID, &e.Kind, &e.Status, &e.Candidate); err != nil {
 			return nil, err
 		}
-		e.Stale = candidate != "" && e.Candidate != "" && e.Candidate != candidate
+		e.Stale = candidate != "" && e.Candidate != candidate
 		out = append(out, e)
 	}
 	return out, rows.Err()
@@ -363,7 +378,8 @@ func (l *Ledger) RecordEvidence(ctx context.Context, id, taskID, kind, status, c
 			INSERT INTO evidence (id, task_id, kind, status, candidate, artifact_hash, summary, detail, created_at)
 			VALUES (?,?,?,?,?,?,?,?,?)
 			ON CONFLICT (id) DO UPDATE SET status = excluded.status, summary = excluded.summary,
-			  detail = excluded.detail, candidate = excluded.candidate`,
+			  detail = excluded.detail, candidate = excluded.candidate,
+			  artifact_hash = excluded.artifact_hash, created_at = excluded.created_at`,
 			id, taskID, kind, status, candidate, artifactHash, summary, string(body), time.Now().UnixMilli())
 		return err
 	})
@@ -376,35 +392,74 @@ func (l *Ledger) RecordEvidence(ctx context.Context, id, taskID, kind, status, c
 func ContentManifest(root string) (string, error) {
 	type entry struct{ path, hash string }
 	var entries []entry
-	err := filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+	add := func(rel string) error {
+		rel = filepath.ToSlash(filepath.Clean(rel))
+		if excludedCandidatePath(rel) {
+			return nil
+		}
+		full := filepath.Join(root, filepath.FromSlash(rel))
+		info, err := os.Lstat(full)
+		if os.IsNotExist(err) {
+			// Git's candidate listing still contains a tracked file that the
+			// task deleted. Represent that absence explicitly: dropping the
+			// entry would make deletion indistinguishable from the original
+			// file (and would make snapshot verification fail on a valid
+			// deletion).
+			entries = append(entries, entry{rel, "deleted"})
+			return nil
+		}
 		if err != nil {
 			return err
 		}
-		if d.IsDir() {
-			switch d.Name() {
-			case ".git", ".bc", "node_modules", "vendor":
-				if p != root {
+		if !info.Mode().IsRegular() {
+			return nil
+		}
+		h, err := hashFile(full)
+		if err != nil {
+			return err
+		}
+		entries = append(entries, entry{rel, h})
+		return nil
+	}
+
+	// In a Git checkout, use the same candidate boundary as a patch: tracked
+	// files plus untracked files that are not ignored. This keeps a rebuilt
+	// bin/ or coverage artifact from invalidating verification even though it
+	// cannot be part of the candidate commit. Non-Git test directories retain
+	// the filesystem walk fallback below.
+	listed, err := exec.Command("git", "-C", root, "ls-files", "-co", "--exclude-standard", "-z").Output()
+	if err == nil {
+		for _, rel := range strings.Split(string(listed), "\x00") {
+			if rel == "" {
+				continue
+			}
+			if err := add(rel); err != nil {
+				return "", err
+			}
+		}
+	} else {
+		err = filepath.WalkDir(root, func(p string, d fs.DirEntry, walkErr error) error {
+			if walkErr != nil {
+				return walkErr
+			}
+			if d.IsDir() {
+				if p != root && excludedCandidatePath(d.Name()) {
 					return fs.SkipDir
 				}
+				return nil
 			}
-			return nil
-		}
-		if !d.Type().IsRegular() {
-			return nil
-		}
-		rel, err := filepath.Rel(root, p)
+			if !d.Type().IsRegular() {
+				return nil
+			}
+			rel, err := filepath.Rel(root, p)
+			if err != nil {
+				return err
+			}
+			return add(rel)
+		})
 		if err != nil {
-			return err
+			return "", err
 		}
-		h, err := hashFile(p)
-		if err != nil {
-			return err
-		}
-		entries = append(entries, entry{filepath.ToSlash(rel), h})
-		return nil
-	})
-	if err != nil {
-		return "", err
 	}
 	sort.Slice(entries, func(i, j int) bool { return entries[i].path < entries[j].path })
 	sum := sha256.New()
@@ -415,6 +470,16 @@ func ContentManifest(root string) (string, error) {
 		sum.Write([]byte{0})
 	}
 	return hex.EncodeToString(sum.Sum(nil)), nil
+}
+
+func excludedCandidatePath(path string) bool {
+	for _, part := range strings.Split(filepath.ToSlash(filepath.Clean(path)), "/") {
+		switch part {
+		case ".git", ".bc", "node_modules", "vendor":
+			return true
+		}
+	}
+	return false
 }
 
 func hashFile(path string) (string, error) {

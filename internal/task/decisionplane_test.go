@@ -210,7 +210,7 @@ func TestAVerificationOnlyRunNeedsNoDecisionPlane(t *testing.T) {
 	ctx := context.Background()
 	id := task.NewID("t")
 	if err := task.NewStore(st).Create(ctx, task.Task{
-		ID: id, Title: "verify", Verification: recipe.Low,
+		ID: id, Title: "verify", Kind: "verification", Verification: recipe.Low,
 		Budget: task.Budget{MaxAttempts: 1, MaxWallTime: time.Minute},
 	}); err != nil {
 		t.Fatal(err)

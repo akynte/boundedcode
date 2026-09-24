@@ -149,7 +149,9 @@ func (s *Store) Requirement(ctx context.Context, id string) (Requirement, error)
 	}
 	r.CreatedAt = time.UnixMilli(created)
 	if acceptance != "" {
-		_ = json.Unmarshal([]byte(acceptance), &r.Acceptance)
+		if err := json.Unmarshal([]byte(acceptance), &r.Acceptance); err != nil {
+			return r, fmt.Errorf("task: requirement %s has invalid acceptance: %w", r.ID, err)
+		}
 	}
 	return r, nil
 }
@@ -215,7 +217,9 @@ func (s *Store) Get(ctx context.Context, id string) (Task, error) {
 		t.FinishedAt = &f
 	}
 	if budget.Valid && budget.String != "" {
-		_ = json.Unmarshal([]byte(budget.String), &t.Budget)
+		if err := json.Unmarshal([]byte(budget.String), &t.Budget); err != nil {
+			return t, fmt.Errorf("task: task %s has an invalid budget: %w", t.ID, err)
+		}
 	}
 	return t, nil
 }
@@ -255,15 +259,35 @@ func (s *Store) SetState(ctx context.Context, id string, state State) error {
 	now := time.Now().UnixMilli()
 	return s.db.Tx(ctx, func(tx *sql.Tx) error {
 		if state.Terminal() {
-			_, err := tx.ExecContext(ctx,
+			res, err := tx.ExecContext(ctx,
 				`UPDATE tasks SET state = ?, updated_at = ?, finished_at = ? WHERE id = ?`,
 				string(state), now, now, id)
-			return err
+			if err != nil {
+				return err
+			}
+			n, err := res.RowsAffected()
+			if err != nil {
+				return err
+			}
+			if n == 0 {
+				return fmt.Errorf("task: no task %q", id)
+			}
+			return nil
 		}
-		_, err := tx.ExecContext(ctx,
+		res, err := tx.ExecContext(ctx,
 			`UPDATE tasks SET state = ?, updated_at = ?, finished_at = NULL WHERE id = ?`,
 			string(state), now, id)
-		return err
+		if err != nil {
+			return err
+		}
+		n, err := res.RowsAffected()
+		if err != nil {
+			return err
+		}
+		if n == 0 {
+			return fmt.Errorf("task: no task %q", id)
+		}
+		return nil
 	})
 }
 
@@ -306,6 +330,33 @@ func (s *Store) Reopen(ctx context.Context, id string) (Task, error) {
 	if err := s.SetState(ctx, id, StatePending); err != nil {
 		return t, err
 	}
+	// An explicit operator retry starts a fresh wall-clock window while
+	// preserving attempt, plan, failure, and evidence history. Resetting those
+	// counters here would turn a retry command into an unbounded model loop.
+	if err := s.db.Tx(ctx, func(tx *sql.Tx) error {
+		var body string
+		err := tx.QueryRowContext(ctx, `SELECT body FROM task_workflow WHERE task_id = ?`, id).Scan(&body)
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		var state map[string]any
+		if err := json.Unmarshal([]byte(body), &state); err != nil {
+			return fmt.Errorf("task: persisted workflow for %s is invalid: %w", id, err)
+		}
+		state["started_at"] = time.Now().UnixMilli()
+		state["edit_budget_exhausted"] = false
+		updated, err := json.Marshal(state)
+		if err != nil {
+			return err
+		}
+		_, err = tx.ExecContext(ctx, `UPDATE task_workflow SET body = ?, updated_at = ? WHERE task_id = ?`, string(updated), time.Now().UnixMilli(), id)
+		return err
+	}); err != nil {
+		return t, err
+	}
 	reopened := t
 	reopened.State = StatePending
 	return reopened, nil
@@ -314,10 +365,20 @@ func (s *Store) Reopen(ctx context.Context, id string) (Task, error) {
 // SetWorktree records which checkout a task owns.
 func (s *Store) SetWorktree(ctx context.Context, id, worktreeID string) error {
 	return s.db.Tx(ctx, func(tx *sql.Tx) error {
-		_, err := tx.ExecContext(ctx,
+		res, err := tx.ExecContext(ctx,
 			`UPDATE tasks SET worktree_id = ?, updated_at = ? WHERE id = ?`,
 			worktreeID, time.Now().UnixMilli(), id)
-		return err
+		if err != nil {
+			return err
+		}
+		n, err := res.RowsAffected()
+		if err != nil {
+			return err
+		}
+		if n == 0 {
+			return fmt.Errorf("task: no task %q", id)
+		}
+		return nil
 	})
 }
 

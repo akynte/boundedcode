@@ -53,9 +53,7 @@ func engineFor(cmd *cobra.Command, root *store.Root, st *store.Store, ws *worksp
 	}
 	f, err := llm.LoadProvidersFile(root.Layout().ConfigDir())
 	if err != nil {
-		fmt.Fprintf(cmd.ErrOrStderr(),
-			"no providers.yaml: running verification only. Run `bcode config init` and configure a model to make edits.\n")
-		return engine.Verify{}, nil
+		return nil, fmt.Errorf("no providers.yaml: a change task cannot run without a coding model; run `bcode config init`, configure a model, and retry (use `bcode task verify` for verification-only work): %w", err)
 	}
 	router, err := llm.NewRouter(f)
 	if err != nil {
@@ -116,9 +114,7 @@ func engineFor(cmd *cobra.Command, root *store.Root, st *store.Store, ws *worksp
 	}
 	eng, err := native.New(opts)
 	if err != nil {
-		fmt.Fprintf(cmd.ErrOrStderr(),
-			"provider %q cannot drive edits (%v): running verification only.\n", provider.Name(), err)
-		return engine.Verify{}, nil
+		return nil, fmt.Errorf("provider %q cannot drive edits: %w; a change task cannot be downgraded to verification-only", provider.Name(), err)
 	}
 	fmt.Fprintf(cmd.ErrOrStderr(), "engine: %s\n", eng.Name())
 	return eng, nil
@@ -491,10 +487,20 @@ func newTaskRecoverCmd() *cobra.Command {
 			}
 			defer closeRoot(cmd, root)
 
+			dirs, err := st.TaskDirs()
+			if err != nil {
+				return err
+			}
 			states, err := ledger.New(st).Recover(ctx, func(taskID string) string {
-				// Until per-task worktrees exist, a task's candidate is the
-				// repository root itself.
-				return filepath.Join(ws.Root)
+				// Native tasks edit a private worktree. Editor/MCP tasks have
+				// no WorktreeID and intentionally operate on the checkout. Never
+				// hash the repository root for a task that has a recorded
+				// worktree: recovery must inspect the same bytes the task edited.
+				t, err := task.NewStore(st).Get(ctx, taskID)
+				if err != nil || t.WorktreeID == "" {
+					return ws.Root
+				}
+				return filepath.Join(dirs.Worktrees, t.WorktreeID)
 			})
 			if err != nil {
 				return err

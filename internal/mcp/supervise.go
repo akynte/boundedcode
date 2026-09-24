@@ -16,6 +16,7 @@ import (
 	"github.com/akynte/boundedcode/internal/ledger"
 	"github.com/akynte/boundedcode/internal/policy"
 	"github.com/akynte/boundedcode/internal/recipe"
+	"github.com/akynte/boundedcode/internal/store"
 	"github.com/akynte/boundedcode/internal/supervisor"
 	"github.com/akynte/boundedcode/internal/task"
 	"github.com/akynte/boundedcode/internal/worktree"
@@ -102,13 +103,25 @@ func (s *Server) registerSupervision(srv *mcp.Server) {
 	}, s.editFile)
 }
 
+func requireTaskBinding(req *mcp.CallToolRequest, st *store.Store, ctx context.Context, taskID string) error {
+	sessionID := openCodeSessionID(req)
+	bound, err := supervisor.TaskBoundToSession(ctx, st, taskID, sessionID)
+	if err != nil {
+		return fmt.Errorf("checking task/session binding: %w", err)
+	}
+	if !bound {
+		return fmt.Errorf("task %q is not bound to this OpenCode session; call bc_task_start or bc_task_resume first", taskID)
+	}
+	return nil
+}
+
 type factIn struct {
 	TaskID string `json:"task_id"`
 	Path   string `json:"path" jsonschema:"repository-relative source path"`
 	Quote  string `json:"quote" jsonschema:"exact source text to confirm, at most 300 characters"`
 }
 
-func (s *Server) taskFact(ctx context.Context, _ *mcp.CallToolRequest, in factIn) (*mcp.CallToolResult, any, error) {
+func (s *Server) taskFact(ctx context.Context, req *mcp.CallToolRequest, in factIn) (*mcp.CallToolResult, any, error) {
 	if in.TaskID == "" || in.Quote == "" || len(in.Quote) > 300 {
 		return fail("task_id and a quote of 1..300 bytes are required"), nil, nil
 	}
@@ -117,6 +130,9 @@ func (s *Server) taskFact(ctx context.Context, _ *mcp.CallToolRequest, in factIn
 		return fail("%v", err), nil, nil
 	}
 	defer sess.Close()
+	if err := requireTaskBinding(req, sess.Store, ctx, in.TaskID); err != nil {
+		return fail("%v", err), nil, nil
+	}
 	if err := (firewall.Access{Protected: protectedSet(sess.Workspace.Root)}).Check(sess.Workspace.Root, in.Path, false); err != nil {
 		return fail("%v", err), nil, nil
 	}
@@ -218,12 +234,15 @@ type memoryAddIn struct {
 	Path       string `json:"path,omitempty" jsonschema:"a subdirectory of the open repository; defaults to its root. Omit this — do not pass the repository's own absolute path"`
 }
 
-func (s *Server) taskMemoryAdd(ctx context.Context, _ *mcp.CallToolRequest, in memoryAddIn) (*mcp.CallToolResult, any, error) {
+func (s *Server) taskMemoryAdd(ctx context.Context, req *mcp.CallToolRequest, in memoryAddIn) (*mcp.CallToolResult, any, error) {
 	sess, err := s.resolve(ctx, "")
 	if err != nil {
 		return fail("%v", err), nil, nil
 	}
 	defer sess.Close()
+	if err := requireTaskBinding(req, sess.Store, ctx, in.TaskID); err != nil {
+		return fail("%v", err), nil, nil
+	}
 	id, err := supervisor.RecordMemory(ctx, sess.Store, in.TaskID, supervisor.MemoryRecord{Type: in.Type, Text: in.Text, Evidence: in.Evidence, Candidate: in.Candidate, Supersedes: in.Supersedes, Path: in.Path}, true)
 	if err != nil {
 		return fail("%v", err), nil, nil
@@ -322,12 +341,16 @@ type answerIn struct {
 // agent holding the conversation does. But an answer about this project is a
 // decision, and a decision that lives only in a chat transcript is gone by the
 // next session. The agent owns the asking; this owns the remembering.
-func (s *Server) taskAnswer(ctx context.Context, _ *mcp.CallToolRequest, in answerIn) (*mcp.CallToolResult, any, error) {
+func (s *Server) taskAnswer(ctx context.Context, req *mcp.CallToolRequest, in answerIn) (*mcp.CallToolResult, any, error) {
 	sess, err := s.resolve(ctx, in.Path)
 	if err != nil {
 		return fail("%v", err), nil, nil
 	}
 	defer sess.Close() //nolint:contextcheck // cleanup must not take the request context: a cancelled call would then skip closing the databases.
+
+	if err := requireTaskBinding(req, sess.Store, ctx, in.TaskID); err != nil {
+		return fail("%v", err), nil, nil
+	}
 
 	// The answer is durable and is read back in the final review, so it goes
 	// through the same credential check as committed content.
@@ -357,13 +380,23 @@ type finishIn struct {
 // The verdict comes from the verification actually on record. A task finished
 // without one is reported UNVERIFIED rather than fine, because an agent's own
 // account of its work is exactly what the contract exists not to trust.
-func (s *Server) taskFinish(ctx context.Context, _ *mcp.CallToolRequest, in finishIn) (*mcp.CallToolResult, *supervisor.Review, error) {
+func (s *Server) taskFinish(ctx context.Context, req *mcp.CallToolRequest, in finishIn) (*mcp.CallToolResult, *supervisor.Review, error) {
 	sess, err := s.resolve(ctx, in.Path)
 	if err != nil {
 		return fail("%v", err), nil, nil
 	}
 	defer sess.Close() //nolint:contextcheck // cleanup must not take the request context: a cancelled call would then skip closing the databases.
 
+	if err := requireTaskBinding(req, sess.Store, ctx, in.TaskID); err != nil {
+		return fail("%v", err), nil, nil
+	}
+	finished, err := task.NewStore(sess.Store).Get(ctx, in.TaskID)
+	if err != nil {
+		return fail("finding task: %v", err), nil, nil
+	}
+	if finished.State.Terminal() {
+		return fail("task %q is already %s and cannot be finished again", in.TaskID, finished.State), nil, nil
+	}
 	rev, err := supervisor.FinishTask(ctx, sess.Store, sess.Workspace.Root, in.TaskID)
 	if err != nil {
 		return fail("finishing the task: %v", err), nil, nil
@@ -417,7 +450,7 @@ func (s *Server) taskStart(ctx context.Context, req *mcp.CallToolRequest, in sta
 		Title:        strings.TrimSpace(in.Objective),
 		Kind:         "supervised",
 		Verification: recipe.Standard,
-		Budget:       task.Budget{MaxAttempts: 1, MaxWallTime: 30 * time.Minute, Scope: in.WriteScope},
+		Budget:       task.Budget{MaxAttempts: 3, MaxWallTime: 30 * time.Minute, Scope: in.WriteScope},
 	}
 	if err := task.NewStore(sess.Store).Create(ctx, t); err != nil {
 		return fail("opening the task: %v", err), startOut{}, nil
@@ -426,11 +459,15 @@ func (s *Server) taskStart(ctx context.Context, req *mcp.CallToolRequest, in sta
 	if err != nil {
 		return fail("finding original user prompt: %v", err), startOut{}, nil
 	}
-	if err := supervisor.RecordEvent(ctx, sess.Store, t.ID, ledger.KindSessionStart,
+	initialCandidate, err := ledger.ContentManifest(sess.Workspace.Root)
+	if err != nil {
+		return fail("recording initial candidate: %v", err), startOut{}, nil
+	}
+	if err := supervisor.RecordEventCandidate(ctx, sess.Store, t.ID, ledger.KindSessionStart,
 		map[string]any{"objective": t.Title, "executor": "opencode", "phase": "EDITOR", "session_id": openCodeSessionID(req),
 			"requirements": in.Requirements, "acceptance_criteria": in.AcceptanceCriteria,
 			"constraints": in.Constraints, "non_goals": in.NonGoals,
-			"original_prompt_hash": promptHash}); err != nil {
+			"original_prompt_hash": promptHash}, initialCandidate); err != nil {
 		return fail("recording the OpenCode session: %v", err), startOut{}, nil
 	}
 
@@ -583,7 +620,7 @@ type verifyOut struct {
 // by the client's timeout. `bcode opencode setup` writes a generous one for this
 // reason, and a client that times out anyway loses the answer rather than the
 // work: the journal and the evidence are already written.
-func (s *Server) verify(ctx context.Context, _ *mcp.CallToolRequest, in verifyIn) (*mcp.CallToolResult, verifyOut, error) {
+func (s *Server) verify(ctx context.Context, req *mcp.CallToolRequest, in verifyIn) (*mcp.CallToolResult, verifyOut, error) {
 	level := recipe.Standard
 	if in.Level != "" {
 		parsed, ok := recipe.ParseLevel(in.Level)
@@ -598,10 +635,51 @@ func (s *Server) verify(ctx context.Context, _ *mcp.CallToolRequest, in verifyIn
 	}
 	defer sess.Close() //nolint:contextcheck // cleanup must not take the request context: a cancelled call would then skip closing the databases.
 
+	var requiredLevel recipe.Level
+	var verificationScope []string
+	if in.TaskID != "" {
+		if err := requireTaskBinding(req, sess.Store, ctx, in.TaskID); err != nil {
+			return fail("%v", err), verifyOut{}, nil
+		}
+		supervised, err := task.NewStore(sess.Store).Get(ctx, in.TaskID)
+		if err != nil {
+			return fail("finding supervised task %q: %v", in.TaskID, err), verifyOut{}, nil
+		}
+		if supervised.Kind != "supervised" {
+			return fail("task %q is not a supervised task", in.TaskID), verifyOut{}, nil
+		}
+		if supervised.State.Terminal() {
+			return fail("task %q is %s; use the supervisor retry decision before verifying again", in.TaskID, supervised.State), verifyOut{}, nil
+		}
+		requiredLevel = supervised.Verification
+		verificationScope = append([]string(nil), supervised.Budget.Scope...)
+		if supervised.Budget.MaxWallTime > 0 && time.Since(supervised.CreatedAt) > supervised.Budget.MaxWallTime {
+			return fail("task %q exceeded its wall-clock budget; start a new task or record an operator decision", in.TaskID), verifyOut{}, nil
+		}
+		maxAttempts := supervised.Budget.MaxAttempts
+		if maxAttempts <= 0 {
+			maxAttempts = 3
+		}
+		var attempts int
+		if err := sess.Store.Ledger().SQL().QueryRowContext(ctx, `
+			SELECT COUNT(*) FROM operations
+			WHERE task_id=? AND kind='recipe_run' AND outcome IS NOT NULL`, in.TaskID).Scan(&attempts); err != nil {
+			return fail("counting verification attempts: %v", err), verifyOut{}, nil
+		}
+		if attempts >= maxAttempts {
+			return fail("task %q exhausted its bounded verification budget (%d/%d); no infinite retry loop is allowed", in.TaskID, attempts, maxAttempts), verifyOut{}, nil
+		}
+		if in.Level == "" {
+			level = requiredLevel
+		} else if !verificationLevelAtLeast(level, requiredLevel) {
+			return fail("task %q requires verification level %q; %q is insufficient", in.TaskID, requiredLevel, level), verifyOut{}, nil
+		}
+	}
+
 	t := task.Task{
 		ID: task.NewID("ocverify"), Title: "verify " + sess.Workspace.Name(),
 		Kind: "verification", Verification: level,
-		Budget: task.Budget{MaxAttempts: 1, MaxWallTime: 30 * time.Minute},
+		Budget: task.Budget{MaxAttempts: 1, MaxWallTime: 30 * time.Minute, Scope: verificationScope},
 	}
 	if err := task.NewStore(sess.Store).Create(ctx, t); err != nil {
 		return fail("opening the verification task: %v", err), verifyOut{}, nil
@@ -630,6 +708,13 @@ func (s *Server) verify(ctx context.Context, _ *mcp.CallToolRequest, in verifyIn
 		if err := supervisor.RecordVerification(ctx, sess.Store, in.TaskID, outcome); err != nil {
 			return fail("recording the verification against %s: %v", in.TaskID, err), verifyOut{}, nil
 		}
+		state := task.StateRunning
+		if outcome.Accepted {
+			state = task.StateReview
+		}
+		if err := task.NewStore(sess.Store).SetState(ctx, in.TaskID, state); err != nil {
+			return fail("recording supervised task state: %v", err), verifyOut{}, nil
+		}
 	}
 	return text(renderOutcome(outcome)), verifyOut{
 		Accepted:   outcome.Accepted,
@@ -637,6 +722,19 @@ func (s *Server) verify(ctx context.Context, _ *mcp.CallToolRequest, in verifyIn
 		Reasons:    outcome.Reasons,
 		OutOfScope: outcome.OutOfScope,
 	}, nil
+}
+
+func verificationLevelAtLeast(got, required recipe.Level) bool {
+	switch required {
+	case recipe.Low:
+		return true
+	case recipe.Standard:
+		return got == recipe.Standard || got == recipe.High
+	case recipe.High:
+		return got == recipe.High
+	default:
+		return false
+	}
 }
 
 func renderOutcome(o *task.Outcome) string {

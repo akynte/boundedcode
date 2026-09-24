@@ -268,7 +268,7 @@ func CheckPresets(presets []Preset, results []Result, candidate string) (bool, [
 	}
 	for _, p := range presets {
 		r, ok := byName[p.Name]
-		if !ok || r.Status != Pass || r.Candidate != candidate {
+		if !ok || r.Status != Pass || candidate == "" || r.Candidate == "" || r.Candidate != candidate {
 			reasons = append(reasons, "required preset did not pass on this candidate: "+p.Name)
 		}
 	}

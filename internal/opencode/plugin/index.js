@@ -87,7 +87,6 @@ export default {
       }
     }
     await ctx.session.hook("context", async (event) => {
-      if (event.model.providerID !== "boundedcode-local") return
       const state = await taskState(event.sessionID)
       if (state) event.system.push({ type: "text", text: state })
     })
@@ -173,7 +172,7 @@ export default {
       }
     })
     await ctx.session.hook("http.response", async (event) => {
-      if (event.model.providerID !== "boundedcode-local" || event.kind !== "primary") return
+      if (event.kind !== "primary") return
       if (!event.response.ok || !event.response.body) return
       // The response is normally an SSE stream. Observe a clone asynchronously
       // instead of awaiting its text here: buffering it would delay OpenCode's
@@ -238,7 +237,6 @@ export default {
       void inspect()
     })
     await ctx.session.hook("compaction", async (event) => {
-      if (event.model.providerID !== "boundedcode-local") return
       const state = await taskState(event.sessionID)
       const taskID = state.match(/BoundedCode authoritative task state \(task ([^;]+);/i)?.[1]
       if (!taskID) return

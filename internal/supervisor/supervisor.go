@@ -15,6 +15,7 @@ package supervisor
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -79,7 +80,10 @@ func Runner(ctx context.Context, root *store.Root, st *store.Store, eng engine.E
 		warnf = func(string, ...any) {}
 	}
 
-	cfg, _ := Config(root)
+	cfg, err := Config(root)
+	if err != nil {
+		return nil, fmt.Errorf("load boundedcode configuration: %w", err)
+	}
 	sb, report := SelectSandbox(ctx, cfg)
 	if sb == nil {
 		return nil, fmt.Errorf("no sandbox runner is available; verification must not run unconfined")
@@ -128,8 +132,12 @@ func Runner(ctx context.Context, root *store.Root, st *store.Store, eng engine.E
 	}
 	r.Ledger.SetSigner(key)
 
-	if profile := Profile(root, cfg); profile != nil {
-		r.PhaseBudgets = profile.PhaseBudgets
+	activeProfile, err := ProfileChecked(root, cfg)
+	if err != nil {
+		return nil, fmt.Errorf("load active profile: %w", err)
+	}
+	if activeProfile != nil {
+		r.PhaseBudgets = activeProfile.PhaseBudgets
 	}
 
 	// §3.4: a repository the watcher has marked dirty is re-analysed before a
@@ -149,7 +157,11 @@ func Runner(ctx context.Context, root *store.Root, st *store.Store, eng engine.E
 	// model the engine happens to hold. task.NewRunner seeds WorkflowModel
 	// from the engine so a standalone engine still works; this replaces it
 	// when providers.yaml routes planning somewhere of its own.
-	if provider, err := PlanningProvider(root); err == nil && provider != nil {
+	planningProvider, err := PlanningProvider(root)
+	if err != nil {
+		return nil, fmt.Errorf("resolve planning role: %w", err)
+	}
+	if provider := planningProvider; provider != nil {
 		if !provider.Capabilities().StructuredOutput {
 			return nil, fmt.Errorf("the planning role is routed to %s, which does not declare "+
 				"structured output; LOCALIZE and PLAN are structured calls and a plan parsed "+
@@ -161,15 +173,18 @@ func Runner(ctx context.Context, root *store.Root, st *store.Store, eng engine.E
 		r.WorkflowModel = provider
 	}
 
-	if provider, err := ReviewProvider(root); err == nil && provider != nil &&
-		provider.Capabilities().StructuredOutput {
+	reviewProvider, err := ReviewProvider(root)
+	if err != nil {
+		return nil, fmt.Errorf("resolve review role: %w", err)
+	}
+	if provider := reviewProvider; provider != nil && provider.Capabilities().StructuredOutput {
 		r.ReviewModel = provider
 		r.Critic = &critic.Critic{Provider: provider, MaxTokens: 2048, Temperature: 0.1}
-		if profile := Profile(root, cfg); profile != nil {
-			r.Critic.Thinking = profile.Thinking
-			r.Critic.MaxTokens = profile.ReservedOutput
+		if activeProfile != nil {
+			r.Critic.Thinking = activeProfile.Thinking
+			r.Critic.MaxTokens = activeProfile.ReservedOutput
 		}
-	} else if err == nil && provider != nil {
+	} else if provider != nil {
 		logf("review and diagnosis are off: %s does not declare structured output", provider.Name())
 	}
 
@@ -247,14 +262,22 @@ func Config(root *store.Root) (config.Config, error) {
 // Profile loads the active hardware profile, or nil when none is set or it
 // cannot be read. A missing profile is a degraded default, not a failure.
 func Profile(root *store.Root, cfg config.Config) *config.Profile {
+	p, _ := ProfileChecked(root, cfg)
+	return p
+}
+
+// ProfileChecked is the fail-closed form used by task construction. Profile is
+// retained for doctor/setup callers that intentionally treat a missing or
+// unreadable optional profile as the shipped default.
+func ProfileChecked(root *store.Root, cfg config.Config) (*config.Profile, error) {
 	if cfg.Profile == "" {
-		return nil
+		return nil, nil
 	}
 	p, err := config.LoadProfile(filepath.Join(root.Layout().ConfigDir(), "profiles"), cfg.Profile)
 	if err != nil {
-		return nil
+		return nil, err
 	}
-	return &p
+	return &p, nil
 }
 
 // SelectSandbox picks the strongest confinement the host actually permits.
@@ -313,7 +336,10 @@ func PlanningProvider(root *store.Root) (llm.Provider, error) {
 func RoleProvider(root *store.Root, role llm.Role) (llm.Provider, error) {
 	f, err := llm.LoadProvidersFile(root.Layout().ConfigDir())
 	if err != nil {
-		return nil, nil //nolint:nilerr // no providers configured is not a fault
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("load providers.yaml: %w", err)
 	}
 	// The router's second argument was the offline flag, which no longer
 	// exists: a remote decision service is required, so there is no mode in

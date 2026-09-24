@@ -131,7 +131,7 @@ func TestVerificationOnlyTaskAcceptsCleanCode(t *testing.T) {
 
 	id := task.NewID("t")
 	if err := task.NewStore(st).Create(ctx, task.Task{
-		ID: id, Title: "verify the package", Verification: recipe.Standard,
+		ID: id, Title: "verify the package", Kind: "verification", Verification: recipe.Standard,
 		Budget: task.Budget{MaxAttempts: 1, MaxWallTime: 5 * time.Minute},
 	}); err != nil {
 		t.Fatal(err)
@@ -523,7 +523,7 @@ func TestUncommittedChangesAreVerifiedWhenSyncIsOn(t *testing.T) {
 		r.SyncUncommitted = sync
 		id := task.NewID("t")
 		if err := task.NewStore(st).Create(context.Background(), task.Task{
-			ID: id, Title: "verify", Verification: recipe.Standard,
+			ID: id, Title: "verify", Kind: "verification", Verification: recipe.Standard,
 			Budget: task.Budget{MaxAttempts: 1, MaxWallTime: 5 * time.Minute},
 		}); err != nil {
 			t.Fatal(err)
@@ -572,7 +572,7 @@ func TestSyncCarriesUntrackedFiles(t *testing.T) {
 	r.SyncUncommitted = true
 	id := task.NewID("t")
 	if err := task.NewStore(st).Create(context.Background(), task.Task{
-		ID: id, Title: "verify", Verification: recipe.Standard,
+		ID: id, Title: "verify", Kind: "verification", Verification: recipe.Standard,
 		Budget: task.Budget{MaxAttempts: 1, MaxWallTime: 5 * time.Minute},
 	}); err != nil {
 		t.Fatal(err)
@@ -737,8 +737,12 @@ func runGated(t *testing.T, repo string, eng engine.Engine, level recipe.Level, 
 
 	ctx := context.Background()
 	id := task.NewID("t")
+	kind := "change"
+	if !engine.Edits(eng) {
+		kind = "verification"
+	}
 	if err := task.NewStore(st).Create(ctx, task.Task{
-		ID: id, Title: "gated task", Verification: level,
+		ID: id, Title: "gated task", Kind: kind, Verification: level,
 		Budget: task.Budget{MaxAttempts: 1, MaxWallTime: 5 * time.Minute, Scope: scope},
 	}); err != nil {
 		t.Fatal(err)

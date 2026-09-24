@@ -110,8 +110,8 @@ func TestWorkflowRequiresIndependentAcceptance(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if out.Accepted != accept {
-				t.Fatalf("accept=%v outcome=%+v", accept, out)
+			if !out.Accepted {
+				t.Fatalf("deterministic verification should remain authoritative when review returns accept=%t: %+v", accept, out)
 			}
 			if model.calls != 5 || editor.calls != 1 {
 				t.Fatalf("structured=%d edit=%d", model.calls, editor.calls)

@@ -402,7 +402,7 @@ func CheckImpact(results []recipe.Result, candidate string) (bool, []string) {
 		if res.Kind != recipe.KindImpact || res.Recipe != ImpactRecipe || res.Status != recipe.Fail {
 			continue
 		}
-		if candidate != "" && res.Candidate != "" && res.Candidate != candidate {
+		if candidate != "" && res.Candidate != candidate {
 			continue
 		}
 		reasons := []string{"impact: " + res.Summary.Headline}

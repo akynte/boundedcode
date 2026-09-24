@@ -76,7 +76,7 @@ func (r *Runner) runPhases(ctx context.Context, t *Task, wt *worktree.Worktree) 
 		ctx, cancel = context.WithDeadline(ctx, time.UnixMilli(s.StartedAt).Add(t.Budget.MaxWallTime))
 		defer cancel()
 	}
-	out := &Outcome{Task: *t}
+	out := &Outcome{Task: *t, VerificationLevel: t.Verification}
 	stop := func(status State, reason string) (*Outcome, error) {
 		out.Accepted = status == StateAccepted
 		out.Attempts, out.TokensUsed = s.Attempts, s.Tokens
@@ -117,6 +117,7 @@ func (r *Runner) runPhases(ctx context.Context, t *Task, wt *worktree.Worktree) 
 		}
 		previous := s.Phase
 		s.Phase = next
+		s.StructuredRetries = 0
 		if err := r.Store.SaveWorkflow(ctx, t.ID, s); err != nil {
 			s.Phase = previous
 			return err
@@ -529,6 +530,17 @@ func (r *Runner) runPhases(ctx context.Context, t *Task, wt *worktree.Worktree) 
 			s.Edit = workflow.Transcript{}
 			err = move(workflow.Edit)
 		case workflow.Edit:
+			if s.Budgeted {
+				changed, changeErr := wt.ChangedFiles(ctx)
+				if changeErr != nil {
+					return stop(StateFailed, "edit budget exhausted and the worktree could not be inspected: "+changeErr.Error())
+				}
+				if len(changed) == 0 {
+					return stop(StateFailed, "edit budget exhausted without a candidate to verify")
+				}
+				err = move(workflow.Verify)
+				break
+			}
 			if !s.Edit.Pending && s.Edit.Candidate != "" && s.Edit.Candidate != s.Candidate {
 				return stop(StateBlocked, "candidate changed outside the persisted EDIT transcript")
 			}
@@ -1196,15 +1208,15 @@ func (r *Runner) runPhases(ctx context.Context, t *Task, wt *worktree.Worktree) 
 			}
 			s.Verdict = &verdict
 			if !verdict.Accept {
-				if s.Attempts >= maxAttempts {
-					return stop(StateFailed, "review rejected: "+strings.Join(verdict.Findings, "; "))
-				}
-				s.Feedback = []recipe.Result{phaseFinding("review rejected: " + strings.Join(verdict.Findings, "; "))}
-				s.Edit = workflow.Transcript{}
-				err = move(workflow.Edit)
-			} else {
-				err = move(workflow.Finalize)
+				// A reviewer is a fallible reader, not the completion oracle.
+				// Keep its findings in the durable state for the human gate,
+				// but let the Supervisor's deterministic verification policy
+				// choose the next phase. A model must not be able to spend the
+				// repair budget or reopen EDIT merely by returning accept=false.
+				r.logf("task %s: review concerns recorded without changing the supervisor decision: %s",
+					t.ID, strings.Join(verdict.Findings, "; "))
 			}
+			err = move(workflow.Finalize)
 		case workflow.Finalize:
 			// Re-check the candidate on resume; never apply a verdict to drifted code.
 			verifiedCandidate := ""
@@ -1223,7 +1235,11 @@ func (r *Runner) runPhases(ctx context.Context, t *Task, wt *worktree.Worktree) 
 					repoID = r.store.ID().String()
 				}
 				var card strings.Builder
-				fmt.Fprintf(&card, "# Task %s\n\nObjective: %s\n\nStatus: review accepted; ready to commit.\n\nVerified code candidate: `%s`\n\nRoot cause: %s\n\nChanged files:\n", t.ID, t.Title, s.Candidate, s.Plan.RootCause)
+				reviewStatus := "deterministic verification accepted; ready to commit"
+				if s.Verdict != nil && !s.Verdict.Accept {
+					reviewStatus = "deterministic verification accepted; model review concerns recorded for the gate"
+				}
+				fmt.Fprintf(&card, "# Task %s\n\nObjective: %s\n\nStatus: %s.\n\nVerified code candidate: `%s`\n\nRoot cause: %s\n\nChanged files:\n", t.ID, t.Title, reviewStatus, s.Candidate, s.Plan.RootCause)
 				for _, file := range s.Plan.Files {
 					fmt.Fprintf(&card, "- %s\n", file)
 				}

@@ -28,6 +28,8 @@ func OpenCodeContext(ctx context.Context, st *store.Store, repoRoot, sessionID s
 		SELECT task_id FROM operations
 		WHERE kind = 'session_start' AND json_valid(intent)
 		  AND json_extract(intent, '$.session_id') = ?
+		  AND id = (SELECT MAX(o2.id) FROM operations o2
+		             WHERE o2.task_id = operations.task_id AND o2.kind = 'session_start')
 		ORDER BY id DESC LIMIT 1`, sessionID).Scan(&taskID)
 	if err != nil && err != sql.ErrNoRows {
 		return "", err
@@ -196,7 +198,7 @@ func OpenCodeContext(ctx context.Context, st *store.Store, repoRoot, sessionID s
 	if shown < decisionCount {
 		fmt.Fprintf(&b, "%d earlier user decisions remain in the task ledger. Call bc_task_history with task_id=%s to retrieve them.\n", decisionCount-shown, t.ID)
 	}
-	if changed := changedFiles(ctx, repoRoot); len(changed) > 0 {
+	if changed, err := changedFiles(ctx, repoRoot); err == nil && len(changed) > 0 {
 		const maxChangedBytes = 2000
 		var listed []string
 		used := 0

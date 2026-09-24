@@ -3,6 +3,8 @@ package mcp
 import (
 	"strings"
 	"testing"
+
+	"github.com/akynte/boundedcode/internal/recipe"
 )
 
 // The cap used to be 500 characters, tight enough that a real acceptance
@@ -70,5 +72,26 @@ func TestValidateTaskDetailsEnforcesTheTotalBudgetAcrossGroups(t *testing.T) {
 func TestValidateTaskDetailsRejectsAnEmptyItem(t *testing.T) {
 	if err := validateTaskDetails([]string{"real one", "  "}); err == nil {
 		t.Error("a blank item was accepted")
+	}
+}
+
+func TestVerificationLevelCannotBeWeakenedForASupervisedTask(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		got      recipe.Level
+		required recipe.Level
+		allowed  bool
+	}{
+		{"standard satisfies standard", recipe.Standard, recipe.Standard, true},
+		{"high satisfies standard", recipe.High, recipe.Standard, true},
+		{"low does not satisfy standard", recipe.Low, recipe.Standard, false},
+		{"standard does not satisfy high", recipe.Standard, recipe.High, false},
+		{"low satisfies low", recipe.Low, recipe.Low, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := verificationLevelAtLeast(tc.got, tc.required); got != tc.allowed {
+				t.Fatalf("verificationLevelAtLeast(%q, %q) = %t, want %t", tc.got, tc.required, got, tc.allowed)
+			}
+		})
 	}
 }
