@@ -7,6 +7,14 @@ import { join } from "node:path"
 export default {
   id: "boundedcode.context",
   async setup(ctx) {
+    // OpenCode treats a length-finished assistant message as a successful
+    // session. That is especially harmful for Bonsai: a reasoning response can
+    // use the whole output allowance and leave no answer or tool call, after
+    // which the UI is idle and waiting for a new user turn. Keep this recovery
+    // bounded so a model that cannot act cannot create an endless synthetic
+    // prompt loop.
+    const recoveries = new Map()
+    const maxRecoveries = 2
     await ctx.session.hook("prompt", async (event) => {
       if (!event.prompt.text) return
       const child = Bun.spawn(["bcode", "opencode", "record-prompt", "--session", String(event.sessionID), "--message", String(event.messageID)], {
@@ -124,6 +132,71 @@ export default {
       } catch (error) {
         console.error(`BoundedCode request accounting failed: ${error}`)
       }
+    })
+    await ctx.session.hook("http.response", async (event) => {
+      if (event.model.providerID !== "boundedcode-local" || event.kind !== "primary") return
+      if (!event.response.ok || !event.response.body) return
+      // The response is normally an SSE stream. Observe a clone asynchronously
+      // instead of awaiting its text here: buffering it would delay OpenCode's
+      // live stream to the UI and could turn a fast tool call into a stalled
+      // turn. The original response remains untouched.
+      const inspect = async () => {
+        let finishReason
+        let hasContent = false
+        const observe = (body) => {
+          const choice = body?.choices?.[0]
+          if (choice?.finish_reason) finishReason = choice.finish_reason
+          const delta = choice?.delta
+          const message = choice?.message
+          if (typeof delta?.content === "string" && delta.content.trim() !== "") hasContent = true
+          if (typeof message?.content === "string" && message.content.trim() !== "") hasContent = true
+        }
+        const parse = (text) => {
+          if (text.trimStart().startsWith("{")) {
+            try { observe(JSON.parse(text)) } catch {}
+            return
+          }
+          for (const line of text.split("\\n")) {
+            const value = line.startsWith("data:") ? line.slice(5).trimStart() : ""
+            if (!value || value === "[DONE]") continue
+            try { observe(JSON.parse(value)) } catch {}
+          }
+        }
+        const reader = event.response.clone().body.getReader()
+        const decoder = new TextDecoder()
+        let pending = ""
+        try {
+          while (true) {
+            const next = await reader.read()
+            pending += decoder.decode(next.value ?? new Uint8Array(), { stream: !next.done })
+            const lines = pending.split("\\n")
+            pending = lines.pop() ?? ""
+            parse(lines.join("\\n"))
+            if (next.done) break
+          }
+          parse(pending)
+          if (finishReason !== "length" || hasContent) {
+            recoveries.delete(event.sessionID)
+            return
+          }
+          const count = recoveries.get(event.sessionID) ?? 0
+          if (count >= maxRecoveries) return
+          recoveries.set(event.sessionID, count + 1)
+          await ctx.session.synthetic({
+            sessionID: event.sessionID,
+            text: "[boundedcode] The previous model response reached its output limit before producing a final answer or a tool call. Do not repeat the reasoning. Act on the task now with a concrete tool call, or provide a concise final answer.",
+            description: "Recovering truncated model response",
+            resume: true,
+          })
+        } catch (error) {
+          // The provider's response is still handled by OpenCode. A clone
+          // failure must never turn a normal model turn into a session error.
+          console.error(`BoundedCode could not inspect an OpenCode response: ${error}`)
+        } finally {
+          reader.releaseLock()
+        }
+      }
+      void inspect()
     })
     await ctx.session.hook("compaction", async (event) => {
       if (event.model.providerID !== "boundedcode-local") return

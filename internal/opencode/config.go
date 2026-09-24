@@ -63,6 +63,14 @@ func InstallPlugin(stateDir string) (dir string, changed bool, err error) {
 // policy that fits the reference 32K Bonsai slot. OpenCode 2.0.15 otherwise
 // retains 15K tokens after compacting while its 20K buffer triggers at 12.8K.
 //
+// The retained-tail setting is not a hard request-size limit in OpenCode: its
+// compaction code always keeps the newest user exchange, including every tool
+// result in that exchange. A model can therefore return one large answer and
+// the next request can be over the trigger again even when keep.tokens is 4K.
+// The local tool-output limit is part of the same policy: it keeps several
+// parallel reads from recreating that oversized exchange. It is applied only
+// to the reference Bonsai model, whose 32K physical window is known here.
+//
 // pluginDir is the absolute path InstallPlugin returned; the caller extracts
 // once and passes it in, rather than this function reaching into the
 // filesystem on its own, so a test can register a policy against a plugin
@@ -102,6 +110,19 @@ func RegisterContextPolicy(repoRoot, pluginDir string) (string, bool, error) {
 			}
 			if !equalJSON(doc["compaction"], want) {
 				doc["compaction"] = want
+				changed = true
+			}
+			// OpenCode's default is 50 KiB per tool result. That is larger than
+			// the useful part of a 32K request when a model makes several reads
+			// in parallel, and it is especially harmful after compaction because
+			// the whole latest user exchange is retained. Keep enough source for
+			// a normal chunk while making the request boundary predictable.
+			wantToolOutput := map[string]any{
+				"max_bytes": 8 << 10,
+				"max_lines": 200,
+			}
+			if !equalJSON(doc["tool_output"], wantToolOutput) {
+				doc["tool_output"] = wantToolOutput
 				changed = true
 			}
 		}
@@ -300,6 +321,15 @@ func RegisterModel(repoRoot, baseURL, model string) (path string, changed bool, 
 				"output": []any{"text"},
 			}
 			modelConfig["limit"] = map[string]any{"context": 32768, "output": 8192}
+			// Bonsai defaults to an xhigh thinking mode. In OpenCode that mode
+			// can spend the complete output allowance before emitting a tool
+			// call or a final answer; the native BoundedCode loop detects that,
+			// but OpenCode otherwise records the truncated step as a successful
+			// idle session. Pass the model's supported template switch so the
+			// editor path is a bounded tool loop too.
+			modelConfig["body"] = map[string]any{
+				"chat_template_kwargs": map[string]any{"enable_thinking": false},
+			}
 		}
 		want := map[string]any{
 			"name":     "Local (via boundedcode)",

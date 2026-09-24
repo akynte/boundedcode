@@ -42,8 +42,24 @@ For the local Bonsai model, setup writes `compaction.auto=true`,
 `compaction.buffer=12000` and `compaction.keep.tokens=4000`. The nominal
 preflight threshold is now 20,768 tokens. The retained tail is smaller than
 the threshold by 16,768 tokens, leaving room for the summary and fixed prompt.
-OpenCode's estimate is heuristic; a single very large message can still exceed
-the physical window.
+That setting is not a hard request-size limit, though: OpenCode keeps the
+newest user exchange as a unit, so several parallel tool results can recreate
+an oversized exchange after compaction. Setup therefore also writes
+`tool_output.max_bytes=8192` and `tool_output.max_lines=200` for Bonsai. OpenCode
+saves a full result outside the model request and gives the model a bounded
+prefix, so the agent can page through the repository instead of carrying an
+unbounded read in every subsequent turn. A single very large user message can
+still exceed the physical window.
+
+The same setup writes `body.chat_template_kwargs.enable_thinking=false` on the
+Bonsai model in `opencode.json`. The native task loop can detect a reasoning
+response that exhausted its output allowance; OpenCode does not have that
+recovery path and otherwise records a length-finished, answerless response as a
+successful idle session. With thinking disabled, the model spends its bounded
+output on tool calls or an answer instead. The context plugin also recognizes a
+length-finished answerless response and injects at most two synthetic recovery
+prompts, so a provider or model that still truncates cannot leave the session
+silently idle or create an unbounded prompt loop.
 
 The project OpenCode plugin invokes `bcode opencode context --session <id>` at
 each primary model request. That Go command reconstructs a small card from the
@@ -66,10 +82,11 @@ process restarts. Any OpenCode generated summary from an unsupervised session
 is working context, not the authority for these fields.
 For a bound supervised task, the plugin also supplies a short deterministic
 OpenCode compaction checkpoint. This skips the separate model summary request
-and prevents recursive summaries from becoming the task record. OpenCode keeps
-its configured 4K recent tail; the next primary request receives a new ledger
-card. Current unrecorded reasoning or tool output outside that tail still has
-to be recovered from repository evidence.
+and prevents recursive summaries from becoming the task record. OpenCode still
+retains the newest user exchange and a configured short recent tail; the tool
+output limit above keeps that exchange bounded. The next primary request
+receives a new ledger card. Current unrecorded reasoning or tool output outside
+that tail still has to be recovered from repository evidence.
 
 The card does **not** yet capture every fact encountered in OpenCode's read and
 search results. Those results remain in OpenCode's stored history and the

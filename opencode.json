@@ -26,6 +26,10 @@
       "tokens": 4000
     }
   },
+  "tool_output": {
+    "max_bytes": 8192,
+    "max_lines": 200
+  },
   "default_agent": "bc-editor",
   "mcp": {
     "servers": {
@@ -63,6 +67,11 @@
           "limit": {
             "context": 32768,
             "output": 8192
+          },
+          "body": {
+            "chat_template_kwargs": {
+              "enable_thinking": false
+            }
           },
           "name": "boundedcode-bonsai"
         }

@@ -231,6 +231,19 @@ func TestContextPolicyFitsTheBonsaiWindowAndIsIdempotent(t *testing.T) {
 				Tokens int `json:"tokens"`
 			} `json:"keep"`
 		} `json:"compaction"`
+		ToolOutput struct {
+			MaxBytes int `json:"max_bytes"`
+			MaxLines int `json:"max_lines"`
+		} `json:"tool_output"`
+		Providers map[string]struct {
+			Models map[string]struct {
+				Body struct {
+					ChatTemplate struct {
+						EnableThinking *bool `json:"enable_thinking"`
+					} `json:"chat_template_kwargs"`
+				} `json:"body"`
+			} `json:"models"`
+		} `json:"providers"`
 		Plugins []string `json:"plugins"`
 	}
 	if err := json.Unmarshal(body, &doc); err != nil {
@@ -238,6 +251,16 @@ func TestContextPolicyFitsTheBonsaiWindowAndIsIdempotent(t *testing.T) {
 	}
 	if !doc.Compaction.Auto || doc.Compaction.Buffer != 12000 || doc.Compaction.Keep.Tokens != 4000 {
 		t.Fatalf("incorrect 32K compaction policy: %+v", doc.Compaction)
+	}
+	if doc.ToolOutput.MaxBytes != 8<<10 || doc.ToolOutput.MaxLines != 200 {
+		t.Fatalf("tool output can recreate an oversized retained exchange: %+v", doc.ToolOutput)
+	}
+	var bonsaiThinking *bool
+	for _, models := range doc.Providers[opencode.ProviderName].Models {
+		bonsaiThinking = models.Body.ChatTemplate.EnableThinking
+	}
+	if bonsaiThinking == nil || *bonsaiThinking {
+		t.Fatalf("Bonsai thinking is not explicitly disabled for OpenCode: %+v", bonsaiThinking)
 	}
 	if len(doc.Plugins) != 1 || doc.Plugins[0] != pluginDir {
 		t.Fatalf("context adapter not registered at its installed, portable path: %v", doc.Plugins)
@@ -263,6 +286,9 @@ func TestInstallPluginExtractsRealContentIdempotently(t *testing.T) {
 	}
 	if !strings.Contains(string(body), "boundedcode.context") {
 		t.Fatalf("extracted plugin does not look like the real adapter:\n%s", body)
+	}
+	if !strings.Contains(string(body), "finish_reason") || !strings.Contains(string(body), "ctx.session.synthetic") {
+		t.Fatalf("extracted plugin does not recover a length-finished response:\n%s", body)
 	}
 	if _, err := os.ReadFile(filepath.Join(dir, "package.json")); err != nil {
 		t.Fatalf("package.json was not extracted: %v", err)
