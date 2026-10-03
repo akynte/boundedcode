@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -324,9 +325,9 @@ func (r *InfraRunner) measure(ctx context.Context, opt InfraOptions, ctxSize int
 		// assistant reply + a new observation. This measures prompt-cache
 		// reuse for that pattern (hybrid recurrent models can only roll back
 		// to checkpoints, so mid-prompt edits would not be representative).
-		follow := append(msgs,
-			inference.Message{Role: "assistant", Content: reply},
-			inference.Message{Role: "user", Content: "Observation: go test ./... failed in Handle3 with a nil pointer. What is the fix?"})
+		follow := slices.Concat(msgs, []inference.Message{
+			{Role: "assistant", Content: reply},
+			{Role: "user", Content: "Observation: go test ./... failed in Handle3 with a nil pointer. What is the fix?"}})
 		warm, _ := runPrompt(ctx, client, opt.Profile.Name, follow, opt.DecodeTokens)
 		warm.TargetTokens, warm.Cached = size, true
 		c.Runs = append(c.Runs, warm)

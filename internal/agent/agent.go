@@ -19,10 +19,10 @@ type Runtime interface {
 // them into its sandbox.
 type OpenRequest struct {
 	TaskID         string
-	SessionID      string // empty: new session
-	Workspace      string // task worktree (host path)
-	GitCommonDir   string // repository .git dir backing the worktree (host path)
-	PersistenceDir string // runtime-owned conversation state (host path)
+	SessionID      string   // empty: new session
+	Workspace      string   // agent working root: one directory per repo worktree (host path)
+	GitCommonDirs  []string // repository .git dirs backing the worktrees (host paths)
+	PersistenceDir string   // runtime-owned conversation state (host path)
 	Model          string
 	MaxIterations  int
 	// MaxInputTokens is the model context; the condenser keeps prompts below it.

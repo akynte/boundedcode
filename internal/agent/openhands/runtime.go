@@ -70,8 +70,8 @@ func (r *Runtime) Open(ctx context.Context, req agent.OpenRequest) (agent.Sessio
 		{Host: req.Workspace, Target: req.Workspace},
 		{Host: req.PersistenceDir, Target: req.PersistenceDir},
 	}
-	if req.GitCommonDir != "" {
-		mounts = append(mounts, sandbox.Mount{Host: req.GitCommonDir, Target: req.GitCommonDir})
+	for _, d := range req.GitCommonDirs {
+		mounts = append(mounts, sandbox.Mount{Host: d, Target: d})
 	}
 	var masks []string
 	for _, m := range req.Masks {
@@ -166,7 +166,7 @@ func (r *Runtime) Open(ctx context.Context, req agent.OpenRequest) (agent.Sessio
 	select {
 	case <-ready:
 	case <-s.exited:
-		return nil, fmt.Errorf("adapter exited before ready: %v (see %s)", s.waitErr, logf.Name())
+		return nil, fmt.Errorf("adapter exited before ready: %w (see %s)", s.waitErr, logf.Name())
 	case <-time.After(timeout):
 		_ = s.Close()
 		return nil, fmt.Errorf("adapter not ready after %s (see %s)", timeout, logf.Name())
@@ -210,7 +210,7 @@ func (s *session) call(ctx context.Context, method string, params, out any) erro
 	if errors.Is(err, jsonrpc.ErrClosed) {
 		select {
 		case <-s.exited:
-			return fmt.Errorf("adapter process exited (%v); see %s", s.waitErr, s.logf.Name())
+			return fmt.Errorf("adapter process exited (%w); see %s", s.waitErr, s.logf.Name())
 		case <-time.After(2 * time.Second):
 			return fmt.Errorf("adapter connection closed; see %s", s.logf.Name())
 		}

@@ -68,8 +68,9 @@ func (g *Gateway) Forward(ctx context.Context, path string, body map[string]any)
 	case errors.As(err, &he):
 		status = he.Status
 	case err != nil:
+		// Transport errors become a 502 for the agent, not a Go error.
 		g.record(ctx, 0, 0, 0, nil, total, "transport_error")
-		return http.StatusBadGateway, map[string]any{"error": map[string]any{"message": err.Error()}}, nil
+		return http.StatusBadGateway, map[string]any{"error": map[string]any{"message": err.Error()}}, nil //nolint:nilerr // see above
 	}
 	var parsed struct {
 		Usage   Usage    `json:"usage"`

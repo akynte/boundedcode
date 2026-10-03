@@ -47,6 +47,10 @@ func newRoot(app *App) *cobra.Command {
 		newWorkspaceCmd(app),
 		newIndexCmd(app),
 		newIntelCmd(app),
+		newTaskCmd(app),
+		newVerifyCmd(app),
+		newFrontierCmd(app),
+		newSandboxCmd(app),
 	)
 	return root
 }

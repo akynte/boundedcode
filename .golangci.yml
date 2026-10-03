@@ -14,5 +14,8 @@ linters:
       disabled-checks: [ifElseChain, singleCaseSwitch]
   exclusions:
     presets: [std-error-handling]
+    rules:
+      - path: _test\.go
+        linters: [noctx]
 formatters:
   enable: [gofmt]

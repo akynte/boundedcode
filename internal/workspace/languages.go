@@ -22,7 +22,7 @@ func DetectLanguages(root string) []string {
 	n := 0
 	_ = filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
-			return nil
+			return nil //nolint:nilerr // unreadable entries are skipped
 		}
 		if d.IsDir() {
 			if skipDirs[d.Name()] {
