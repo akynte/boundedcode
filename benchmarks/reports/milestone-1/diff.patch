@@ -1,0 +1,323 @@
+### ledger-service
+diff --git a/internal/consumer/consumer_test.go b/internal/consumer/consumer_test.go
+index d5c3d8f..431f3ba 100644
+--- a/internal/consumer/consumer_test.go
++++ b/internal/consumer/consumer_test.go
+@@ -20,3 +20,30 @@ func TestHandlePaymentCharged(t *testing.T) {
+ 		t.Fatalf("settlement = %d", got)
+ 	}
+ }
++
++func TestHandlePaymentChargedIdempotent(t *testing.T) {
++	l := &ledger.Ledger{}
++	c := &Consumer{Ledger: l}
++	msg := &ConsumerMessage{Topic: TopicPaymentCharged, Value: []byte(`{"payment_id":"p1","account_id":"a1","amount_cents":500,"currency":"EUR"}`)}
++
++	// Process the same event twice
++	if err := c.HandlePaymentCharged(msg); err != nil {
++		t.Fatal(err)
++	}
++	if err := c.HandlePaymentCharged(msg); err != nil {
++		t.Fatal(err)
++	}
++
++	// Balance should only reflect one posting
++	if got := l.Balance("a1"); got != 500 {
++		t.Fatalf("balance = %d, want 500", got)
++	}
++	if got := l.Balance(SettlementAccount); got != -500 {
++		t.Fatalf("settlement = %d, want -500", got)
++	}
++
++	// Only 2 entries total (one pair), not 4
++	if got := len(l.Entries()); got != 2 {
++		t.Fatalf("entries count = %d, want 2", got)
++	}
++}
+diff --git a/internal/ledger/ledger.go b/internal/ledger/ledger.go
+index 690c3c5..914e25b 100644
+--- a/internal/ledger/ledger.go
++++ b/internal/ledger/ledger.go
+@@ -16,13 +16,22 @@ type Entry struct {
+ 
+ // Ledger stores entries in memory (stand-in for SQL).
+ type Ledger struct {
+-	mu      sync.Mutex
+-	entries []Entry
++	mu             sync.Mutex
++	entries        []Entry
++	postedPayments map[string]struct{}
+ }
+ 
+ // ErrUnbalanced is returned when entries do not sum to zero.
+ var ErrUnbalanced = errors.New("unbalanced posting")
+ 
++// HasPosted reports whether entries for the given payment_id have already been posted.
++func (l *Ledger) HasPosted(paymentID string) bool {
++	l.mu.Lock()
++	defer l.mu.Unlock()
++	_, ok := l.postedPayments[paymentID]
++	return ok
++}
++
+ // Post records a balanced set of entries:
+ // INSERT INTO ledger_entries (payment_id, account_id, amount_cents, currency) VALUES ...
+ func (l *Ledger) Post(entries ...Entry) error {
+@@ -35,7 +44,18 @@ func (l *Ledger) Post(entries ...Entry) error {
+ 	}
+ 	l.mu.Lock()
+ 	defer l.mu.Unlock()
++	for _, e := range entries {
++		if _, ok := l.postedPayments[e.PaymentID]; ok {
++			return nil
++		}
++	}
+ 	l.entries = append(l.entries, entries...)
++	for _, e := range entries {
++		if l.postedPayments == nil {
++			l.postedPayments = make(map[string]struct{})
++		}
++		l.postedPayments[e.PaymentID] = struct{}{}
++	}
+ 	return nil
+ }
+ 
+diff --git a/internal/consumer/hidden_accept_test.go b/internal/consumer/hidden_accept_test.go
+new file mode 100644
+index 0000000..17b157a
+--- /dev/null
++++ b/internal/consumer/hidden_accept_test.go
+@@ -0,0 +1,21 @@
++package consumer
++
++import (
++	"testing"
++
++	"example.com/ledger-service/internal/ledger"
++)
++
++func TestHiddenDuplicateEvent(t *testing.T) {
++	l := &ledger.Ledger{}
++	c := &Consumer{Ledger: l}
++	msg := &ConsumerMessage{Topic: TopicPaymentCharged, Value: []byte(`{"payment_id":"p1","account_id":"a","amount_cents":500,"currency":"EUR"}`)}
++	for i := 0; i < 3; i++ {
++		if err := c.HandlePaymentCharged(msg); err != nil {
++			t.Fatalf("attempt %d: %v", i, err)
++		}
++	}
++	if l.Balance("a") != 500 || len(l.Entries()) != 2 {
++		t.Fatalf("balance=%d entries=%d", l.Balance("a"), len(l.Entries()))
++	}
++}
+
+### payment-service
+diff --git a/internal/api/handler.go b/internal/api/handler.go
+index c40cfdc..c0be9bd 100644
+--- a/internal/api/handler.go
++++ b/internal/api/handler.go
+@@ -6,6 +6,7 @@ import (
+ 	"encoding/hex"
+ 	"encoding/json"
+ 	"net/http"
++	"sync"
+ 
+ 	"example.com/payment-service/internal/events"
+ 	"example.com/payment-service/internal/store"
+@@ -15,6 +16,23 @@ import (
+ type Handler struct {
+ 	Store  *store.Store
+ 	Events *events.Publisher
++
++	mu             sync.Mutex
++	idempotencyMap map[string]idempotentResult
++}
++
++type idempotentResult struct {
++	Payment store.Payment
++	Status  int
++}
++
++// NewHandler returns a Handler with initialized idempotency map.
++func NewHandler(s *store.Store, e *events.Publisher) *Handler {
++	return &Handler{
++		Store:          s,
++		Events:         e,
++		idempotencyMap: make(map[string]idempotentResult),
++	}
+ }
+ 
+ // CreatePaymentRequest is the JSON body of POST /v1/payments.
+@@ -41,6 +59,20 @@ func (h *Handler) CreatePayment(w http.ResponseWriter, r *http.Request) {
+ 		http.Error(w, "invalid payment", http.StatusUnprocessableEntity)
+ 		return
+ 	}
++
++	idempKey := r.Header.Get("Idempotency-Key")
++	if idempKey != "" {
++		h.mu.Lock()
++		if result, ok := h.idempotencyMap[idempKey]; ok {
++			h.mu.Unlock()
++			w.Header().Set("Content-Type", "application/json")
++			w.WriteHeader(http.StatusOK)
++			_ = json.NewEncoder(w).Encode(result.Payment)
++			return
++		}
++		h.mu.Unlock()
++	}
++
+ 	p := store.Payment{ID: newID(), AccountID: req.AccountID, AmountCents: req.AmountCents, Currency: req.Currency, Status: "charged"}
+ 	if err := h.Store.InsertPayment(r.Context(), p); err != nil {
+ 		http.Error(w, "store error", http.StatusInternalServerError)
+@@ -50,6 +82,13 @@ func (h *Handler) CreatePayment(w http.ResponseWriter, r *http.Request) {
+ 		http.Error(w, "publish error", http.StatusInternalServerError)
+ 		return
+ 	}
++
++	if idempKey != "" {
++		h.mu.Lock()
++		h.idempotencyMap[idempKey] = idempotentResult{Payment: p, Status: http.StatusCreated}
++		h.mu.Unlock()
++	}
++
+ 	w.Header().Set("Content-Type", "application/json")
+ 	w.WriteHeader(http.StatusCreated)
+ 	_ = json.NewEncoder(w).Encode(p)
+diff --git a/internal/api/handler_test.go b/internal/api/handler_test.go
+index 4ea8bc1..7ec4fd9 100644
+--- a/internal/api/handler_test.go
++++ b/internal/api/handler_test.go
+@@ -1,6 +1,7 @@
+ package api
+ 
+ import (
++	"encoding/json"
+ 	"net/http"
+ 	"net/http/httptest"
+ 	"strings"
+@@ -12,7 +13,7 @@ import (
+ 
+ func newTestServer() (*http.ServeMux, *events.MemoryProducer) {
+ 	prod := &events.MemoryProducer{}
+-	h := &Handler{Store: store.New(), Events: &events.Publisher{Producer: prod}}
++	h := NewHandler(store.New(), &events.Publisher{Producer: prod})
+ 	mux := http.NewServeMux()
+ 	h.Routes(mux)
+ 	return mux, prod
+@@ -40,3 +41,77 @@ func TestCreatePaymentValidation(t *testing.T) {
+ 		}
+ 	}
+ }
++
++func TestCreatePaymentIdempotency(t *testing.T) {
++	mux, prod := newTestServer()
++	body := `{"account_id":"acc_1","amount_cents":500,"currency":"EUR"}`
++
++	// First request with idempotency key
++	rec := httptest.NewRecorder()
++	req := httptest.NewRequest("POST", "/v1/payments", strings.NewReader(body))
++	req.Header.Set("Idempotency-Key", "key-1")
++	mux.ServeHTTP(rec, req)
++	if rec.Code != http.StatusCreated {
++		t.Fatalf("first request status = %d", rec.Code)
++	}
++	var firstResp map[string]interface{}
++	_ = json.NewDecoder(rec.Body).Decode(&firstResp)
++	payID1 := firstResp["id"]
++
++	// Second request with same idempotency key
++	rec = httptest.NewRecorder()
++	req = httptest.NewRequest("POST", "/v1/payments", strings.NewReader(body))
++	req.Header.Set("Idempotency-Key", "key-1")
++	mux.ServeHTTP(rec, req)
++	if rec.Code != http.StatusOK {
++		t.Fatalf("second request status = %d", rec.Code)
++	}
++	var secondResp map[string]interface{}
++	_ = json.NewDecoder(rec.Body).Decode(&secondResp)
++	payID2 := secondResp["id"]
++
++	if payID1 != payID2 {
++		t.Errorf("same idempotency key returned different IDs: %s vs %s", payID1, payID2)
++	}
++
++	// Only one event should be published
++	if len(prod.Sent) != 1 {
++		t.Errorf("events published = %d, want 1", len(prod.Sent))
++	}
++}
++
++func TestCreatePaymentDifferentKeys(t *testing.T) {
++	mux, prod := newTestServer()
++	body := `{"account_id":"acc_1","amount_cents":500,"currency":"EUR"}`
++
++	// Two requests with different idempotency keys
++	for _, key := range []string{"key-a", "key-b"} {
++		rec := httptest.NewRecorder()
++		req := httptest.NewRequest("POST", "/v1/payments", strings.NewReader(body))
++		req.Header.Set("Idempotency-Key", key)
++		mux.ServeHTTP(rec, req)
++		if rec.Code != http.StatusCreated {
++			t.Fatalf("key %s: status = %d", key, rec.Code)
++		}
++	}
++
++	// Two events should be published
++	if len(prod.Sent) != 2 {
++		t.Errorf("events published = %d, want 2", len(prod.Sent))
++	}
++}
++
++func TestCreatePaymentNoHeader(t *testing.T) {
++	mux, prod := newTestServer()
++	body := `{"account_id":"acc_1","amount_cents":500,"currency":"EUR"}`
++
++	// Request without idempotency key
++	rec := httptest.NewRecorder()
++	mux.ServeHTTP(rec, httptest.NewRequest("POST", "/v1/payments", strings.NewReader(body)))
++	if rec.Code != http.StatusCreated {
++		t.Fatalf("status = %d", rec.Code)
++	}
++	if len(prod.Sent) != 1 {
++		t.Errorf("events published = %d, want 1", len(prod.Sent))
++	}
++}
+diff --git a/internal/api/hidden_accept_test.go b/internal/api/hidden_accept_test.go
+new file mode 100644
+index 0000000..fd8e31b
+--- /dev/null
++++ b/internal/api/hidden_accept_test.go
+@@ -0,0 +1,33 @@
++package api
++
++import (
++	"encoding/json"
++	"net/http/httptest"
++	"strings"
++	"testing"
++)
++
++func TestHiddenIdempotencyKey(t *testing.T) {
++	mux, prod := newTestServer()
++	ids := map[string]bool{}
++	for i := 0; i < 3; i++ {
++		req := httptest.NewRequest("POST", "/v1/payments", strings.NewReader(`{"account_id":"a","amount_cents":10,"currency":"EUR"}`))
++		req.Header.Set("Idempotency-Key", "k-1")
++		rec := httptest.NewRecorder()
++		mux.ServeHTTP(rec, req)
++		if rec.Code != 200 && rec.Code != 201 {
++			t.Fatalf("status %d", rec.Code)
++		}
++		var p struct{ ID string }
++		_ = json.Unmarshal(rec.Body.Bytes(), &p)
++		ids[p.ID] = true
++	}
++	if len(ids) != 1 || len(prod.Sent) != 1 {
++		t.Fatalf("ids=%v events=%d", ids, len(prod.Sent))
++	}
++	rec := httptest.NewRecorder()
++	mux.ServeHTTP(rec, httptest.NewRequest("POST", "/v1/payments", strings.NewReader(`{"account_id":"a","amount_cents":10,"currency":"EUR"}`)))
++	if len(prod.Sent) != 2 {
++		t.Fatalf("request without key should publish: events=%d", len(prod.Sent))
++	}
++}
+

@@ -143,6 +143,15 @@ func TestRunFailEscalateCrashResumeAndComplete(t *testing.T) {
 	if got.Status != task.StatusCompleted || got.VerificationState != "full_pass" || got.Phase != task.PhaseReview {
 		t.Fatalf("expected completed merge candidate, got status=%s phase=%s verify=%s; messages:\n%s", got.Status, got.Phase, got.VerificationState, strings.Join(rt2.Messages, "\n----\n"))
 	}
+	if rt2.Requests[0].Gateway == nil {
+		t.Fatal("runner did not pass its metering gateway to the runtime")
+	}
+	strats, _ := r2.Ledger.Strategies(ctx, tk.ID)
+	for _, st := range strats {
+		if st.Outcome == "active" {
+			t.Errorf("strategy %d left active: %+v", st.ID, st)
+		}
+	}
 	if rt2.Resumes != 1 || got.Budget.SessionsResumed < 1 {
 		t.Fatalf("session was not resumed: resumes=%d", rt2.Resumes)
 	}

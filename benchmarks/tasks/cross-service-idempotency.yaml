@@ -24,6 +24,7 @@ hidden:
       	"encoding/json"
       	"net/http/httptest"
       	"strings"
+      	"sync"
       	"testing"
       )
 
@@ -49,6 +50,34 @@ hidden:
       	mux.ServeHTTP(rec, httptest.NewRequest("POST", "/v1/payments", strings.NewReader(`{"account_id":"a","amount_cents":10,"currency":"EUR"}`)))
       	if len(prod.Sent) != 2 {
       		t.Fatalf("request without key should publish: events=%d", len(prod.Sent))
+      	}
+      }
+
+      // Concurrent retries with the same key (a real client timeout/retry race)
+      // must still produce exactly one payment and one event.
+      func TestHiddenIdempotencyKeyConcurrent(t *testing.T) {
+      	mux, prod := newTestServer()
+      	var wg sync.WaitGroup
+      	var mu sync.Mutex
+      	ids := map[string]bool{}
+      	for i := 0; i < 32; i++ {
+      		wg.Add(1)
+      		go func() {
+      			defer wg.Done()
+      			req := httptest.NewRequest("POST", "/v1/payments", strings.NewReader(`{"account_id":"a","amount_cents":10,"currency":"EUR"}`))
+      			req.Header.Set("Idempotency-Key", "k-race")
+      			rec := httptest.NewRecorder()
+      			mux.ServeHTTP(rec, req)
+      			var p struct{ ID string }
+      			_ = json.Unmarshal(rec.Body.Bytes(), &p)
+      			mu.Lock()
+      			ids[p.ID] = true
+      			mu.Unlock()
+      		}()
+      	}
+      	wg.Wait()
+      	if len(ids) != 1 || len(prod.Sent) != 1 {
+      		t.Fatalf("concurrent same-key requests: ids=%d events=%d", len(ids), len(prod.Sent))
       	}
       }
   - repo: ledger-service
@@ -77,7 +106,7 @@ hidden:
       }
 checks:
   - repo: payment-service
-    run: [go, test, ./...]
+    run: [go, test, -race, -count=3, ./...]
   - repo: ledger-service
     run: [go, test, ./...]
 timeout: 60m

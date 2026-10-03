@@ -21,6 +21,7 @@ type Runtime struct {
 	Messages []string // every message received, for assertions
 	Opens    int
 	Resumes  int
+	Requests []agent.OpenRequest
 }
 
 // Name implements agent.Runtime.
@@ -31,6 +32,7 @@ func (r *Runtime) Open(_ context.Context, req agent.OpenRequest) (agent.Session,
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.Opens++
+	r.Requests = append(r.Requests, req)
 	id, resumed := req.SessionID, req.SessionID != ""
 	if resumed {
 		r.Resumes++

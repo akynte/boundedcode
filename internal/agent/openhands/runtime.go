@@ -128,7 +128,10 @@ func (r *Runtime) Open(ctx context.Context, req agent.OpenRequest) (agent.Sessio
 		return nil, fmt.Errorf("start adapter: %w", err)
 	}
 	s := &session{peer: jsonrpc.New(stdout, stdin), cmd: cmd, stdin: stdin, logf: logf, cancel: cancel, exited: make(chan struct{})}
-	gw := r.Gateway(req.TaskID)
+	gw := req.Gateway
+	if gw == nil {
+		gw = r.Gateway(req.TaskID)
+	}
 	s.peer.Handle("llm.complete", func(ctx context.Context, params json.RawMessage) (any, error) {
 		var p struct {
 			Path string         `json:"path"`

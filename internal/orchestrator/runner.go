@@ -178,7 +178,7 @@ func (r *Runner) Run(ctx context.Context, taskID string, opt RunOptions) (*task.
 	openReq := agent.OpenRequest{TaskID: t.ID, SessionID: t.AgentSessionID, Workspace: r.WorkDir(t.ID), GitCommonDirs: gitDirs, GitAdminDirs: adminDirs,
 		PersistenceDir: filepath.Join(r.Paths.TaskDir(t.ID), "runtime"), MaxIterations: r.Cfg.Agent.MaxIterations,
 		MaxInputTokens: r.CtxSize, MaxOutputTokens: 8192, CondenserMaxEvents: r.Cfg.Agent.CondenserMaxEvents,
-		CondenserMaxTokens: r.CtxSize * 7 / 10, Masks: masks, OnEvent: onEvent}
+		CondenserMaxTokens: r.CtxSize * 7 / 10, Masks: masks, OnEvent: onEvent, Gateway: gw}
 	sess, mode, err := r.openSession(ctx, t, openReq)
 	if err != nil {
 		return t, err
@@ -246,6 +246,7 @@ func (r *Runner) Run(ctx context.Context, taskID string, opt RunOptions) (*task.
 		res, err := sess.Send(ctx, pack.Render())
 		if err != nil {
 			if ctx.Err() != nil {
+				_ = r.Ledger.ResolveStrategy(context.WithoutCancel(ctx), stratID, "rejected", "interrupted before completion")
 				_ = save()
 				return t, ctx.Err()
 			}
@@ -309,6 +310,11 @@ func (r *Runner) Run(ctx context.Context, taskID string, opt RunOptions) (*task.
 				passed, sig, failSummary = r.verifyAll(ctx, t, wts, verify.Full)
 			}
 		}
+		if ctx.Err() != nil {
+			_ = r.Ledger.ResolveStrategy(context.WithoutCancel(ctx), stratID, "rejected", "interrupted during verification")
+			_ = save()
+			return t, ctx.Err()
+		}
 		t.Budget.VerificationRuns++
 		summary := trunc(res.FinalMessage, 500)
 		if summary == "" {
@@ -331,6 +337,7 @@ func (r *Runner) Run(ctx context.Context, taskID string, opt RunOptions) (*task.
 				}
 			}
 			_ = r.Ledger.ResolveStrategy(ctx, stratID, "succeeded", "verification passed (targeted + full)")
+			_ = r.updateStrategySummary(ctx, stratID, summary)
 			t.VerificationState = "full_pass"
 			t.MarkStep("implement")
 			t.MarkStep("verify (full gate)")

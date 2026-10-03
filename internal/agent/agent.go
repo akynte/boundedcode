@@ -5,6 +5,8 @@ package agent
 import (
 	"context"
 	"encoding/json"
+
+	"github.com/akynte/boundedcode/internal/inference"
 )
 
 // Runtime opens agent sessions. Implementations: openhands (adapter), and a
@@ -35,6 +37,9 @@ type OpenRequest struct {
 	Masks []string
 	// OnEvent receives runtime events (may be nil). Called sequentially.
 	OnEvent func(Event)
+	// Gateway meters and forwards the session's model calls. The task runner
+	// supplies it so token budgets are enforced on the same counter.
+	Gateway *inference.Gateway
 }
 
 // Session is an open agent conversation.
