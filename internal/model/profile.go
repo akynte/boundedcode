@@ -112,12 +112,37 @@ func (p Profile) Validate() error {
 	return nil
 }
 
-// ResolveFile returns the absolute GGUF path.
+// ResolveFile returns the absolute GGUF path: absolute files as-is, else the
+// first existing match in modelsDir, then the project's own models dir
+// ($XDG_DATA_HOME/boundedcode/models, where scripts/fetch-model.sh writes).
+// If none exists, the modelsDir path is returned (for error messages).
 func (p Profile) ResolveFile(modelsDir string) string {
 	if filepath.IsAbs(p.File) {
 		return p.File
 	}
-	return filepath.Join(modelsDir, p.File)
+	primary := filepath.Join(modelsDir, p.File)
+	if _, err := os.Stat(primary); err == nil || modelsDir == "" {
+		return primary
+	}
+	if fallback := filepath.Join(DataModelsDir(), p.File); fileExists(fallback) {
+		return fallback
+	}
+	return primary
+}
+
+// DataModelsDir is where scripts/fetch-model.sh stores weights.
+func DataModelsDir() string {
+	base := os.Getenv("XDG_DATA_HOME")
+	if base == "" || !filepath.IsAbs(base) {
+		h, _ := os.UserHomeDir()
+		base = filepath.Join(h, ".local", "share")
+	}
+	return filepath.Join(base, "boundedcode", "models")
+}
+
+func fileExists(p string) bool {
+	_, err := os.Stat(p)
+	return err == nil
 }
 
 // Catalog is the set of known profiles, keyed by name.
