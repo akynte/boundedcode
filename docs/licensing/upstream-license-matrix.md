@@ -61,9 +61,23 @@ Notes:
 
 ## Python adapter dependencies
 
-The adapter is not part of the Go binary. It is installed into its own
-environment or container image, which is built locally and not published.
-Its direct dependencies are `openhands-sdk` and `openhands-tools` (MIT, see
-above). The transitive tree (litellm, fastmcp, pydantic, …) is checked by
-`scripts/pylicensecheck.sh` and the result is recorded in
-`adapters/openhands/python/THIRD_PARTY.md`.
+The adapter is not part of the Go binary. It is installed from PyPI into a
+uv-managed environment or a locally built container image. This project does
+not redistribute it or publish an image. Its direct dependencies are
+`openhands-sdk` and `openhands-tools` (MIT, see above). The transitive tree
+(about 190 distributions) is classified by `scripts/pylicensecheck.py`, and
+the result is recorded in
+[`adapters/openhands/python/THIRD_PARTY.md`](../../adapters/openhands/python/THIRD_PARTY.md).
+
+Findings (2026-10-03):
+
+| Package | Pulled in by | License | Decision |
+|---|---|---|---|
+| `lmnr-claude-code-proxy` 0.1.24 | `openhands-sdk` → `lmnr` (Laminar tracing) | **LicenseRef-Proprietary** ("© LMNR AI, Inc. All rights reserved", subject to Laminar ToS) | **Excluded** through a uv `override-dependencies` entry. It is only imported by Laminar's Claude-agent instrumentation, which we never enable. The adapter integration test passes without it. |
+| `lmnr` 0.7.64 | `openhands-sdk` | Apache-2.0 | Kept. Tracing activates only when `LMNR_PROJECT_API_KEY` or `OTEL_*` endpoints are set. The sandbox strips those variables and runs the container with `--network none`. |
+| `certifi` | `httpx`/`requests` | MPL-2.0 | Manual review: used unmodified as a separate package (file-level copyleft). Accepted for the adapter environment. |
+| `tqdm` | `huggingface-hub` and others | MPL-2.0 AND MIT | Same as certifi. |
+| `func_timeout` 4.3.5 | `openhands-tools` | LGPLv2 | Manual review: used unmodified as a separately installed library and never vendored. Accepted for the adapter environment. Revisit before shipping any bundled image. |
+| `agent-client-protocol`, `openhands-sdk`, `openhands-tools` | | no PyPI license metadata | Upstream repositories verified: OpenHands is MIT (above), and agent-client-protocol is Apache-2.0 (github.com/agentclientprotocol/python-sdk, checked via the GitHub license API). |
+
+No GPL, AGPL or SSPL packages are present.

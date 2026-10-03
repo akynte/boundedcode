@@ -25,3 +25,11 @@ packages = ["src/bc_openhands"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.uv]
+# lmnr (Laminar tracing, pulled in by openhands-sdk) depends on
+# lmnr-claude-code-proxy, which is licensed "LicenseRef-Proprietary". It is only
+# imported by Laminar's Claude-agent instrumentation, which this adapter never
+# enables. Exclude it so the environment contains no proprietary code.
+# See docs/licensing/upstream-license-matrix.md.
+override-dependencies = ["lmnr-claude-code-proxy; sys_platform == 'never'"]

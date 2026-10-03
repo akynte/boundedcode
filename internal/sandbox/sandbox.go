@@ -223,7 +223,7 @@ func scrubbedEnv() []string {
 // carry a credential.
 func isSensitiveEnv(k string) bool {
 	u := strings.ToUpper(k)
-	for _, pfx := range []string{"AWS_", "AZURE_", "GOOGLE_", "GCLOUD_", "CLOUDSDK_", "OPENAI_", "ANTHROPIC_", "CODEX_", "GITHUB_TOKEN", "GH_TOKEN", "GITLAB_", "SSH_AUTH_SOCK", "SSH_AGENT", "KUBECONFIG", "DOCKER_AUTH", "VAULT_", "NPM_TOKEN", "HF_TOKEN", "HUGGING"} {
+	for _, pfx := range []string{"AWS_", "AZURE_", "GOOGLE_", "GCLOUD_", "CLOUDSDK_", "OPENAI_", "ANTHROPIC_", "CODEX_", "GITHUB_TOKEN", "GH_TOKEN", "GITLAB_", "SSH_AUTH_SOCK", "SSH_AGENT", "KUBECONFIG", "DOCKER_AUTH", "VAULT_", "NPM_TOKEN", "HF_TOKEN", "HUGGING", "LMNR_", "OTEL_", "LANGFUSE_", "SENTRY_"} {
 		if strings.HasPrefix(u, pfx) {
 			return true
 		}
