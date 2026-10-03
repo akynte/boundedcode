@@ -1,0 +1,41 @@
+{
+  "id": "suite-20261003T211927Z",
+  "model": "qwen3.6-35b-a3b",
+  "started": "2026-10-03T21:19:27.026178709Z",
+  "finished": "2026-10-03T21:33:50.166629176Z",
+  "results": [
+    {
+      "id": "cross-service-idempotency",
+      "category": "cross-service",
+      "model": "qwen3.6-35b-a3b",
+      "success": false,
+      "task_status": "completed",
+      "self_verified": true,
+      "attempts": 1,
+      "local_tokens": 90583,
+      "generated_tokens": 21899,
+      "cached_prompt_tokens": 600996,
+      "escalations": 0,
+      "local_only": false,
+      "condensations": 1,
+      "resumes": 0,
+      "wall_seconds": 863.13570709,
+      "failed_checks": [
+        "ledger-service: go test ./...: …r.go:56 +0x26a\nexample.com/ledger-service/internal/consumer.TestHiddenDuplicateEvent(0x1c9e4bea908)\n\t<task-work>/ledger-service/internal/consumer/hidden_accept_test.go:14 +0x14b\ntesting.tRunner(0x1c9e4bea908, 0x787f28)\n\t/usr/local/go/src/testing/testing.go:2193 +0xea\ncreated by testing.(*T).Run in goroutine 1\n\t/usr/local/go/src/testing/testing.go:2258 +0x4d4\nFAIL\texample.com/ledger-service/internal/consumer\t0.004s\n?   \texample.com/ledger-service/internal/ledger\t[no test files]\nFAIL\n"
+      ],
+      "task_id": "t20261003-3939dc"
+    }
+  ],
+  "summary": {
+    "tasks": 1,
+    "verified": 0,
+    "success_rate": 0,
+    "local_only_completion_rate": 0,
+    "frontier_escalation_rate": 0,
+    "verified_tasks_per_hour": 0,
+    "attempts_per_successful_task": 0,
+    "wall_seconds_per_task": 863.13570709,
+    "local_tokens_per_task": 90583,
+    "self_verified_but_hidden_failed": 1
+  }
+}

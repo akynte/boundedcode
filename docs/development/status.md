@@ -12,14 +12,15 @@ limited validation or unstable interfaces), **planned**.
 | llama.cpp supervision (start/reuse/stop, health, OOM classification, external server) | implemented | `internal/inference/llamacpp` |
 | Infrastructure benchmark (feasibility search, prompt/decode, cache reuse, thermals) | implemented | `bench infra`; reports in `benchmarks/reports/` |
 | OpenHands adapter (JSON-RPC/stdio, LLM tunnel, resume, condense) | implemented | real SDK through the adapter, scripted LLM, host and container tests |
-| Agent runs against the local model end to end | experimental | see `benchmarks/reports/` engineering runs |
+| Agent runs against the local model end to end | implemented | milestone 1 (kill/resume, condensation, local-only); 11-task suite on 3 models |
 | Workspaces + codebase-memory-mcp (persistent MCP session) | implemented | Phase 3 gap report |
-| Cross-service impact (HTTP, Kafka) | planned | upstream gaps documented. No custom analyzers until real task failures justify them. |
+| Cross-service analyzers | planned | none justified by failures yet (`docs/design/phase9-analyzers.md`) |
 | Task ledger + context planner (resume packs) | implemented | determinism and budget tests, end-to-end resume test |
 | Verification engine (Go/TS presets, impact-selected Go packages, diff scope, gitleaks) | implemented | |
 | Sandbox + policy (container, masks, read-only git, host git hardening) | implemented | adversarial tests; residual risks in `docs/design/sandbox.md` |
-| Frontier escalation Z1–Z4 (Codex subscription, manual) | experimental | policy, packets and persistence tested with a fake provider. Live Codex calls need maintainer approval. |
+| Frontier escalation Z1–Z4 (Codex subscription, manual) | experimental | live Codex run (Phase 7) fixed a task the local model failed; codex now runs contained |
 | Engineering benchmark harness (11 tasks, hidden checks) | implemented | every task fails on its base (self-check) |
-| Model evaluation (Qwen3.6 vs Laguna XS 2.1 vs Qwen3-Coder-Next) | planned | Laguna license under review; Coder-Next Q4 is ~48 GB |
+| Model evaluation (Qwen3.6, Laguna XS 2.1, Qwen3-Coder-Next) | implemented | `docs/design/model-evaluation.md`. The default is provisional pending the OpenMDW-1.1 review (ADR-0007). |
 | Daemon, GUI | planned | |
-| Release packaging, SBOM | planned | Phase 10 |
+| Release packaging, SBOM | implemented (unpublished) | `make dist`, `scripts/sbom`. Publishing needs maintainer approval. |
+| Local escalation tier (switch to a stronger local model before frontier) | planned | motivated by the 4/4 vs 1/4 result in ADR-0007 |

@@ -1,0 +1,41 @@
+{
+  "id": "suite-20261003T204826Z",
+  "model": "qwen3.6-35b-a3b",
+  "started": "2026-10-03T20:48:26.379647955Z",
+  "finished": "2026-10-03T21:05:28.831786808Z",
+  "results": [
+    {
+      "id": "cross-service-idempotency",
+      "category": "cross-service",
+      "model": "qwen3.6-35b-a3b",
+      "success": false,
+      "task_status": "completed",
+      "self_verified": true,
+      "attempts": 2,
+      "local_tokens": 157203,
+      "generated_tokens": 24510,
+      "cached_prompt_tokens": 1034953,
+      "escalations": 0,
+      "local_only": false,
+      "condensations": 3,
+      "resumes": 0,
+      "wall_seconds": 1022.447501024,
+      "failed_checks": [
+        "payment-service: go test -race -count=3 ./...: ?   \texample.com/payment-service/cmd/server\t[no test files]\n--- FAIL: TestHiddenIdempotencyKeyConcurrent (0.00s)\n    hidden_accept_test.go:60: concurrent same-key requests: ids=2 events=2\nFAIL\nFAIL\texample.com/payment-service/internal/api\t0.013s\n?   \texample.com/payment-service/internal/config\t[no test files]\n?   \texample.com/payment-service/internal/events\t[no test files]\n?   \texample.com/payment-service/internal/store\t[no test files]\nFAIL\n"
+      ],
+      "task_id": "t20261003-5fe0f3"
+    }
+  ],
+  "summary": {
+    "tasks": 1,
+    "verified": 0,
+    "success_rate": 0,
+    "local_only_completion_rate": 0,
+    "frontier_escalation_rate": 0,
+    "verified_tasks_per_hour": 0,
+    "attempts_per_successful_task": 0,
+    "wall_seconds_per_task": 1022.447501024,
+    "local_tokens_per_task": 157203,
+    "self_verified_but_hidden_failed": 1
+  }
+}

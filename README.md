@@ -33,6 +33,27 @@ Read [docs/architecture/system-architecture.md](docs/architecture/system-archite
 for details and [docs/product-spec.md](docs/product-spec.md) for goals and
 constraints.
 
+## Measured so far
+
+These numbers come from a single laptop (see below), with every result
+linked to its raw report. They come from 11 synthetic tasks, so they are
+indicative, not general claims.
+
+| | Qwen3.6-35B-A3B | Laguna XS 2.1 | Qwen3-Coder-Next (3-bit) |
+|---|---|---|---|
+| Decode t/s at 2K / 58K context | 39 / 30 | ~38 / ~31 | 27 / 21 |
+| Engineering suite, local only (hidden checks) | 10/11 | 11/11 | 10/11 |
+| Hard cross-service task (4 runs) | 1/4 | 4/4 | 0/1 |
+| Verified tasks per hour | 18.2 | 7.0 | 9.8 |
+
+* Milestone 1: a multi-repo task survived a forced process kill and two
+  context condensations and completed locally
+  ([report](benchmarks/reports/milestone-1/)).
+* Frontier escalation (Codex, ChatGPT sign-in) fixed the hard task for
+  Qwen3.6 with 2 messages ([report](benchmarks/reports/phase7-frontier/)).
+* Details: [infrastructure reports](benchmarks/reports/) and
+  [model evaluation](docs/design/model-evaluation.md).
+
 ## Quick start (development)
 
 ```bash
