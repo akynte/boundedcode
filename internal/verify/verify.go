@@ -360,6 +360,9 @@ func (e *Engine) spec(t RepoTarget, argv []string) sandbox.Spec {
 	env := map[string]string{"GOFLAGS": "-buildvcs=false", "GOTOOLCHAIN": "local", "CI": "1"}
 	if common, err := gitops.CommonDir(context.Background(), t.Worktree); err == nil {
 		mounts = append(mounts, sandbox.Mount{Host: common, Target: common, ReadOnly: true})
+		if admin, err := gitops.AdminDir(context.Background(), t.Worktree); err == nil && admin != common {
+			mounts = append(mounts, sandbox.Mount{Host: admin, Target: admin, ReadOnly: true})
+		}
 	}
 	if e.CacheDir != "" {
 		gc := filepath.Join(e.CacheDir, "gocache")

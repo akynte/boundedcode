@@ -21,7 +21,8 @@ type OpenRequest struct {
 	TaskID         string
 	SessionID      string   // empty: new session
 	Workspace      string   // agent working root: one directory per repo worktree (host path)
-	GitCommonDirs  []string // repository .git dirs backing the worktrees (host paths)
+	GitCommonDirs  []string // repository .git dirs backing the worktrees (mounted read-only)
+	GitAdminDirs   []string // per-worktree admin dirs (<common>/worktrees/<name>, mounted read-write)
 	PersistenceDir string   // runtime-owned conversation state (host path)
 	Model          string
 	MaxIterations  int

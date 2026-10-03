@@ -14,9 +14,22 @@ import (
 	"strings"
 )
 
+// hardening disables every git mechanism that executes repository-controlled
+// commands on the host. Worktrees are written by a sandboxed agent, so the
+// host must never run hooks, fsmonitor daemons or external diff/pager
+// programs on their behalf. (External diff drivers and textconv are disabled
+// per command with --no-ext-diff/--no-textconv.)
+var hardening = []string{
+	"-c", "core.hooksPath=/dev/null",
+	"-c", "core.fsmonitor=false",
+	"-c", "core.pager=cat",
+	"-c", "protocol.ext.allow=never",
+	"-c", "uploadpack.packObjectsHook=",
+}
+
 // Run executes git in dir and returns trimmed stdout.
 func Run(ctx context.Context, dir string, args ...string) (string, error) {
-	cmd := exec.CommandContext(ctx, "git", args...)
+	cmd := exec.CommandContext(ctx, "git", append(append([]string{}, hardening...), args...)...)
 	cmd.Dir = dir
 	// Never prompt for credentials; never use the user's pager/editor.
 	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GIT_PAGER=cat", "GIT_EDITOR=true", "LC_ALL=C")
@@ -135,7 +148,7 @@ func Diff(ctx context.Context, worktree, base string, stat bool) (string, error)
 	if err != nil {
 		return "", err
 	}
-	args := []string{"diff", "--no-color", "--no-ext-diff"}
+	args := []string{"diff", "--no-color", "--no-ext-diff", "--no-textconv"}
 	if stat {
 		args = append(args, "--stat")
 	}
@@ -157,7 +170,7 @@ func Diff(ctx context.Context, worktree, base string, stat bool) (string, error)
 			fmt.Fprintf(&b, "\n %s (new, untracked)", f)
 			continue
 		}
-		nd, err := runAllowExit1(ctx, worktree, "diff", "--no-color", "--no-index", "/dev/null", f)
+		nd, err := runAllowExit1(ctx, worktree, "diff", "--no-color", "--no-ext-diff", "--no-textconv", "--no-index", "/dev/null", f)
 		if err != nil {
 			return "", err
 		}
@@ -167,7 +180,7 @@ func Diff(ctx context.Context, worktree, base string, stat bool) (string, error)
 }
 
 func runAllowExit1(ctx context.Context, dir string, args ...string) (string, error) {
-	cmd := exec.CommandContext(ctx, "git", args...)
+	cmd := exec.CommandContext(ctx, "git", append(append([]string{}, hardening...), args...)...)
 	cmd.Dir = dir
 	out, err := cmd.Output()
 	var ee *exec.ExitError
@@ -198,4 +211,35 @@ func CommitAll(ctx context.Context, worktree, message string) (string, error) {
 		return "", err
 	}
 	return Run(ctx, worktree, "rev-parse", "HEAD")
+}
+
+// AdminDir returns the worktree's private git directory
+// (<common>/worktrees/<name>), which holds its HEAD and index.
+func AdminDir(ctx context.Context, worktree string) (string, error) {
+	d, err := Run(ctx, worktree, "rev-parse", "--absolute-git-dir")
+	if err != nil {
+		return "", err
+	}
+	return filepath.Clean(d), nil
+}
+
+// CheckWorktree verifies that worktree's .git pointer still refers to an
+// admin directory inside the repository's common dir. A sandboxed agent can
+// write the worktree, so it could redirect .git to a crafted gitdir whose
+// config runs commands on the host; we refuse to touch such a worktree.
+func CheckWorktree(worktree, commonDir string) error {
+	b, err := os.ReadFile(filepath.Join(worktree, ".git"))
+	if err != nil {
+		return fmt.Errorf("worktree %s: .git pointer: %w", worktree, err)
+	}
+	ptr, ok := strings.CutPrefix(strings.TrimSpace(string(b)), "gitdir: ")
+	if !ok {
+		return fmt.Errorf("worktree %s: .git is not a gitdir pointer", worktree)
+	}
+	ptr = filepath.Clean(ptr)
+	want := filepath.Join(filepath.Clean(commonDir), "worktrees") + string(filepath.Separator)
+	if !strings.HasPrefix(ptr, want) || strings.Contains(strings.TrimPrefix(ptr, want), string(filepath.Separator)) {
+		return fmt.Errorf("worktree %s: .git points to %s, outside %s (tampered?)", worktree, ptr, want)
+	}
+	return nil
 }

@@ -130,15 +130,24 @@ func (r *Runner) Run(ctx context.Context, taskID string, opt RunOptions) (*task.
 	if err != nil {
 		return t, err
 	}
-	var gitDirs []string
+	var gitDirs, adminDirs []string
 	for _, w := range wts {
 		// Recreate missing worktrees from their branch: git is the persistence layer.
 		if err := gitops.EnsureWorktree(ctx, w.RepoPath, w.Path, w.Branch, w.BaseCommit); err != nil {
 			return t, err
 		}
-		if d, err := gitops.CommonDir(ctx, w.Path); err == nil {
-			gitDirs = append(gitDirs, d)
+		common, err := gitops.CommonDir(ctx, w.RepoPath)
+		if err != nil {
+			return t, err
 		}
+		if err := gitops.CheckWorktree(w.Path, common); err != nil {
+			return t, err
+		}
+		admin, err := gitops.AdminDir(ctx, w.Path)
+		if err != nil {
+			return t, err
+		}
+		gitDirs, adminDirs = append(gitDirs, common), append(adminDirs, admin)
 	}
 	runStart := time.Now()
 	priorTokens := t.Budget.UsedLocalTokens
@@ -166,7 +175,7 @@ func (r *Runner) Run(ctx context.Context, taskID string, opt RunOptions) (*task.
 		r.Rec.Emit(context.WithoutCancel(ctx), t.ID, "agent.event", data)
 	}
 	masks := secretMasks(r.WorkDir(t.ID), wts)
-	openReq := agent.OpenRequest{TaskID: t.ID, SessionID: t.AgentSessionID, Workspace: r.WorkDir(t.ID), GitCommonDirs: gitDirs,
+	openReq := agent.OpenRequest{TaskID: t.ID, SessionID: t.AgentSessionID, Workspace: r.WorkDir(t.ID), GitCommonDirs: gitDirs, GitAdminDirs: adminDirs,
 		PersistenceDir: filepath.Join(r.Paths.TaskDir(t.ID), "runtime"), MaxIterations: r.Cfg.Agent.MaxIterations,
 		MaxInputTokens: r.CtxSize, MaxOutputTokens: 8192, CondenserMaxEvents: r.Cfg.Agent.CondenserMaxEvents,
 		CondenserMaxTokens: r.CtxSize * 7 / 10, Masks: masks, OnEvent: onEvent}
@@ -262,10 +271,15 @@ func (r *Runner) Run(ctx context.Context, taskID string, opt RunOptions) (*task.
 			return t, r.block(t, save, "local token budget exhausted")
 		}
 
-		// Git checkpoint: persist the attempt's work on the task branch.
+		// Git checkpoint: persist the attempt's work on the task branch. The
+		// worktree pointer is re-checked first: the agent could have tampered with it.
 		changedAny := false
 		var changedFiles, changedRepos []string
-		for _, w := range wts {
+		for i, w := range wts {
+			if err := gitops.CheckWorktree(w.Path, gitDirs[i]); err != nil {
+				r.Rec.Emit(ctx, t.ID, "policy.violation", map[string]any{"repo": w.RepoName, "error": err.Error()})
+				return t, r.block(t, save, "worktree integrity check failed: "+err.Error())
+			}
 			if _, err := gitops.CommitAll(ctx, w.Path, fmt.Sprintf("boundedcode %s: attempt %d", t.ID, t.AttemptCount)); err != nil {
 				r.Log.Warn("checkpoint commit failed", "repo", w.RepoName, "err", err)
 			}

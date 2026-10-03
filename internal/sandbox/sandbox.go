@@ -143,9 +143,21 @@ func (c *Container) Args(s Spec) ([]string, error) {
 		args = append(args, "--mount", spec)
 	}
 	for _, p := range s.Masks {
-		// An empty, read-only tmpfs hides the path. Docker creates a mount point
-		// for files too, so this masks both files and directories.
-		args = append(args, "--mount", fmt.Sprintf("type=tmpfs,destination=%s,tmpfs-size=1k,tmpfs-mode=0500", p))
+		// Mounts are identity-mapped, so the host path tells us the type.
+		fi, err := os.Stat(p)
+		switch {
+		case err != nil:
+			continue // nothing to hide
+		case fi.IsDir():
+			args = append(args, "--mount", fmt.Sprintf("type=tmpfs,destination=%s,tmpfs-size=1k,tmpfs-mode=0500", p))
+		default:
+			// tmpfs cannot cover a file: bind an empty read-only file instead.
+			empty, err := emptyFile()
+			if err != nil {
+				return nil, err
+			}
+			args = append(args, "--mount", fmt.Sprintf("type=bind,source=%s,target=%s,readonly", empty, p))
+		}
 	}
 	if s.Workdir != "" {
 		args = append(args, "-w", s.Workdir)
@@ -238,3 +250,24 @@ func isSensitiveEnv(k string) bool {
 
 // ScrubbedEnv is exported for runners that execute on the host.
 func ScrubbedEnv() []string { return scrubbedEnv() }
+
+// emptyFile returns a read-only empty file used to mask secret files. It lives
+// under the user cache dir because Docker Desktop only shares $HOME-like
+// paths with its VM (a host /dev/null is not reachable).
+func emptyFile() (string, error) {
+	dir, err := os.UserCacheDir()
+	if err != nil {
+		return "", err
+	}
+	p := filepath.Join(dir, "boundedcode", "sandbox-empty")
+	if fi, err := os.Stat(p); err == nil && fi.Size() == 0 {
+		return p, nil
+	}
+	if err := os.MkdirAll(filepath.Dir(p), 0o700); err != nil {
+		return "", err
+	}
+	if err := os.WriteFile(p, nil, 0o444); err != nil {
+		return "", err
+	}
+	return p, nil
+}

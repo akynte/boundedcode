@@ -86,3 +86,46 @@ func TestWorktreeLifecycle(t *testing.T) {
 		t.Fatal("committed work not restored")
 	}
 }
+
+func TestCheckWorktreeDetectsTampering(t *testing.T) {
+	ctx := context.Background()
+	repo := initRepo(t)
+	info, _ := Inspect(ctx, repo)
+	wt := filepath.Join(t.TempDir(), "wt")
+	if err := EnsureWorktree(ctx, repo, wt, TaskBranch("t2"), info.Head); err != nil {
+		t.Fatal(err)
+	}
+	common, _ := CommonDir(ctx, repo)
+	if err := CheckWorktree(wt, common); err != nil {
+		t.Fatalf("fresh worktree rejected: %v", err)
+	}
+	// An agent redirects .git to a crafted gitdir inside the worktree.
+	evil := filepath.Join(wt, ".evil")
+	_ = os.MkdirAll(evil, 0o755)
+	_ = os.WriteFile(filepath.Join(wt, ".git"), []byte("gitdir: "+evil+"\n"), 0o644)
+	if err := CheckWorktree(wt, common); err == nil {
+		t.Fatal("tampered pointer accepted")
+	}
+	_ = os.WriteFile(filepath.Join(wt, ".git"), []byte("gitdir: "+filepath.Join(common, "worktrees", "..", "..", "x")+"\n"), 0o644)
+	if err := CheckWorktree(wt, common); err == nil {
+		t.Fatal("path traversal accepted")
+	}
+}
+
+func TestHostGitIgnoresHooks(t *testing.T) {
+	ctx := context.Background()
+	repo := initRepo(t)
+	canary := filepath.Join(t.TempDir(), "pwned")
+	hook := filepath.Join(repo, ".git", "hooks", "pre-commit")
+	_ = os.WriteFile(hook, []byte("#!/bin/sh\ntouch "+canary+"\n"), 0o755)
+	_ = os.WriteFile(filepath.Join(repo, "x.go"), []byte("package a\n"), 0o644)
+	if _, err := Run(ctx, repo, "add", "."); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Run(ctx, repo, "commit", "-qm", "x"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(canary); err == nil {
+		t.Fatal("repository hook executed on the host")
+	}
+}

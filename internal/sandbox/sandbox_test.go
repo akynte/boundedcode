@@ -13,14 +13,14 @@ func TestContainerArgsHardening(t *testing.T) {
 	args, err := c.Args(Spec{
 		Argv: []string{"python", "-m", "x"}, Workdir: "/workspace", Interactive: true,
 		Mounts: []Mount{{Host: "/tmp/wt", Target: "/workspace"}, {Host: "/tmp/git", Target: "/git", ReadOnly: true}},
-		Masks:  []string{"/workspace/.env"}, Env: map[string]string{"B": "2", "A": "1"},
+		Masks:  []string{t.TempDir(), "/nonexistent/.env"}, Env: map[string]string{"B": "2", "A": "1"},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	s := strings.Join(args, " ")
 	for _, want := range []string{"--network none", "--cap-drop ALL", "no-new-privileges", "--user 1000:1000", "-i",
-		"source=/tmp/git,target=/git,readonly", "destination=/workspace/.env", "-e A=1 -e B=2 img:1 python -m x"} {
+		"source=/tmp/git,target=/git,readonly", "type=tmpfs,destination=/tmp/", "-e A=1 -e B=2 img:1 python -m x"} {
 		if !strings.Contains(s, want) {
 			t.Errorf("missing %q in %s", want, s)
 		}

@@ -70,7 +70,13 @@ func (r *Runtime) Open(ctx context.Context, req agent.OpenRequest) (agent.Sessio
 		{Host: req.Workspace, Target: req.Workspace},
 		{Host: req.PersistenceDir, Target: req.PersistenceDir},
 	}
+	// The shared git dir is read-only so the agent cannot plant hooks or
+	// config that would later run on the host; only the worktree's own
+	// admin dir (HEAD, index) is writable. Commits are made host-side.
 	for _, d := range req.GitCommonDirs {
+		mounts = append(mounts, sandbox.Mount{Host: d, Target: d, ReadOnly: true})
+	}
+	for _, d := range req.GitAdminDirs {
 		mounts = append(mounts, sandbox.Mount{Host: d, Target: d})
 	}
 	var masks []string
