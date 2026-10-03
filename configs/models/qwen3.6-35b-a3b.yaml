@@ -13,18 +13,21 @@ architecture:
   moe: true
   total_params_b: 35
   active_params_b: 3
-# Server flags. These are starting values for an 8 GB GPU + 64 GB RAM machine.
-# `boundedcode bench infra --sweep` measures alternatives; the chosen values
-# come from benchmarks/reports, not guesses.
+# Server flags measured on the reference machine (RTX 4060 Laptop 8 GB, 64 GB
+# DDR5) with llama.cpp v0.5.0 -- see benchmarks/reports/20261003T152755Z-infra-*
+# (sweep) and 20261003T161953Z-infra-* (idle, cold-load finalists):
+#   128K ctx, ubatch 2048, n_cpu_moe 35: ~39 t/s decode @2K, ~30 @58K, ~24 @116K;
+#   ~580-780 t/s prompt processing; 1.1 GB VRAM headroom; stable over 10 min.
+# Other machines: run `boundedcode bench infra --apply`.
 server:
-  ctx_size: 65536
+  ctx_size: 131072
   gpu_layers: 999
-  n_cpu_moe: 30
+  n_cpu_moe: 35
   flash_attn: "on"
   cache_type_k: q8_0
   cache_type_v: q8_0
   batch_size: 2048
-  ubatch_size: 512
+  ubatch_size: 2048
   threads: 8
   parallel: 1
   jinja: true

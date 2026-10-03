@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/akynte/boundedcode/internal/hw"
+	"github.com/akynte/boundedcode/internal/inference/llamacpp"
 )
 
 // checkStatus is the outcome of one doctor check.
@@ -90,8 +91,11 @@ func runDoctor(ctx context.Context, app *App) []check {
 	if cfg.Inference.Mode == "external" {
 		add(check{"inference", statusOK, "external server at " + cfg.Inference.ExternalURL, ""})
 	} else {
-		add(versionCheck(ctx, "llama-server", cfg.Inference.ServerBinary, []string{"--version"}, true,
-			"build llama.cpp with CUDA (scripts/build-llama-cpp.sh) or pass `init --llama-server PATH`"))
+		if v, err := llamacpp.Version(ctx, cfg.Inference.ServerBinary); err != nil {
+			add(check{"llama-server", statusFail, err.Error(), "build llama.cpp with CUDA (scripts/build-llama-cpp.sh) or pass `init --llama-server PATH`"})
+		} else {
+			add(check{"llama-server", statusOK, v + " (" + cfg.Inference.ServerBinary + ")", ""})
+		}
 	}
 	if p, err := app.Models.Get(cfg.DefaultModel); err != nil {
 		add(check{"default model", statusFail, err.Error(), ""})
@@ -118,6 +122,14 @@ func runDoctor(ctx context.Context, app *App) []check {
 		"install from https://github.com/DeusData/codebase-memory-mcp/releases (scripts/install-deps.sh)"))
 	add(versionCheck(ctx, "gitleaks", "gitleaks", []string{"version"}, false, "secret scanning stage is skipped without it"))
 	add(versionCheck(ctx, "ripgrep", "rg", []string{"--version"}, false, "used for exact lexical retrieval"))
+	if cfg.Sandbox.Kind == "docker" {
+		out, err := exec.CommandContext(ctx, cfg.Sandbox.Engine, "image", "inspect", "--format", "{{.Id}}", cfg.Agent.Image).Output()
+		if err != nil {
+			add(check{"sandbox image", statusWarn, cfg.Agent.Image + " not built", "run `boundedcode sandbox build --dir adapters/openhands`"})
+		} else {
+			add(check{"sandbox image", statusOK, cfg.Agent.Image + " " + strings.TrimSpace(string(out))[:19], ""})
+		}
+	}
 	add(frontierCheck(ctx, app))
 	return out
 }

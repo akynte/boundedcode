@@ -46,11 +46,12 @@ Keep these markers accurate when code changes.
 | `boundedcode` CLI | user | per command; long-running for `task run` |
 | `llama-server` | supervised by `inference/llamacpp` or user-supplied | long-lived; reused across tasks |
 | OpenHands adapter | spawned per task session by `agent/openhands` | per session; may crash or restart without losing the task |
-| `codebase-memory-mcp` | spawned on demand by `repointel/cbm` | per command/session |
+| `codebase-memory-mcp` | `repointel/cbm` keeps one persistent MCP stdio session per command or task (ADR-0006), with a private cache dir and UI/watchers disabled | per command/task |
 | `codex exec` | spawned by `frontier/codex` per escalation | per escalation |
 | verification commands | `verify` (inside sandbox when configured) | per stage |
 
-A daemon is **[plan]**. Version 1 runs the control loop in the foreground CLI
+A daemon is **[plan]**. Everything else in this document is **[impl]**
+unless marked otherwise. Version 1 runs the control loop in the foreground CLI
 process. Because state is in SQLite, Git and the OpenHands persistence
 directory, a killed CLI can be resumed with `task resume`.
 
@@ -61,7 +62,7 @@ Interfaces exist only where replacement is plausible:
 | Interface | Package | Implementations |
 |---|---|---|
 | `inference.Runtime` | `internal/inference` | `llamacpp` (managed or external) |
-| `agent.Runtime` | `internal/agent` | `openhands` (adapter) and a scripted fake for tests |
+| `agent.Runtime` | `internal/agent` | `openhands` (adapter) and `scripted` (deterministic, for tests) |
 | `repointel.Intelligence` | `internal/repointel` | `cbm` (codebase-memory-mcp) |
 | `frontier.Provider` | `internal/frontier` | `codex` (subscription CLI) and a manual/clipboard provider |
 | `sandbox.Sandbox` | `internal/sandbox` | `docker` and `none` (development only, refused for autonomous tasks unless explicitly overridden) |
@@ -149,14 +150,25 @@ Packs are deterministic for a given state, which makes them testable.
 
 See [SECURITY.md](../../SECURITY.md) and [sandbox design](../design/sandbox.md).
 
-* The agent process and its tools run in a container. Only the task worktree
-  is mounted read-write. The base repo's `.git` is mounted read-only where a
-  worktree needs it. There is no `$HOME`, no SSH agent and no credentials,
-  and the network is `none`.
+* The agent process and its tools run in a container. The task work dir is
+  mounted read-write. Each repository's git common dir is mounted
+  **read-only**, and only the worktree's own admin dir is writable. There is
+  no `$HOME`, no SSH agent and no credentials, and the network is `none`.
+* Host-side git runs with hooks and fsmonitor disabled and no external
+  diff or textconv. It verifies each worktree's `.git` pointer first, because
+  the agent can write the worktree.
 * Path policy denies `.env*`, `secrets/`, key material and kubeconfigs inside
   the container, using masked mounts.
 * Command policy is deterministic and evaluated in Go before verification
-  commands run. Inside the agent, OpenHands security confirmation is a second
-  layer, not the boundary.
+  commands run. Inside the agent, the container is the boundary. The agent's
+  own commands are not filtered, because they cannot reach anything outside
+  the sandbox.
 * Frontier credentials stay on the host. `codex exec` runs with
   `--sandbox read-only` on a packet file, never in the agent container.
+
+## 9. Package map
+
+`cli` → `orchestrator` → {`task`, `contextplan`, `verify`, `policy`,
+`frontier`, `agent/*`, `inference/*`, `repointel/*`, `sandbox`, `gitops`,
+`workspace`, `telemetry`, `store`}. Lower layers never import `cli` or
+`orchestrator`.

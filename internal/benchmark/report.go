@@ -17,7 +17,12 @@ func WriteInfraMarkdown(w io.Writer, r *InfraReport) error {
 		fmt.Fprintf(&b, ", %s %d MiB (driver %s, power limit %.0f W)", g.Name, g.MemTotalMiB, g.Driver, g.PowerLimitW)
 	}
 	fmt.Fprintf(&b, "\n* started: %s, finished: %s\n", r.Started.Format("2006-01-02 15:04Z"), r.Finished.Format("2006-01-02 15:04Z"))
-	fmt.Fprintf(&b, "* decode tokens per request: %d; prompts: %v tokens (cold = unique prompt, warm = same prefix + new suffix)\n\n", r.Options.DecodeTokens, r.Options.PromptSizes)
+	fmt.Fprintf(&b, "* decode tokens per request: %d; prompts: %v tokens (cold = unique prompt; warm = the conversation continued with the reply plus a new observation)\n", r.Options.DecodeTokens, r.Options.PromptSizes)
+	loadKind := "warm page cache"
+	if r.Options.ColdLoad {
+		loadKind = "cold (model evicted from page cache before each load)"
+	}
+	fmt.Fprintf(&b, "* model load: %s\n* conditions: %s\n\n", loadKind, orDash(r.Options.Conditions))
 
 	b.WriteString("## Feasibility (minimum `n_cpu_moe` that loads)\n\n| ctx | KV type | ubatch | min n_cpu_moe | probes |\n|---|---|---|---|---|\n")
 	for _, f := range r.Feasibility {
@@ -86,4 +91,11 @@ func WriteSuiteMarkdown(w io.Writer, r *SuiteReport) error {
 	}
 	_, err := io.WriteString(w, b.String())
 	return err
+}
+
+func orDash(s string) string {
+	if s == "" {
+		return "not recorded"
+	}
+	return s
 }

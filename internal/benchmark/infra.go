@@ -47,6 +47,21 @@ type InfraOptions struct {
 	// recommended (the desktop and other apps share the GPU).
 	MinFreeVRAMMiB int
 	OutPath        string
+	// Only measures exactly these configurations (skips the feasibility
+	// search), e.g. to re-measure finalists on an idle machine.
+	Only []Config `json:"only,omitempty"`
+	// ColdLoad evicts the model from the page cache before each load.
+	ColdLoad bool
+	// Conditions is a free-text note about the run (idle, AC power, ...).
+	Conditions string
+}
+
+// Config identifies one server configuration.
+type Config struct {
+	CtxSize   int    `json:"ctx_size"`
+	CacheType string `json:"cache_type"`
+	UBatch    int    `json:"ubatch"`
+	NCPUMoE   int    `json:"n_cpu_moe"`
 }
 
 // InfraReport is the persisted result.
@@ -172,6 +187,26 @@ func (r *InfraRunner) Run(ctx context.Context, opt InfraOptions) (*InfraReport, 
 	}
 	defer func() { _ = r.Mgr.Stop(context.WithoutCancel(ctx)) }()
 
+	if len(opt.Only) > 0 {
+		for _, cf := range opt.Only {
+			rep.Candidates = append(rep.Candidates, r.measure(ctx, opt, cf.CtxSize, cf.CacheType, cf.UBatch, cf.NCPUMoE))
+			save()
+			if ctx.Err() != nil {
+				return rep, ctx.Err()
+			}
+		}
+		rep.Recommended = recommend(rep.Candidates, opt.MinFreeVRAMMiB)
+		if rep.Recommended != nil && opt.Sustained > 0 {
+			s, err := r.sustained(ctx, opt, *rep.Recommended)
+			if err != nil {
+				rep.Notes = append(rep.Notes, "sustained run failed: "+err.Error())
+			}
+			rep.Sustained = s
+		}
+		rep.Finished = time.Now().UTC()
+		save()
+		return rep, nil
+	}
 	ub0 := opt.UBatches[0]
 	for _, ctxSize := range opt.CtxSizes {
 		for _, ct := range opt.CacheTypes {
@@ -296,6 +331,11 @@ func (r *InfraRunner) measure(ctx context.Context, opt InfraOptions, ctxSize int
 		Args: llamacpp.BuildArgs(p, p.ResolveFile(r.Mgr.ModelsDir), r.Mgr.Host, r.Mgr.Port)}
 	r.progress("measure: ctx=%d kv=%s ub=%d n_cpu_moe=%d", ctxSize, ct, ub, ncmoe)
 	_ = r.Mgr.Stop(ctx)
+	if opt.ColdLoad {
+		if err := EvictFromPageCache(p.ResolveFile(r.Mgr.ModelsDir)); err != nil {
+			r.progress("  page-cache eviction failed: %v", err)
+		}
+	}
 	load, err := r.Mgr.Start(ctx, p, c.Args)
 	if err != nil {
 		c.Error = err.Error()

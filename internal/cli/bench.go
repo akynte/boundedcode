@@ -32,6 +32,7 @@ func newBenchInfraCmd(app *App) *cobra.Command {
 		sustained time.Duration
 		outDir    string
 		apply     bool
+		onlyCfg   []string
 	)
 	cmd := &cobra.Command{
 		Use:   "infra",
@@ -52,6 +53,13 @@ This stops any managed llama-server and takes a long time (tens of minutes).`,
 				return err
 			}
 			opt.Profile, opt.Sustained = p, sustained
+			for _, c := range onlyCfg {
+				var cf benchmark.Config
+				if _, err := fmt.Sscanf(strings.ReplaceAll(c, ":", " "), "%d %s %d %d", &cf.CtxSize, &cf.CacheType, &cf.UBatch, &cf.NCPUMoE); err != nil {
+					return fmt.Errorf("--config %q: want ctx:kv:ubatch:n_cpu_moe", c)
+				}
+				opt.Only = append(opt.Only, cf)
+			}
 			if err := os.MkdirAll(outDir, 0o755); err != nil {
 				return err
 			}
@@ -116,6 +124,9 @@ This stops any managed llama-server and takes a long time (tens of minutes).`,
 	f.DurationVar(&sustained, "sustained", 0, "sustained decode run on the recommended config (e.g. 10m)")
 	f.StringVar(&outDir, "out", "benchmarks/reports", "output directory")
 	f.BoolVar(&apply, "apply", false, "save the recommended settings as a user profile override")
+	f.StringSliceVar(&onlyCfg, "config", nil, "measure only these configs: ctx:kv:ubatch:n_cpu_moe (repeatable), skipping the search")
+	f.BoolVar(&opt.ColdLoad, "cold", false, "evict the model from the page cache before each load (true cold-load times)")
+	f.StringVar(&opt.Conditions, "conditions", "", "note about run conditions (e.g. \"idle, AC power\")")
 	return cmd
 }
 

@@ -1,0 +1,47 @@
+# Development Guide
+
+## Layout
+
+| Path | Contents |
+|---|---|
+| `cmd/boundedcode` | entry point |
+| `internal/cli` | cobra commands (thin) |
+| `internal/orchestrator` | task run loop and escalation |
+| `internal/task` | canonical ledger |
+| `internal/contextplan` | context packs |
+| `internal/verify`, `internal/policy` | deterministic verification and safety rules |
+| `internal/agent{,/openhands,/scripted}` | agent runtime boundary and implementations |
+| `internal/inference{,/llamacpp}` | inference boundary, client, gateway, llama.cpp supervisor |
+| `internal/repointel{,/cbm}` | repository intelligence boundary and codebase-memory-mcp client |
+| `internal/sandbox`, `internal/gitops`, `internal/workspace` | isolation, git, workspaces |
+| `internal/frontier` | Z1–Z4 policy, packets, providers |
+| `internal/benchmark` | infrastructure and engineering benchmarks |
+| `adapters/openhands` | Python adapter and sandbox Dockerfile |
+| `benchmarks/fixtures`, `benchmarks/tasks`, `benchmarks/reports` | fixtures, task specs, results |
+
+## Tests
+
+```bash
+make check                                     # fmt, vet, unit, race, lint, licenses
+go test -short ./...                           # fast unit tests only
+go test ./...                                  # + integration tests needing go/git/uv/cbm
+BC_TEST_DOCKER_IMAGE=boundedcode-openhands:local go test ./internal/sandbox/ ./internal/agent/openhands/ ./internal/benchmark/
+(cd adapters/openhands/python && uv run --group dev pytest -q)
+```
+
+Integration tests skip themselves when a tool is missing. Tests that need a
+GPU or a real model live behind the `bench` commands, not `go test`.
+
+## Benchmark hygiene
+
+The MoE configuration computes most experts on the CPU, so **any concurrent
+CPU load changes decode speed**. Run `bench infra` on an otherwise idle
+machine, with the laptop on AC power, and note the conditions in the
+report. Numbers measured under load are only valid for feasibility.
+
+## Conventions
+
+* Persist-then-act: write the ledger before long or destructive steps.
+* Interfaces only at replaceable boundaries.
+* No global mutable state. Pass dependencies explicitly (`cli.App`).
+* Never log secrets or full source. Use `telemetry.Redact` for free text.

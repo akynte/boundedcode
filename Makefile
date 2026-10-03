@@ -3,7 +3,7 @@ BIN := bin/boundedcode
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -s -w -X github.com/akynte/boundedcode/internal/buildinfo.Version=$(VERSION)
 
-.PHONY: build test race vet fmt lint check licenses clean
+.PHONY: build test race vet fmt lint check licenses sbom dist clean
 
 build:
 	CGO_ENABLED=0 $(GO) build -trimpath -ldflags '$(LDFLAGS)' -o $(BIN) ./cmd/boundedcode
@@ -25,6 +25,16 @@ lint:
 
 licenses:
 	rm -rf LICENSES/go && $(GO) run ./scripts/licensecheck -write LICENSES/go
+
+sbom: build
+	$(GO) run ./scripts/sbom -version $(VERSION) -binary $(BIN) -o SBOM.spdx.json
+
+dist: licenses build
+	rm -rf dist && mkdir -p dist
+	cp $(BIN) dist/boundedcode-linux-amd64
+	$(GO) run ./scripts/sbom -version $(VERSION) -binary $(BIN) -o dist/SBOM.spdx.json
+	cp -r LICENSE NOTICE THIRD_PARTY_NOTICES.md LICENSES dist/
+	cd dist && sha256sum boundedcode-linux-amd64 SBOM.spdx.json > SHA256SUMS
 
 check: fmt vet test race lint licenses
 
