@@ -118,7 +118,8 @@ func classify(dir string) string {
 	ids := map[string]bool{}
 	for _, e := range entries {
 		n := strings.ToUpper(e.Name())
-		if e.IsDir() || !(strings.HasPrefix(n, "LICENSE") || strings.HasPrefix(n, "COPYING")) || strings.Contains(n, "3RD-PARTY") {
+		isLicense := strings.HasPrefix(n, "LICENSE") || strings.HasPrefix(n, "COPYING")
+		if e.IsDir() || !isLicense || strings.Contains(n, "3RD-PARTY") {
 			continue
 		}
 		b, err := os.ReadFile(filepath.Join(dir, e.Name()))
