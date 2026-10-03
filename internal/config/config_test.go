@@ -60,3 +60,16 @@ func TestSaveRoundTrip(t *testing.T) {
 		t.Fatalf("perm = %v", fi.Mode().Perm())
 	}
 }
+
+func TestRuntimeDirSharedAcrossHomes(t *testing.T) {
+	t.Setenv("BOUNDEDCODE_HOME", t.TempDir())
+	a, err := DefaultPaths()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("BOUNDEDCODE_HOME", t.TempDir())
+	b, _ := DefaultPaths()
+	if a.Runtime != b.Runtime || a.Data == b.Data {
+		t.Fatalf("runtime must be machine-wide, data per home: %+v %+v", a, b)
+	}
+}

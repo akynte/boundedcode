@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -18,7 +19,7 @@ func (a *App) llamaManager() *llamacpp.Manager {
 	c := a.Config.Inference
 	return &llamacpp.Manager{
 		Binary: c.ServerBinary, Host: c.Host, Port: c.Port, ModelsDir: a.Config.ModelsDir,
-		StateDir: a.Paths.State, StartupTimeout: c.StartupTimeout.D(), Log: a.Log,
+		StateDir: a.Paths.Runtime, StartupTimeout: c.StartupTimeout.D(), Log: a.Log,
 	}
 }
 
@@ -115,7 +116,7 @@ func newRuntimeCmd(app *App) *cobra.Command {
 		Use:   "logs",
 		Short: "Print the managed server log path and tail",
 		RunE: func(*cobra.Command, []string) error {
-			p := app.llamaManager().StateDir + "/llama-server.log"
+			p := filepath.Join(app.llamaManager().StateDir, "llama-server.log")
 			b, err := os.ReadFile(p)
 			if err != nil {
 				return err

@@ -16,25 +16,34 @@ type Paths struct {
 	Data   string // state.db, task directories
 	Cache  string // derived, rebuildable data
 	State  string // logs, pid files
+	// Runtime holds machine-wide supervisor state (the inference server owns
+	// the GPU, which is shared by every data home). It ignores
+	// BOUNDEDCODE_HOME so isolated homes see the same running server.
+	Runtime string
 }
 
 // DefaultPaths resolves Paths from the environment.
 func DefaultPaths() (Paths, error) {
+	userHome, err := os.UserHomeDir()
+	if err != nil {
+		return Paths{}, fmt.Errorf("resolve home directory: %w", err)
+	}
+	runtime := filepath.Join(userHome, ".local", "state", buildinfo.DataDirName, "runtime")
+	if v := os.Getenv("XDG_STATE_HOME"); v != "" && filepath.IsAbs(v) {
+		runtime = filepath.Join(v, buildinfo.DataDirName, "runtime")
+	}
 	if home := os.Getenv(buildinfo.EnvPrefix + "HOME"); home != "" {
 		abs, err := filepath.Abs(home)
 		if err != nil {
 			return Paths{}, fmt.Errorf("resolve %sHOME: %w", buildinfo.EnvPrefix, err)
 		}
 		return Paths{
-			Config: filepath.Join(abs, "config"),
-			Data:   filepath.Join(abs, "data"),
-			Cache:  filepath.Join(abs, "cache"),
-			State:  filepath.Join(abs, "state"),
+			Runtime: runtime,
+			Config:  filepath.Join(abs, "config"),
+			Data:    filepath.Join(abs, "data"),
+			Cache:   filepath.Join(abs, "cache"),
+			State:   filepath.Join(abs, "state"),
 		}, nil
-	}
-	userHome, err := os.UserHomeDir()
-	if err != nil {
-		return Paths{}, fmt.Errorf("resolve home directory: %w", err)
 	}
 	xdg := func(env, fallback string) string {
 		if v := os.Getenv(env); v != "" && filepath.IsAbs(v) {
@@ -43,16 +52,17 @@ func DefaultPaths() (Paths, error) {
 		return filepath.Join(userHome, fallback, buildinfo.DataDirName)
 	}
 	return Paths{
-		Config: xdg("XDG_CONFIG_HOME", ".config"),
-		Data:   xdg("XDG_DATA_HOME", ".local/share"),
-		Cache:  xdg("XDG_CACHE_HOME", ".cache"),
-		State:  xdg("XDG_STATE_HOME", ".local/state"),
+		Runtime: runtime,
+		Config:  xdg("XDG_CONFIG_HOME", ".config"),
+		Data:    xdg("XDG_DATA_HOME", ".local/share"),
+		Cache:   xdg("XDG_CACHE_HOME", ".cache"),
+		State:   xdg("XDG_STATE_HOME", ".local/state"),
 	}, nil
 }
 
 // Ensure creates all directories with owner-only permissions.
 func (p Paths) Ensure() error {
-	for _, d := range []string{p.Config, p.Data, p.Cache, p.State} {
+	for _, d := range []string{p.Config, p.Data, p.Cache, p.State, p.Runtime} {
 		if err := os.MkdirAll(d, 0o700); err != nil {
 			return fmt.Errorf("create %s: %w", d, err)
 		}

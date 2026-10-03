@@ -197,7 +197,7 @@ func newBenchTasksCmd(app *App) *cobra.Command {
 			sr := &benchmark.SuiteRunner{FixturesDir: fixtures, WorkRoot: work, Sandbox: sb,
 				Progress: func(s string) { fmt.Fprintf(app.Err, "%s %s\n", time.Now().Format("15:04:05"), s) },
 				NewRunner: func(ctx context.Context, stateDir string) (*orchestrator.Runner, func(), error) {
-					paths := config.Paths{Config: app.Paths.Config, Data: filepath.Join(stateDir, "data"), Cache: filepath.Join(stateDir, "cache"), State: filepath.Join(stateDir, "state")}
+					paths := config.Paths{Runtime: app.Paths.Runtime, Config: app.Paths.Config, Data: filepath.Join(stateDir, "data"), Cache: filepath.Join(stateDir, "cache"), State: filepath.Join(stateDir, "state")}
 					if err := paths.Ensure(); err != nil {
 						return nil, nil, err
 					}
