@@ -44,6 +44,9 @@ func newRoot(app *App) *cobra.Command {
 		newRuntimeCmd(app),
 		newModelCmd(app),
 		newBenchCmd(app),
+		newWorkspaceCmd(app),
+		newIndexCmd(app),
+		newIntelCmd(app),
 	)
 	return root
 }

@@ -1,0 +1,6 @@
+image: payment-service:latest
+env:
+  PAYMENT_DB_DSN:
+    secretKeyRef: {name: payment-db, key: dsn}
+  KAFKA_BROKERS: kafka:9092
+  LISTEN_ADDR: ":8080"
