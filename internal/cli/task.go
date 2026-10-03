@@ -130,7 +130,14 @@ func (a *App) buildRunnerWith(ctx context.Context, f runFlags, db *sql.DB, paths
 	if a.Config.Frontier.Enabled {
 		switch a.Config.Frontier.Provider {
 		case "codex":
-			r.Frontier = &frontier.Codex{Binary: a.Config.Frontier.Binary, Model: a.Config.Frontier.Model, Timeout: a.Config.Frontier.Timeout.D()}
+			cx := &frontier.Codex{Binary: a.Config.Frontier.Binary, Model: a.Config.Frontier.Model, Timeout: a.Config.Frontier.Timeout.D()}
+			if a.Config.Frontier.Contain {
+				if a.Config.Sandbox.Kind != "docker" {
+					return nil, nil, errors.New("frontier.contain requires a container engine (sandbox.kind: docker); set frontier.contain: false to run codex unconfined")
+				}
+				cx.Container = &frontier.CodexContainer{Engine: a.Config.Sandbox.Engine, Image: a.Config.Agent.Image, UID: os.Getuid(), GID: os.Getgid()}
+			}
+			r.Frontier = cx
 		case "manual":
 			r.Frontier = frontier.Manual{}
 		}

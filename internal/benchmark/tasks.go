@@ -83,22 +83,24 @@ func LoadTasks(dir string) ([]TaskSpec, error) {
 
 // TaskResult is the outcome of one benchmark task.
 type TaskResult struct {
-	ID            string   `json:"id"`
-	Category      string   `json:"category"`
-	Model         string   `json:"model"`
-	Success       bool     `json:"success"` // hidden acceptance checks passed
-	TaskStatus    string   `json:"task_status"`
-	SelfVerified  bool     `json:"self_verified"` // our verification gate passed
-	Attempts      int      `json:"attempts"`
-	LocalTokens   int      `json:"local_tokens"`
-	Escalations   int      `json:"escalations"`
-	LocalOnly     bool     `json:"local_only"`
-	Condensations int      `json:"condensations"`
-	Resumes       int      `json:"resumes"`
-	WallSeconds   float64  `json:"wall_seconds"`
-	FailedChecks  []string `json:"failed_checks,omitempty"`
-	Error         string   `json:"error,omitempty"`
-	TaskID        string   `json:"task_id"`
+	ID              string   `json:"id"`
+	Category        string   `json:"category"`
+	Model           string   `json:"model"`
+	Success         bool     `json:"success"` // hidden acceptance checks passed
+	TaskStatus      string   `json:"task_status"`
+	SelfVerified    bool     `json:"self_verified"` // our verification gate passed
+	Attempts        int      `json:"attempts"`
+	LocalTokens     int      `json:"local_tokens"` // processed (uncached prompt + generated)
+	GeneratedTokens int      `json:"generated_tokens"`
+	CachedTokens    int      `json:"cached_prompt_tokens"`
+	Escalations     int      `json:"escalations"`
+	LocalOnly       bool     `json:"local_only"`
+	Condensations   int      `json:"condensations"`
+	Resumes         int      `json:"resumes"`
+	WallSeconds     float64  `json:"wall_seconds"`
+	FailedChecks    []string `json:"failed_checks,omitempty"`
+	Error           string   `json:"error,omitempty"`
+	TaskID          string   `json:"task_id"`
 }
 
 // SuiteReport aggregates a run.
@@ -222,6 +224,7 @@ func (s *SuiteRunner) runOne(ctx context.Context, model string, spec TaskSpec) (
 		res.SelfVerified = final.VerificationState == "full_pass"
 		res.Attempts = final.AttemptCount
 		res.LocalTokens = final.Budget.UsedLocalTokens
+		res.GeneratedTokens, res.CachedTokens = final.Budget.GeneratedTokens, final.Budget.CachedTokens
 		res.Escalations = final.Budget.UsedEscalations
 		res.Condensations = final.Budget.Condensations
 		res.Resumes = final.Budget.SessionsResumed

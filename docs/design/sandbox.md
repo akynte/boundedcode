@@ -31,7 +31,7 @@ part of this boundary.
 | 9 | Commits happen host-side on `agent/<task-id>` only. `CommitAll` refuses other branches. There are no pushes. | `gitops.CommitAll` |
 | 10 | Verification runs in the same image with the worktree mounted and the git dirs read-only. The module cache is mounted read-only, with `GOPROXY=off`. | `verify.Engine.spec` |
 | 11 | Diff-scope gate: changes touching secret paths, or more than N files, fail verification. gitleaks scans the task diff. | `verify` |
-| 12 | Frontier credentials stay on the host. `codex exec` runs read-only in an empty directory and receives only a redacted packet. API-key auth is refused. | `frontier.Codex` |
+| 12 | Frontier: packets are redacted, host paths are rewritten to workspace-relative names, and a packet still containing `$HOME` is not sent. `codex exec` runs **in a container** with only an empty workdir and the Codex credential dir mounted. Codex's own `read-only` sandbox restricts writes, not reads, so containment is required. API-key auth is refused. | `frontier.Codex`, `frontier.CheckPacket` |
 | 13 | Audit events are redacted (`telemetry.Redact`), and prompts and source are not logged by default. | `telemetry` |
 
 ## Adversarial tests (all must fail to escape)
@@ -48,6 +48,7 @@ part of this boundary.
 | overwrite masked `.env` | host file unchanged |
 | plant `.git/hooks/pre-commit`, then host commit | hook not executed |
 | redirect worktree `.git` to a crafted gitdir | rejected by `CheckWorktree` |
+| containerized codex: list host repos / `$HOME` | not visible (only the empty workdir) |
 
 ## Residual risks (known, accepted for now)
 
@@ -73,7 +74,10 @@ part of this boundary.
    disk. This is bounded by disk quota only.
 7. **`sandbox.kind: none`** disables all of the above. It is refused for
    autonomous tasks unless `--unsafe-no-sandbox` is passed.
-8. **Prompt injection steering the work itself.** A malicious repository
+8. **The frontier container has network access** (it must reach OpenAI) and
+   holds the Codex credentials. Only the packet and an empty workdir are
+   inside it.
+9. **Prompt injection steering the work itself.** A malicious repository
    can make the agent write wrong code. The defence is deterministic
    verification plus human review of the merge candidate. Nothing merges
    automatically.

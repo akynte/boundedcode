@@ -30,6 +30,19 @@ type Codex struct {
 	Binary  string
 	Model   string
 	Timeout time.Duration
+	// Container, when set, runs codex inside a container so that commands
+	// codex's own agent executes cannot read the host filesystem: only an
+	// empty workdir and the codex credential dir are mounted. (codex's
+	// read-only sandbox restricts writes, not reads.)
+	Container *CodexContainer
+}
+
+// CodexContainer configures containment for codex exec.
+type CodexContainer struct {
+	Engine string // docker | podman
+	Image  string // any image with CA certificates (the agent sandbox image works)
+	UID    int
+	GID    int
 }
 
 // Name implements Provider.
@@ -67,7 +80,15 @@ func (c *Codex) Ask(ctx context.Context, packet, dir string) (string, error) {
 	}
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, c.Binary, args...)
+	var cmd *exec.Cmd
+	if c.Container != nil {
+		cmd, err = c.containerCmd(ctx, args, dir)
+		if err != nil {
+			return "", err
+		}
+	} else {
+		cmd = exec.CommandContext(ctx, c.Binary, args...)
+	}
 	cmd.Stdin = strings.NewReader(packet)
 	// Drop API-key variables so codex cannot fall back to metered API auth.
 	for _, kv := range os.Environ() {
@@ -105,4 +126,37 @@ func tailStr(s string, n int) string {
 		return s[len(s)-n:]
 	}
 	return s
+}
+
+// containerCmd wraps `codex <args>` in a container. Paths in args (the
+// empty cwd and the output file) live under dir, which is mounted at the
+// same path. CODEX_HOME is mounted read-write for token refresh.
+func (c *Codex) containerCmd(ctx context.Context, args []string, dir string) (*exec.Cmd, error) {
+	bin, err := exec.LookPath(c.Binary)
+	if err != nil {
+		return nil, err
+	}
+	if bin, err = filepath.EvalSymlinks(bin); err != nil {
+		return nil, err
+	}
+	codexHome := os.Getenv("CODEX_HOME")
+	if codexHome == "" {
+		h, err := os.UserHomeDir()
+		if err != nil {
+			return nil, err
+		}
+		codexHome = filepath.Join(h, ".codex")
+	}
+	cc := c.Container
+	run := []string{"run", "--rm", "-i", "--init",
+		"--cap-drop", "ALL", "--security-opt", "no-new-privileges",
+		"--user", fmt.Sprintf("%d:%d", cc.UID, cc.GID),
+		"--tmpfs", "/home/agent:rw,exec,size=256m,mode=1777", "-e", "HOME=/home/agent",
+		"--mount", fmt.Sprintf("type=bind,source=%s,target=/usr/local/bin/codex-host,readonly", bin),
+		"--mount", fmt.Sprintf("type=bind,source=%s,target=/home/agent/.codex", codexHome),
+		"--mount", fmt.Sprintf("type=bind,source=%s,target=%s", dir, dir),
+		"-e", "CODEX_HOME=/home/agent/.codex",
+		"-w", dir,
+		cc.Image, "/usr/local/bin/codex-host"}
+	return exec.CommandContext(ctx, cc.Engine, append(run, args...)...), nil
 }

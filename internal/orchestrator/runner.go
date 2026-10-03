@@ -150,7 +150,7 @@ func (r *Runner) Run(ctx context.Context, taskID string, opt RunOptions) (*task.
 		gitDirs, adminDirs = append(gitDirs, common), append(adminDirs, admin)
 	}
 	runStart := time.Now()
-	priorTokens := t.Budget.UsedLocalTokens
+	priorTokens, priorGen, priorCached := t.Budget.UsedLocalTokens, t.Budget.GeneratedTokens, t.Budget.CachedTokens
 	gw := r.NewGateway(t.ID, max(t.Budget.MaxLocalTokens-priorTokens, 1))
 
 	// Events from the runtime are audited; condensations are counted.
@@ -193,7 +193,9 @@ func (r *Runner) Run(ctx context.Context, taskID string, opt RunOptions) (*task.
 	reviewedZ3 := r.hasEscalation(ctx, t.ID, frontier.Z3)
 
 	save := func() error {
-		t.Budget.UsedLocalTokens = priorTokens + gw.Used()
+		used, gen, cached := gw.Stats()
+		t.Budget.UsedLocalTokens = priorTokens + used
+		t.Budget.GeneratedTokens, t.Budget.CachedTokens = priorGen+gen, priorCached+cached
 		t.Budget.UsedWallClockS += time.Since(runStart).Seconds()
 		runStart = time.Now()
 		evMu.Lock()

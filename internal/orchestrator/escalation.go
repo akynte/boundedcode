@@ -34,7 +34,19 @@ func (r *Runner) escalate(ctx context.Context, t *task.Task, wts []task.Worktree
 		r.Log.Error("build frontier pack", "err", err)
 		return ""
 	}
-	packet := frontier.BuildPacket(tr, pack, frontier.DefaultQuestion(tr))
+	paths := frontier.PathMap{r.WorkDir(t.ID): "."}
+	for _, w := range wts {
+		paths[w.RepoPath] = w.RepoName
+		paths[w.Path] = w.RepoName
+	}
+	packet := frontier.BuildPacket(tr, pack, frontier.DefaultQuestion(tr), paths)
+	if home, err := os.UserHomeDir(); err == nil {
+		if err := frontier.CheckPacket(packet, home); err != nil {
+			r.Rec.Emit(ctx, t.ID, "frontier.blocked", map[string]any{"error": err.Error()})
+			r.say("escalation %s not sent: %v", tr.Code, err)
+			return ""
+		}
+	}
 	tokens := contextplan.EstimateTokens(packet)
 	dir := filepath.Join(r.Paths.TaskDir(t.ID), "frontier")
 	if err := os.MkdirAll(dir, 0o700); err != nil {

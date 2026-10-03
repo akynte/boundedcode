@@ -81,7 +81,9 @@ type Budget struct {
 	MaxLocalTokens   int     `json:"max_local_tokens"`
 	MaxEscalations   int     `json:"max_escalations"`
 	UsedWallClockS   float64 `json:"used_wall_clock_s"`
-	UsedLocalTokens  int     `json:"used_local_tokens"`
+	UsedLocalTokens  int     `json:"used_local_tokens"` // processed: uncached prompt + generated
+	GeneratedTokens  int     `json:"generated_tokens"`
+	CachedTokens     int     `json:"cached_prompt_tokens"`
 	UsedEscalations  int     `json:"used_escalations"`
 	ContextResets    int     `json:"context_resets"`
 	Condensations    int     `json:"condensations"`

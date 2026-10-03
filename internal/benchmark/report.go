@@ -78,7 +78,7 @@ func WriteSuiteMarkdown(w io.Writer, r *SuiteReport) error {
 	s := r.Summary
 	fmt.Fprintf(&b, "# Engineering benchmark `%s`\n\nmodel: `%s` · started %s · finished %s\n\n", r.ID, r.Model,
 		r.Started.Format("2006-01-02 15:04Z"), r.Finished.Format("2006-01-02 15:04Z"))
-	fmt.Fprintf(&b, "| metric | value |\n|---|---|\n| tasks | %d |\n| verified (hidden checks) | %d (%.0f%%) |\n| local-only completion rate | %.0f%% |\n| frontier escalation rate | %.0f%% |\n| verified tasks / hour | %.2f |\n| attempts / successful task | %.2f |\n| wall-clock / task | %.0f s |\n| local tokens / task | %.0f |\n| self-verified but hidden checks failed | %d |\n\n",
+	fmt.Fprintf(&b, "| metric | value |\n|---|---|\n| tasks | %d |\n| verified (hidden checks) | %d (%.0f%%) |\n| local-only completion rate | %.0f%% |\n| frontier escalation rate | %.0f%% |\n| verified tasks / hour | %.2f |\n| attempts / successful task | %.2f |\n| wall-clock / task | %.0f s |\n| processed local tokens / task (uncached prompt + generated) | %.0f |\n| self-verified but hidden checks failed | %d |\n\n",
 		s.Tasks, s.Verified, 100*s.SuccessRate, 100*s.LocalOnlyRate, 100*s.FrontierEscalationRate, s.VerifiedPerHour, s.MeanAttemptsSuccess, s.MeanWallSeconds, s.MeanLocalTokens, s.SelfVerifyFalsePass)
 	b.WriteString("| task | category | success | status | self-verified | attempts | tokens | escalations | wall s | notes |\n|---|---|---|---|---|---|---|---|---|---|\n")
 	for _, t := range r.Results {

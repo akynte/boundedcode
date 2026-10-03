@@ -26,14 +26,25 @@ type Gateway struct {
 	// (0 = unlimited).
 	MaxTokens int
 
-	mu   sync.Mutex
-	used int
+	mu        sync.Mutex
+	used      int // processed tokens: uncached prompt + completion
+	generated int // completion tokens
+	cached    int // prompt tokens served from the server's prompt cache
+}
+
+// Stats returns processed, generated and cached token counts.
+func (g *Gateway) Stats() (processed, generated, cached int) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	return g.used, g.generated, g.cached
 }
 
 // ErrBudgetExhausted is returned when the token budget is spent.
 var ErrBudgetExhausted = errors.New("local token budget exhausted")
 
-// Used returns tokens consumed so far.
+// Used returns processed tokens (uncached prompt + completion) so far; this
+// is what the token budget limits, since cached prefix tokens cost almost no
+// compute.
 func (g *Gateway) Used() int {
 	g.mu.Lock()
 	defer g.mu.Unlock()
@@ -79,13 +90,15 @@ func (g *Gateway) Forward(ctx context.Context, path string, body map[string]any)
 	var out any
 	_ = json.Unmarshal(resp, &out)
 	_ = json.Unmarshal(resp, &parsed)
-	g.mu.Lock()
-	g.used += parsed.Usage.PromptTokens + parsed.Usage.CompletionTokens
-	g.mu.Unlock()
 	cached := 0
 	if parsed.Timings != nil {
 		cached = parsed.Timings.CacheN
 	}
+	g.mu.Lock()
+	g.used += max(parsed.Usage.PromptTokens-cached, 0) + parsed.Usage.CompletionTokens
+	g.generated += parsed.Usage.CompletionTokens
+	g.cached += cached
+	g.mu.Unlock()
 	st := "ok"
 	if status != http.StatusOK {
 		st = fmt.Sprintf("http_%d", status)

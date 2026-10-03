@@ -2,16 +2,21 @@ package frontier
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/akynte/boundedcode/internal/contextplan"
 	"github.com/akynte/boundedcode/internal/telemetry"
 )
 
+// PathMap rewrites host paths to workspace-relative names in packets
+// (e.g. /home/u/.cache/.../repos/payment-service -> payment-service).
+type PathMap map[string]string
+
 // BuildPacket turns a context pack into a compact escalation packet with a
-// specific question. The pack is built with the frontier budget; the packet
-// is redacted again as defence in depth.
-func BuildPacket(trigger Trigger, pack contextplan.Pack, question string) string {
+// specific question. The pack is built with the frontier budget; host paths
+// are rewritten via paths and the packet is redacted again.
+func BuildPacket(trigger Trigger, pack contextplan.Pack, question string, paths PathMap) string {
 	var b strings.Builder
 	b.WriteString("You are a senior software architect advising a local coding agent. ")
 	b.WriteString("You cannot run code or see the repository beyond what is below. ")
@@ -25,7 +30,25 @@ func BuildPacket(trigger Trigger, pack contextplan.Pack, question string) string
 		fmt.Fprintf(&b, "## %s\n%s\n\n", s.Title, s.Body)
 	}
 	fmt.Fprintf(&b, "## SPECIFIC QUESTION\n%s\n", question)
-	return telemetry.Redact(b.String())
+	out := b.String()
+	// Longest prefixes first so nested paths map correctly.
+	keys := make([]string, 0, len(paths))
+	for k := range paths {
+		keys = append(keys, k)
+	}
+	sort.Slice(keys, func(i, j int) bool { return len(keys[i]) > len(keys[j]) })
+	for _, k := range keys {
+		out = strings.ReplaceAll(out, k, paths[k])
+	}
+	return telemetry.Redact(out)
+}
+
+// CheckPacket refuses packets that still reveal host filesystem locations.
+func CheckPacket(packet, home string) error {
+	if home != "" && strings.Contains(packet, home) {
+		return fmt.Errorf("frontier packet still contains the host home directory %q; refusing to send", home)
+	}
+	return nil
 }
 
 // DefaultQuestion returns the question for a trigger.

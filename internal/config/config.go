@@ -75,6 +75,9 @@ type FrontierConfig struct {
 	// MaxPacketTokens caps the escalation packet size.
 	MaxPacketTokens int      `yaml:"max_packet_tokens"`
 	Timeout         Duration `yaml:"timeout"`
+	// Contain runs the frontier CLI inside a container so its own agent
+	// cannot read the host filesystem (only the packet is visible).
+	Contain bool `yaml:"contain"`
 }
 
 // SandboxConfig configures where agent tools and verification run.
@@ -124,7 +127,7 @@ func Defaults() Config {
 		RepoIntel: RepoIntelConfig{Provider: "codebase-memory-mcp", Binary: "codebase-memory-mcp"},
 		Frontier: FrontierConfig{
 			Enabled: false, Provider: "codex", Binary: "codex",
-			RequireApproval: true, MaxPacketTokens: 24000, Timeout: Duration(15 * time.Minute),
+			RequireApproval: true, MaxPacketTokens: 24000, Timeout: Duration(15 * time.Minute), Contain: true,
 		},
 		Sandbox: SandboxConfig{Kind: "docker", Engine: "docker", Network: "none", Memory: "8g", CPUs: "8"},
 		Budgets: Budgets{
