@@ -95,11 +95,38 @@ func TestAdapterRunAndResume(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(adapterDir, ".venv")); err != nil {
 		t.Skip("adapter venv missing; run `uv sync` in " + adapterDir)
 	}
+	runAdapterScenario(t, sandbox.None{}, []string{"uv", "run", "--frozen", "--project", adapterDir, "bc-openhands-adapter"}, t.TempDir())
+}
+
+// TestAdapterInContainer runs the same scenario inside the sandbox image with
+// --network none: the only path to the (fake) model is the stdio tunnel.
+// Set BC_TEST_DOCKER_IMAGE to enable.
+func TestAdapterInContainer(t *testing.T) {
+	image := os.Getenv("BC_TEST_DOCKER_IMAGE")
+	if image == "" || testing.Short() {
+		t.Skip("set BC_TEST_DOCKER_IMAGE (e.g. boundedcode-openhands:local)")
+	}
+	// Docker Desktop shares $HOME with its VM by default, but not /tmp.
+	home, _ := os.UserHomeDir()
+	base := filepath.Join(home, ".cache", "boundedcode-test")
+	if err := os.MkdirAll(base, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	tmp, err := os.MkdirTemp(base, "adapter-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.RemoveAll(tmp) })
+	sb := &sandbox.Container{Engine: "docker", Image: image, Network: "none", Memory: "4g", UID: os.Getuid(), GID: os.Getgid()}
+	runAdapterScenario(t, sb, []string{"bc-openhands-adapter"}, tmp)
+}
+
+func runAdapterScenario(t *testing.T, sb sandbox.Sandbox, argv []string, tmp string) {
+	t.Helper()
 	llm := &fakeLLM{}
 	srv := httptest.NewServer(llm)
 	defer srv.Close()
 
-	tmp := t.TempDir()
 	ws := filepath.Join(tmp, "ws")
 	persist := filepath.Join(tmp, "persist")
 	if err := os.MkdirAll(ws, 0o755); err != nil {
@@ -107,8 +134,8 @@ func TestAdapterRunAndResume(t *testing.T) {
 	}
 	gw := &inference.Gateway{Client: inference.NewClient(srv.URL, time.Minute), Model: "fake"}
 	rt := &Runtime{
-		Sandbox: sandbox.None{},
-		Argv:    []string{"uv", "run", "--frozen", "--project", adapterDir, "bc-openhands-adapter"},
+		Sandbox: sb,
+		Argv:    argv,
 		Gateway: func(string) *inference.Gateway { return gw },
 		LogDir:  tmp,
 	}
