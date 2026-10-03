@@ -66,3 +66,24 @@ func firstLine(s string) string {
 	}
 	return s
 }
+
+// WriteSuiteMarkdown renders an engineering suite report.
+func WriteSuiteMarkdown(w io.Writer, r *SuiteReport) error {
+	var b strings.Builder
+	s := r.Summary
+	fmt.Fprintf(&b, "# Engineering benchmark `%s`\n\nmodel: `%s` · started %s · finished %s\n\n", r.ID, r.Model,
+		r.Started.Format("2006-01-02 15:04Z"), r.Finished.Format("2006-01-02 15:04Z"))
+	fmt.Fprintf(&b, "| metric | value |\n|---|---|\n| tasks | %d |\n| verified (hidden checks) | %d (%.0f%%) |\n| local-only completion rate | %.0f%% |\n| frontier escalation rate | %.0f%% |\n| verified tasks / hour | %.2f |\n| attempts / successful task | %.2f |\n| wall-clock / task | %.0f s |\n| local tokens / task | %.0f |\n| self-verified but hidden checks failed | %d |\n\n",
+		s.Tasks, s.Verified, 100*s.SuccessRate, 100*s.LocalOnlyRate, 100*s.FrontierEscalationRate, s.VerifiedPerHour, s.MeanAttemptsSuccess, s.MeanWallSeconds, s.MeanLocalTokens, s.SelfVerifyFalsePass)
+	b.WriteString("| task | category | success | status | self-verified | attempts | tokens | escalations | wall s | notes |\n|---|---|---|---|---|---|---|---|---|---|\n")
+	for _, t := range r.Results {
+		note := firstLine(t.Error)
+		if len(t.FailedChecks) > 0 {
+			note = firstLine(t.FailedChecks[0])
+		}
+		fmt.Fprintf(&b, "| %s | %s | %v | %s | %v | %d | %d | %d | %.0f | %s |\n", t.ID, t.Category, t.Success, t.TaskStatus, t.SelfVerified,
+			t.Attempts, t.LocalTokens, t.Escalations, t.WallSeconds, strings.ReplaceAll(note, "|", "/"))
+	}
+	_, err := io.WriteString(w, b.String())
+	return err
+}

@@ -1,0 +1,31 @@
+id: docker-hardening
+category: docker
+fixture: payment-platform
+repos: [payment-service]
+request: >-
+  Harden payment-service's Dockerfile: build with `-trimpath` and `-ldflags="-s -w"`,
+  and run the final image as a non-root user (use the distroless `:nonroot` image tag
+  or an explicit numeric non-root USER). Keep the multi-stage structure.
+criteria:
+  - build uses -trimpath and -ldflags "-s -w"
+  - final stage runs as non-root
+hidden:
+  - repo: payment-service
+    path: .bench/check_docker.py
+    content: |
+      import re, sys
+      d = open("Dockerfile").read()
+      stages = re.split(r"(?im)^FROM\s", d)
+      if len(stages) < 3:
+          sys.exit("multi-stage build removed")
+      build, final = stages[1], stages[-1]
+      if "-trimpath" not in build or not re.search(r"-ldflags[= ]+[\"']?-s -w", build):
+          sys.exit("build flags missing")
+      nonroot = re.search(r":nonroot", final.splitlines()[0]) or re.search(r"(?m)^USER\s+(?!0\b|root\b)\S+", final)
+      if not nonroot:
+          sys.exit("final stage not non-root")
+      print("ok")
+checks:
+  - repo: payment-service
+    run: [python3, .bench/check_docker.py]
+timeout: 30m

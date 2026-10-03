@@ -1,0 +1,42 @@
+id: terraform-topics
+category: terraform
+fixture: payment-platform
+repos: [infrastructure]
+request: >-
+  In infrastructure/terraform/kafka.tf: set a 7-day retention on the payments.charged
+  topic (config "retention.ms" = "604800000"), and add a new kafka_topic resource named
+  payments_refunded for topic "payments.refunded" with the same partitions and
+  replication factor as payments.charged. Do not run terraform apply.
+criteria:
+  - payments.charged has retention.ms = 604800000
+  - kafka_topic.payments_refunded exists with matching partitions/replication
+hidden:
+  - repo: infrastructure
+    path: .bench/check_tf.py
+    content: |
+      import re, sys
+      tf = open("terraform/kafka.tf").read()
+      def block(name):
+          m = re.search(r'resource\s+"kafka_topic"\s+"' + name + r'"\s*\{', tf)
+          if not m:
+              return None
+          depth, i = 0, m.end() - 1
+          for j in range(i, len(tf)):
+              depth += {"{": 1, "}": -1}.get(tf[j], 0)
+              if depth == 0:
+                  return tf[i:j + 1]
+      charged, refunded = block("payments_charged"), block("payments_refunded")
+      if not charged or not re.search(r'"?retention\.ms"?\s*=\s*"?604800000"?', charged):
+          sys.exit("retention.ms missing on payments_charged")
+      if not refunded or '"payments.refunded"' not in refunded:
+          sys.exit("payments_refunded topic missing")
+      for k in ("partitions", "replication_factor"):
+          a = re.search(k + r"\s*=\s*(\d+)", charged)
+          b = re.search(k + r"\s*=\s*(\d+)", refunded)
+          if not a or not b or a.group(1) != b.group(1):
+              sys.exit(f"{k} mismatch")
+      print("ok")
+checks:
+  - repo: infrastructure
+    run: [python3, .bench/check_tf.py]
+timeout: 30m

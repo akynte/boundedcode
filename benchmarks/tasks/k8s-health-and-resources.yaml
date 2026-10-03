@@ -1,0 +1,49 @@
+id: k8s-health-and-resources
+category: kubernetes
+fixture: payment-platform
+repos: [payment-service]
+request: >-
+  Prepare payment-service for Kubernetes. (1) Add a `GET /healthz` endpoint that returns
+  HTTP 200. (2) In deploy/helm/payment-service/values.yaml add resources (requests:
+  cpu 100m, memory 128Mi; limits: cpu 500m, memory 256Mi) and a readinessProbe doing an
+  httpGet on path /healthz port 8080. Keep the existing values.
+criteria:
+  - GET /healthz returns 200
+  - values.yaml has the requested resources and readinessProbe
+hidden:
+  - repo: payment-service
+    path: internal/api/hidden_accept_test.go
+    content: |
+      package api
+
+      import (
+      	"net/http/httptest"
+      	"testing"
+      )
+
+      func TestHiddenHealthz(t *testing.T) {
+      	mux, _ := newTestServer()
+      	rec := httptest.NewRecorder()
+      	mux.ServeHTTP(rec, httptest.NewRequest("GET", "/healthz", nil))
+      	if rec.Code != 200 {
+      		t.Fatalf("status %d", rec.Code)
+      	}
+      }
+  - repo: payment-service
+    path: .bench/check_values.py
+    content: |
+      import re, sys
+      v = open("deploy/helm/payment-service/values.yaml").read()
+      need = [r"resources:", r"requests:", r"cpu:\s*['\"]?100m", r"memory:\s*['\"]?128Mi", r"limits:", r"cpu:\s*['\"]?500m",
+              r"memory:\s*['\"]?256Mi", r"readinessProbe:", r"httpGet:", r"path:\s*['\"]?/healthz", r"port:\s*['\"]?8080",
+              r"KAFKA_BROKERS", r"PAYMENT_DB_DSN"]
+      missing = [n for n in need if not re.search(n, v)]
+      if missing:
+          sys.exit(f"values.yaml missing: {missing}")
+      print("ok")
+checks:
+  - repo: payment-service
+    run: [go, test, ./...]
+  - repo: payment-service
+    run: [python3, .bench/check_values.py]
+timeout: 40m

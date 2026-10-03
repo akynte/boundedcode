@@ -1,0 +1,70 @@
+id: api-contract-description
+category: api-contract
+fixture: payment-platform
+repos: [shared-protos, payment-service]
+request: >-
+  Add an optional free-text `description` to payments. In shared-protos/proto/payment.proto
+  add `string description` to both CreatePaymentRequest and Payment using the next free
+  field numbers. In payment-service accept `description` in the POST /v1/payments JSON body,
+  store it on the payment and return it in the response. Reject descriptions longer than
+  140 characters with HTTP 422. Add tests.
+criteria:
+  - proto messages have the new field with the next free field numbers
+  - description round-trips through POST /v1/payments
+  - descriptions over 140 characters are rejected with 422
+hidden:
+  - repo: payment-service
+    path: internal/api/hidden_accept_test.go
+    content: |
+      package api
+
+      import (
+      	"encoding/json"
+      	"net/http/httptest"
+      	"strings"
+      	"testing"
+      )
+
+      func TestHiddenDescription(t *testing.T) {
+      	mux, _ := newTestServer()
+      	rec := httptest.NewRecorder()
+      	mux.ServeHTTP(rec, httptest.NewRequest("POST", "/v1/payments", strings.NewReader(`{"account_id":"a","amount_cents":10,"currency":"EUR","description":"coffee"}`)))
+      	if rec.Code != 201 {
+      		t.Fatalf("status %d: %s", rec.Code, rec.Body)
+      	}
+      	var got map[string]any
+      	_ = json.Unmarshal(rec.Body.Bytes(), &got)
+      	found := false
+      	for k, v := range got {
+      		if strings.EqualFold(k, "description") && v == "coffee" {
+      			found = true
+      		}
+      	}
+      	if !found {
+      		t.Fatalf("description not returned: %s", rec.Body)
+      	}
+      	rec = httptest.NewRecorder()
+      	mux.ServeHTTP(rec, httptest.NewRequest("POST", "/v1/payments", strings.NewReader(`{"account_id":"a","amount_cents":10,"currency":"EUR","description":"`+strings.Repeat("x", 141)+`"}`)))
+      	if rec.Code != 422 {
+      		t.Fatalf("long description: status %d", rec.Code)
+      	}
+      }
+  - repo: shared-protos
+    path: .bench/check_proto.py
+    content: |
+      import re, sys
+      src = open("proto/payment.proto").read()
+      def body(name):
+          m = re.search(r"message\s+" + name + r"\s*\{(.*?)\n\}", src, re.S)
+          return m.group(1) if m else ""
+      if not re.search(r"string\s+description\s*=\s*5\s*;", body("CreatePaymentRequest")):
+          sys.exit("CreatePaymentRequest.description = 5 missing")
+      if not re.search(r"string\s+description\s*=\s*6\s*;", body("Payment")):
+          sys.exit("Payment.description = 6 missing")
+      print("ok")
+checks:
+  - repo: payment-service
+    run: [go, test, ./...]
+  - repo: shared-protos
+    run: [python3, .bench/check_proto.py]
+timeout: 45m

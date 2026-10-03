@@ -1,0 +1,59 @@
+id: go-debug-ledger-balance-query
+category: debugging
+fixture: payment-platform
+repos: [ledger-service]
+setup:
+  - repo: ledger-service
+    file: internal/ledger/ledger.go
+    old: "if e.AccountID == accountID {"
+    new: "if e.AccountID != accountID || e.Currency == \"\" {"
+  - repo: ledger-service
+    file: internal/ledger/ledger_test.go
+    new: |
+      package ledger
+
+      import "testing"
+
+      func TestBalance(t *testing.T) {
+      	l := &Ledger{}
+      	if err := l.Post(Entry{AccountID: "a", AmountCents: 100, Currency: "EUR"}, Entry{AccountID: "b", AmountCents: -100, Currency: "EUR"}); err != nil {
+      		t.Fatal(err)
+      	}
+      	if got := l.Balance("a"); got != 100 {
+      		t.Fatalf("balance(a) = %d, want 100", got)
+      	}
+      }
+request: >-
+  go test ./... fails in ledger-service (TestBalance). Find the root cause in the
+  production code and fix it. Do not modify or delete existing tests.
+criteria:
+  - go test ./... passes without changing ledger_test.go
+hidden:
+  - repo: ledger-service
+    path: internal/ledger/hidden_accept_test.go
+    content: |
+      package ledger
+
+      import "testing"
+
+      func TestHiddenBalanceMulti(t *testing.T) {
+      	l := &Ledger{}
+      	_ = l.Post(Entry{AccountID: "x", AmountCents: 70}, Entry{AccountID: "y", AmountCents: -70})
+      	_ = l.Post(Entry{AccountID: "x", AmountCents: 30, Currency: "EUR"}, Entry{AccountID: "y", AmountCents: -30, Currency: "EUR"})
+      	if l.Balance("x") != 100 || l.Balance("y") != -100 || l.Balance("z") != 0 {
+      		t.Fatalf("x=%d y=%d z=%d", l.Balance("x"), l.Balance("y"), l.Balance("z"))
+      	}
+      }
+  - repo: ledger-service
+    path: .bench/check_tests_unchanged.sh
+    content: |
+      set -e
+      git diff --quiet HEAD~0 -- internal/ledger/ledger_test.go 2>/dev/null || true
+      base=$(git rev-list --max-parents=0 HEAD)
+      git diff --exit-code "$base" -- internal/ledger/ledger_test.go
+checks:
+  - repo: ledger-service
+    run: [go, test, ./...]
+  - repo: ledger-service
+    run: [sh, .bench/check_tests_unchanged.sh]
+timeout: 40m

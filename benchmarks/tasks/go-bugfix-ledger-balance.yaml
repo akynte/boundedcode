@@ -1,0 +1,47 @@
+id: go-bugfix-ledger-balance
+category: go-bugfix
+fixture: payment-platform
+repos: [ledger-service]
+setup:
+  - repo: ledger-service
+    file: internal/consumer/consumer.go
+    old: "AmountCents: -ev.AmountCents"
+    new: "AmountCents: ev.AmountCents"
+request: >-
+  In ledger-service, charged payments produce unbalanced ledger postings and the
+  consumer returns an error for every event. Fix HandlePaymentCharged so that each
+  charge posts a credit to the customer's account and a matching debit to the
+  settlement account.
+criteria:
+  - go test ./... passes in ledger-service
+  - every posting balances (entries sum to zero)
+hidden:
+  - repo: ledger-service
+    path: internal/consumer/hidden_accept_test.go
+    content: |
+      package consumer
+
+      import (
+      	"testing"
+
+      	"example.com/ledger-service/internal/ledger"
+      )
+
+      func TestHiddenBalancedPosting(t *testing.T) {
+      	l := &ledger.Ledger{}
+      	c := &Consumer{Ledger: l}
+      	if err := c.HandlePaymentCharged(&ConsumerMessage{Topic: TopicPaymentCharged, Value: []byte(`{"payment_id":"p9","account_id":"acc","amount_cents":1250,"currency":"USD"}`)}); err != nil {
+      		t.Fatal(err)
+      	}
+      	var sum int64
+      	for _, e := range l.Entries() {
+      		sum += e.AmountCents
+      	}
+      	if sum != 0 || l.Balance("acc") != 1250 || l.Balance(SettlementAccount) != -1250 {
+      		t.Fatalf("sum=%d acc=%d settlement=%d", sum, l.Balance("acc"), l.Balance(SettlementAccount))
+      	}
+      }
+checks:
+  - repo: ledger-service
+    run: [go, test, ./...]
+timeout: 40m

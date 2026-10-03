@@ -3,6 +3,7 @@ package cli
 import (
 	"bufio"
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"os"
@@ -16,15 +17,18 @@ import (
 
 	"github.com/akynte/boundedcode/internal/agent"
 	"github.com/akynte/boundedcode/internal/agent/openhands"
+	"github.com/akynte/boundedcode/internal/config"
 	"github.com/akynte/boundedcode/internal/frontier"
 	"github.com/akynte/boundedcode/internal/gitops"
 	"github.com/akynte/boundedcode/internal/inference"
 	"github.com/akynte/boundedcode/internal/orchestrator"
+	"github.com/akynte/boundedcode/internal/repointel/cbm"
 	"github.com/akynte/boundedcode/internal/sandbox"
 	"github.com/akynte/boundedcode/internal/store"
 	"github.com/akynte/boundedcode/internal/task"
 	"github.com/akynte/boundedcode/internal/telemetry"
 	"github.com/akynte/boundedcode/internal/verify"
+	"github.com/akynte/boundedcode/internal/workspace"
 )
 
 type runFlags struct {
@@ -64,7 +68,14 @@ func (a *App) buildRunner(ctx context.Context, f runFlags) (*orchestrator.Runner
 	if err != nil {
 		return nil, nil, err
 	}
-	rec := telemetry.New(s.DB, a.Log)
+	return a.buildRunnerWith(ctx, f, s.DB, a.Paths)
+}
+
+// buildRunnerWith wires a runner against an explicit database and paths
+// (benchmarks use an isolated state per task).
+func (a *App) buildRunnerWith(ctx context.Context, f runFlags, db *sql.DB, paths config.Paths) (*orchestrator.Runner, func(), error) {
+	var err error
+	rec := telemetry.New(db, a.Log)
 	p, err := a.profile(f.model)
 	if err != nil {
 		return nil, nil, err
@@ -89,18 +100,18 @@ func (a *App) buildRunner(ctx context.Context, f runFlags) (*orchestrator.Runner
 	}
 	timeout := a.Config.Inference.RequestTimeout.D()
 	newGW := func(taskID string, maxTokens int) *inference.Gateway {
-		return &inference.Gateway{Client: inference.NewClient(ep.BaseURL, timeout), Model: ep.Model, DB: s.DB,
+		return &inference.Gateway{Client: inference.NewClient(ep.BaseURL, timeout), Model: ep.Model, DB: db,
 			TaskID: taskID, Source: "agent", MaxTokens: maxTokens}
 	}
 	var rt agent.Runtime
 	switch a.Config.Agent.Runtime {
 	case "openhands":
-		rt = &openhands.Runtime{Sandbox: sb, Argv: argv, Log: a.Log, LogDir: filepath.Join(a.Paths.State, "adapter"),
+		rt = &openhands.Runtime{Sandbox: sb, Argv: argv, Log: a.Log, LogDir: filepath.Join(paths.State, "adapter"),
 			Gateway: func(taskID string) *inference.Gateway { return newGW(taskID, 0) }}
 	default:
 		return nil, nil, fmt.Errorf("agent runtime %q cannot run tasks from the CLI", a.Config.Agent.Runtime)
 	}
-	intel := a.intel()
+	intel := &cbm.Client{Binary: a.Config.RepoIntel.Binary, CacheDir: filepath.Join(paths.Cache, "codebase-memory")}
 	cleanup := func() { _ = intel.Close() }
 	if err := intel.Open(ctx); err != nil {
 		a.Log.Warn("repository intelligence unavailable; continuing without graph context", "err", err)
@@ -108,12 +119,12 @@ func (a *App) buildRunner(ctx context.Context, f runFlags) (*orchestrator.Runner
 	}
 	gomodcache, _ := exec.CommandContext(ctx, "go", "env", "GOMODCACHE").Output()
 	r := &orchestrator.Runner{
-		DB: s.DB, Ledger: task.Ledger{DB: s.DB}, Rec: rec, Agent: rt, Intel: intel,
-		Verify: &verify.Engine{Sandbox: sb, CacheDir: filepath.Join(a.Paths.Cache, "build"), GoModCache: strings.TrimSpace(string(gomodcache)), DB: s.DB, Rec: rec},
-		Cfg:    a.Config, Paths: a.Paths, Model: p.Name, CtxSize: p.Server.CtxSize, Log: a.Log, Out: a.Err,
+		DB: db, Ledger: task.Ledger{DB: db}, Rec: rec, Agent: rt, Intel: intel,
+		Verify: &verify.Engine{Sandbox: sb, CacheDir: filepath.Join(paths.Cache, "build"), GoModCache: strings.TrimSpace(string(gomodcache)), DB: db, Rec: rec},
+		Cfg:    a.Config, Paths: paths, Model: p.Name, CtxSize: p.Server.CtxSize, Log: a.Log, Out: a.Err,
 		CondenseEachRetry: f.condenseRetry,
 	}
-	r.WS, _ = a.workspaces(ctx)
+	r.WS = workspace.Store{DB: db}
 	// Gateway budget is per task; the runner passes the remaining allowance.
 	r.NewGateway = newGW
 	if a.Config.Frontier.Enabled {

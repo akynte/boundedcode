@@ -1,0 +1,35 @@
+id: sql-migration-idempotency-key
+category: database-migration
+fixture: payment-platform
+repos: [payment-service]
+request: >-
+  Add a new SQL migration to payment-service (migrations/002_*.sql) that adds a nullable
+  `idempotency_key TEXT` column to the payments table and a unique index on that column.
+  Do not modify migration 001.
+criteria:
+  - migrations/002_*.sql adds the column and a unique index
+  - migration 001 is unchanged
+hidden:
+  - repo: payment-service
+    path: .bench/check_migration.py
+    content: |
+      import glob, re, subprocess, sys
+      files = glob.glob("migrations/002_*.sql")
+      if len(files) != 1:
+          sys.exit(f"expected one migrations/002_*.sql, found {files}")
+      sql = open(files[0]).read().lower()
+      sql = re.sub(r"\s+", " ", sql)
+      if not re.search(r"alter table (if exists )?payments add (column )?(if not exists )?idempotency_key text", sql):
+          sys.exit("missing ALTER TABLE payments ADD COLUMN idempotency_key TEXT")
+      if "not null" in sql.split("idempotency_key text", 1)[1].split(";", 1)[0]:
+          sys.exit("column must be nullable")
+      if not re.search(r"create unique index[^;]*on payments ?\( ?idempotency_key ?\)", sql):
+          sys.exit("missing unique index on payments(idempotency_key)")
+      base = subprocess.check_output(["git", "rev-list", "--max-parents=0", "HEAD"], text=True).strip()
+      if subprocess.call(["git", "diff", "--quiet", base, "--", "migrations/001_create_payments.sql"]) != 0:
+          sys.exit("migration 001 was modified")
+      print("ok")
+checks:
+  - repo: payment-service
+    run: [python3, .bench/check_migration.py]
+timeout: 30m

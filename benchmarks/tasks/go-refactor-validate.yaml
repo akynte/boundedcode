@@ -1,0 +1,36 @@
+id: go-refactor-validate
+category: refactoring
+fixture: payment-platform
+repos: [payment-service]
+request: >-
+  Refactor payment-service: move the request validation out of the CreatePayment
+  handler into a method `func (r CreatePaymentRequest) Validate() error` in package
+  internal/api, and make CreatePayment use it. Behaviour must not change: invalid
+  requests still get 422, valid ones 201. Keep existing tests passing.
+criteria:
+  - CreatePaymentRequest has a Validate() error method used by CreatePayment
+  - existing behaviour unchanged; go test ./... passes
+hidden:
+  - repo: payment-service
+    path: internal/api/hidden_accept_test.go
+    content: |
+      package api
+
+      import "testing"
+
+      func TestHiddenValidate(t *testing.T) {
+      	if err := (CreatePaymentRequest{AccountID: "a", AmountCents: 1, Currency: "EUR"}).Validate(); err != nil {
+      		t.Fatalf("valid request rejected: %v", err)
+      	}
+      	for _, r := range []CreatePaymentRequest{{AccountID: "", AmountCents: 1, Currency: "EUR"}, {AccountID: "a", AmountCents: 0, Currency: "EUR"}, {AccountID: "a", AmountCents: 1, Currency: "EU"}} {
+      		if r.Validate() == nil {
+      			t.Errorf("invalid request accepted: %+v", r)
+      		}
+      	}
+      }
+checks:
+  - repo: payment-service
+    run: [go, test, ./...]
+  - repo: payment-service
+    run: [sh, -c, "grep -q 'Validate()' internal/api/handler.go"]
+timeout: 40m

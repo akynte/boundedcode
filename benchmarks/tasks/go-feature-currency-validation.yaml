@@ -1,0 +1,40 @@
+id: go-feature-currency-validation
+category: go-feature
+fixture: payment-platform
+repos: [payment-service]
+request: >-
+  payment-service currently accepts any three-letter currency. Only EUR, USD and GBP
+  are supported. POST /v1/payments must reject any other currency, including lowercase
+  spellings such as "eur", with HTTP 422 Unprocessable Entity. Add tests.
+criteria:
+  - unsupported or lowercase currencies are rejected with 422
+  - EUR, USD and GBP are accepted (201)
+  - go test ./... passes
+hidden:
+  - repo: payment-service
+    path: internal/api/hidden_accept_test.go
+    content: |
+      package api
+
+      import (
+      	"net/http"
+      	"net/http/httptest"
+      	"strings"
+      	"testing"
+      )
+
+      func TestHiddenCurrency(t *testing.T) {
+      	mux, _ := newTestServer()
+      	for cur, want := range map[string]int{"EUR": 201, "USD": 201, "GBP": 201, "eur": 422, "JPY": 422, "XXX": 422} {
+      		rec := httptest.NewRecorder()
+      		mux.ServeHTTP(rec, httptest.NewRequest("POST", "/v1/payments", strings.NewReader(`{"account_id":"a","amount_cents":10,"currency":"`+cur+`"}`)))
+      		if rec.Code != want {
+      			t.Errorf("%s: status %d want %d", cur, rec.Code, want)
+      		}
+      	}
+      	_ = http.StatusOK
+      }
+checks:
+  - repo: payment-service
+    run: [go, test, ./...]
+timeout: 40m

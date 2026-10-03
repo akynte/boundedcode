@@ -2,10 +2,12 @@ package cli
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -13,12 +15,13 @@ import (
 
 	"github.com/akynte/boundedcode/internal/benchmark"
 	"github.com/akynte/boundedcode/internal/config"
+	"github.com/akynte/boundedcode/internal/orchestrator"
 	"github.com/akynte/boundedcode/internal/store"
 )
 
 func newBenchCmd(app *App) *cobra.Command {
 	cmd := &cobra.Command{Use: "bench", Short: "Run reproducible benchmarks"}
-	cmd.AddCommand(newBenchInfraCmd(app))
+	cmd.AddCommand(newBenchInfraCmd(app), newBenchTasksCmd(app))
 	return cmd
 }
 
@@ -133,4 +136,91 @@ func recordBenchmark(cmd *cobra.Command, app *App, id, kind, modelName string, c
 func hostname() string {
 	h, _ := os.Hostname()
 	return h
+}
+
+func newBenchTasksCmd(app *App) *cobra.Command {
+	var (
+		dir, out, fixtures string
+		only               []string
+		rf                 runFlags
+	)
+	cmd := &cobra.Command{
+		Use:   "tasks",
+		Short: "Run the engineering benchmark suite (hidden acceptance checks) with the real agent",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			ctx := cmd.Context()
+			tasks, err := benchmark.LoadTasks(dir)
+			if err != nil {
+				return err
+			}
+			if len(only) > 0 {
+				var sel []benchmark.TaskSpec
+				for _, t := range tasks {
+					if contains(only, t.ID) || contains(only, t.Category) {
+						sel = append(sel, t)
+					}
+				}
+				tasks = sel
+			}
+			if len(tasks) == 0 {
+				return fmt.Errorf("no tasks selected")
+			}
+			p, err := app.profile(rf.model)
+			if err != nil {
+				return err
+			}
+			sb, err := app.sandbox(rf.unsafeNoSandbox)
+			if err != nil {
+				return err
+			}
+			// Scratch space must be visible to the container engine (Docker
+			// Desktop shares $HOME, not /tmp).
+			work := filepath.Join(app.Paths.Cache, "bench-work")
+			if err := os.MkdirAll(work, 0o700); err != nil {
+				return err
+			}
+			stamp := time.Now().UTC().Format("20060102T150405Z")
+			if out == "" {
+				out = filepath.Join("benchmarks", "reports", fmt.Sprintf("%s-tasks-%s.json", stamp, p.Name))
+			}
+			sr := &benchmark.SuiteRunner{FixturesDir: fixtures, WorkRoot: work, Sandbox: sb,
+				Progress: func(s string) { fmt.Fprintf(app.Err, "%s %s\n", time.Now().Format("15:04:05"), s) },
+				NewRunner: func(ctx context.Context, stateDir string) (*orchestrator.Runner, func(), error) {
+					paths := config.Paths{Config: app.Paths.Config, Data: filepath.Join(stateDir, "data"), Cache: filepath.Join(stateDir, "cache"), State: filepath.Join(stateDir, "state")}
+					if err := paths.Ensure(); err != nil {
+						return nil, nil, err
+					}
+					st, err := store.Open(ctx, paths.StateDB())
+					if err != nil {
+						return nil, nil, err
+					}
+					r, cleanup, err := app.buildRunnerWith(ctx, rf, st.DB, paths)
+					if err != nil {
+						st.Close()
+						return nil, nil, err
+					}
+					r.Out = app.Err
+					return r, func() { cleanup(); st.Close() }, nil
+				}}
+			rep, err := sr.Run(ctx, p.Name, tasks, out)
+			if rep != nil {
+				md := strings.TrimSuffix(out, ".json") + ".md"
+				var b bytes.Buffer
+				_ = benchmark.WriteSuiteMarkdown(&b, rep)
+				_ = os.WriteFile(md, b.Bytes(), 0o644)
+				_ = recordBenchmark(cmd, app, rep.ID, "engineering", p.Name, map[string]any{"tasks": len(tasks)}, rep)
+				s := rep.Summary
+				app.printf("verified %d/%d (%.0f%%), local-only %.0f%%, escalation rate %.0f%%, %.1f verified/hour, %.0fs/task\nreport: %s\n",
+					s.Verified, s.Tasks, 100*s.SuccessRate, 100*s.LocalOnlyRate, 100*s.FrontierEscalationRate, s.VerifiedPerHour, s.MeanWallSeconds, md)
+			}
+			return err
+		},
+	}
+	f := cmd.Flags()
+	f.StringVar(&dir, "tasks", "benchmarks/tasks", "task definitions directory")
+	f.StringVar(&fixtures, "fixtures", "benchmarks/fixtures", "fixtures directory")
+	f.StringSliceVar(&only, "only", nil, "task ids or categories to run")
+	f.StringVar(&out, "out", "", "report path (.json; .md written alongside)")
+	addRunFlags(cmd, &rf)
+	return cmd
 }

@@ -1,0 +1,50 @@
+id: ts-retry-5xx
+category: typescript
+fixture: payment-platform
+repos: [gateway]
+request: >-
+  In gateway/src/payments.ts make createPayment retry on HTTP 5xx responses: at most
+  3 attempts in total, then throw. It must not retry on 4xx responses (throw immediately).
+  Keep the exported function signature unchanged. Do not add dependencies.
+criteria:
+  - 5xx responses are retried up to 3 total attempts
+  - 4xx responses are not retried
+hidden:
+  - repo: gateway
+    path: .bench/retry.test.ts
+    content: |
+      import { test } from "node:test";
+      import assert from "node:assert/strict";
+      import { createPayment } from "../src/payments.ts";
+
+      function fakeFetch(statuses: number[]) {
+        let calls = 0;
+        (globalThis as any).fetch = async () => {
+          const s = statuses[Math.min(calls, statuses.length - 1)];
+          calls++;
+          return new Response(JSON.stringify({ id: "p1", account_id: "a", amount_cents: 1, currency: "EUR", status: "charged" }), { status: s });
+        };
+        return () => calls;
+      }
+      const req = { account_id: "a", amount_cents: 1, currency: "EUR" };
+
+      test("retries 5xx then succeeds", async () => {
+        const calls = fakeFetch([503, 500, 201]);
+        const p = await createPayment(req);
+        assert.equal(p.id, "p1");
+        assert.equal(calls(), 3);
+      });
+      test("gives up after 3 attempts", async () => {
+        const calls = fakeFetch([502, 502, 502, 201]);
+        await assert.rejects(createPayment(req));
+        assert.equal(calls(), 3);
+      });
+      test("does not retry 4xx", async () => {
+        const calls = fakeFetch([400, 201]);
+        await assert.rejects(createPayment(req));
+        assert.equal(calls(), 1);
+      });
+checks:
+  - repo: gateway
+    run: [node, --test, .bench/retry.test.ts]
+timeout: 40m
