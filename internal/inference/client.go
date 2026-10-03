@@ -41,6 +41,9 @@ type ChatRequest struct {
 	TopK        int       `json:"top_k,omitempty"`
 	Seed        *int      `json:"seed,omitempty"`
 	CachePrompt *bool     `json:"cache_prompt,omitempty"`
+	// IgnoreEOS is a llama.cpp extension used by benchmarks to force exactly
+	// MaxTokens of decode.
+	IgnoreEOS bool `json:"ignore_eos,omitempty"`
 	// ChatTemplateKwargs is forwarded to llama.cpp's Jinja templates
 	// (e.g. {"enable_thinking": false}).
 	ChatTemplateKwargs map[string]bool `json:"chat_template_kwargs,omitempty"`
@@ -174,6 +177,25 @@ func (c *Client) Healthy(ctx context.Context) (bool, error) {
 		return false, err
 	}
 	return code == http.StatusOK, nil
+}
+
+// Tokenize returns the token count of text using llama-server's /tokenize.
+func (c *Client) Tokenize(ctx context.Context, text string) (int, error) {
+	body, err := json.Marshal(map[string]any{"content": text})
+	if err != nil {
+		return 0, err
+	}
+	raw, _, err := c.Raw(ctx, "/tokenize", body)
+	if err != nil {
+		return 0, err
+	}
+	var out struct {
+		Tokens []json.RawMessage `json:"tokens"`
+	}
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return 0, err
+	}
+	return len(out.Tokens), nil
 }
 
 // ErrNotReady is returned while a server is still loading.
