@@ -1,0 +1,35 @@
+# Qwen3.6-35B-A3B: sparse MoE (~35B total / ~3B active). Weights are NOT
+# redistributed by this project; download them from the source below and
+# review the model license there.
+name: qwen3.6-35b-a3b
+display_name: Qwen3.6-35B-A3B (UD-Q4_K_M GGUF)
+file: Qwen3.6-35B-A3B-UD-Q4_K_M.gguf
+source:
+  repo: unsloth/Qwen3.6-35B-A3B-GGUF
+  file: Qwen3.6-35B-A3B-UD-Q4_K_M.gguf
+  base_model: Qwen/Qwen3.6-35B-A3B
+  license: apache-2.0
+architecture:
+  moe: true
+  total_params_b: 35
+  active_params_b: 3
+# Server flags. These are starting values for an 8 GB GPU + 64 GB RAM machine.
+# `boundedcode bench infra --sweep` measures alternatives; the chosen values
+# come from benchmarks/reports, not guesses.
+server:
+  ctx_size: 65536
+  gpu_layers: 999
+  n_cpu_moe: 30
+  flash_attn: "on"
+  cache_type_k: q8_0
+  cache_type_v: q8_0
+  batch_size: 2048
+  ubatch_size: 512
+  threads: 8
+  parallel: 1
+  jinja: true
+sampling:
+  temperature: 0.6
+  top_p: 0.95
+  top_k: 20
+  min_p: 0.0
