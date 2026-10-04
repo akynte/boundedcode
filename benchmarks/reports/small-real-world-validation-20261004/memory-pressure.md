@@ -1,5 +1,18 @@
 # Memory-pressure interruption (2026-10-04)
 
+> **Update 15:47: root cause confirmed.** Re-running `vuejs__core-11899` on
+> the frozen build, alone, with the sampler below, reproduced the failure:
+> the **BoundedCode process itself** grew from 9.9 GiB (30 s after start) to
+> 58.9 GiB RSS during task setup, host available memory fell to 328 MiB and
+> the process was SIGKILLed (exit 137). llama-server was at 145 MiB and the
+> Docker VM was stopped. In isolation the growth reproduces in
+> `xservice.(*jsAnalyzer).eval` on `packages/reactivity/src/collectionHandlers.ts`:
+> exponential expansion of constant bindings. The Docker VM hypothesis below
+> is **ruled out** for this event. The first interruption happened at the same
+> point (vuejs setup) and is very likely the same defect, but it was not
+> sampled. Fix: commit "Bound cross-service constant evaluation".
+> Evidence: `evidence/vuejs__core-11899-frozen-memory.log`.
+
 ## What happened
 
 At about 13:50 local time the frozen 8-task run was stopped, 5 tasks in
@@ -25,7 +38,7 @@ already persisted; the report JSON is written after every task.
 | `~/.cache/boundedcode/bench-work` | 15 GiB on disk, 115 directories (screening and task scratch; disk, not RAM). |
 | Other host load | Other Claude Code sessions, a browser and desktop applications (a few GiB in total when read). |
 
-## Interpretation
+## Interpretation (written before the cause was found; kept as recorded)
 
 The evidence is **insufficient to name a root cause**. What it does show:
 
