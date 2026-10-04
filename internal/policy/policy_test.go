@@ -124,3 +124,52 @@ func TestFindSecretPathsFailsClosed(t *testing.T) {
 		t.Fatalf("exactly at the limit: %v", err)
 	}
 }
+
+// TestSourceCodeIsNotSecret is the regression test for a defect found by the
+// 2026-10-04 real-world validation (grpc/grpc-go): source code in a package
+// named "credentials" (and files like credentials.go or kubeconfig.go) was
+// masked from the agent and rejected by verification's diff scope, so a task
+// in that package could not be done at all. Source files are code, not
+// secret stores; literal secrets in them are the secret scanner's job.
+func TestSourceCodeIsNotSecret(t *testing.T) {
+	code := []string{"credentials/credentials.go", "credentials/tls.go", "credentials/alts/alts.go",
+		"pkg/secrets/manager.go", "internal/secret.go", "pkg/kube/kubeconfig.go", "src/auth/credentials.ts",
+		"lib/credentials.py"}
+	for _, p := range code {
+		if IsSecretPath(p) {
+			t.Errorf("%s is source code, not a secret", p)
+		}
+	}
+	// Secret stores keep matching, also next to code, and dot directories
+	// stay secret whatever their contents.
+	secret := []string{"credentials", "credentials.json", "credentials/prod.json", "credentials/testdata/server1.key",
+		"secrets/db.yaml", ".aws/credentials", ".aws/helper.py", ".ssh/config", ".env.go"}
+	for _, p := range secret {
+		if !IsSecretPath(p) {
+			t.Errorf("%s should be secret", p)
+		}
+	}
+}
+
+func TestFindSecretPathsDescendsIntoCodePackages(t *testing.T) {
+	root := t.TempDir()
+	for _, f := range []string{"credentials/credentials.go", "credentials/tls.go", "credentials/testdata/server1.key",
+		"credentials/prod.json", "secrets/db.yaml", "secrets/nested/token.txt", "secrets/.hidden/x.go",
+		"auth/credentials/alts/alts.go"} {
+		p := filepath.Join(root, f)
+		_ = os.MkdirAll(filepath.Dir(p), 0o755)
+		_ = os.WriteFile(p, []byte("x"), 0o600)
+	}
+	got, err := FindSecretPaths(root, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The code package is walked file by file; a directory with no source
+	// code is still masked as a whole.
+	want := "[credentials/prod.json credentials/testdata secrets]"
+	// (auth/credentials holds code only in a subdirectory and stays visible;
+	// code under a dot directory does not unmask its parent.)
+	if fmt.Sprint(got) != want {
+		t.Fatalf("got %v, want %s", got, want)
+	}
+}

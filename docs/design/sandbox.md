@@ -29,7 +29,7 @@ part of this boundary.
 | 7 | Deterministic command policy blocks push/force-push, hard resets, protected-branch merges, `terraform apply/destroy`, mutating `kubectl`/`helm`/cloud CLIs, publishing, and `curl … \| sh`. Command lines are normalized first (global flags such as `git -C`, `kubectl --context`, `terraform -chdir`; env assignments; wrappers; `sh -c` bodies). It applies to verification commands. The agent's own commands are not filtered: inside the container they cannot reach a remote, credentials or the host. | `policy.CheckCommand` |
 | 8 | Host-side git hardening: hooks disabled (`core.hooksPath=/dev/null`), `core.fsmonitor=false`, `--no-ext-diff --no-textconv`, no commit signing. Before any host git runs in a worktree (run, resume, `task verify`, `task diff`, checkpoints) the control plane verifies the `.git` pointer, that the agent-writable admin dir's `commondir` still points at the real (read-only) common dir, that there is no `config.worktree`, and that `HEAD` is the task branch. A redirected `commondir` would otherwise let host `git add` run an agent-defined filter (reproduced in `TestAdminDirTamperingDetected`). | `gitops.CheckTaskWorktree` |
 | 9 | Commits happen host-side on `agent/<task-id>` only. `CommitAll` refuses other branches. There are no pushes. | `gitops.CommitAll` |
-| 10 | Verification runs in the same image with the worktree mounted and the git dirs read-only. The module cache is mounted read-only, with `GOPROXY=off`. Each task has its own Go build cache. Its config and language presets come from the task's **base commit**, never from the agent-writable worktree; deleting a stage's required file (e.g. `go.mod`) fails the stage. | `verify.LoadConfig`, `verify.Engine.spec` |
+| 10 | Verification runs in the same image with the worktree mounted and the git dirs read-only. The module cache is mounted read-only, with `GOPROXY=off`. Installed `node_modules` directories of the repository's own checkout (path from the task ledger, never from the worktree) are mounted read-only at the same paths in the worktree, for verification and the agent; they shadow anything the agent put there, and a symlink or file at a mount point fails the stage (or refuses the session). A JavaScript project that declares a `test`/`lint`/`build` script but has no installed dependencies fails that stage instead of skipping it. Each task has its own Go build cache. Its config and language presets come from the task's **base commit**, never from the agent-writable worktree; deleting a stage's required file (e.g. `go.mod`) fails the stage. | `verify.LoadConfig`, `verify.Engine.spec`, `sandbox.DependencyMounts` |
 | 11 | Diff-scope gate: changes touching secret paths, protected paths (`.boundedcode/`, CI workflows, CODEOWNERS, `.gitmodules`), or more than N files fail verification. gitleaks scans the task diff; without gitleaks the full gate fails. | `verify`, `policy.IsProtectedPath` |
 | 14 | Host-side reads of agent-written files (context packs, ADRs, cross-service scans) never follow symlinks out of the worktree and never read secret paths; packs are redacted before they reach the model or a frontier packet, and diffs omit secret paths. codebase-memory-mcp and ripgrep do not follow symlinks (verified 2026-10-04). | `contextplan.ReadConfined`, `xservice.Scan` |
 | 15 | More secret paths than can be masked (500) refuses to start the agent instead of masking only some. | `policy.FindSecretPaths` |
@@ -68,15 +68,21 @@ part of this boundary.
    branch.
 3. **Build scripts run with worktree access.** `go test` or `npm` scripts
    chosen by the agent run inside the sandbox, so they are contained but
-   unrestricted within it.
+   unrestricted within it. The worktree's `package.json` is agent-writable,
+   so its `test` script is too: as with editable test files, the stages
+   catch mistakes, not an adversarial agent (hidden acceptance checks do).
 4. **Secret detection is pattern-based.** A secret stored under an
    innocuous name (for example `config/prod.yaml`) is not masked. gitleaks
    on the diff catches *new* secrets only. Mitigation: keep production
-   secrets out of development checkouts (see SECURITY.md). The heuristic
-   also has false positives: grpc-go's `credentials/` packages and
-   `credentials.go` files are masked, so that repository cannot build in the
-   sandbox (found by the ADR-0008 benchmark, 2026-10-03; not changed here,
-   since loosening the masks is a security decision of its own).
+   secrets out of development checkouts (see SECURITY.md). Source-code
+   files (`.go`, `.ts`, `.py`, ...) are not secret by name alone: before
+   2026-10-04, grpc-go's `credentials/` package and files such as
+   `credentials.go` or `kubeconfig.go` were masked and rejected by the diff
+   scope, so tasks there could not be done (found by the ADR-0008 benchmark
+   and the small real-world validation). A secret-named directory that holds
+   source is walked file by file (its non-code files stay masked); dot
+   directories (`.ssh`, `.aws`, ...) stay masked whole. Literal secrets
+   inside code are left to gitleaks on the diff.
 5. **Persistence directory.** The OpenHands conversation store is writable
    by the agent. It holds data, not executables, and the control plane
    treats it as untrusted. The task ledger in SQLite is the source of truth

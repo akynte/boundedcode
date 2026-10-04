@@ -26,6 +26,22 @@ var secretGlobs = []string{
 	"service-account*.json", "*-sa.json",
 }
 
+// sourceExts are source-code files. They are code, not secret stores, so a
+// secret-sounding name (credentials.go, kubeconfig.go, a "secrets" package)
+// does not make them secret; literal secrets inside code are the secret
+// scanner's job. Dot directories (.ssh, .aws, ...) stay secret regardless.
+var sourceExts = map[string]bool{
+	".go": true, ".ts": true, ".tsx": true, ".js": true, ".jsx": true, ".mjs": true, ".cjs": true,
+	".py": true, ".rb": true, ".java": true, ".kt": true, ".scala": true, ".rs": true, ".c": true,
+	".h": true, ".cc": true, ".cpp": true, ".hpp": true, ".cs": true, ".swift": true, ".php": true,
+	".vue": true, ".svelte": true,
+}
+
+// isSourceFile reports whether base names a source file (not a dotfile).
+func isSourceFile(base string) bool {
+	return !strings.HasPrefix(base, ".") && sourceExts[path.Ext(base)]
+}
+
 // allowedExceptions are conventional non-secret templates.
 var allowedExceptions = []string{".env.example", ".env.sample", ".env.template", "*.example.tfvars"}
 
@@ -40,6 +56,16 @@ func IsSecretPath(rel string) bool {
 		}
 	}
 	parts := strings.Split(rel, "/")
+	if isSourceFile(base) {
+		for _, p := range parts[:len(parts)-1] {
+			for _, g := range secretGlobs {
+				if strings.HasPrefix(g, ".") && p == g {
+					return true // e.g. .aws/helper.py
+				}
+			}
+		}
+		return false
+	}
 	for _, g := range secretGlobs {
 		if ok, _ := path.Match(g, base); ok {
 			return true
@@ -83,6 +109,12 @@ func FindSecretPaths(root string, limit int) ([]string, error) {
 			return filepath.SkipDir
 		}
 		if IsSecretPath(rel) {
+			// A secret-named directory holding source code (a Go package
+			// named "credentials") is walked file by file: its code stays
+			// visible, its other files are masked individually.
+			if d.IsDir() && !strings.HasPrefix(d.Name(), ".") && containsSource(p) {
+				return nil
+			}
 			if len(out) >= limit {
 				tooMany = true
 				return filepath.SkipAll
@@ -98,6 +130,31 @@ func FindSecretPaths(root string, limit int) ([]string, error) {
 		err = fmt.Errorf("%w: more than %d under %s", ErrTooManySecrets, limit, root)
 	}
 	return out, err
+}
+
+// containsSource reports whether the tree under dir holds a source file. It
+// looks at no more than 5000 entries and skips dot directories; an
+// unreadable or very large tree counts as not containing source, so it is
+// masked whole (fail closed).
+func containsSource(dir string) bool {
+	seen, found := 0, false
+	_ = filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return filepath.SkipAll
+		}
+		if seen++; seen > 5000 {
+			return filepath.SkipAll
+		}
+		if d.IsDir() && p != dir && strings.HasPrefix(d.Name(), ".") {
+			return filepath.SkipDir
+		}
+		if d.Type().IsRegular() && isSourceFile(d.Name()) {
+			found = true
+			return filepath.SkipAll
+		}
+		return nil
+	})
+	return found
 }
 
 // protectedPaths are workspace-relative globs a task's change must never
