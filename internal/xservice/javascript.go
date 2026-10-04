@@ -14,6 +14,19 @@ type jsAnalyzer struct {
 	axios     map[string]string  // NAME bound to axios.create({baseURL}) -> base path
 	out       []Endpoint
 	diags     []Diagnostic
+	// Evaluation bounds (see budget.go): binding values are computed once
+	// per file, a binding being evaluated is a cycle, and each top-level
+	// evaluation has a step budget.
+	memo       map[string]jsValue
+	evaluating map[string]bool
+	budget     evalBudget
+	overBudget bool // a diagnostic was emitted for this file
+}
+
+// jsValue is a memoized binding value.
+type jsValue struct {
+	s  string
+	ok bool
 }
 
 func analyzeJS(repo, root string, relFiles []string) ([]Endpoint, []Diagnostic) {
@@ -24,13 +37,52 @@ func analyzeJS(repo, root string, relFiles []string) ([]Endpoint, []Diagnostic) 
 		if err != nil || len(b) > 2<<20 {
 			continue
 		}
-		a := &jsAnalyzer{repo: repo, rel: filepath.ToSlash(rel), toks: jsLex(string(b)), bindings: map[string][]jsTok{}, axios: map[string]string{}}
+		a := &jsAnalyzer{repo: repo, rel: filepath.ToSlash(rel), toks: jsLex(string(b)), bindings: map[string][]jsTok{}, axios: map[string]string{},
+			memo: map[string]jsValue{}, evaluating: map[string]bool{}}
 		a.collectBindings()
 		a.scan()
 		out = append(out, a.out...)
 		diags = append(diags, a.diags...)
 	}
 	return out, diags
+}
+
+// continuesExpr are operators that, ending a line or starting the next one,
+// continue an expression across a newline.
+var continuesExpr = map[string]bool{"+": true, "-": true, "*": true, "/": true, "%": true, ".": true, "?.": true,
+	"?": true, ":": true, "||": true, "&&": true, "??": true, "=": true, "=>": true, "(": true, "[": true, ",": true,
+	"|": true, "&": true, "==": true, "===": true, "!=": true, "!==": true, "<": true, ">": true, "<=": true, ">=": true}
+
+func continues(tk jsTok) bool { return tk.kind == jsPunct && continuesExpr[tk.text] }
+
+// stmtEnd is exprEnd for a binding's initializer: it also stops at a newline
+// at nesting depth 0 when neither side of it continues the expression, so
+// that in code without semicolons a binding does not swallow the following
+// statements (automatic semicolon insertion, approximately).
+func stmtEnd(t []jsTok, i int) int {
+	start, depth := i, 0
+	for ; i < len(t); i++ {
+		if depth == 0 && i > start && t[i].line > t[i-1].line && !continues(t[i-1]) && !continues(t[i]) {
+			return i
+		}
+		if t[i].kind != jsPunct {
+			continue
+		}
+		switch t[i].text {
+		case "(", "[", "{":
+			depth++
+		case ")", "]", "}":
+			if depth == 0 {
+				return i
+			}
+			depth--
+		case ",", ";":
+			if depth == 0 {
+				return i
+			}
+		}
+	}
+	return i
 }
 
 // exprEnd returns the index just past the expression starting at i: it stops
@@ -81,7 +133,7 @@ func (a *jsAnalyzer) collectBindings() {
 		if j >= len(t) || t[j].text != "=" {
 			continue
 		}
-		end := exprEnd(t, j+1)
+		end := stmtEnd(t, j+1)
 		expr := t[j+1 : end]
 		a.bindings[name] = expr
 		// axios.create({ baseURL: ... })
@@ -123,12 +175,24 @@ func objectValue(t []jsTok, key string) ([]jsTok, bool) {
 // eval resolves an expression's token list to a string; unresolved parts
 // become "{}". The bool reports full resolution.
 func (a *jsAnalyzer) eval(t []jsTok, depth int) (string, bool) {
-	if depth > 10 || len(t) == 0 {
+	if depth == 0 {
+		a.budget = evalBudget{}
+	}
+	if depth > 10 || len(t) == 0 || !a.budget.step() {
+		a.noteBudget(t)
 		return "{}", false
 	}
 	var b strings.Builder
 	ok := true
 	for i := 0; i < len(t); i++ {
+		if b.Len() > maxEvalLen {
+			a.budget.exhausted = true // a value this long is not an address
+		}
+		if a.budget.exhausted {
+			a.noteBudget(t)
+			s, _ := capLen(b.String())
+			return s, false
+		}
 		tk := t[i]
 		switch {
 		case tk.kind == jsString:
@@ -155,7 +219,7 @@ func (a *jsAnalyzer) eval(t []jsTok, depth int) (string, bool) {
 			}
 		case tk.kind == jsIdent:
 			if bound, found := a.bindings[tk.text]; found && (i+1 >= len(t) || t[i+1].text != "(") {
-				v, sok := a.eval(bound, depth+1)
+				v, sok := a.binding(tk.text, bound, depth+1)
 				b.WriteString(v)
 				ok = ok && sok
 			} else {
@@ -173,7 +237,41 @@ func (a *jsAnalyzer) eval(t []jsTok, depth int) (string, bool) {
 			ok = false
 		}
 	}
-	return b.String(), ok
+	s, fits := capLen(b.String())
+	return s, ok && fits
+}
+
+// binding evaluates a named binding once per file. A binding reached again
+// while it is being evaluated (x = f(x), or a = b; b = a) is unresolved.
+func (a *jsAnalyzer) binding(name string, bound []jsTok, depth int) (string, bool) {
+	if v, ok := a.memo[name]; ok {
+		return v.s, v.ok
+	}
+	if a.evaluating[name] {
+		return "{}", false
+	}
+	a.evaluating[name] = true
+	s, ok := a.eval(bound, depth)
+	delete(a.evaluating, name)
+	// A value cut short by the depth limit or the budget is not memoized:
+	// it depends on where it was reached from.
+	if !a.budget.exhausted && depth <= 1 {
+		a.memo[name] = jsValue{s, ok}
+	}
+	return s, ok
+}
+
+// noteBudget records, once per file, that evaluation was cut short.
+func (a *jsAnalyzer) noteBudget(t []jsTok) {
+	if !a.budget.exhausted || a.overBudget {
+		return
+	}
+	a.overBudget = true
+	line := 0
+	if len(t) > 0 {
+		line = t[0].line
+	}
+	a.diags = append(a.diags, Diagnostic{File: a.rel, Line: line, Message: "constant evaluation budget exceeded; values in this file may be unresolved"})
 }
 
 func (a *jsAnalyzer) emit(line int, e Endpoint) {

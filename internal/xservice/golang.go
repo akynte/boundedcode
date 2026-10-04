@@ -35,6 +35,7 @@ type goAnalyzer struct {
 	consts map[string]ast.Expr // "importpath.Name" -> value expression
 	diags  []Diagnostic
 	out    []Endpoint
+	budget evalBudget // of the current top-level evaluation (see budget.go)
 }
 
 func analyzeGo(repo, root string, relFiles []string) ([]Endpoint, []Diagnostic) {
@@ -567,11 +568,18 @@ func classifyTopicType(t string) (Kind, bool) {
 // eval resolves an expression to a string. Unresolvable parts become "{}"
 // and the confidence is Partial.
 func (a *goAnalyzer) eval(sc *scope, e ast.Expr) (string, Confidence) {
-	return a.evalDepth(sc, e, 0)
+	a.budget = evalBudget{}
+	v, c := a.evalDepth(sc, e, 0)
+	if a.budget.exhausted {
+		a.diags = append(a.diags, Diagnostic{File: a.fset.Position(e.Pos()).Filename, Line: a.fset.Position(e.Pos()).Line,
+			Message: "constant evaluation budget exceeded; value left unresolved"})
+		return "{}", Partial
+	}
+	return v, c
 }
 
 func (a *goAnalyzer) evalDepth(sc *scope, e ast.Expr, depth int) (string, Confidence) {
-	if depth > 12 || e == nil {
+	if depth > 12 || e == nil || !a.budget.step() {
 		return "{}", Partial
 	}
 	switch x := e.(type) {
@@ -612,7 +620,7 @@ func (a *goAnalyzer) evalDepth(sc *scope, e ast.Expr, depth int) (string, Confid
 		if x.Op == token.ADD {
 			l, lc := a.evalDepth(sc, x.X, depth+1)
 			r, rc := a.evalDepth(sc, x.Y, depth+1)
-			return l + r, worse(worse(lc, rc), Resolved)
+			return capConf(l+r, worse(worse(lc, rc), Resolved))
 		}
 	case *ast.CallExpr:
 		if sel, ok := x.Fun.(*ast.SelectorExpr); ok {
@@ -632,7 +640,7 @@ func (a *goAnalyzer) evalDepth(sc *scope, e ast.Expr, depth int) (string, Confid
 					if s, _ := a.evalDepth(sc, x.Args[0], depth+1); strings.HasPrefix(s, "/") {
 						joined = "/" + joined
 					}
-					return joined, conf
+					return capConf(joined, conf)
 				case "strings.ToUpper", "strings.ToLower", "strings.TrimSpace":
 					if len(x.Args) == 1 {
 						v, c := a.evalDepth(sc, x.Args[0], depth+1)
@@ -703,8 +711,19 @@ func (a *goAnalyzer) sprintf(sc *scope, args []ast.Expr, depth int) (string, Con
 		b.WriteString(val)
 		conf = worse(conf, c)
 		i = j
+		if b.Len() > maxEvalLen {
+			break
+		}
 	}
-	return b.String(), conf
+	return capConf(b.String(), conf)
+}
+
+// capConf bounds an evaluated string; a cut value is Partial.
+func capConf(s string, c Confidence) (string, Confidence) {
+	if v, fits := capLen(s); !fits {
+		return v, Partial
+	}
+	return s, c
 }
 
 func worse(a, b Confidence) Confidence {
