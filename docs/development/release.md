@@ -31,9 +31,10 @@ irreversible.
    * `LICENSES/`
 6. Secret-scan the full history: `gitleaks git --redact .`
 7. Check DCO sign-off on every commit: `scripts/check-dco.sh <root> HEAD`
-8. **Maintainer:** choose the public name (see `renaming.md`), set the
-   security contact in `SECURITY.md` and `CODE_OF_CONDUCT.md`, create the
-   GitHub repository, push, tag and draft the release.
+8. **Maintainer:** tag the release and draft the GitHub release from the
+   `dist/` artifacts. The name (`renaming.md`), the security contact
+   (`SECURITY.md`, `CODE_OF_CONDUCT.md`, private vulnerability reporting)
+   and the repository are already set up.
 
 ## Versioning
 

@@ -7,10 +7,29 @@ Once releases exist, the latest minor release will be supported.
 
 ## Reporting a vulnerability
 
-Please do **not** open a public issue. Use GitHub's private vulnerability
-reporting ("Report a vulnerability" under the repository's Security tab).
-Expect an acknowledgement within 7 days. *(A dedicated contact will be added
-before the first public release.)*
+Please do **not** open a public issue, pull request or discussion for a
+security problem.
+
+* **Preferred:** GitHub private vulnerability reporting. Open the
+  [Security tab](https://github.com/akynte/boundedcode/security) and choose
+  **Report a vulnerability**
+  ([direct link](https://github.com/akynte/boundedcode/security/advisories/new)).
+* **Alternative** (no GitHub account): email **ali@aliakbari.dev** with
+  "BoundedCode security" in the subject.
+
+Please include the affected version or commit, reproduction steps, impact,
+and any suggested fix. Do not include real credentials or other people's
+data.
+
+What to expect:
+
+* acknowledgement within **7 days**;
+* an initial assessment, and a fix plan or a reasoned decline, within
+  **30 days**;
+* coordinated disclosure: we publish a GitHub security advisory once a fix
+  is available, credit you if you wish, and ask that you not disclose
+  publicly before then or 90 days after your report, whichever comes
+  first.
 
 ## Security model
 
