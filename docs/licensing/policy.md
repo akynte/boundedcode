@@ -19,8 +19,15 @@ invalid.
 Enforcement:
 
 * `scripts/licensecheck` fails CI for denied, unknown or unreviewed licenses
-  among Go modules linked into shipped binaries.
-* `scripts/pylicensecheck.sh` covers the Python adapter environment.
+  among Go modules linked into shipped binaries. With `-check-notices` it
+  also fails when a linked module is missing from `THIRD_PARTY_NOTICES.md` or
+  the license matrix, and CI fails when `make licenses` changes `LICENSES/`.
+* `scripts/pylicensecheck.py` covers the Python environments of the adapter
+  and of Serena. It fails on a denied license. For an expression with `AND`,
+  every part must pass; `OR` picks the most permissive option within one
+  part. CI regenerates `adapters/openhands/python/THIRD_PARTY.md` and
+  `configs/serena/THIRD_PARTY.md` and fails if they change, so new
+  review-class packages are reviewed and recorded in the matrix.
 * `docs/licensing/upstream-license-matrix.md` covers external runtimes and
   models.
 
@@ -49,7 +56,9 @@ does not permit in the core), a compatibility review, `boundedcode bench
 intel` on the new version, and explicit maintainer approval. CI
 (`scripts/serenaguard`) fails if the pin changes without the matrix,
 notices, ADR and benchmark changing with it, or if anything installs Serena
-unpinned. Dependency updaters must ignore `serena-agent`.
+unpinned. It scans install files (scripts, Dockerfiles, CI, Python
+project files) and Markdown. A Markdown line that only names the package in
+prose can carry an HTML comment `serenaguard:allow`. Dependency updaters must ignore `serena-agent`. <!-- serenaguard:allow: prose, not an install -->
 
 ## Copied or derived code
 
@@ -70,10 +79,23 @@ in this repository.**
 ## Models
 
 Model weights are never committed or redistributed. Profiles record the
-source repository, revision and license so users can review them before
-downloading.
+source repository, the commit (`source.revision`) and the license so users
+can review them before downloading. `scripts/fetch-model.sh` only downloads
+at an explicit commit and verifies the file against the hub's LFS sha256.
 
 ## SBOM
 
-Release builds produce an SPDX JSON SBOM (`make sbom`, see the
-[release process](../development/release.md)).
+Release builds produce an SPDX 2.3 JSON SBOM (`make sbom`, see the
+[release process](../development/release.md)); CI generates one on every
+run as a smoke test. It lists:
+
+* the Go modules linked into the binary, with licenses classified from their
+  LICENSE files;
+* the pinned external programs (llama.cpp, `openhands-sdk`,
+  `openhands-tools`, codebase-memory-mcp, gitleaks, Serena);
+* the Python distributions of the adapter and Serena environments, from
+  their `uv.lock` files (version, artifact URL, sha256). Only runtime (not
+  dev) dependencies that are installed in the reference Linux x86-64
+  environment are listed. Their license field is `NOASSERTION`; the package
+  metadata license and the classifier verdict are in each entry's comment,
+  and the reviewed decisions are in the matrix.

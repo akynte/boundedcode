@@ -10,8 +10,11 @@
 //   - the license matrix, THIRD_PARTY_NOTICES.md, upstream-components.md and the ADR
 //   - a `bench intel` report measured with that version (compatibility evidence)
 //
-// It also rejects unpinned installs (git+…/serena without a ref, serena-agent
-// without ==) and dependency updaters that could bump Serena automatically.
+// It also rejects unpinned installs in install files and Markdown: any
+// serena-agent not followed by ==<version>, any oraios/serena git or archive
+// ref other than the pinned tag or commit, git+…/serena without a ref, and
+// dependency updaters that could bump Serena automatically. A Markdown line
+// that only names the package in prose can carry `serenaguard:allow`.
 package main
 
 import (
@@ -129,22 +132,22 @@ func check(root string) []string {
 	}
 
 	// 4. No unpinned or floating installs anywhere in tracked files.
-	floatingGit := regexp.MustCompile(`git\+https?://github\.com/oraios/serena(\.git)?(["'\s]|$)`)
-	looseSpec := regexp.MustCompile(`serena-agent\s*(>=|~=|>|<|!=|\^|@\s*(latest|main))|serena-agent\s*$|serena-agent["'](\s|,|\])`)
 	for _, f := range trackedFiles(root) {
-		if !installFile(f) {
-			continue // prose, code and lock files describe or pin; they do not install
+		if !scannedFile(f) {
+			continue // Go code, lock files and data pin or describe; they do not install
 		}
 		b, err := os.ReadFile(filepath.Join(root, f))
 		if err != nil {
 			continue
 		}
-		s := string(b)
-		if floatingGit.MatchString(s) {
-			bad("%s installs Serena from git without a pinned ref", f)
-		}
-		if looseSpec.MatchString(s) {
-			bad("%s references serena-agent without an exact == pin", f)
+		markdown := strings.EqualFold(filepath.Ext(f), ".md")
+		for i, line := range strings.Split(string(b), "\n") {
+			if markdown && strings.Contains(line, allowMarker) {
+				continue
+			}
+			for _, why := range scanLine(line, ver, commit) {
+				bad("%s:%d: %s", f, i+1, why)
+			}
 		}
 	}
 
@@ -162,17 +165,73 @@ func check(root string) []string {
 	return problems
 }
 
+// allowMarker exempts one Markdown line from the install scan. It is meant for
+// prose that names the package without installing it ("updaters must ignore
+// serena-agent"). It has no effect outside Markdown files.
+const allowMarker = "serenaguard:allow"
+
 // installFile reports whether a file can install Python packages.
 func installFile(f string) bool {
 	base := strings.ToLower(filepath.Base(f))
 	switch {
-	case base == "pyproject.toml", base == "setup.py", base == "setup.cfg", base == "pipfile",
+	case base == "pyproject.toml", base == "setup.py", base == "setup.cfg", base == "pipfile", base == "makefile",
 		strings.HasPrefix(base, "requirements") && strings.HasSuffix(base, ".txt"),
 		strings.HasPrefix(base, "dockerfile"), strings.HasSuffix(base, ".dockerfile"),
-		strings.HasSuffix(base, ".sh"), strings.HasSuffix(base, ".yml"), strings.HasSuffix(base, ".yaml"):
+		strings.HasSuffix(base, ".sh"), strings.HasSuffix(base, ".yml"), strings.HasSuffix(base, ".yaml"),
+		strings.HasSuffix(base, ".toml"), strings.HasSuffix(base, ".py"):
 		return true
 	}
 	return false
+}
+
+// scannedFile reports whether the install scan reads f: anything that can
+// install packages, plus Markdown, whose commands users copy and paste.
+func scannedFile(f string) bool {
+	return installFile(f) || strings.EqualFold(filepath.Ext(f), ".md")
+}
+
+var (
+	// PEP 503 normalisation makes serena-agent, serena_agent and Serena.Agent
+	// the same distribution.
+	agentName = regexp.MustCompile(`(?i)serena[-_.]agent`)
+	// oraios/serena followed by a git ref (`@ref`) or an archive path.
+	serenaRepo = regexp.MustCompile(`(?i)oraios/serena(?:\.git)?(?:[^A-Za-z0-9_.-]|$)`)
+	gitAtRef   = regexp.MustCompile(`(?i)oraios/serena(?:\.git)?@([^\s"'#&\])>` + "`" + `]*)`)
+	archiveRef = regexp.MustCompile(`(?i)oraios/serena/(?:archive|tarball|zipball)/(?:refs/tags/)?([^\s"'#&\])>` + "`" + `]*)`)
+	gitPlus    = regexp.MustCompile(`(?i)git\+(?:https?|ssh|git)://(?:[^/\s]+/)?(?:github\.com[/:])?oraios/serena`)
+)
+
+// scanLine returns the reasons a line installs or references Serena without
+// the exact pin: every serena-agent must be followed by ==ver (or @ver, -ver,
+// or a "| ver" table cell), and every oraios/serena git or archive reference
+// must name tag v<ver> or the pinned commit.
+func scanLine(line, ver, commit string) []string {
+	var why []string
+	pinned := regexp.MustCompile(`^(?:\s*===?\s*|@|-|\s*\|\s*)v?` + regexp.QuoteMeta(ver) + `(?:$|[^0-9A-Za-z.*+_-]|\.(?:$|[^0-9A-Za-z*]))`)
+	for _, m := range agentName.FindAllStringIndex(line, -1) {
+		if !pinned.MatchString(line[m[1]:]) {
+			why = append(why, fmt.Sprintf("serena-agent without an exact ==%s pin: %q", ver, strings.TrimSpace(line)))
+			break
+		}
+	}
+	okRef := func(ref string) bool {
+		ref = strings.TrimSuffix(strings.TrimSuffix(strings.TrimSuffix(ref, ".zip"), ".tar.gz"), ".git")
+		return ref == "v"+ver || ref == commit
+	}
+	for _, m := range gitAtRef.FindAllStringSubmatch(line, -1) {
+		if !okRef(m[1]) {
+			why = append(why, fmt.Sprintf("oraios/serena@%s is not tag v%s or commit %.8s", m[1], ver, commit))
+		}
+	}
+	for _, m := range archiveRef.FindAllStringSubmatch(line, -1) {
+		if !okRef(m[1]) {
+			why = append(why, fmt.Sprintf("oraios/serena archive %q is not tag v%s or commit %.8s", m[1], ver, commit))
+		}
+	}
+	if gitPlus.MatchString(line) && serenaRepo.MatchString(line) && !gitAtRef.MatchString(line) {
+		why = append(why, "installs Serena from git without a pinned ref: "+strings.TrimSpace(line))
+	}
+	return why
 }
 
 func lineWithAll(text string, needs []string) bool {

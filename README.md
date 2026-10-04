@@ -60,6 +60,10 @@ indicative, not general claims.
 
 ## Quick start (development)
 
+The full walkthrough (prerequisites with versions, model download, sandbox
+image, first task) is in
+[docs/usage/getting-started.md](docs/usage/getting-started.md).
+
 ```bash
 make build
 ./scripts/build-llama-cpp.sh                 # pinned llama.cpp with CUDA (optional if you have one)
@@ -71,8 +75,30 @@ make build
 ```
 
 Model weights are **not** distributed with this project. Each profile in
-[`configs/models/`](configs/models) names the upstream source and license.
-Download from there.
+[`configs/models/`](configs/models) names the upstream source, the pinned
+commit and the license. Download with `scripts/fetch-model.sh` (see the
+getting-started guide).
+
+## Limitations
+
+* **Pre-alpha.** Commands and configuration may change between versions.
+* **Platform.** Linux x86-64 with an NVIDIA GPU, tested only on the
+  reference laptop below. Other platforms and GPUs are untested.
+* **CLI only.** There is no daemon and no GUI.
+* **Verification presets** exist only for Go and TypeScript. The TypeScript
+  preset is limited: `tsc`, `lint`, `test` and `build` run only when the
+  repository's `node_modules` and `package.json` scripts provide them. Other
+  languages need a `.boundedcode/verification.yaml`.
+* **Cross-service analysis** covers HTTP routes and calls, Kafka-style
+  topics, environment variables and Terraform topic/queue resources, in Go
+  and TypeScript/JavaScript. gRPC, OpenAPI, protobuf and SQL contracts are
+  not analyzed (see [cross-service-analysis.md](docs/design/cross-service-analysis.md)).
+* **Frontier escalation** works only through the Codex CLI with a ChatGPT
+  subscription sign-in, or by pasting packets manually. API keys are
+  refused ([ADR-0009](docs/architecture/adr/0009-frontier-escalation.md)).
+* **Local-only success rates** are measured only on this repository's
+  benchmark suite of 11 synthetic tasks. They say nothing yet about real
+  codebases.
 
 ## Reference hardware
 

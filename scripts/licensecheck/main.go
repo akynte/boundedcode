@@ -2,6 +2,10 @@
 // the shipped binaries and enforces the project license policy
 // (docs/licensing/policy.md). It exits non-zero on a denied license or on a
 // license needing manual review that is not listed in the review allowlist.
+//
+// With -check-notices FILE[,FILE...] it also fails when a linked module is not
+// named, with its version, on a line of each file (THIRD_PARTY_NOTICES.md and
+// the license matrix), so a new dependency cannot ship unlisted.
 package main
 
 import (
@@ -36,6 +40,7 @@ type mod struct{ path, version, dir string }
 func main() {
 	verbose := flag.Bool("v", false, "print every module")
 	writeDir := flag.String("write", "", "copy license files of linked modules into this directory")
+	notices := flag.String("check-notices", "", "comma-separated files that must name every linked module and version")
 	flag.Parse()
 	mods, err := linkedModules("./cmd/...")
 	if err != nil {
@@ -56,6 +61,19 @@ func main() {
 			if err := copyLicenses(m, *writeDir); err != nil {
 				fmt.Fprintln(os.Stderr, err)
 				os.Exit(2)
+			}
+		}
+	}
+	if *notices != "" {
+		for _, f := range strings.Split(*notices, ",") {
+			b, err := os.ReadFile(f)
+			if err != nil {
+				fmt.Fprintln(os.Stderr, err)
+				os.Exit(2)
+			}
+			for _, m := range missingFromNotices(string(b), mods) {
+				fmt.Printf("NOTICE %-55s not listed in %s (add the module and version)\n", m.path+"@"+m.version, f)
+				failed = true
 			}
 		}
 	}
@@ -84,6 +102,59 @@ func verdictFor(path, id string) string {
 		}
 	}
 	return "ok"
+}
+
+// missingFromNotices returns the modules that no line of text names together
+// with their version. A pseudo-version (v0.0.0-20230129092748-24d4a6f8daec)
+// may be shortened to its date (v0.0.0-20230129).
+func missingFromNotices(text string, mods []mod) []mod {
+	var missing []mod
+	lines := strings.Split(text, "\n")
+	for _, m := range mods {
+		found := false
+		for _, l := range lines {
+			if namesModule(l, m.path) && strings.Contains(l, shortVersion(m.version)) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			missing = append(missing, m)
+		}
+	}
+	return missing
+}
+
+// namesModule reports whether line contains path as a whole module path (not
+// as a prefix of a longer path such as golang.org/x/sys/unix).
+func namesModule(line, path string) bool {
+	for i := 0; ; {
+		j := strings.Index(line[i:], path)
+		if j < 0 {
+			return false
+		}
+		start, end := i+j, i+j+len(path)
+		before := start == 0 || !isPathChar(line[start-1])
+		after := end == len(line) || (!isPathChar(line[end]) && line[end] != '/')
+		if before && after {
+			return true
+		}
+		i = start + 1
+	}
+}
+
+func isPathChar(c byte) bool {
+	return c == '.' || c == '-' || c == '_' || c == '/' || c == '~' ||
+		('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z') || ('0' <= c && c <= '9')
+}
+
+func shortVersion(v string) string {
+	// vX.Y.Z-yyyymmddhhmmss-abcdef123456 -> vX.Y.Z-yyyymmdd
+	parts := strings.Split(v, "-")
+	if len(parts) >= 3 && len(parts[len(parts)-2]) == 14 && len(parts[len(parts)-1]) == 12 {
+		return strings.Join(parts[:len(parts)-2], "-") + "-" + parts[len(parts)-2][:8]
+	}
+	return v
 }
 
 func hasPrefix(s string, prefixes []string) bool {

@@ -4,14 +4,18 @@
 
 ## 1. Prerequisites
 
-| Need | Why | Check |
-|---|---|---|
-| Linux x86-64, NVIDIA GPU (8 GB+), 32–64 GB RAM | local inference with MoE expert offload | `boundedcode doctor` |
-| Go 1.27+ | build the CLI | `go version` |
-| Docker or Podman | agent sandbox | `docker version` |
-| CUDA toolkit (to build llama.cpp) | inference runtime | `nvcc --version` |
-| uv | adapter development without containers | `uv --version` |
-| git, ripgrep | worktrees, search | |
+Versions marked "tested" are what the reference machine (Debian 13) runs;
+older ones may work but are not checked.
+
+| Need | Version | Why | Check |
+|---|---|---|---|
+| Linux x86-64, NVIDIA GPU (8 GB+), 32–64 GB RAM | | local inference with MoE expert offload | `boundedcode doctor` |
+| Go | 1.27.1+ (`go.mod`) | build the CLI | `go version` |
+| Docker (or Podman) | tested: Docker 29.8; Podman is configurable but not tested on the reference machine | agent sandbox, contained Codex | `docker version` |
+| CUDA toolkit | tested: 13.4 (`nvcc` in `/usr/local/cuda/bin`) | only to build llama.cpp with CUDA | `nvcc --version` |
+| uv | 0.12.18 (the version the sandbox image and CI use) | adapter development without containers, Serena setup | `uv --version` |
+| Python | adapter: >= 3.12 (`requires-python`; the image uses 3.13); Serena: >= 3.11, < 3.15 | adapter outside containers, Serena | `python3 --version` |
+| git, ripgrep | git >= 2.17 | worktrees, search | `git --version` |
 
 ## 2. Build and install the external pieces
 
@@ -21,9 +25,24 @@ make build                                   # ./bin/boundedcode
 ./scripts/install-deps.sh ~/.local/bin       # gitleaks + codebase-memory-mcp (checksum-pinned)
 ```
 
-Download a model yourself. This project does not redistribute weights. For
-example, the default profile expects `Qwen3.6-35B-A3B-UD-Q4_K_M.gguf` from
-`unsloth/Qwen3.6-35B-A3B-GGUF` (Apache-2.0).
+`install-deps.sh` installs only gitleaks and codebase-memory-mcp. Docker,
+uv, the CUDA toolkit, Go and Python come from your system.
+
+Download a model yourself. This project does not redistribute weights.
+Review the license on the model page first. The default profile
+(`configs/models/qwen3.6-35b-a3b.yaml`) expects
+`Qwen3.6-35B-A3B-UD-Q4_K_M.gguf` (about 22 GB, Apache-2.0) from
+`unsloth/Qwen3.6-35B-A3B-GGUF` at the commit pinned in its
+`source.revision`:
+
+```bash
+./scripts/fetch-model.sh unsloth/Qwen3.6-35B-A3B-GGUF Qwen3.6-35B-A3B-UD-Q4_K_M.gguf \
+    a483e9e6cbd595906af30beda3187c2663a1118c ~/models
+```
+
+The script refuses branch names such as `main` and checks the file against
+the sha256 the hub publishes for that commit. Without the last argument it
+writes to `~/.local/share/boundedcode/models`, which is also searched.
 
 ## 3. Configure
 

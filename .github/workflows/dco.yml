@@ -1,6 +1,8 @@
 name: dco
 on:
   pull_request:
+  push:
+    branches: [main]
 permissions:
   contents: read
 jobs:
@@ -12,6 +14,8 @@ jobs:
           fetch-depth: 0
       - name: check Signed-off-by on every commit
         env:
-          BASE: ${{ github.event.pull_request.base.sha }}
-          HEAD: ${{ github.event.pull_request.head.sha }}
+          # Pull requests: the PR's commits. Pushes to main: the pushed commits
+          # (an all-zero "before", e.g. the first push, checks the whole history).
+          BASE: ${{ github.event_name == 'push' && github.event.before || github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event_name == 'push' && github.sha || github.event.pull_request.head.sha }}
         run: scripts/check-dco.sh "$BASE" "$HEAD"

@@ -3,16 +3,17 @@
 Each component is used as an **external process or a dependency, never as a
 fork**. Licenses are covered in
 [upstream-license-matrix.md](../licensing/upstream-license-matrix.md). All
-entries were last verified on **2026-10-03**.
+entries were last verified on **2026-10-03**; the Codex CLI and llama.cpp
+rows were re-checked on **2026-10-04**.
 
 | Name | Source | Pinned | Integration | Update policy |
 |---|---|---|---|---|
-| llama.cpp | github.com/ggml-org/llama.cpp | `v0.5.0` (`7fe450e1`) | external `llama-server`/`llama-bench` binaries, built by `scripts/build-llama-cpp.sh` or supplied by the user | Follow stable `vX.Y.Z` releases, not hourly `bNNNNN` prereleases. Re-run the infra benchmark on upgrade. |
+| llama.cpp | github.com/ggml-org/llama.cpp | `v0.5.0` (`7fe450e1`) | external `llama-server`/`llama-bench` binaries, built by `scripts/build-llama-cpp.sh` or supplied by the user | Follow stable `vX.Y.Z` releases, not hourly `bNNNNN` prereleases. The build script refuses the pinned tag at any other commit (`PINNED_COMMIT`). Re-run the infra benchmark on upgrade. |
 | OpenHands Software Agent SDK | github.com/OpenHands/software-agent-sdk, PyPI `openhands-sdk`, `openhands-tools` | `1.51.0` (`a955aa5d`) | Python dependency of our adapter (`adapters/openhands/python`) | Pin exact versions in `pyproject.toml` and `uv.lock`. Re-run the adapter acceptance test on upgrade. |
 | codebase-memory-mcp | github.com/DeusData/codebase-memory-mcp | `v0.11.0` (`8972ea69`) | external binary, used through its `cli <tool> --format json` mode | Pin a release asset by checksum (`scripts/install-deps.sh`). Re-run the repointel benchmark on upgrade. |
 | gitleaks | github.com/gitleaks/gitleaks | `v8.30.1` (`83d9cd68`) | external binary, used as a verification stage and in CI | Pin a release asset by checksum. |
-| Serena (optional) | github.com/oraios/serena, PyPI `serena-agent` | `v1.7.0` (`949a27ef`) | external `serena start-mcp-server` processes (MCP over stdio), one per task worktree, managed by `internal/repointel/serena` (ADR-0008) | **Manual only.** Exact pin in `configs/serena/pyproject.toml` + `uv.lock` (wheel hash); `scripts/serenaguard` enforces it in CI. No updater may change it. Upgrades need a license review (v2 is GPL-3.0-or-later), a compatibility review, `bench intel` and explicit approval. |
-| Codex CLI | github.com/openai/codex | user-installed (tested 0.156.1) | external `codex exec` process for frontier escalation, with ChatGPT sign-in | User-managed. We depend only on documented `exec` flags. |
+| Serena (optional) | github.com/oraios/serena, PyPI `serena-agent==1.7.0` | `v1.7.0` (`949a27ef`) | external `serena start-mcp-server` processes (MCP over stdio), one per task worktree, managed by `internal/repointel/serena` (ADR-0008) | **Manual only.** Exact pin in `configs/serena/pyproject.toml` + `uv.lock` (wheel hash); `scripts/serenaguard` enforces it in CI. No updater may change it. Upgrades need a license review (v2 is GPL-3.0-or-later), a compatibility review, `bench intel` and explicit approval. |
+| Codex CLI | github.com/openai/codex | user-installed; tested with `codex-cli 0.156.1` (tag `rust-v0.156.1`, `b412ff32`) | external `codex exec` process for frontier escalation, with ChatGPT sign-in | User-managed. We depend only on documented `exec` flags. |
 
 ## Observed facts used by the integration
 

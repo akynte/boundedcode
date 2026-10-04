@@ -20,8 +20,12 @@ vet:
 fmt:
 	@out=$$(gofmt -l . | grep -v '^\.tmp-home/' || true); if [ -n "$$out" ]; then echo "gofmt needed:"; echo "$$out"; exit 1; fi
 
+# Locally a missing golangci-lint is skipped; in CI (CI=true) it is an error.
+# The CI lint job runs golangci-lint through its pinned action.
 lint:
-	@if command -v golangci-lint >/dev/null; then golangci-lint run ./...; else echo "golangci-lint not installed; skipping"; fi
+	@if command -v golangci-lint >/dev/null; then golangci-lint run ./...; \
+	elif [ -n "$$CI" ]; then echo "golangci-lint not installed (required in CI)" >&2; exit 1; \
+	else echo "golangci-lint not installed; skipping"; fi
 
 licenses:
 	rm -rf LICENSES/go && $(GO) run ./scripts/licensecheck -write LICENSES/go

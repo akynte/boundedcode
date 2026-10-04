@@ -21,14 +21,23 @@ jobs:
         run: go test ./...
       - name: race
         run: go test -race ./...
-      - name: license policy
-        run: go run ./scripts/licensecheck
+      - name: license policy and notices
+        run: go run ./scripts/licensecheck -check-notices THIRD_PARTY_NOTICES.md,docs/licensing/upstream-license-matrix.md
+      - name: LICENSES/go up to date
+        run: |
+          make licenses
+          git add -N LICENSES
+          git diff --exit-code --stat -- LICENSES/ || { echo "run 'make licenses' and commit LICENSES/go"; exit 1; }
       - name: serena pin guard (MIT-licensed v1.7.0 only; upgrades need a license review)
         run: go run ./scripts/serenaguard
       - name: govulncheck
-        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
       - name: build
         run: make build
+      - name: SBOM smoke test
+        run: |
+          go run ./scripts/sbom -version ci -binary bin/boundedcode -o "$RUNNER_TEMP/SBOM.spdx.json"
+          python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); assert d["spdxVersion"]=="SPDX-2.3" and len(d["packages"])>1' "$RUNNER_TEMP/SBOM.spdx.json"
   lint:
     runs-on: ubuntu-latest
     steps:
@@ -41,10 +50,22 @@ jobs:
           version: v2.13.2
   adapter:
     runs-on: ubuntu-latest
+    env:
+      UV_PYTHON: "3.13" # the sandbox image's Python; THIRD_PARTY.md files are generated with it
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          version: "0.12.18" # same uv as adapters/openhands/Dockerfile
       - name: adapter unit tests
         working-directory: adapters/openhands/python
+        run: uv run --frozen pytest -q
+      - name: adapter license check
+        working-directory: adapters/openhands/python
+        run: uv run --frozen python ../../../scripts/pylicensecheck.py --markdown THIRD_PARTY.md
+      - name: serena environment license check
         run: |
-          if [ -f pyproject.toml ]; then uv run --frozen pytest -q; else echo "adapter not present yet"; fi
+          uv sync --frozen --no-dev --project configs/serena
+          configs/serena/.venv/bin/python scripts/pylicensecheck.py --markdown configs/serena/THIRD_PARTY.md
+      - name: license inventories up to date
+        run: git diff --exit-code -- adapters/openhands/python/THIRD_PARTY.md configs/serena/THIRD_PARTY.md || { echo "review the new packages, record them in docs/licensing/upstream-license-matrix.md and commit THIRD_PARTY.md"; exit 1; }

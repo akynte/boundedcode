@@ -1,6 +1,6 @@
 # ADR-0001: Project foundations
 
-Status: accepted (2026-10-03)
+Status: accepted (2026-10-03); §7 amended by [ADR-0008](0008-serena-symbol-navigation.md)
 
 ## Context
 
@@ -50,6 +50,8 @@ reproducible measurement.
    want a permissively licensed core with no GPL coupling. Any future
    support must be an optional, separately installed process with its own
    review.
+   *Amended by ADR-0008: Serena v1.7.0 (MIT) is now an optional, separately
+   installed external process, pinned to that release.*
 8. **Models are downloaded separately.** We do not redistribute weights.
    This avoids model-license redistribution obligations and multi-GB
    artifacts in releases, and it keeps the model choice with the user.

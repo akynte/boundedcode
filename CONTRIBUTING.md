@@ -26,7 +26,7 @@ llama.cpp for the integration paths. See
 [docs/development/guide.md](docs/development/guide.md).
 
 ```bash
-make check     # gofmt, go vet, go test, go test -race, golangci-lint if installed
+make check     # gofmt, go vet, go test, go test -race, golangci-lint if installed (CI always lints)
 make build     # ./bin/boundedcode
 ```
 

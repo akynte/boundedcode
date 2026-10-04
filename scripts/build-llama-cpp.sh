@@ -9,6 +9,9 @@
 set -euo pipefail
 
 PINNED_TAG="v0.5.0" # keep in sync with docs/architecture/upstream-components.md
+# Commit the pinned tag resolves to (git ls-remote ... 'refs/tags/v0.5.0^{}').
+# A tag can be moved upstream; building the pinned tag at any other commit fails.
+PINNED_COMMIT="7fe450e19305b828c199d602c23a8337aaa1f03b"
 TAG="${1:-$PINNED_TAG}"
 DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
 PREFIX="${2:-$DATA_HOME/boundedcode/runtimes/llama.cpp/$TAG}"
@@ -34,6 +37,11 @@ fi
 git -C "$SRC" fetch --depth 1 origin "refs/tags/$TAG:refs/tags/$TAG" 2>/dev/null || true
 git -C "$SRC" checkout -q "$TAG"
 COMMIT="$(git -C "$SRC" rev-parse HEAD)"
+if [[ "$TAG" == "$PINNED_TAG" && "$COMMIT" != "$PINNED_COMMIT" ]]; then
+  echo "llama.cpp $TAG resolved to $COMMIT, expected pinned commit $PINNED_COMMIT; refusing to build" >&2
+  echo "(re-verify the tag upstream and update PINNED_COMMIT and the license matrix deliberately)" >&2
+  exit 1
+fi
 
 cmake -S "$SRC" -B "$SRC/build" -DCMAKE_BUILD_TYPE=Release \
   -DLLAMA_CURL=OFF -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF \
