@@ -7,6 +7,7 @@ package contextplan
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -16,8 +17,10 @@ import (
 	"strings"
 
 	"github.com/akynte/boundedcode/internal/gitops"
+	"github.com/akynte/boundedcode/internal/policy"
 	"github.com/akynte/boundedcode/internal/repointel"
 	"github.com/akynte/boundedcode/internal/task"
+	"github.com/akynte/boundedcode/internal/telemetry"
 	"github.com/akynte/boundedcode/internal/verify"
 	"github.com/akynte/boundedcode/internal/xservice"
 )
@@ -53,6 +56,9 @@ type Inputs struct {
 	Contracts []xservice.Link
 	// ChangedFiles are repo-qualified paths changed so far ("repo/file").
 	ChangedFiles []string
+	// Heads are the task branch heads per repository name (the latest
+	// checkpoint commit); empty means still at the base commit.
+	Heads map[string]string
 }
 
 // Section is one block of the pack.
@@ -160,7 +166,9 @@ func (p Pack) Render() string {
 		}
 		b.WriteString("\n")
 	}
-	return b.String()
+	// Packs carry source, diffs and tool output: redact credentials before
+	// they reach the model (and, through packets, the frontier).
+	return telemetry.Redact(b.String())
 }
 
 func taskSection(in Inputs) string {
@@ -188,12 +196,40 @@ func taskSection(in Inputs) string {
 			fmt.Fprintf(&b, "- [%s] %s\n", d.Source, d.Text)
 		}
 	}
+	fmt.Fprintf(&b, "\nVerification state: %s\n", orDash(t.VerificationState))
+	if len(t.ChangedFiles) > 0 {
+		fmt.Fprintf(&b, "Changed files (%d): %s\n", len(t.ChangedFiles), strings.Join(lastN(t.ChangedFiles, 30), ", "))
+	}
+	if len(t.ChangedSymbols) > 0 {
+		fmt.Fprintf(&b, "Changed symbols: %s\n", strings.Join(lastN(t.ChangedSymbols, 40), ", "))
+	}
+	if n := t.Budget.UsedEscalations; n > 0 {
+		fmt.Fprintf(&b, "Frontier escalations used: %d\n", n)
+	}
 	b.WriteString("\nRepositories (each is a git worktree on the task branch):\n")
 	for _, w := range in.Worktrees {
 		rel, _ := filepath.Rel(in.WorkDir, w.Path)
-		fmt.Fprintf(&b, "- %s: ./%s (branch %s)\n", w.RepoName, rel, w.Branch)
+		head := in.Heads[w.RepoName]
+		if head == "" {
+			head = "base " + w.BaseCommit
+		}
+		fmt.Fprintf(&b, "- %s: ./%s (branch %s, at %s)\n", w.RepoName, rel, w.Branch, short(head))
 	}
 	return b.String()
+}
+
+func orDash(s string) string {
+	if s == "" {
+		return "-"
+	}
+	return s
+}
+
+func short(sha string) string {
+	if i := strings.LastIndex(sha, " "); i >= 0 && len(sha)-i > 13 {
+		return sha[:i+13]
+	}
+	return sha[:min(len(sha), 12)]
 }
 
 func lastN[T any](xs []T, n int) []T {
@@ -238,12 +274,51 @@ func diffSection(ctx context.Context, in Inputs) string {
 			continue
 		}
 		patch, _ := gitops.Diff(ctx, w.Path, w.BaseCommit, false)
-		fmt.Fprintf(&b, "### %s\n```\n%s\n```\n```diff\n%s\n```\n", w.RepoName, strings.TrimSpace(stat), strings.TrimSpace(patch))
+		fmt.Fprintf(&b, "### %s\n```\n%s\n```\n```diff\n%s\n```\n", w.RepoName, strings.TrimSpace(stat), strings.TrimSpace(capPatch(patch, maxDiffLinesPerFile)))
 	}
 	if b.Len() == 0 && in.Mode != ModeInitial {
 		return "No changes yet."
 	}
 	return b.String()
+}
+
+// maxDiffLinesPerFile bounds each file's hunks so one large new file cannot
+// crowd out the rest of the diff (the stat above still lists every file).
+const maxDiffLinesPerFile = 150
+
+var diffFileRE = regexp.MustCompile(`^diff --git a/(\S+) b/(\S+)`)
+
+// capPatch truncates each file's part of a unified diff to maxLines and
+// omits files on the secret denylist entirely.
+func capPatch(patch string, maxLines int) string {
+	var out strings.Builder
+	lines := strings.Split(patch, "\n")
+	for i := 0; i < len(lines); {
+		j := i + 1
+		for j < len(lines) && !strings.HasPrefix(lines[j], "diff --git ") {
+			j++
+		}
+		block := lines[i:j]
+		name := ""
+		if m := diffFileRE.FindStringSubmatch(block[0]); m != nil {
+			name = m[2]
+			if name == "/dev/null" || name == "" {
+				name = m[1]
+			}
+		}
+		switch {
+		case name != "" && policy.IsSecretPath(name):
+			fmt.Fprintf(&out, "%s\n[contents of secret path %s omitted]\n", block[0], name)
+		case len(block) > maxLines:
+			out.WriteString(strings.Join(block[:maxLines], "\n"))
+			fmt.Fprintf(&out, "\n[%d more lines of %s omitted; read the file in the worktree]\n", len(block)-maxLines, name)
+		default:
+			out.WriteString(strings.Join(block, "\n"))
+			out.WriteString("\n")
+		}
+		i = j
+	}
+	return out.String()
 }
 
 func impactSection(ctx context.Context, in Inputs) string {
@@ -258,7 +333,9 @@ func impactSection(ctx context.Context, in Inputs) string {
 		if files, err := gitops.ChangedFiles(ctx, w.Path, w.BaseCommit); err != nil || len(files) == 0 {
 			continue
 		}
-		out, err := in.Intel.Impact(ctx, w.IndexProject, "", 2)
+		// IndexProject is the worktree's own project when the runner indexed
+		// it (detect_changes only diffs the indexed checkout).
+		out, err := in.Intel.Impact(ctx, w.IndexProject, w.BaseCommit, 2)
 		if err != nil || strings.TrimSpace(out) == "" {
 			continue
 		}
@@ -318,8 +395,7 @@ func readAround(wts []task.Worktree, repo, file string, line, radius int) string
 		if w.RepoName != repo {
 			continue
 		}
-		p := filepath.Join(w.Path, filepath.Clean("/" + file)[1:])
-		b, err := os.ReadFile(p)
+		b, err := ReadConfined(w.Path, filepath.Clean("/" + file)[1:])
 		if err != nil {
 			// go test output paths are relative to the package dir; search.
 			matches, _ := filepath.Glob(filepath.Join(w.Path, "*", filepath.Base(file)))
@@ -328,7 +404,8 @@ func readAround(wts []task.Worktree, repo, file string, line, radius int) string
 			if len(matches) != 1 {
 				return ""
 			}
-			if b, err = os.ReadFile(matches[0]); err != nil {
+			rel, _ := filepath.Rel(w.Path, matches[0])
+			if b, err = ReadConfined(w.Path, rel); err != nil {
 				return ""
 			}
 		}
@@ -345,6 +422,41 @@ func readAround(wts []task.Worktree, repo, file string, line, radius int) string
 		return out.String()
 	}
 	return ""
+}
+
+// errNotConfined is returned for paths the host must not read on the
+// agent's behalf.
+var errNotConfined = errors.New("path outside the worktree or on the secret denylist")
+
+// ReadConfined reads root/rel on the host for context packs. The worktree is
+// agent-writable, so rel may be a symlink planted to make the host read a
+// file the sandbox hides (a key in $HOME, a masked .env). The path must
+// resolve inside root, must not be a secret path before or after resolving
+// symlinks, and must be a regular file of reasonable size.
+func ReadConfined(root, rel string) ([]byte, error) {
+	if rel == "" || filepath.IsAbs(rel) || policy.IsSecretPath(rel) {
+		return nil, errNotConfined
+	}
+	realRoot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		return nil, err
+	}
+	real, err := filepath.EvalSymlinks(filepath.Join(root, rel))
+	if err != nil {
+		return nil, err
+	}
+	inside, err := filepath.Rel(realRoot, real)
+	if err != nil || inside == ".." || strings.HasPrefix(inside, ".."+string(filepath.Separator)) || policy.IsSecretPath(inside) {
+		return nil, errNotConfined
+	}
+	fi, err := os.Stat(real)
+	if err != nil {
+		return nil, err
+	}
+	if !fi.Mode().IsRegular() || fi.Size() > 4<<20 {
+		return nil, errNotConfined
+	}
+	return os.ReadFile(real)
 }
 
 func adrSection(in Inputs) string {
@@ -365,7 +477,8 @@ func adrSection(in Inputs) string {
 		for _, dir := range []string{"docs/adr", "docs/architecture/adr", "adr", "docs/decisions"} {
 			files, _ := filepath.Glob(filepath.Join(w.Path, dir, "*.md"))
 			for _, f := range files {
-				b, err := os.ReadFile(f)
+				rel, _ := filepath.Rel(w.Path, f)
+				b, err := ReadConfined(w.Path, rel)
 				if err != nil {
 					continue
 				}

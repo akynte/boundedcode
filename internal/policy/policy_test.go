@@ -1,6 +1,8 @@
 package policy
 
 import (
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -55,5 +57,70 @@ func TestCheckCommand(t *testing.T) {
 		if err := CheckCommand(a); err != nil {
 			t.Errorf("%v should be allowed: %v", a, err)
 		}
+	}
+}
+
+func TestCheckCommandBypasses(t *testing.T) {
+	deny := [][]string{
+		{"git", "-C", ".", "push"},
+		{"git", "-c", "user.name=x", "push", "--force"},
+		{"git", "--git-dir=.git", "push"},
+		{"kubectl", "--context=prod", "apply", "-f", "x.yaml"},
+		{"kubectl", "-n", "payments", "delete", "pod", "x"},
+		{"terraform", "-chdir=infra", "apply"},
+		{"helm", "--kube-context", "prod", "upgrade", "x", "chart"},
+		{"rm", "-r", "-f", "/"},
+		{"rm", "-rf", "~/"},
+		{"rm", "--recursive", "--force", "$HOME"},
+		{"sh", "-c", "cd infra && terraform -chdir=. destroy"},
+		{"bash", "-lc", "FOO=1 git -C repo push origin HEAD"},
+		{"sh", "-c", "echo ok; env GIT_TRACE=1 git push"},
+		{"sh", "-c", "timeout 30 kubectl --context prod apply -f x"},
+		{"sh", "-c", "x=$(git push)"},
+	}
+	allow := [][]string{
+		{"git", "-C", ".", "status"},
+		{"kubectl", "--context=kind", "get", "pods"},
+		{"terraform", "-chdir=infra", "validate"},
+		{"rm", "-r", "-f", "build"},
+		{"sh", "-c", "go vet ./... && go test ./..."},
+		{"sh", "-c", `out=$(gofmt -l $(git ls-files '*.go')); [ -z "$out" ]`},
+	}
+	for _, a := range deny {
+		if CheckCommand(a) == nil {
+			t.Errorf("%q should be denied", a)
+		}
+	}
+	for _, a := range allow {
+		if err := CheckCommand(a); err != nil {
+			t.Errorf("%q should be allowed: %v", a, err)
+		}
+	}
+}
+
+func TestIsProtectedPath(t *testing.T) {
+	for _, p := range []string{".boundedcode/verification.yaml", ".boundedcode", ".github/workflows/ci.yml", "CODEOWNERS", ".gitmodules"} {
+		if !IsProtectedPath(p) {
+			t.Errorf("%s should be protected", p)
+		}
+	}
+	for _, p := range []string{"main.go", ".github/ISSUE_TEMPLATE/bug.md", "docs/boundedcode.md", "x/.boundedcode.go"} {
+		if IsProtectedPath(p) {
+			t.Errorf("%s should not be protected", p)
+		}
+	}
+}
+
+func TestFindSecretPathsFailsClosed(t *testing.T) {
+	root := t.TempDir()
+	for i := range 5 {
+		_ = os.WriteFile(filepath.Join(root, fmt.Sprintf("k%d.pem", i)), []byte("x"), 0o600)
+	}
+	got, err := FindSecretPaths(root, 3)
+	if !errors.Is(err, ErrTooManySecrets) || len(got) != 3 {
+		t.Fatalf("got %v, %v; want 3 paths and ErrTooManySecrets", got, err)
+	}
+	if _, err := FindSecretPaths(root, 5); err != nil {
+		t.Fatalf("exactly at the limit: %v", err)
 	}
 }

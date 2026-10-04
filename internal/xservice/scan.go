@@ -4,6 +4,8 @@ import (
 	"io/fs"
 	"path/filepath"
 	"strings"
+
+	"github.com/akynte/boundedcode/internal/policy"
 )
 
 // ScanOptions bound a repository scan.
@@ -34,11 +36,19 @@ func Scan(repo, root string, opt ScanOptions) ([]Endpoint, []Diagnostic, error) 
 			}
 			return nil
 		}
+		// Symlinks are never followed: task worktrees are agent-written, and a
+		// link could point the host at files the sandbox hides.
+		if !d.Type().IsRegular() {
+			return nil
+		}
 		n++
 		if n > opt.MaxFiles {
 			return filepath.SkipAll
 		}
 		rel, _ := filepath.Rel(root, p)
+		if policy.IsSecretPath(rel) {
+			return nil
+		}
 		name := strings.ToLower(d.Name())
 		switch {
 		case strings.HasSuffix(name, ".go"):

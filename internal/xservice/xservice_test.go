@@ -2,6 +2,8 @@ package xservice
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"testing"
@@ -180,4 +182,18 @@ func contains(xs []string, s string) bool {
 		}
 	}
 	return false
+}
+
+func TestScanSkipsSymlinks(t *testing.T) {
+	root := t.TempDir()
+	outside := filepath.Join(t.TempDir(), "routes.go")
+	_ = os.WriteFile(outside, []byte("package x\n\nimport \"net/http\"\n\nfunc init() { http.HandleFunc(\"/secret-route\", nil) }\n"), 0o644)
+	_ = os.Symlink(outside, filepath.Join(root, "linked.go"))
+	eps, _, err := Scan("r", root, ScanOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(eps) != 0 {
+		t.Fatalf("scan followed a symlink: %+v", eps)
+	}
 }

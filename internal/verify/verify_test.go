@@ -104,3 +104,66 @@ func TestMissingTools(t *testing.T) {
 		t.Fatalf("required missing tool: %+v", req)
 	}
 }
+
+// TestAgentCannotWeakenVerification: the agent rewrites the verification
+// config to a no-op and deletes go.mod to switch the Go stages off. The
+// config is read from the base commit, the protected path fails diff scope,
+// and the removed go.mod fails its stages.
+func TestAgentCannotWeakenVerification(t *testing.T) {
+	if _, err := exec.LookPath("go"); err != nil || testing.Short() {
+		t.Skip("go toolchain required")
+	}
+	ctx := context.Background()
+	repo := t.TempDir()
+	files := map[string]string{
+		"go.mod":    "module example.com/x\n\ngo 1.22\n",
+		"x.go":      "package x\n\nfunc Add(a, b int) int { return a + b }\n",
+		"x_test.go": "package x\n\nimport \"testing\"\n\nfunc TestAdd(t *testing.T) {\n\tif Add(1, 2) != 3 {\n\t\tt.Fatal(\"bad\")\n\t}\n}\n",
+		ConfigPath:  "version: 1\nstages:\n  - name: go-test\n    run: [go, test, ./...]\n    requires: [go.mod]\n",
+	}
+	for f, c := range files {
+		_ = os.MkdirAll(filepath.Dir(filepath.Join(repo, f)), 0o755)
+		_ = os.WriteFile(filepath.Join(repo, f), []byte(c), 0o644)
+	}
+	for _, a := range [][]string{{"init", "-q", "-b", "main"}, {"add", "-A"}, {"-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "i"}} {
+		if _, err := gitops.Run(ctx, repo, a...); err != nil {
+			t.Fatal(err)
+		}
+	}
+	base, _ := gitops.Run(ctx, repo, "rev-parse", "HEAD")
+	e := &Engine{Sandbox: sandbox.None{}, CacheDir: t.TempDir()}
+	tgt := RepoTarget{Name: "x", Worktree: repo, Base: base, TaskID: "t1"}
+
+	// Break the code and neuter the config in the worktree.
+	_ = os.WriteFile(filepath.Join(repo, "x.go"), []byte("package x\n\nfunc Add(a, b int) int { return a - b }\n"), 0o644)
+	_ = os.WriteFile(filepath.Join(repo, ConfigPath), []byte("version: 1\nstages:\n  - name: ok\n    run: [\"true\"]\n"), 0o644)
+	res, err := e.Run(ctx, tgt, Targeted)
+	if err != nil {
+		t.Fatal(err)
+	}
+	failed := names(res.Failures())
+	if res.Passed || !slices.Contains(failed, "go-test") || !slices.Contains(failed, "diff-scope") {
+		t.Fatalf("weakened config was honoured: %+v", res.Stages)
+	}
+	// Deleting go.mod does not switch the Go stage off.
+	_ = os.Remove(filepath.Join(repo, "go.mod"))
+	res, _ = e.Run(ctx, tgt, Targeted)
+	for _, s := range res.Stages {
+		if s.Name == "go-test" && s.Status != "fail" {
+			t.Fatalf("go-test with go.mod removed: %+v", s)
+		}
+	}
+}
+
+func TestPresetFromBaseFiles(t *testing.T) {
+	c := presetFor(map[string]bool{"go.mod": true, "package.json": true, "tsconfig.json": true, "infra/main.tf": true, "deploy/chart/Chart.yaml": true})
+	got := map[string]bool{}
+	for _, s := range c.Stages {
+		got[s.Name] = true
+	}
+	for _, want := range []string{"gofmt", "go-build", "go-vet", "go-test", "tsc", "npm-lint", "npm-test", "npm-build", "terraform-fmt", "helm-lint"} {
+		if !got[want] {
+			t.Errorf("missing preset stage %s", want)
+		}
+	}
+}

@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -86,7 +87,16 @@ func TaskBranch(taskID string) string { return "agent/" + taskID }
 // EnsureWorktree creates (or reuses) a worktree at path on branch, starting
 // from base. It is idempotent so a crashed task can be resumed.
 func EnsureWorktree(ctx context.Context, repo, path, branch, base string) error {
-	if _, err := os.Stat(filepath.Join(path, ".git")); err == nil {
+	if _, err := os.Lstat(filepath.Join(path, ".git")); err == nil {
+		// The worktree exists and is agent-writable: verify it before any
+		// host git command runs inside it.
+		common, err := CommonDir(ctx, repo)
+		if err != nil {
+			return err
+		}
+		if err := CheckTaskWorktree(path, common, branch); err != nil {
+			return err
+		}
 		cur, err := Run(ctx, path, "rev-parse", "--abbrev-ref", "HEAD")
 		if err != nil {
 			return err
@@ -206,7 +216,7 @@ func CommitAll(ctx context.Context, worktree, message string) (string, error) {
 	if st, _ := Run(ctx, worktree, "status", "--porcelain"); st == "" {
 		return Run(ctx, worktree, "rev-parse", "HEAD")
 	}
-	if _, err := Run(ctx, worktree, "-c", "user.name=boundedcode-agent", "-c", "user.email=agent@boundedcode.invalid",
+	if _, err := Run(ctx, worktree, "-c", "user.name=boundedcode-agent", "-c", "user.email=agent@boundedcode.invalid", "-c", "commit.gpgSign=false",
 		"commit", "-q", "--no-verify", "-m", message); err != nil {
 		return "", err
 	}
@@ -224,10 +234,16 @@ func AdminDir(ctx context.Context, worktree string) (string, error) {
 }
 
 // CheckWorktree verifies that worktree's .git pointer still refers to an
-// admin directory inside the repository's common dir. A sandboxed agent can
-// write the worktree, so it could redirect .git to a crafted gitdir whose
-// config runs commands on the host; we refuse to touch such a worktree.
+// admin directory inside the repository's common dir, and that the admin
+// directory (writable by the sandboxed agent, because it holds HEAD and the
+// index) still points back at that common dir and carries no per-worktree
+// config. Either redirect would let the agent supply a git config (filter
+// drivers, gpg.program, ...) that host git would execute; we refuse to
+// touch such a worktree.
 func CheckWorktree(worktree, commonDir string) error {
+	if fi, err := os.Lstat(filepath.Join(worktree, ".git")); err == nil && !fi.Mode().IsRegular() {
+		return fmt.Errorf("worktree %s: .git is not a regular file (tampered?)", worktree)
+	}
 	b, err := os.ReadFile(filepath.Join(worktree, ".git"))
 	if err != nil {
 		return fmt.Errorf("worktree %s: .git pointer: %w", worktree, err)
@@ -241,5 +257,177 @@ func CheckWorktree(worktree, commonDir string) error {
 	if !strings.HasPrefix(ptr, want) || strings.Contains(strings.TrimPrefix(ptr, want), string(filepath.Separator)) {
 		return fmt.Errorf("worktree %s: .git points to %s, outside %s (tampered?)", worktree, ptr, want)
 	}
+	if fi, err := os.Lstat(ptr); err != nil || !fi.IsDir() {
+		return fmt.Errorf("worktree %s: admin dir %s is missing or not a directory (tampered?)", worktree, ptr)
+	}
+	cd, err := os.ReadFile(filepath.Join(ptr, "commondir"))
+	if err != nil {
+		return fmt.Errorf("worktree %s: admin commondir: %w", worktree, err)
+	}
+	target := strings.TrimSpace(string(cd))
+	if !filepath.IsAbs(target) {
+		target = filepath.Join(ptr, target)
+	}
+	if !sameDir(target, commonDir) {
+		return fmt.Errorf("worktree %s: admin commondir points to %s, not %s (tampered?)", worktree, target, commonDir)
+	}
+	if _, err := os.Lstat(filepath.Join(ptr, "config.worktree")); err == nil {
+		return fmt.Errorf("worktree %s: per-worktree config %s is not allowed", worktree, filepath.Join(ptr, "config.worktree"))
+	}
 	return nil
+}
+
+// CheckTaskWorktree is CheckWorktree plus a check that HEAD is still the
+// task's own branch (the agent can rewrite HEAD in the admin dir).
+func CheckTaskWorktree(worktree, commonDir, branch string) error {
+	if err := CheckWorktree(worktree, commonDir); err != nil {
+		return err
+	}
+	b, _ := os.ReadFile(filepath.Join(worktree, ".git"))
+	admin := filepath.Clean(strings.TrimPrefix(strings.TrimSpace(string(b)), "gitdir: "))
+	head, err := os.ReadFile(filepath.Join(admin, "HEAD"))
+	if err != nil {
+		return fmt.Errorf("worktree %s: HEAD: %w", worktree, err)
+	}
+	if got, want := strings.TrimSpace(string(head)), "ref: refs/heads/"+branch; got != want {
+		return fmt.Errorf("worktree %s: HEAD is %q, expected %q (tampered?)", worktree, got, want)
+	}
+	return nil
+}
+
+func sameDir(a, b string) bool {
+	ra, err1 := filepath.EvalSymlinks(a)
+	rb, err2 := filepath.EvalSymlinks(b)
+	if err1 != nil || err2 != nil {
+		return filepath.Clean(a) == filepath.Clean(b)
+	}
+	return ra == rb
+}
+
+var (
+	hunkHeaderRE = regexp.MustCompile(`^@@ [^@]* @@ ?(.*)$`)
+	// declRE matches declarations in Go, TypeScript/JavaScript, Python, Java
+	// and SQL well enough to name what a hunk touches.
+	declRE = regexp.MustCompile(`^\s*(?:export\s+)?(?:default\s+)?(?:async\s+)?(?:` +
+		`func\s+(?:\([^)]*\)\s*)?([A-Za-z_]\w*)` +
+		`|type\s+([A-Za-z_]\w*)` +
+		`|(?:abstract\s+)?(?:class|interface|enum)\s+([A-Za-z_]\w*)` +
+		`|function\*?\s+([A-Za-z_$][\w$]*)` +
+		`|(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*(?::[^=]*)?=\s*(?:async\s*)?(?:\(|function)` +
+		`|def\s+([A-Za-z_]\w*)` +
+		`|(?i:create\s+(?:table|index|view)(?:\s+if\s+not\s+exists)?)\s+([A-Za-z_][\w.]*)` +
+		`)`)
+	methodRE = regexp.MustCompile(`^\s*(?:public\s+|private\s+|protected\s+|static\s+|async\s+|readonly\s+)*([A-Za-z_$][\w$]*)\s*\([^)]*\)\s*(?::[^{]*)?\{\s*$`)
+)
+
+// ChangedSymbols names the declarations a worktree's change touches,
+// relative to base: the enclosing declaration of every hunk (from git's
+// function context) and declarations added or removed in it. Qualified as
+// "path:Name". Heuristic and language-agnostic; used for the ledger and for
+// context packs, never for correctness decisions.
+func ChangedSymbols(ctx context.Context, worktree, base string) ([]string, error) {
+	// Zero context lines: the hunk header then names the declaration that
+	// encloses the change, not one in the surrounding context.
+	patch, err := Run(ctx, worktree, "diff", "-U0", "--no-color", "--no-ext-diff", "--no-textconv", base)
+	if err != nil {
+		return nil, err
+	}
+	untracked, err := Run(ctx, worktree, "ls-files", "--others", "--exclude-standard")
+	if err != nil {
+		return nil, err
+	}
+	for f := range strings.SplitSeq(untracked, "\n") {
+		if f == "" {
+			continue
+		}
+		nd, err := runAllowExit1(ctx, worktree, "diff", "-U0", "--no-color", "--no-ext-diff", "--no-textconv", "--no-index", "/dev/null", f)
+		if err != nil {
+			return nil, err
+		}
+		patch += "\n" + nd
+	}
+	seen := map[string]bool{}
+	var out []string
+	file := ""
+	add := func(name string) {
+		if name == "" || file == "" {
+			return
+		}
+		k := file + ":" + name
+		if !seen[k] {
+			seen[k] = true
+			out = append(out, k)
+		}
+	}
+	// A hunk names the declarations it adds or removes; only a hunk without
+	// any (a change inside a body) is attributed to its enclosing declaration
+	// from the header (which, for an insertion, is the preceding one).
+	header, hunkDecl := "", false
+	flush := func() {
+		if !hunkDecl {
+			add(declName(header))
+		}
+		header, hunkDecl = "", false
+	}
+	for l := range strings.SplitSeq(patch, "\n") {
+		switch {
+		case strings.HasPrefix(l, "diff "):
+			flush()
+		case strings.HasPrefix(l, "+++ "):
+			file = strings.TrimPrefix(strings.TrimPrefix(l, "+++ "), "b/")
+			if file == "/dev/null" {
+				file = ""
+			}
+		case strings.HasPrefix(l, "--- "):
+			if f := strings.TrimPrefix(strings.TrimPrefix(l, "--- "), "a/"); f != "/dev/null" {
+				file = f // a deleted file keeps its old name
+			}
+		case strings.HasPrefix(l, "@@"):
+			flush()
+			if m := hunkHeaderRE.FindStringSubmatch(l); m != nil {
+				header = m[1]
+			}
+		case strings.HasPrefix(l, "+") || strings.HasPrefix(l, "-"):
+			if n := declName(l[1:]); n != "" {
+				hunkDecl = true
+				add(n)
+			}
+		}
+	}
+	flush()
+	return out, nil
+}
+
+func declName(line string) string {
+	if m := declRE.FindStringSubmatch(line); m != nil {
+		for _, g := range m[1:] {
+			if g != "" {
+				return g
+			}
+		}
+	}
+	if m := methodRE.FindStringSubmatch(line); m != nil {
+		switch m[1] {
+		case "if", "for", "while", "switch", "catch", "return", "function":
+			return ""
+		}
+		return m[1]
+	}
+	return ""
+}
+
+// DeleteTaskBranch deletes an agent/* branch. It is only called on explicit
+// user request (task cleanup --delete-branch) and refuses any other branch.
+func DeleteTaskBranch(ctx context.Context, repo, branch string) error {
+	if !strings.HasPrefix(branch, "agent/") {
+		return fmt.Errorf("refusing to delete non-agent branch %q", branch)
+	}
+	_, err := Run(ctx, repo, "branch", "-D", branch)
+	return err
+}
+
+// PruneWorktrees drops administrative entries of removed worktrees.
+func PruneWorktrees(ctx context.Context, repo string) error {
+	_, err := Run(ctx, repo, "worktree", "prune")
+	return err
 }

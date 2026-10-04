@@ -124,23 +124,84 @@ type RepoTarget struct {
 	TaskID   string
 }
 
-// LoadConfig reads <worktree>/.boundedcode/verification.yaml or falls back
-// to a language preset.
-func LoadConfig(worktree string) (Config, error) {
-	p := filepath.Join(worktree, ".boundedcode", "verification.yaml")
-	b, err := os.ReadFile(p)
+// ConfigPath is the repository-relative verification config.
+const ConfigPath = ".boundedcode/verification.yaml"
+
+// LoadConfig returns the verification config of a task worktree. It is read
+// from the base commit, never from the worktree: the agent can write the
+// worktree, and must not be able to redefine how its own work is judged.
+// Without a config at base, the language preset for the files at base is
+// used. An empty base (no task context) falls back to the working tree.
+func LoadConfig(ctx context.Context, worktree, base string) (Config, error) {
+	var (
+		b   []byte
+		err error
+	)
+	if base == "" {
+		b, err = os.ReadFile(filepath.Join(worktree, ConfigPath))
+	} else {
+		var out string
+		out, err = gitops.Run(ctx, worktree, "cat-file", "blob", base+":"+ConfigPath)
+		b = []byte(out)
+		if err != nil && !blobMissing(ctx, worktree, base, ConfigPath) {
+			return Config{}, fmt.Errorf("read %s at %s: %w", ConfigPath, short(base), err)
+		}
+		if err != nil {
+			err = os.ErrNotExist
+		}
+	}
 	if err == nil {
 		var c Config
 		if err := config.DecodeStrict(b, &c); err != nil {
-			return c, fmt.Errorf("%s: %w", p, err)
+			return c, fmt.Errorf("%s: %w", ConfigPath, err)
 		}
 		return c, c.validate()
 	}
 	if !errors.Is(err, os.ErrNotExist) {
 		return Config{}, err
 	}
-	return Preset(worktree), nil
+	files, err := baseFiles(ctx, worktree, base)
+	if err != nil {
+		return Config{}, err
+	}
+	return presetFor(files), nil
 }
+
+func blobMissing(ctx context.Context, worktree, base, path string) bool {
+	_, err := gitops.Run(ctx, worktree, "cat-file", "-e", base+":"+path)
+	if err == nil {
+		return false
+	}
+	// cat-file -e fails both for a missing path and a bad commit; tell them apart.
+	_, cerr := gitops.Run(ctx, worktree, "cat-file", "-e", base+"^{commit}")
+	return cerr == nil
+}
+
+// baseFiles lists the repository files at base (or in the working tree when
+// base is empty).
+func baseFiles(ctx context.Context, worktree, base string) (map[string]bool, error) {
+	files := map[string]bool{}
+	if base == "" {
+		for _, f := range []string{"go.mod", "package.json", "tsconfig.json"} {
+			if _, err := os.Stat(filepath.Join(worktree, f)); err == nil {
+				files[f] = true
+			}
+		}
+		return files, nil
+	}
+	out, err := gitops.Run(ctx, worktree, "ls-tree", "-r", "--name-only", base)
+	if err != nil {
+		return nil, err
+	}
+	for f := range strings.SplitSeq(out, "\n") {
+		if f != "" {
+			files[f] = true
+		}
+	}
+	return files, nil
+}
+
+func short(sha string) string { return sha[:min(len(sha), 12)] }
 
 func (c Config) validate() error {
 	for _, s := range c.Stages {
@@ -159,11 +220,20 @@ func (c Config) validate() error {
 	return nil
 }
 
-// Preset returns built-in stages for the languages detected in worktree.
-func Preset(worktree string) Config {
+// presetFor returns built-in stages for the languages found in files.
+// Optional stages are skipped when their tool is not installed in the
+// sandbox image.
+func presetFor(files map[string]bool) Config {
 	c := Config{Version: 1}
-	exists := func(f string) bool { _, err := os.Stat(filepath.Join(worktree, f)); return err == nil }
-	if exists("go.mod") {
+	anySuffix := func(suffix string) bool {
+		for f := range files {
+			if strings.HasSuffix(f, suffix) {
+				return true
+			}
+		}
+		return false
+	}
+	if files["go.mod"] {
 		c.Stages = append(c.Stages,
 			Stage{Name: "gofmt", Run: []string{"sh", "-c", `out=$(gofmt -l $(git ls-files '*.go' | grep -v '^vendor/') 2>&1); [ -z "$out" ] || { echo "files need gofmt:"; echo "$out"; exit 1; }`}, Requires: []string{"go.mod"}},
 			Stage{Name: "go-build", Run: []string{"go", "build", "./..."}, Requires: []string{"go.mod"}},
@@ -172,10 +242,29 @@ func Preset(worktree string) Config {
 			Stage{Name: "golangci-lint", Run: []string{"golangci-lint", "run", "./..."}, Scope: "full", Optional: true, Requires: []string{"go.mod"}},
 		)
 	}
-	if exists("package.json") && exists("tsconfig.json") {
+	if files["package.json"] && files["tsconfig.json"] {
+		// Dependencies are not installed by verification (no network); the
+		// stages are skipped when node_modules is absent.
+		npmScript := func(name string) string {
+			return `[ -d node_modules ] || { echo "node_modules missing"; exit 127; }; ` +
+				`node -e 'process.exit(require("./package.json").scripts?.["` + name + `"] ? 0 : 3)'; rc=$?; ` +
+				`[ $rc = 3 ] && { echo "no ` + name + ` script"; exit 127; }; npm run --silent ` + name
+		}
 		c.Stages = append(c.Stages,
-			Stage{Name: "tsc", Run: []string{"sh", "-c", `if [ -x node_modules/.bin/tsc ]; then node_modules/.bin/tsc --noEmit; else echo "tsc not installed (node_modules missing)"; exit 127; fi`}, Optional: true},
+			Stage{Name: "tsc", Run: []string{"sh", "-c", `if [ -x node_modules/.bin/tsc ]; then node_modules/.bin/tsc --noEmit; else echo "tsc not installed (node_modules missing)"; exit 127; fi`}, Optional: true, Requires: []string{"tsconfig.json"}},
+			Stage{Name: "npm-lint", Run: []string{"sh", "-c", npmScript("lint")}, Optional: true, Requires: []string{"package.json"}},
+			Stage{Name: "npm-test", Run: []string{"sh", "-c", npmScript("test")}, Optional: true, Requires: []string{"package.json"}, Timeout: config.Duration(20 * time.Minute)},
+			Stage{Name: "npm-build", Run: []string{"sh", "-c", npmScript("build")}, Scope: "full", Optional: true, Requires: []string{"package.json"}},
 		)
+	}
+	if anySuffix(".tf") {
+		// Offline checks only: validate/plan need providers and credentials.
+		c.Stages = append(c.Stages, Stage{Name: "terraform-fmt", Optional: true,
+			Run: []string{"sh", "-c", `command -v terraform >/dev/null || exit 127; terraform fmt -check -recursive -diff`}})
+	}
+	if anySuffix("Chart.yaml") {
+		c.Stages = append(c.Stages, Stage{Name: "helm-lint", Optional: true,
+			Run: []string{"sh", "-c", `command -v helm >/dev/null || exit 127; for c in $(git ls-files '*Chart.yaml'); do helm lint "$(dirname "$c")" || exit 1; done`}})
 	}
 	return c
 }
@@ -183,7 +272,7 @@ func Preset(worktree string) Config {
 // Run verifies one repository at the given scope. Built-in stages
 // (diff-scope, secret-scan) always run.
 func (e *Engine) Run(ctx context.Context, t RepoTarget, scope Scope) (Result, error) {
-	cfg, err := LoadConfig(t.Worktree)
+	cfg, err := LoadConfig(ctx, t.Worktree, t.Base)
 	if err != nil {
 		return Result{}, err
 	}
@@ -193,11 +282,11 @@ func (e *Engine) Run(ctx context.Context, t RepoTarget, scope Scope) (Result, er
 		return res, err
 	}
 	res.Stages = append(res.Stages, diffScope(changed, cfg))
-	res.Stages = append(res.Stages, e.secretScan(ctx, t))
+	res.Stages = append(res.Stages, e.secretScan(ctx, t, scope))
 
 	packages := []string{"./..."}
 	if scope == Targeted {
-		if pk, err := e.goImpactedPackages(ctx, t.Worktree, changed); err == nil && len(pk) > 0 {
+		if pk, err := e.goImpactedPackages(ctx, t, changed); err == nil && len(pk) > 0 {
 			packages = pk
 		}
 	}
@@ -250,6 +339,9 @@ func diffScope(changed []string, cfg Config) StageResult {
 		if policy.IsSecretPath(f) {
 			problems = append(problems, "touches secret path: "+f)
 		}
+		if policy.IsProtectedPath(f) {
+			problems = append(problems, "touches protected path: "+f+" (verification, CI and ownership config cannot be changed by a task)")
+		}
 		for _, g := range cfg.DenyPaths {
 			if ok, _ := filepath.Match(g, f); ok {
 				problems = append(problems, "touches denied path: "+f)
@@ -263,12 +355,16 @@ func diffScope(changed []string, cfg Config) StageResult {
 }
 
 // secretScan pipes the task diff to gitleaks on the host (it never needs the
-// network). Skipped when gitleaks is not installed.
-func (e *Engine) secretScan(ctx context.Context, t RepoTarget) StageResult {
+// network). Without gitleaks it is skipped during iteration but is an error
+// in the full gate: a merge candidate is never produced unscanned.
+func (e *Engine) secretScan(ctx context.Context, t RepoTarget, scope Scope) StageResult {
 	sr := StageResult{Name: "secret-scan", Command: "git diff | gitleaks stdin"}
 	bin, err := exec.LookPath("gitleaks")
 	if err != nil {
 		sr.Status, sr.Output = "skipped", "gitleaks not installed"
+		if scope == Full {
+			sr.Status, sr.Output = "error", "gitleaks not installed: the full gate requires a secret scan (scripts/install-deps.sh installs it)"
+		}
 		return sr
 	}
 	diff, err := gitops.Diff(ctx, t.Worktree, t.Base, false)
@@ -300,6 +396,12 @@ func (e *Engine) runStage(ctx context.Context, t RepoTarget, st Stage, packages 
 	sr := StageResult{Name: st.Name}
 	for _, req := range st.Requires {
 		if _, err := os.Stat(filepath.Join(t.Worktree, req)); err != nil {
+			// A stage that applied at base cannot be switched off by deleting
+			// its required file.
+			if t.Base != "" && !blobMissing(ctx, t.Worktree, t.Base, req) {
+				sr.Status, sr.ExitCode, sr.Output = "fail", 1, req+" exists at the base commit but was removed by the change"
+				return sr
+			}
 			sr.Status, sr.Output = "skipped", "missing "+req
 			return sr
 		}
@@ -323,7 +425,12 @@ func (e *Engine) runStage(ctx context.Context, t RepoTarget, st Stage, packages 
 	}
 	sctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	cmd, err := e.Sandbox.Command(sctx, e.spec(t, argv))
+	spec, err := e.spec(t, argv)
+	if err != nil {
+		sr.Status, sr.Output = "error", err.Error()
+		return sr
+	}
+	cmd, err := e.Sandbox.Command(sctx, spec)
 	if err != nil {
 		sr.Status, sr.Output = "error", err.Error()
 		return sr
@@ -362,7 +469,7 @@ func (e *Engine) runStage(ctx context.Context, t RepoTarget, st Stage, packages 
 	return sr
 }
 
-func (e *Engine) spec(t RepoTarget, argv []string) sandbox.Spec {
+func (e *Engine) spec(t RepoTarget, argv []string) (sandbox.Spec, error) {
 	mounts := []sandbox.Mount{{Host: t.Worktree, Target: t.Worktree}}
 	env := map[string]string{"GOFLAGS": "-buildvcs=false", "GOTOOLCHAIN": "local", "CI": "1"}
 	if common, err := gitops.CommonDir(context.Background(), t.Worktree); err == nil {
@@ -372,7 +479,13 @@ func (e *Engine) spec(t RepoTarget, argv []string) sandbox.Spec {
 		}
 	}
 	if e.CacheDir != "" {
-		gc := filepath.Join(e.CacheDir, "gocache")
+		// One build cache per task: a cache shared across tasks could be
+		// poisoned by code one task's tests write into it.
+		key := t.TaskID
+		if key == "" {
+			key = "_adhoc"
+		}
+		gc := filepath.Join(e.CacheDir, "gocache", key)
 		_ = os.MkdirAll(gc, 0o700)
 		mounts = append(mounts, sandbox.Mount{Host: gc, Target: gc})
 		env["GOCACHE"] = gc
@@ -386,18 +499,21 @@ func (e *Engine) spec(t RepoTarget, argv []string) sandbox.Spec {
 		}
 	}
 	var masks []string
-	if secrets, err := policy.FindSecretPaths(t.Worktree, 200); err == nil {
-		for _, s := range secrets {
-			masks = append(masks, filepath.Join(t.Worktree, s))
-		}
+	secrets, err := policy.FindSecretPaths(t.Worktree, policy.MaxSecretMasks)
+	if err != nil {
+		return sandbox.Spec{}, fmt.Errorf("secret masks: %w", err)
 	}
-	return sandbox.Spec{Argv: argv, Workdir: t.Worktree, Mounts: mounts, Env: env, Masks: masks}
+	for _, s := range secrets {
+		masks = append(masks, filepath.Join(t.Worktree, s))
+	}
+	return sandbox.Spec{Argv: argv, Workdir: t.Worktree, Mounts: mounts, Env: env, Masks: masks}, nil
 }
 
 // goImpactedPackages returns the Go packages containing changed files plus
 // every package in the module that (transitively) imports them, including
 // via tests. Deterministic and cheap; independent of the code graph.
-func (e *Engine) goImpactedPackages(ctx context.Context, worktree string, changed []string) ([]string, error) {
+func (e *Engine) goImpactedPackages(ctx context.Context, t RepoTarget, changed []string) ([]string, error) {
+	worktree := t.Worktree
 	if _, err := os.Stat(filepath.Join(worktree, "go.mod")); err != nil {
 		return nil, err
 	}
@@ -416,7 +532,11 @@ func (e *Engine) goImpactedPackages(ctx context.Context, worktree string, change
 		}
 	}
 	argv := []string{"go", "list", "-e", "-f", "{{.ImportPath}}\t{{.Dir}}\t{{join .Imports \",\"}},{{join .TestImports \",\"}},{{join .XTestImports \",\"}}", "./..."}
-	cmd, err := e.Sandbox.Command(ctx, e.spec(RepoTarget{Worktree: worktree}, argv))
+	spec, err := e.spec(t, argv)
+	if err != nil {
+		return nil, err
+	}
+	cmd, err := e.Sandbox.Command(ctx, spec)
 	if err != nil {
 		return nil, err
 	}
