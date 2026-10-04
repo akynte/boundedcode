@@ -33,7 +33,11 @@ type Manager struct {
 	ModelsDir      string
 	StateDir       string
 	StartupTimeout time.Duration
-	Log            *slog.Logger
+	// IdleSleep makes servers started by Ensure unload the model after this
+	// much inactivity (--sleep-idle-seconds); the next request reloads it.
+	// Zero disables it. Start (benchmarks) passes its args verbatim.
+	IdleSleep time.Duration
+	Log       *slog.Logger
 }
 
 var _ inference.Runtime = (*Manager)(nil)
@@ -109,7 +113,7 @@ func (m *Manager) Ensure(ctx context.Context, p model.Profile) (inference.Endpoi
 	if _, err := os.Stat(modelPath); err != nil {
 		return ep, fmt.Errorf("model file for %s: %w", p.Name, err)
 	}
-	args := BuildArgs(p, modelPath, m.Host, m.Port)
+	args := m.ServerArgs(p, modelPath)
 	hash := ArgsHash(m.Binary, args)
 
 	st, err := m.readState()
@@ -136,6 +140,11 @@ func (m *Manager) Ensure(ctx context.Context, p model.Profile) (inference.Endpoi
 	}
 	_, err = m.start(ctx, p, args, hash)
 	return ep, err
+}
+
+// ServerArgs is BuildArgs plus the manager's runtime settings (idle sleep).
+func (m *Manager) ServerArgs(p model.Profile, modelPath string) []string {
+	return WithIdleSleep(BuildArgs(p, modelPath, m.Host, m.Port), m.IdleSleep)
 }
 
 // Start launches the server unconditionally (used by benchmarks that need a
@@ -282,7 +291,8 @@ type props struct {
 	DefaultGen struct {
 		NCtx int `json:"n_ctx"`
 	} `json:"default_generation_settings"`
-	TotalSlots int `json:"total_slots"`
+	TotalSlots int  `json:"total_slots"`
+	IsSleeping bool `json:"is_sleeping"`
 }
 
 // Status implements inference.Runtime.
@@ -304,7 +314,7 @@ func (m *Manager) Status(ctx context.Context) (inference.Status, error) {
 		s.Healthy = true
 		var p props
 		if _, err := c.Get(ctx, "/props", &p); err == nil {
-			s.Version, s.CtxSize = p.BuildInfo, p.DefaultGen.NCtx
+			s.Version, s.CtxSize, s.Sleeping = p.BuildInfo, p.DefaultGen.NCtx, p.IsSleeping
 		}
 		if !s.Running {
 			s.Detail = "a server is answering on this port but was not started by this tool"

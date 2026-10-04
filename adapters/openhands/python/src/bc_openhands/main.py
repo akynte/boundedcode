@@ -8,6 +8,8 @@ Protocol (ADR-0004), newline-delimited JSON-RPC 2.0 on stdin/stdout:
   Go -> adapter  session.open, session.send, session.interrupt, session.state,
                  session.condense, shutdown
   adapter -> Go  llm.complete (request), event (notification), ready (notification)
+
+`ready` carries PROTOCOL_VERSION; the control plane refuses a mismatch.
 """
 
 from __future__ import annotations
@@ -32,6 +34,7 @@ PROTO_OUT = _claim_stdout()
 os.environ.setdefault("OPENHANDS_SUPPRESS_BANNER", "1")
 
 import logging  # noqa: E402
+import signal  # noqa: E402
 import threading  # noqa: E402
 import uuid  # noqa: E402
 from pathlib import Path  # noqa: E402
@@ -43,6 +46,11 @@ from .rpc import INVALID_PARAMS, Peer, RPCError  # noqa: E402
 log = logging.getLogger("bc_openhands")
 
 MAX_TEXT = 2000
+
+# Bump on any incompatible protocol change (renamed/removed methods or fields,
+# changed semantics). Additive, optional fields do not bump it. Must match
+# ProtocolVersion in internal/agent/openhands/runtime.go (ADR-0004).
+PROTOCOL_VERSION = 1
 
 
 def _trim(s: str, n: int = MAX_TEXT) -> str:
@@ -301,13 +309,29 @@ def main() -> None:
     peer.register("shutdown", shutdown)
 
     reader = threading.Thread(target=peer.serve, name="rpc-reader", daemon=True)
-    reader.start()
-    import openhands.sdk  # noqa: F401 - import early so `ready` means the SDK loaded
+    # SIGTERM (docker stop / kill) ends the loop like EOF so the conversation
+    # is closed and persisted cleanly.
+    signal.signal(signal.SIGTERM, lambda *_: done.set())
+    try:
+        reader.start()
+        import openhands.sdk  # noqa: F401 - import early so `ready` means the SDK loaded
 
-    peer.notify("ready", {"adapter": "bc-openhands", "sdk_version": _sdk_version(), "pid": os.getpid()})
-    while not done.is_set() and not peer.closed.is_set():
-        done.wait(0.5)
-    session.close()
+        peer.notify("ready", ready_params())
+        while not done.is_set() and not peer.closed.is_set():
+            done.wait(0.5)
+    except KeyboardInterrupt:
+        log.info("interrupted; closing session")
+    finally:
+        session.close()
+
+
+def ready_params() -> dict[str, Any]:
+    return {
+        "adapter": "bc-openhands",
+        "protocol_version": PROTOCOL_VERSION,
+        "sdk_version": _sdk_version(),
+        "pid": os.getpid(),
+    }
 
 
 def _sdk_version() -> str:

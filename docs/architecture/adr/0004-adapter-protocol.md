@@ -22,6 +22,17 @@ bind-mounted from the host does not reach the container.
   with `--network none`.
 * The adapter contains no product logic. It contains no retry policy,
   verification, routing or escalation.
+* **Versioning:** the adapter's `ready` notification carries an integer
+  `protocol_version` (currently 1). Go refuses to open a session when it is
+  missing or differs from its own constant, and tells the user to rebuild
+  the sandbox image (`boundedcode sandbox build`), since the image bakes in
+  a copy of the adapter. The version is bumped on any incompatible change:
+  a renamed or removed method or field, a changed type, or changed
+  semantics. Adding an optional field or a new method that the other side
+  may ignore does not bump it. Both sides ignore unknown fields. The
+  constants live in `internal/agent/openhands/runtime.go`
+  (`ProtocolVersion`) and the adapter's `main.py` (`PROTOCOL_VERSION`), and
+  must change together.
 
 ## Consequences
 * `docker run -i` carries stdio across the Docker Desktop VM boundary, and

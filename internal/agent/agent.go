@@ -5,6 +5,7 @@ package agent
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	"github.com/akynte/boundedcode/internal/inference"
 )
@@ -33,6 +34,10 @@ type OpenRequest struct {
 	MaxOutputTokens    int
 	CondenserMaxEvents int
 	CondenserMaxTokens int
+	// LLMTimeout bounds one model call inside the runtime; pass the gateway's
+	// request timeout (inference.request_timeout). Zero keeps the runtime's
+	// default.
+	LLMTimeout time.Duration
 	// Masks are workspace-relative paths hidden from the agent.
 	Masks []string
 	// OnEvent receives runtime events (may be nil). Called sequentially.
@@ -46,7 +51,9 @@ type OpenRequest struct {
 type Session interface {
 	ID() string
 	Resumed() bool
-	// Send delivers a message and runs the agent until it stops.
+	// Send delivers a message and runs the agent until it stops. When ctx
+	// ends first the runtime interrupts the agent (falling back to killing
+	// it) and returns ctx's error; bound a turn with a ctx deadline.
 	Send(ctx context.Context, message string) (Result, error)
 	// Condense forces a context condensation.
 	Condense(ctx context.Context) error

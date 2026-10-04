@@ -19,7 +19,7 @@ func (a *App) llamaManager() *llamacpp.Manager {
 	c := a.Config.Inference
 	return &llamacpp.Manager{
 		Binary: c.ServerBinary, Host: c.Host, Port: c.Port, ModelsDir: a.Config.ModelsDir,
-		StateDir: a.Paths.Runtime, StartupTimeout: c.StartupTimeout.D(), Log: a.Log,
+		StateDir: a.Paths.Runtime, StartupTimeout: c.StartupTimeout.D(), IdleSleep: c.IdleSleep.D(), Log: a.Log,
 	}
 }
 
@@ -101,7 +101,7 @@ func newRuntimeCmd(app *App) *cobra.Command {
 			if app.jsonOut {
 				return app.printJSON(st)
 			}
-			app.printf("running: %v  healthy: %v  managed: %v\n", st.Running, st.Healthy, st.Managed)
+			app.printf("running: %v  healthy: %v  managed: %v  sleeping: %v\n", st.Running, st.Healthy, st.Managed, st.Sleeping)
 			app.printf("endpoint: %s  profile: %s  pid: %d  rss: %d MiB  ctx: %d\n", st.Endpoint.BaseURL, st.Profile, st.PID, st.RSSMiB, st.CtxSize)
 			if st.Version != "" {
 				app.printf("build: %s\n", st.Version)
@@ -176,7 +176,7 @@ func newModelCmd(app *App) *cobra.Command {
 				return err
 			}
 			c := app.Config.Inference
-			argv := llamacpp.BuildArgs(p, p.ResolveFile(app.Config.ModelsDir), c.Host, c.Port)
+			argv := app.llamaManager().ServerArgs(p, p.ResolveFile(app.Config.ModelsDir))
 			if app.jsonOut {
 				return app.printJSON(map[string]any{"profile": p, "server_args": argv})
 			}

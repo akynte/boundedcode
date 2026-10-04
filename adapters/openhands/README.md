@@ -20,7 +20,12 @@ A thin Python process that connects the boundedcode control plane to the
 | Go → adapter | `session.condense` | request | Force context condensation |
 | Go → adapter | `session.interrupt`, `session.state`, `shutdown` | request | |
 | adapter → Go | `llm.complete` | request | Chat completion, metered and forwarded by Go |
-| adapter → Go | `ready`, `event` | notification | Startup signal and event summaries |
+| adapter → Go | `ready`, `event` | notification | Startup signal (with `protocol_version`) and event summaries |
+
+`ready` carries `protocol_version`; the control plane refuses a mismatch.
+Bump `PROTOCOL_VERSION` in `main.py` and `ProtocolVersion` in
+`internal/agent/openhands/runtime.go` together on incompatible changes, then
+rebuild the image (`boundedcode sandbox build`).
 
 stdout carries only protocol messages. The adapter re-points fd 1 at stderr
 before importing the SDK.

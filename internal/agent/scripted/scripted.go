@@ -52,7 +52,10 @@ type session struct {
 func (s *session) ID() string    { return s.id }
 func (s *session) Resumed() bool { return s.resumed }
 
-func (s *session) Send(_ context.Context, message string) (agent.Result, error) {
+func (s *session) Send(ctx context.Context, message string) (agent.Result, error) {
+	if err := ctx.Err(); err != nil {
+		return agent.Result{}, err // like a real runtime: an expired turn does not run
+	}
 	s.rt.mu.Lock()
 	s.rt.Messages = append(s.rt.Messages, message)
 	if s.rt.next >= len(s.rt.Steps) {

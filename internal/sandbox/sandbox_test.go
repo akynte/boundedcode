@@ -59,3 +59,29 @@ func TestNoneRequiresIdentityMounts(t *testing.T) {
 		t.Fatal("expected error")
 	}
 }
+
+func TestContainerCommandAlwaysNamed(t *testing.T) {
+	c := &Container{Engine: "docker", Image: "i"}
+	a, err := c.Command(t.Context(), Spec{Argv: []string{"true"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _ := c.Command(t.Context(), Spec{Argv: []string{"true"}})
+	nameOf := func(args []string) string {
+		if i := slices.Index(args, "--name"); i >= 0 && i+1 < len(args) {
+			return args[i+1]
+		}
+		return ""
+	}
+	na, nb := nameOf(a.Args), nameOf(b.Args)
+	if !strings.HasPrefix(na, "bc-v-") || na == nb {
+		t.Fatalf("names %q %q: want unique bc-v-*", na, nb)
+	}
+	if a.Cancel == nil {
+		t.Fatal("container command must remove the container on cancel")
+	}
+	named, _ := c.Command(t.Context(), Spec{Argv: []string{"true"}, Name: "bc-task/1"})
+	if got := nameOf(named.Args); got != "bc-task-1" {
+		t.Fatalf("explicit name = %q", got)
+	}
+}

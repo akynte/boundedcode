@@ -2,6 +2,7 @@ import io
 import json
 import os
 import threading
+import time
 import urllib.request
 
 from bc_openhands.llmproxy import start_proxy
@@ -86,3 +87,66 @@ def test_summarize_unknown_event():
         source = "agent"
 
     assert summarize_event(Weird())["kind"] == "Weird"
+
+
+def feed_peer(lines):
+    """A peer reading the given raw lines; returns (peer, output buffer)."""
+    out = io.StringIO()
+    peer = Peer(io.StringIO("".join(line + "\n" for line in lines)), out)
+    return peer, out
+
+
+def test_malformed_lines_do_not_stop_the_stream():
+    seen = threading.Event()
+    peer, _out = feed_peer(
+        [
+            "not json",
+            "[1, 2]",
+            "5",
+            '{"jsonrpc":"2.0","id":[1],"result":1}',
+            '{"jsonrpc":"2.0","method":7,"params":{}}',
+            '{"jsonrpc":"2.0","id":424242,"result":{}}',
+            '{"jsonrpc":"2.0","method":"event","params":{"k":1}}',
+        ]
+    )
+    peer.register("event", lambda p: seen.set())
+    peer.serve()  # returns at EOF without raising
+    assert seen.wait(5)
+    assert peer.closed.is_set()
+
+
+def test_unknown_method_and_invalid_method_get_errors():
+    peer, out = feed_peer(
+        [
+            '{"jsonrpc":"2.0","id":1,"method":"nope","params":{}}',
+            '{"jsonrpc":"2.0","id":2,"method":["x"]}',
+            '{"jsonrpc":"2.0","method":"unknown.notification","params":{}}',
+        ]
+    )
+    peer.serve()
+    replies = {}
+    for _ in range(50):  # request handlers run on worker threads
+        replies = {m["id"]: m for m in map(json.loads, out.getvalue().splitlines())}
+        if len(replies) == 2:
+            break
+        time.sleep(0.1)
+    assert replies[1]["error"]["code"] == -32601
+    assert replies[2]["error"]["code"] == -32600
+
+
+def test_call_after_close_fails_fast():
+    peer, _ = feed_peer([])
+    peer.serve()
+    try:
+        peer.call("x", {}, timeout=1)
+        raise AssertionError("expected error")
+    except RPCError as e:
+        assert "closed" in e.message
+
+
+def test_ready_reports_protocol_version():
+    from bc_openhands.main import PROTOCOL_VERSION, ready_params
+
+    params = ready_params()
+    assert params["protocol_version"] == PROTOCOL_VERSION == 1
+    assert params["adapter"] == "bc-openhands"

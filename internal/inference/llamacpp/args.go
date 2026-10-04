@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/akynte/boundedcode/internal/model"
 )
@@ -79,6 +80,15 @@ func BuildArgs(p model.Profile, modelPath, host string, port int) []string {
 		args = append(args, "--repeat-penalty", ftoa(smp.RepeatPenalty))
 	}
 	return append(args, s.ExtraArgs...)
+}
+
+// WithIdleSleep appends --sleep-idle-seconds when d is at least one second.
+// It is a server runtime setting, not part of a model profile.
+func WithIdleSleep(args []string, d time.Duration) []string {
+	if secs := int(d / time.Second); secs > 0 {
+		return append(args, "--sleep-idle-seconds", strconv.Itoa(secs))
+	}
+	return args
 }
 
 func ftoa(f float64) string { return strconv.FormatFloat(f, 'f', -1, 64) }

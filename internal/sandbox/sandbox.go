@@ -5,12 +5,15 @@ package sandbox
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 )
 
 // Mount binds a host path into the sandbox.
@@ -30,7 +33,8 @@ type Spec struct {
 	// Masks are paths inside the sandbox hidden behind empty read-only
 	// mounts (secret files and directories inside mounted trees).
 	Masks []string
-	// Name labels the container (sanitized) for diagnostics.
+	// Name labels the container (sanitized). The container commands give an
+	// unnamed spec a unique bc-v-<random> name so it can be stopped on cancel.
 	Name string
 }
 
@@ -88,15 +92,49 @@ func (c *Container) Name() string { return c.Engine }
 // Isolated implements Sandbox.
 func (c *Container) Isolated() bool { return true }
 
-// Command implements Sandbox.
+// Command implements Sandbox. Cancelling ctx removes the container, not just
+// the engine CLI: killing `docker run` alone leaves the container running.
 func (c *Container) Command(ctx context.Context, s Spec) (*exec.Cmd, error) {
+	if s.Name == "" {
+		s.Name = "bc-v-" + randomSuffix()
+	}
 	args, err := c.Args(s)
 	if err != nil {
 		return nil, err
 	}
 	cmd := exec.CommandContext(ctx, c.Engine, args...)
 	cmd.Env = os.Environ() // the engine CLI itself needs DOCKER_HOST etc.; the container does not inherit it
+	name := sanitizeName(s.Name)
+	cmd.Cancel = func() error {
+		_ = c.Remove(context.Background(), name)
+		return cmd.Process.Kill()
+	}
+	// Once the CLI is gone, do not wait long for its output pipes.
+	cmd.WaitDelay = 10 * time.Second
 	return cmd, nil
+}
+
+// removeTimeout bounds `<engine> rm -f`, which runs after the caller's
+// context is already done.
+const removeTimeout = 15 * time.Second
+
+// Remove force-removes the named container (stopping it first) if it exists.
+// It is used on cancellation and to clear a stale container left by a
+// crashed run before reusing its name.
+func (c *Container) Remove(ctx context.Context, name string) error {
+	ctx, cancel := context.WithTimeout(ctx, removeTimeout)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, c.Engine, "rm", "-f", sanitizeName(name)).CombinedOutput()
+	if err != nil && !strings.Contains(strings.ToLower(string(out)), "no such container") {
+		return fmt.Errorf("%s rm -f %s: %w: %s", c.Engine, name, err, strings.TrimSpace(string(out)))
+	}
+	return nil
+}
+
+func randomSuffix() string {
+	b := make([]byte, 6)
+	_, _ = rand.Read(b)
+	return hex.EncodeToString(b)
 }
 
 // Args returns the engine arguments (exported for tests and dry runs).

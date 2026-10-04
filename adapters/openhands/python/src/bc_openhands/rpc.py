@@ -28,6 +28,7 @@ class RPCError(Exception):
         self.data = data
 
 
+INVALID_REQUEST = -32600
 METHOD_NOT_FOUND = -32601
 INVALID_PARAMS = -32602
 INTERNAL_ERROR = -32603
@@ -64,11 +65,13 @@ class Peer:
             self.closed.set()
 
     def call(self, method: str, params: Any, timeout: float | None = None) -> Any:
-        if self.closed.is_set():
-            raise RPCError(INTERNAL_ERROR, "peer closed")
         msg_id = next(self._ids)
         fut: Future = Future()
+        # Check and register atomically: serve() drains pending under the
+        # same lock, so a call cannot slip in after the drain and hang.
         with self._pending_lock:
+            if self.closed.is_set():
+                raise RPCError(INTERNAL_ERROR, "peer closed")
             self._pending[msg_id] = fut
         try:
             self._send({"jsonrpc": "2.0", "id": msg_id, "method": method, "params": params})
@@ -90,22 +93,35 @@ class Peer:
                 except json.JSONDecodeError:
                     log.error("invalid JSON from peer: %.200s", line)
                     continue
-                self._dispatch(msg)
+                if not isinstance(msg, dict):
+                    log.error("non-object message from peer: %.200s", line)
+                    continue
+                try:
+                    self._dispatch(msg)
+                except Exception:  # noqa: BLE001 - one bad message must not end the stream
+                    log.exception("dropping malformed message: %.200s", line)
         finally:
-            self.closed.set()
             with self._pending_lock:
+                self.closed.set()
                 for fut in self._pending.values():
                     if not fut.done():
                         fut.set_exception(RPCError(INTERNAL_ERROR, "peer closed"))
 
     def _dispatch(self, msg: dict[str, Any]) -> None:
         if "method" in msg:
+            if not isinstance(msg["method"], str):
+                log.error("invalid method %.100r", msg["method"])
+                if msg.get("id") is not None:
+                    self._reply_error(msg["id"], INVALID_REQUEST, "invalid method")
+                return
             if "id" in msg:
                 threading.Thread(target=self._handle_request, args=(msg,), daemon=True).start()
             else:
                 handler = self._handlers.get(msg["method"])
                 if handler:
                     threading.Thread(target=handler, args=(msg.get("params") or {},), daemon=True).start()
+                else:
+                    log.debug("ignoring unknown notification %s", msg["method"])
             return
         msg_id = msg.get("id")
         with self._pending_lock:
@@ -115,6 +131,9 @@ class Peer:
             return
         if "error" in msg and msg["error"] is not None:
             err = msg["error"]
+            if not isinstance(err, dict):
+                fut.set_exception(RPCError(INTERNAL_ERROR, f"malformed error object: {err!r:.200}"))
+                return
             fut.set_exception(RPCError(err.get("code", APP_ERROR), err.get("message", ""), err.get("data")))
         else:
             fut.set_result(msg.get("result"))

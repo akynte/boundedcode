@@ -4,6 +4,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/akynte/boundedcode/internal/model"
 )
@@ -35,5 +36,28 @@ func TestClassifyExit(t *testing.T) {
 	err := m.classifyExit(nil)
 	if err == nil || !strings.Contains(err.Error(), "out of memory") {
 		t.Fatalf("got %v", err)
+	}
+}
+
+func TestIdleSleepArgs(t *testing.T) {
+	base := []string{"--model", "m"}
+	if got := WithIdleSleep(base, 0); !slices.Equal(got, base) {
+		t.Errorf("zero must not add flags: %q", got)
+	}
+	if got := WithIdleSleep(base, 500*time.Millisecond); !slices.Equal(got, base) {
+		t.Errorf("sub-second must not add flags: %q", got)
+	}
+	got := WithIdleSleep(slices.Clone(base), 30*time.Minute)
+	if !slices.Equal(got, []string{"--model", "m", "--sleep-idle-seconds", "1800"}) {
+		t.Errorf("got %q", got)
+	}
+	p := model.Profile{Name: "m", File: "m.gguf"}
+	m := &Manager{Host: "127.0.0.1", Port: 1, IdleSleep: time.Minute}
+	if a := strings.Join(m.ServerArgs(p, "/m.gguf"), " "); !strings.HasSuffix(a, "--sleep-idle-seconds 60") {
+		t.Errorf("ServerArgs = %q", a)
+	}
+	m.IdleSleep = 0
+	if slices.Contains(m.ServerArgs(p, "/m.gguf"), "--sleep-idle-seconds") {
+		t.Error("disabled idle sleep emitted a flag")
 	}
 }

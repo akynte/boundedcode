@@ -41,8 +41,10 @@ type Status struct {
 	StartedAt time.Time `json:"started_at,omitzero"`
 	Version   string    `json:"version,omitempty"`
 	CtxSize   int       `json:"ctx_size,omitempty"`
-	RSSMiB    int       `json:"rss_mib,omitempty"`
-	Args      []string  `json:"args,omitempty"`
-	LogPath   string    `json:"log_path,omitempty"`
-	Detail    string    `json:"detail,omitempty"`
+	// Sleeping reports a llama-server that unloaded its model after idling.
+	Sleeping bool     `json:"sleeping,omitempty"`
+	RSSMiB   int      `json:"rss_mib,omitempty"`
+	Args     []string `json:"args,omitempty"`
+	LogPath  string   `json:"log_path,omitempty"`
+	Detail   string   `json:"detail,omitempty"`
 }

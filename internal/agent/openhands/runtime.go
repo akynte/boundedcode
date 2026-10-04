@@ -3,6 +3,7 @@
 package openhands
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -19,7 +20,13 @@ import (
 	"github.com/akynte/boundedcode/internal/inference"
 	"github.com/akynte/boundedcode/internal/jsonrpc"
 	"github.com/akynte/boundedcode/internal/sandbox"
+	"github.com/akynte/boundedcode/internal/telemetry"
 )
+
+// ProtocolVersion is the adapter protocol this control plane speaks. The
+// adapter reports its own in the `ready` notification; a mismatch is refused
+// (ADR-0004). Keep in sync with PROTOCOL_VERSION in the adapter's main.py.
+const ProtocolVersion = 1
 
 // Runtime launches one adapter process per session.
 type Runtime struct {
@@ -30,10 +37,28 @@ type Runtime struct {
 	Argv []string
 	// Gateway returns the LLM gateway for a task (meters and forwards calls).
 	Gateway func(taskID string) *inference.Gateway
-	// LogDir receives per-session adapter stderr logs.
+	// LogDir is unused: adapter stderr goes to a per-task log next to the
+	// session's PersistenceDir (see AdapterLogPath).
+	//
+	// Deprecated: kept so existing callers compile.
 	LogDir       string
 	ReadyTimeout time.Duration
-	Log          *slog.Logger
+	// InterruptGrace bounds how long a cancelled Send waits for the agent to
+	// stop after session.interrupt before the adapter is killed (default 30s).
+	InterruptGrace time.Duration
+	Log            *slog.Logger
+}
+
+// AdapterLogPath is where the adapter's (redacted) stderr for a session is
+// written: one file per task, beside the task's persistence directory.
+func AdapterLogPath(req agent.OpenRequest) string {
+	return filepath.Join(filepath.Dir(req.PersistenceDir), "adapter.log")
+}
+
+// containerRemover is implemented by sandboxes whose sessions are named
+// containers that can outlive the engine CLI (sandbox.Container).
+type containerRemover interface {
+	Remove(ctx context.Context, name string) error
 }
 
 var _ agent.Runtime = (*Runtime)(nil)
@@ -48,7 +73,10 @@ type session struct {
 	cmd     *exec.Cmd
 	stdin   io.WriteCloser
 	logf    *os.File
+	stderr  *redactWriter
 	cancel  context.CancelFunc
+	remove  func() // force-removes the container, if any
+	grace   time.Duration
 	exited  chan struct{}
 	waitErr error
 	once    sync.Once
@@ -91,6 +119,15 @@ func (r *Runtime) Open(ctx context.Context, req agent.OpenRequest) (agent.Sessio
 		Env:  map[string]string{"OPENHANDS_SUPPRESS_BANNER": "1", "BC_ADAPTER_LOG": "INFO", "PYTHONUNBUFFERED": "1"},
 		Name: "bc-" + req.TaskID,
 	}
+	remove := func() {}
+	if rm, ok := r.Sandbox.(containerRemover); ok {
+		// A container left by a crashed run holds the name and would make
+		// `run --name` fail, blocking resume.
+		if err := rm.Remove(ctx, spec.Name); err != nil {
+			r.log().Warn("could not remove stale adapter container", "name", spec.Name, "err", err)
+		}
+		remove = func() { _ = rm.Remove(context.Background(), spec.Name) }
+	}
 	// The adapter must outlive request contexts; Close() ends it.
 	procCtx, cancel := context.WithCancel(context.Background())
 	cmd, err := r.Sandbox.Command(procCtx, spec)
@@ -98,17 +135,18 @@ func (r *Runtime) Open(ctx context.Context, req agent.OpenRequest) (agent.Sessio
 		cancel()
 		return nil, err
 	}
-	if err := os.MkdirAll(r.LogDir, 0o700); err != nil {
-		cancel()
-		return nil, err
+	if !r.Sandbox.Isolated() {
+		hostProcessGroup(cmd)
 	}
-	logf, err := os.OpenFile(filepath.Join(r.LogDir, "adapter.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
+	logPath := AdapterLogPath(req)
+	logf, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 	if err != nil {
 		cancel()
 		return nil, err
 	}
 	fmt.Fprintf(logf, "\n=== %s adapter start (sandbox=%s) ===\n", time.Now().UTC().Format(time.RFC3339), r.Sandbox.Name())
-	cmd.Stderr = logf
+	stderr := &redactWriter{w: logf}
+	cmd.Stderr = stderr
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		cancel()
@@ -127,7 +165,13 @@ func (r *Runtime) Open(ctx context.Context, req agent.OpenRequest) (agent.Sessio
 		logf.Close()
 		return nil, fmt.Errorf("start adapter: %w", err)
 	}
-	s := &session{peer: jsonrpc.New(stdout, stdin), cmd: cmd, stdin: stdin, logf: logf, cancel: cancel, exited: make(chan struct{})}
+	grace := r.InterruptGrace
+	if grace == 0 {
+		grace = 30 * time.Second
+	}
+	s := &session{peer: jsonrpc.New(stdout, stdin), cmd: cmd, stdin: stdin, logf: logf, stderr: stderr, cancel: cancel,
+		remove: remove, grace: grace, exited: make(chan struct{})}
+	s.peer.SetLogger(r.Log)
 	gw := req.Gateway
 	if gw == nil {
 		gw = r.Gateway(req.TaskID)
@@ -148,10 +192,17 @@ func (r *Runtime) Open(ctx context.Context, req agent.OpenRequest) (agent.Sessio
 	})
 	ready := make(chan struct{})
 	var readyOnce sync.Once
+	var hello struct {
+		ProtocolVersion *int   `json:"protocol_version"`
+		SDKVersion      string `json:"sdk_version"`
+	}
 	s.peer.OnNotify(func(method string, params json.RawMessage) {
 		switch method {
 		case "ready":
-			readyOnce.Do(func() { close(ready) })
+			readyOnce.Do(func() {
+				_ = json.Unmarshal(params, &hello)
+				close(ready)
+			})
 		case "event":
 			if req.OnEvent != nil {
 				var ev agent.Event
@@ -175,6 +226,7 @@ func (r *Runtime) Open(ctx context.Context, req agent.OpenRequest) (agent.Sessio
 	select {
 	case <-ready:
 	case <-s.exited:
+		_ = s.Close()
 		return nil, fmt.Errorf("adapter exited before ready: %w (see %s)", s.waitErr, logf.Name())
 	case <-time.After(timeout):
 		_ = s.Close()
@@ -183,6 +235,11 @@ func (r *Runtime) Open(ctx context.Context, req agent.OpenRequest) (agent.Sessio
 		_ = s.Close()
 		return nil, ctx.Err()
 	}
+	if err := checkProtocol(hello.ProtocolVersion); err != nil {
+		_ = s.Close()
+		return nil, err
+	}
+	r.log().Debug("adapter ready", "sdk_version", hello.SDKVersion, "log", logPath)
 
 	var res struct {
 		ConversationID string `json:"conversation_id"`
@@ -194,6 +251,7 @@ func (r *Runtime) Open(ctx context.Context, req agent.OpenRequest) (agent.Sessio
 		"conversation_id": req.SessionID, "max_iterations": nilIfZero(req.MaxIterations),
 		"max_input_tokens": nilIfZero(req.MaxInputTokens), "max_output_tokens": nilIfZero(req.MaxOutputTokens),
 		"condenser_max_events": nilIfZero(req.CondenserMaxEvents), "condenser_max_tokens": nilIfZero(req.CondenserMaxTokens),
+		"llm_timeout": llmTimeout(req.LLMTimeout),
 	}
 	if err := s.peer.Call(ctx, "session.open", params, &res); err != nil {
 		_ = s.Close()
@@ -201,6 +259,39 @@ func (r *Runtime) Open(ctx context.Context, req agent.OpenRequest) (agent.Sessio
 	}
 	s.id, s.resumed = res.ConversationID, res.Resumed
 	return s, nil
+}
+
+// checkProtocol refuses an adapter that speaks another protocol version.
+func checkProtocol(v *int) error {
+	const fix = "rebuild the sandbox image with `boundedcode sandbox build` (host mode: update the adapter checkout and `uv sync`)"
+	switch {
+	case v == nil:
+		return fmt.Errorf("adapter reported no protocol version, control plane expects v%d; %s", ProtocolVersion, fix)
+	case *v != ProtocolVersion:
+		return fmt.Errorf("adapter protocol v%d, control plane expects v%d; %s", *v, ProtocolVersion, fix)
+	}
+	return nil
+}
+
+// llmTimeoutMargin keeps the adapter's per-call LLM timeout above the
+// gateway's, so the control plane's timeout fires first and the adapter does
+// not retry a request the model server is still working on.
+const llmTimeoutMargin = 30 * time.Second
+
+// llmTimeout is the adapter's per-call timeout in seconds; nil keeps the
+// adapter default.
+func llmTimeout(d time.Duration) any {
+	if d <= 0 {
+		return nil
+	}
+	return int((d + llmTimeoutMargin + time.Second - 1) / time.Second)
+}
+
+func (r *Runtime) log() *slog.Logger {
+	if r.Log == nil {
+		return slog.New(slog.DiscardHandler)
+	}
+	return r.Log
 }
 
 func nilIfZero(n int) any {
@@ -227,16 +318,45 @@ func (s *session) call(ctx context.Context, method string, params, out any) erro
 	return err
 }
 
+// Send runs the agent until it stops or ctx ends. On cancellation or deadline
+// the agent is interrupted between steps so the conversation persists
+// cleanly; if it does not stop within the grace period the adapter is killed.
+// Either way ctx's error is returned.
 func (s *session) Send(ctx context.Context, message string) (agent.Result, error) {
-	var res agent.Result
-	err := s.call(ctx, "session.send", map[string]any{"message": message}, &res)
-	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-		// Stop the agent between steps so the conversation persists cleanly.
-		ictx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer cancel()
-		_ = s.Interrupt(ictx)
+	if err := ctx.Err(); err != nil {
+		return agent.Result{}, err
 	}
-	return res, err
+	var res agent.Result
+	// The call itself outlives ctx so the interrupted run's reply is awaited.
+	callCtx, stop := context.WithCancel(context.WithoutCancel(ctx))
+	defer stop()
+	done := make(chan error, 1)
+	go func() { done <- s.call(callCtx, "session.send", map[string]any{"message": message}, &res) }()
+	select {
+	case err := <-done:
+		return res, err
+	case <-ctx.Done():
+	}
+	ictx, cancel := context.WithTimeout(context.Background(), s.grace)
+	defer cancel()
+	if err := s.Interrupt(ictx); err == nil {
+		select {
+		case <-done:
+			return res, ctx.Err()
+		case <-ictx.Done():
+		}
+	}
+	s.kill()
+	stop()
+	<-done
+	return agent.Result{}, ctx.Err()
+}
+
+// kill terminates the adapter: the sandbox's cancel hook removes the
+// container (or kills the host process group).
+func (s *session) kill() {
+	s.cancel()
+	s.remove()
 }
 
 func (s *session) Condense(ctx context.Context) error {
@@ -262,12 +382,53 @@ func (s *session) Close() error {
 		select {
 		case <-s.exited:
 		case <-time.After(15 * time.Second):
-			s.cancel() // kills the process (or the engine CLI, which stops the container)
+			s.kill()
 			<-s.exited
 		}
 		s.cancel()
 		<-s.peer.Done()
+		s.stderr.Flush()
 		_ = s.logf.Close()
 	})
 	return nil
+}
+
+// redactWriter writes adapter stderr line by line through telemetry.Redact so
+// credentials echoed by tools or libraries do not land in the log.
+type redactWriter struct {
+	mu  sync.Mutex
+	w   io.Writer
+	buf []byte
+}
+
+const maxPartialLine = 64 << 10
+
+func (r *redactWriter) Write(p []byte) (int, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.buf = append(r.buf, p...)
+	for {
+		i := bytes.IndexByte(r.buf, '\n')
+		if i < 0 {
+			break
+		}
+		_, _ = io.WriteString(r.w, telemetry.Redact(string(r.buf[:i+1])))
+		r.buf = r.buf[i+1:]
+	}
+	if len(r.buf) > maxPartialLine {
+		_, _ = io.WriteString(r.w, telemetry.Redact(string(r.buf)))
+		r.buf = nil
+	}
+	r.buf = append([]byte(nil), r.buf...)
+	return len(p), nil
+}
+
+// Flush writes a trailing partial line.
+func (r *redactWriter) Flush() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if len(r.buf) > 0 {
+		_, _ = io.WriteString(r.w, telemetry.Redact(string(r.buf)))
+		r.buf = nil
+	}
 }
