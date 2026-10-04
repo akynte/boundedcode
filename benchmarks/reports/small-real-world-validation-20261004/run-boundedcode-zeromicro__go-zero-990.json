@@ -1,0 +1,62 @@
+{
+  "id": "suite-20261004T212341Z",
+  "model": "qwen3.6-35b-a3b",
+  "started": "2026-10-04T21:23:41.776663644Z",
+  "finished": "2026-10-04T22:54:31.664320721Z",
+  "results": [
+    {
+      "id": "zeromicro__go-zero-990",
+      "category": "difficult",
+      "model": "qwen3.6-35b-a3b",
+      "success": false,
+      "task_status": "active",
+      "self_verified": false,
+      "attempts": 2,
+      "local_tokens": 296999,
+      "generated_tokens": 167761,
+      "cached_prompt_tokens": 2314669,
+      "escalations": 1,
+      "local_only": false,
+      "condensations": 3,
+      "resumes": 0,
+      "wall_seconds": 5449.882751247,
+      "failed_checks": [
+        "go-zero: sh -c go test -v ./tools/goctl/util -run '^(TestIndex|TestReadLink|TestSafeString|TestTitle|TestUntitle)$': # github.com/tal-tech/go-zero/tools/goctl/util [github.com/tal-tech/go-zero/tools/goctl/util.test]\ntools/goctl/util/path_test.go:21:15: undefined: ReadLink\ntools/goctl/util/path_test.go:27:15: undefined: ReadLink\nFAIL\tgithub.com/tal-tech/go-zero/tools/goctl/util [build failed]\nFAIL\n"
+      ],
+      "task_id": "t20261004-5b2071",
+      "state_dir": "$HOME/.cache/boundedcode/bench-work/zeromicro__go-zero-990-1791149021776694231/state",
+      "intel": {
+        "context_packs": 2,
+        "pack_tokens": 4077,
+        "code_tokens": 0,
+        "serena_calls": 0,
+        "serena_errors": 0,
+        "serena_ms": 0,
+        "graph_calls": 0,
+        "graph_ms": 0,
+        "serena_symbols": 0,
+        "graph_symbols": 0,
+        "fallbacks": 0,
+        "agent_tool_calls": 72,
+        "agent_tools": {
+          "file_editor": 32,
+          "task_tracker": 1,
+          "terminal": 32,
+          "think": 7
+        }
+      }
+    }
+  ],
+  "summary": {
+    "tasks": 1,
+    "verified": 0,
+    "success_rate": 0,
+    "local_only_completion_rate": 0,
+    "frontier_escalation_rate": 1,
+    "verified_tasks_per_hour": 0,
+    "attempts_per_successful_task": 0,
+    "wall_seconds_per_task": 5449.882751247,
+    "local_tokens_per_task": 296999,
+    "self_verified_but_hidden_failed": 0
+  }
+}

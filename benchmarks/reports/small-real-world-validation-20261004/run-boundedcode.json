@@ -1,0 +1,231 @@
+{
+  "id": "suite-20261004T134210Z",
+  "model": "qwen3.6-35b-a3b",
+  "started": "2026-10-04T13:42:10.81912675Z",
+  "finished": "0001-01-01T00:00:00Z",
+  "results": [
+    {
+      "id": "axios__axios-6539",
+      "category": "javascript",
+      "model": "qwen3.6-35b-a3b",
+      "success": false,
+      "task_status": "completed",
+      "self_verified": true,
+      "attempts": 1,
+      "local_tokens": 71456,
+      "generated_tokens": 8235,
+      "cached_prompt_tokens": 1181766,
+      "escalations": 0,
+      "local_only": false,
+      "condensations": 0,
+      "resumes": 0,
+      "wall_seconds": 589.72912964,
+      "failed_checks": [
+        "axios: sh -c npx mocha -R tap test/unit/regression/SNYK-JS-AXIOS-7361793.js: …S-7361793.js:39:42)\n      at process.processImmediate (node:internal/timers:574:21)\n      at Axios.request (file://$HOME/.cache/boundedcode/bench-work/axios__axios-6539-1791121330819151169/state/data/tasks/t20261004-818cbd/work/axios/lib/core/Axios.js:45:41)\n      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n      at async Context.\u003canonymous\u003e (file://$HOME/.cache/boundedcode/bench-work/axios__axios-6539-1791121330819151169/state/data/tasks/t20261004-818cbd/work/axios/test/unit/regression/SNYK-JS-AXIOS-7361793.js:39:26)\n# tests 1\n# pass 0\n# fail 1\n1..1\n"
+      ],
+      "task_id": "t20261004-818cbd",
+      "state_dir": "$HOME/.cache/boundedcode/bench-work/axios__axios-6539-1791121330819151169/state",
+      "intel": {
+        "context_packs": 1,
+        "pack_tokens": 8661,
+        "code_tokens": 7197,
+        "serena_calls": 11,
+        "serena_errors": 1,
+        "serena_ms": 6268.466000000001,
+        "graph_calls": 4,
+        "graph_ms": 33.208,
+        "serena_symbols": 3,
+        "graph_symbols": 0,
+        "fallbacks": 0,
+        "agent_tool_calls": 29,
+        "agent_tools": {
+          "file_editor": 12,
+          "finish": 1,
+          "terminal": 13,
+          "think": 3
+        }
+      }
+    },
+    {
+      "id": "caddyserver__caddy-6288",
+      "category": "devops-infra",
+      "model": "qwen3.6-35b-a3b",
+      "success": false,
+      "task_status": "completed",
+      "self_verified": true,
+      "attempts": 1,
+      "local_tokens": 148433,
+      "generated_tokens": 43298,
+      "cached_prompt_tokens": 1859490,
+      "escalations": 0,
+      "local_only": false,
+      "condensations": 1,
+      "resumes": 0,
+      "wall_seconds": 1796.769005392,
+      "failed_checks": [
+        "caddy: sh -c go test -v ./caddytest/integration -run \"TestCaddyfileAdapt*\": …: Caddyfile input is not formatted; run 'caddy fmt --overwrite' to fix inconsistencies\n{\"level\":\"warn\",\"ts\":1791123716.8933873,\"msg\":\"The 'trusted_ca_cert_file' field is deprecated. Use the 'trust_pool' field instead.\"}\n{\"level\":\"warn\",\"ts\":1791123716.8937085,\"msg\":\"The 'trusted_ca_cert_file' field is deprecated. Use the 'trust_pool' field instead.\"}\n{\"level\":\"warn\",\"ts\":1791123716.8942108,\"msg\":\"The 'trusted_ca_cert' field is deprecated. Use the 'trust_pool' field instead.\"}\n--- FAIL: TestCaddyfileAdaptToJSON (0.03s)\nFAIL\nFAIL\tgithub.com/caddyserver/caddy/v2/caddytest/integration\t0.049s\nFAIL\n"
+      ],
+      "task_id": "t20261004-325967",
+      "state_dir": "$HOME/.cache/boundedcode/bench-work/caddyserver__caddy-6288-1791121920553876796/state",
+      "intel": {
+        "context_packs": 1,
+        "pack_tokens": 1735,
+        "code_tokens": 1195,
+        "serena_calls": 1,
+        "serena_errors": 0,
+        "serena_ms": 5679.873,
+        "graph_calls": 1,
+        "graph_ms": 5.126,
+        "serena_symbols": 0,
+        "graph_symbols": 0,
+        "fallbacks": 0,
+        "agent_tool_calls": 51,
+        "agent_tools": {
+          "file_editor": 18,
+          "finish": 1,
+          "task_tracker": 5,
+          "terminal": 24,
+          "think": 3
+        }
+      }
+    },
+    {
+      "id": "gin-gonic__gin-3227",
+      "category": "go",
+      "model": "qwen3.6-35b-a3b",
+      "success": false,
+      "task_status": "completed",
+      "self_verified": true,
+      "attempts": 3,
+      "local_tokens": 371242,
+      "generated_tokens": 135483,
+      "cached_prompt_tokens": 4220010,
+      "escalations": 1,
+      "local_only": false,
+      "condensations": 6,
+      "resumes": 0,
+      "wall_seconds": 4953.49501477,
+      "failed_checks": [
+        "gin: sh -c go test -v . -run \"^TestRedirect\": === RUN   TestRedirectTrailingSlash\n    tree_test.go:703: want true, is false\n--- FAIL: TestRedirectTrailingSlash (0.00s)\nFAIL\nFAIL\tgithub.com/gin-gonic/gin\t0.004s\nFAIL\n"
+      ],
+      "task_id": "t20261004-0fc1e3",
+      "state_dir": "$HOME/.cache/boundedcode/bench-work/gin-gonic__gin-3227-1791123717327315439/state",
+      "intel": {
+        "context_packs": 3,
+        "pack_tokens": 16767,
+        "code_tokens": 10968,
+        "serena_calls": 27,
+        "serena_errors": 0,
+        "serena_ms": 16631.725,
+        "graph_calls": 9,
+        "graph_ms": 74.21799999999999,
+        "serena_symbols": 9,
+        "graph_symbols": 0,
+        "fallbacks": 0,
+        "agent_tool_calls": 146,
+        "agent_tools": {
+          "file_editor": 27,
+          "finish": 1,
+          "terminal": 107,
+          "think": 11
+        }
+      }
+    },
+    {
+      "id": "grpc__grpc-go-2744",
+      "category": "go",
+      "model": "qwen3.6-35b-a3b",
+      "success": false,
+      "task_status": "active",
+      "self_verified": false,
+      "attempts": 3,
+      "local_tokens": 332252,
+      "generated_tokens": 166075,
+      "cached_prompt_tokens": 3311768,
+      "escalations": 0,
+      "local_only": false,
+      "condensations": 6,
+      "resumes": 0,
+      "wall_seconds": 5449.299259471,
+      "failed_checks": [
+        "grpc-go: sh -c go test -v ./credentials -run '^(TestAppendH2ToNextProtos|TestClientHandshakeReturnsAuthInfo|TestServerAndClientHandshake|TestServerHandshakeReturnsAuthInfo|TestTLSClone|TestTLSOverrideServerName)$': # google.golang.org/grpc/credentials [google.golang.org/grpc/credentials.test]\ncredentials/credentials_test.go:238:14: undefined: appendH2ToNextProtos\nFAIL\tgoogle.golang.org/grpc/credentials [build failed]\nFAIL\n"
+      ],
+      "task_id": "t20261004-dd4824",
+      "state_dir": "$HOME/.cache/boundedcode/bench-work/grpc__grpc-go-2744-1791128670827646277/state",
+      "intel": {
+        "context_packs": 3,
+        "pack_tokens": 3529,
+        "code_tokens": 504,
+        "serena_calls": 15,
+        "serena_errors": 0,
+        "serena_ms": 10491.452000000001,
+        "graph_calls": 15,
+        "graph_ms": 136.138,
+        "serena_symbols": 0,
+        "graph_symbols": 0,
+        "fallbacks": 0,
+        "agent_tool_calls": 142,
+        "agent_tools": {
+          "file_editor": 8,
+          "terminal": 128,
+          "think": 6
+        }
+      }
+    },
+    {
+      "id": "prometheus__prometheus-13845",
+      "category": "large-repo",
+      "model": "qwen3.6-35b-a3b",
+      "success": false,
+      "task_status": "completed",
+      "self_verified": true,
+      "attempts": 2,
+      "local_tokens": 215296,
+      "generated_tokens": 39549,
+      "cached_prompt_tokens": 3400239,
+      "escalations": 0,
+      "local_only": false,
+      "condensations": 4,
+      "resumes": 1,
+      "wall_seconds": 2067.589340942,
+      "failed_checks": [
+        "prometheus: sh -c go test -v ./promql ./model/labels -run \"^(TestRangeQuery|TestLabels)\": …de5031/work/prometheus/model/labels/labels_test.go:464\n        \tError:      \tShould be true\n        \tTest:       \tTestLabels_DropMetricName\n--- FAIL: TestLabels_DropMetricName (0.00s)\n=== RUN   TestLabels_Copy\n--- PASS: TestLabels_Copy (0.00s)\n=== RUN   TestLabels_Map\n--- PASS: TestLabels_Map (0.00s)\n=== RUN   TestLabels_BytesWithLabels\n--- PASS: TestLabels_BytesWithLabels (0.00s)\n=== RUN   TestLabels_BytesWithoutLabels\n--- PASS: TestLabels_BytesWithoutLabels (0.00s)\n=== RUN   TestLabels_Hash\n--- PASS: TestLabels_Hash (0.00s)\nFAIL\nFAIL\tgithub.com/prometheus/prometheus/model/labels\t0.003s\nFAIL\n"
+      ],
+      "task_id": "t20261004-de5031",
+      "interrupted": true,
+      "state_dir": "$HOME/.cache/boundedcode/bench-work/prometheus__prometheus-13845-1791134120132368197/state",
+      "intel": {
+        "context_packs": 2,
+        "pack_tokens": 8663,
+        "code_tokens": 6214,
+        "serena_calls": 38,
+        "serena_errors": 4,
+        "serena_ms": 37966.038,
+        "graph_calls": 2,
+        "graph_ms": 21.054000000000002,
+        "serena_symbols": 10,
+        "graph_symbols": 0,
+        "fallbacks": 0,
+        "agent_tool_calls": 109,
+        "agent_tools": {
+          "file_editor": 27,
+          "finish": 1,
+          "terminal": 75,
+          "think": 6
+        }
+      }
+    }
+  ],
+  "summary": {
+    "tasks": 5,
+    "verified": 0,
+    "success_rate": 0,
+    "local_only_completion_rate": 0,
+    "frontier_escalation_rate": 0.2,
+    "verified_tasks_per_hour": 0,
+    "attempts_per_successful_task": 0,
+    "wall_seconds_per_task": 2971.376350043,
+    "local_tokens_per_task": 227735.8,
+    "self_verified_but_hidden_failed": 4
+  }
+}

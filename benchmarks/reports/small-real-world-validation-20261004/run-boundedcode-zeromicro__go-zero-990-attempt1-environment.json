@@ -1,0 +1,57 @@
+{
+  "id": "suite-20261004T212250Z",
+  "model": "qwen3.6-35b-a3b",
+  "started": "2026-10-04T21:22:50.193228581Z",
+  "finished": "2026-10-04T21:23:03.392900751Z",
+  "results": [
+    {
+      "id": "zeromicro__go-zero-990",
+      "category": "difficult",
+      "model": "qwen3.6-35b-a3b",
+      "success": false,
+      "task_status": "active",
+      "self_verified": false,
+      "attempts": 0,
+      "local_tokens": 0,
+      "generated_tokens": 0,
+      "cached_prompt_tokens": 0,
+      "escalations": 0,
+      "local_only": false,
+      "condensations": 0,
+      "resumes": 0,
+      "wall_seconds": 13.19483622,
+      "failed_checks": [
+        "go-zero: sh -c go test -v ./tools/goctl/util -run '^(TestIndex|TestReadLink|TestSafeString|TestTitle|TestUntitle)$': docker: Error response from daemon: invalid mount config for type \"bind\": bind source path does not exist: /host_mnt$HOME/.cache/boundedcode/bench-work/zeromicro__go-zero-990-1791148970193246362/state/data/tasks/t20261004-c0432a/work/go-zero\n\nRun 'docker run --help' for more information\n"
+      ],
+      "error": "open agent session: adapter exited before ready: exit status 125 (see $HOME/.cache/boundedcode/bench-work/zeromicro__go-zero-990-1791148970193246362/state/data/tasks/t20261004-c0432a/adapter.log)",
+      "task_id": "t20261004-c0432a",
+      "state_dir": "$HOME/.cache/boundedcode/bench-work/zeromicro__go-zero-990-1791148970193246362/state",
+      "intel": {
+        "context_packs": 0,
+        "pack_tokens": 0,
+        "code_tokens": 0,
+        "serena_calls": 0,
+        "serena_errors": 0,
+        "serena_ms": 0,
+        "graph_calls": 0,
+        "graph_ms": 0,
+        "serena_symbols": 0,
+        "graph_symbols": 0,
+        "fallbacks": 0,
+        "agent_tool_calls": 0
+      }
+    }
+  ],
+  "summary": {
+    "tasks": 1,
+    "verified": 0,
+    "success_rate": 0,
+    "local_only_completion_rate": 0,
+    "frontier_escalation_rate": 0,
+    "verified_tasks_per_hour": 0,
+    "attempts_per_successful_task": 0,
+    "wall_seconds_per_task": 13.19483622,
+    "local_tokens_per_task": 0,
+    "self_verified_but_hidden_failed": 0
+  }
+}

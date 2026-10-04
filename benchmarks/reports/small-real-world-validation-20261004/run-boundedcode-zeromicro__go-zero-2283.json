@@ -1,0 +1,63 @@
+{
+  "id": "suite-20261004T195333Z",
+  "model": "qwen3.6-35b-a3b",
+  "started": "2026-10-04T19:53:33.374155009Z",
+  "finished": "2026-10-04T21:21:08.320704497Z",
+  "results": [
+    {
+      "id": "zeromicro__go-zero-2283",
+      "category": "go",
+      "model": "qwen3.6-35b-a3b",
+      "success": false,
+      "task_status": "blocked",
+      "self_verified": false,
+      "attempts": 6,
+      "local_tokens": 587340,
+      "generated_tokens": 114929,
+      "cached_prompt_tokens": 7177769,
+      "escalations": 2,
+      "local_only": false,
+      "condensations": 8,
+      "resumes": 0,
+      "wall_seconds": 5254.941027085,
+      "failed_checks": [
+        "go-zero: sh -c go test -v ./rest -run '^(TestEngine_checkedMaxBytes|TestEngine_checkedTimeout|TestEngine_notFoundHandler|TestEngine_notFoundHandlerNotNil|TestEngine_notFoundHandlerNotNilWriteHeader|TestEngine_withTimeout|TestHandleError|TestMultiMiddlewares|TestNewEngine|TestNewServer|TestServer_PrintRoutes|TestServer_Routes|TestServer_WithChain|TestServer_WithCors|TestValidateSecret|TestWithCors|TestWithCustomCors|TestWithMaxBytes|TestWithMiddleware|TestWithPrefix|TestWithPriority|TestWithTLSConfig)$': # github.com/zeromicro/go-zero/rest [github.com/zeromicro/go-zero/rest.test]\nrest/server_test.go:531:9: undefined: corsRouter\nFAIL\tgithub.com/zeromicro/go-zero/rest [build failed]\nFAIL\n"
+      ],
+      "task_id": "t20261004-7bb246",
+      "state_dir": "$HOME/.cache/boundedcode/bench-work/zeromicro__go-zero-2283-1791143613374184348/state",
+      "intel": {
+        "context_packs": 6,
+        "pack_tokens": 38552,
+        "code_tokens": 12819,
+        "serena_calls": 108,
+        "serena_errors": 30,
+        "serena_ms": 61487.77,
+        "graph_calls": 0,
+        "graph_ms": 0,
+        "serena_symbols": 36,
+        "graph_symbols": 0,
+        "fallbacks": 0,
+        "agent_tool_calls": 186,
+        "agent_tools": {
+          "file_editor": 81,
+          "finish": 5,
+          "task_tracker": 7,
+          "terminal": 80,
+          "think": 13
+        }
+      }
+    }
+  ],
+  "summary": {
+    "tasks": 1,
+    "verified": 0,
+    "success_rate": 0,
+    "local_only_completion_rate": 0,
+    "frontier_escalation_rate": 1,
+    "verified_tasks_per_hour": 0,
+    "attempts_per_successful_task": 0,
+    "wall_seconds_per_task": 5254.941027085,
+    "local_tokens_per_task": 587340,
+    "self_verified_but_hidden_failed": 0
+  }
+}
