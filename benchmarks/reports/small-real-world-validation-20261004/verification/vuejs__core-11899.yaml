@@ -1,0 +1,23 @@
+# Repository verification config for the POST-FIX rerun of this benchmark task,
+# committed into the task's base commit (ENVIRONMENT_ONLY setup). With
+# dependencies available (commit bcc17e1), the default JavaScript preset runs
+# the repository's scripts; `npm test` (vitest) includes the end-to-end suite,
+# which launches a browser (puppeteer) and fails at base in the sandbox. The
+# repository's own unit-test script is used instead. tsc, lint and build are
+# the preset's and pass at base. The frozen run never reached verification.
+version: 1
+stages:
+  - name: tsc
+    run: ["sh", "-c", "node_modules/.bin/tsc --noEmit"]
+    requires: [tsconfig.json]
+  - name: npm-lint
+    run: ["sh", "-c", "npm run --silent lint"]
+    requires: [package.json]
+  - name: vitest-unit
+    run: ["sh", "-c", "node_modules/.bin/vitest run -c vitest.unit.config.ts"]
+    requires: [package.json]
+    timeout: 20m
+  - name: npm-build
+    run: ["sh", "-c", "npm run --silent build"]
+    scope: full
+    requires: [package.json]

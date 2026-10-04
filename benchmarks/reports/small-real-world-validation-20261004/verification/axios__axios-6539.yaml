@@ -1,0 +1,27 @@
+# Repository verification config for the POST-FIX rerun of this benchmark task,
+# committed into the task's base commit (ENVIRONMENT_ONLY setup). With
+# dependencies available (commit bcc17e1), the default JavaScript preset runs
+# the repository's own scripts; these checks fail on the untouched base in the
+# offline sandbox and are left out (measured before the rerun):
+#   tsc: axios type-checks with dtslint, not plain `tsc --noEmit` (fails at base)
+#   npm test: also runs karma (needs a browser), dtslint (needs the network) and
+#             test:exports (fails at base); 4 mocha unit tests need the network:
+#             fetch-failed, HTTPS, DNS errors and issue 4999 (postman-echo.com);
+#             2 more (HTTPS proxies) read test/unit/adapters/{key,cert}.pem, which
+#             BoundedCode's secret masking hides in the sandbox
+# The frozen run had no config: every JavaScript stage was skipped.
+version: 1
+stages:
+  - name: eslint
+    run: ["sh", "-c", "npm run --silent test:eslint"]
+    requires: [package.json]
+  - name: mocha
+    # Direct mocha call: bin/ssl_hotfix.js re-runs its arguments through an
+    # unquoting shell; this sets the option it would add.
+    run: ["sh", "-c", "NODE_OPTIONS=--openssl-legacy-provider node_modules/.bin/mocha 'test/unit/**/*.js' --timeout 30000 --exit --invert --grep 'should handle fetch failed error as an AxiosError with ERR_NETWORK code|should support HTTPS protocol|should support HTTPS proxies|should support HTTPS proxy set via env var|DNS should handle errors|should not fail with query parsing'"]
+    requires: [package.json]
+    timeout: 20m
+  - name: build
+    run: ["sh", "-c", "npm run --silent build"]
+    scope: full
+    requires: [package.json]

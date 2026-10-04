@@ -6,6 +6,11 @@
 #   go vet: printf and stringintconv findings at base (2019 code, newer vet)
 #   go test: those vet findings make 9 test packages fail to build -> -vet=off in tests (vet runs as its own stage);
 #            google.golang.org/grpc/test (end-to-end) exceeds the 10-minute test timeout at base -> excluded
+#   (post-fix rerun) once credentials/ is no longer masked (commit e86a7aa), the
+#            grpc root suite (Test) and 3 credentials handshake tests fail at base:
+#            they read testdata/{ca.pem,server1.key,server1.pem}, which BoundedCode's
+#            secret masking hides in the sandbox. The hidden acceptance check runs
+#            unmasked and still runs them.
 version: 1
 stages:
   - name: gofmt
@@ -18,7 +23,7 @@ stages:
     run: [go, vet, -printf=false, -stringintconv=false, "{packages}"]
     requires: [go.mod]
   - name: go-test
-    run: ["sh", "-c", "pk=$(go list \"$@\" | grep -v -x google.golang.org/grpc/test); [ -z \"$pk\" ] && exit 0; go test -count=1 -vet=off $pk", "sh", "{packages}"]
+    run: ["sh", "-c", "pk=$(go list \"$@\" | grep -v -x google.golang.org/grpc/test); [ -z \"$pk\" ] && exit 0; go test -count=1 -vet=off -skip '^(Test|TestClientHandshakeReturnsAuthInfo|TestServerHandshakeReturnsAuthInfo|TestServerAndClientHandshake)$' $pk", "sh", "{packages}"]
     requires: [go.mod]
     timeout: 20m
   - name: golangci-lint
