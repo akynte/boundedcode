@@ -1,6 +1,8 @@
 // Package config defines the typed, validated configuration. Configuration is
 // layered: built-in defaults < user config (~/.config/boundedcode/config.yaml)
-// < workspace overrides. Unknown keys are rejected so typos fail loudly.
+// < workspace overrides (<config dir>/workspaces/<workspace>.yaml, limited to
+// task policy: budgets, escalation and a few switches; see WorkspaceOverride).
+// Unknown keys are rejected so typos fail loudly.
 package config
 
 import (
@@ -10,6 +12,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"go.yaml.in/yaml/v3"
@@ -44,6 +47,10 @@ type InferenceConfig struct {
 	StartupTimeout Duration `yaml:"startup_timeout"`
 	// RequestTimeout bounds a single completion; it doubles as stall detection.
 	RequestTimeout Duration `yaml:"request_timeout"`
+	// IdleSleep makes a managed llama-server unload the model after this much
+	// inactivity (llama-server --sleep-idle-seconds) and reload it on the
+	// next request, so an idle server does not hold RAM/VRAM. 0 disables.
+	IdleSleep Duration `yaml:"idle_sleep"`
 }
 
 // AgentConfig configures the agent runtime adapter.
@@ -60,7 +67,9 @@ type AgentConfig struct {
 
 // RepoIntelConfig configures repository intelligence.
 type RepoIntelConfig struct {
-	Provider string `yaml:"provider"` // "codebase-memory-mcp"
+	// Provider must be "codebase-memory-mcp", the only implementation; the
+	// key is kept so existing config files still load.
+	Provider string `yaml:"provider"`
 	Binary   string `yaml:"binary"`
 	// CrossService enables the built-in cross-service contract analyzers
 	// (internal/xservice) in indexing, context packs and escalation policy.
@@ -148,6 +157,7 @@ func Defaults() Config {
 			Mode: "managed", ServerBinary: "llama-server", BenchBinary: "llama-bench",
 			Host: "127.0.0.1", Port: 8765,
 			StartupTimeout: Duration(5 * time.Minute), RequestTimeout: Duration(10 * time.Minute),
+			IdleSleep: Duration(30 * time.Minute),
 		},
 		Agent: AgentConfig{
 			Runtime: "openhands", Image: "boundedcode-openhands:local",
@@ -234,13 +244,29 @@ func (c Config) Validate() error {
 	default:
 		errs = append(errs, fmt.Errorf("inference.mode: %q is not managed|external", c.Inference.Mode))
 	}
-	if c.Agent.Runtime != "openhands" && c.Agent.Runtime != "scripted" {
-		errs = append(errs, fmt.Errorf("agent.runtime: unknown %q", c.Agent.Runtime))
+	if c.Inference.IdleSleep < 0 {
+		errs = append(errs, errors.New("inference.idle_sleep: must be >= 0 (0 disables)"))
+	}
+	// The scripted runtime exists for Go tests, which wire it directly; a
+	// config file can only select a runtime the CLI can run.
+	if c.Agent.Runtime != "openhands" {
+		errs = append(errs, fmt.Errorf("agent.runtime: %q is not supported (openhands)", c.Agent.Runtime))
+	}
+	if c.Agent.MaxIterations < 1 {
+		errs = append(errs, errors.New("agent.max_iterations: must be >= 1"))
+	}
+	if c.RepoIntel.Provider != "codebase-memory-mcp" {
+		errs = append(errs, fmt.Errorf("repointel.provider: %q is not supported (codebase-memory-mcp)", c.RepoIntel.Provider))
 	}
 	switch c.Sandbox.Kind {
 	case "docker", "none":
 	default:
 		errs = append(errs, fmt.Errorf("sandbox.kind: %q is not docker|none", c.Sandbox.Kind))
+	}
+	switch c.Sandbox.Engine {
+	case "docker", "podman":
+	default:
+		errs = append(errs, fmt.Errorf("sandbox.engine: %q is not docker|podman", c.Sandbox.Engine))
 	}
 	switch c.Sandbox.Network {
 	case "none", "bridge":
@@ -251,6 +277,9 @@ func (c Config) Validate() error {
 	case "codex", "manual":
 	default:
 		errs = append(errs, fmt.Errorf("frontier.provider: %q is not codex|manual", c.Frontier.Provider))
+	}
+	if c.Frontier.MaxPacketTokens < 1 {
+		errs = append(errs, errors.New("frontier.max_packet_tokens: must be >= 1"))
 	}
 	if sc := c.RepoIntel.Serena; true {
 		if sc.Version != SerenaVersion {
@@ -265,9 +294,22 @@ func (c Config) Validate() error {
 		if sc.MaxInstances < 1 {
 			errs = append(errs, errors.New("repointel.serena.max_instances: must be >= 1"))
 		}
+		if sc.Enabled {
+			for _, t := range []struct {
+				name string
+				d    Duration
+			}{{"idle_timeout", sc.IdleTimeout}, {"startup_timeout", sc.StartupTimeout}, {"call_timeout", sc.CallTimeout}} {
+				if t.d <= 0 {
+					errs = append(errs, fmt.Errorf("repointel.serena.%s: must be > 0 when serena is enabled", t.name))
+				}
+			}
+		}
 	}
 	if c.Budgets.MaxAttempts < 1 {
 		errs = append(errs, errors.New("budgets.max_attempts: must be >= 1"))
+	}
+	if c.Budgets.MaxWallClock < 0 || c.Budgets.MaxLocalTokens < 0 || c.Budgets.MaxEscalations < 0 {
+		errs = append(errs, errors.New("budgets: max_wall_clock, max_local_tokens and max_escalations must be >= 0"))
 	}
 	if c.Budgets.ContextPackTokens < 2000 {
 		errs = append(errs, errors.New("budgets.context_pack_tokens: must be >= 2000"))
@@ -276,6 +318,73 @@ func (c Config) Validate() error {
 		errs = append(errs, errors.New("escalation thresholds must be >= 1"))
 	}
 	return errors.Join(errs...)
+}
+
+// WorkspaceOverride is the part of the configuration a workspace may
+// override, in <config dir>/workspaces/<workspace>.yaml. It covers task
+// policy only; machine settings (inference, sandbox, binaries) stay global,
+// and verification commands live in each repository's
+// .boundedcode/verification.yaml. Keys left out keep the user config value;
+// a list (escalation keywords) replaces the user list.
+type WorkspaceOverride struct {
+	Budgets    Budgets          `yaml:"budgets"`
+	Escalation EscalationConfig `yaml:"escalation"`
+	RepoIntel  struct {
+		CrossService bool `yaml:"cross_service"`
+		Serena       struct {
+			Enabled bool `yaml:"enabled"`
+		} `yaml:"serena"`
+	} `yaml:"repointel"`
+	Frontier struct {
+		Enabled bool `yaml:"enabled"`
+	} `yaml:"frontier"`
+}
+
+// WorkspaceFile is the override file of a workspace.
+func WorkspaceFile(configDir, workspace string) string {
+	return filepath.Join(configDir, "workspaces", workspace+".yaml")
+}
+
+// LoadForWorkspace loads the user config and applies the workspace's
+// override file, if any.
+func LoadForWorkspace(paths Paths, workspace string) (Config, error) {
+	cfg, err := Load(filepath.Join(paths.Config, "config.yaml"))
+	if err != nil {
+		return cfg, err
+	}
+	return cfg.WithWorkspace(paths.Config, workspace)
+}
+
+// WithWorkspace returns c with the workspace's override file applied and
+// validated. A missing file returns c unchanged.
+func (c Config) WithWorkspace(configDir, workspace string) (Config, error) {
+	if workspace == "" || workspace != filepath.Base(workspace) || strings.HasPrefix(workspace, ".") {
+		return c, fmt.Errorf("invalid workspace name %q", workspace)
+	}
+	path := WorkspaceFile(configDir, workspace)
+	b, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return c, nil
+	}
+	if err != nil {
+		return c, fmt.Errorf("read workspace config: %w", err)
+	}
+	o := WorkspaceOverride{Budgets: c.Budgets, Escalation: c.Escalation}
+	o.RepoIntel.CrossService = c.RepoIntel.CrossService
+	o.RepoIntel.Serena.Enabled = c.RepoIntel.Serena.Enabled
+	o.Frontier.Enabled = c.Frontier.Enabled
+	if err := decodeStrict(b, &o); err != nil {
+		return c, fmt.Errorf("parse %s (a workspace may override budgets, escalation, repointel.cross_service, repointel.serena.enabled and frontier.enabled): %w", path, err)
+	}
+	out := c
+	out.Budgets, out.Escalation = o.Budgets, o.Escalation
+	out.RepoIntel.CrossService = o.RepoIntel.CrossService
+	out.RepoIntel.Serena.Enabled = o.RepoIntel.Serena.Enabled
+	out.Frontier.Enabled = o.Frontier.Enabled
+	if err := out.Validate(); err != nil {
+		return c, fmt.Errorf("%s: %w", path, err)
+	}
+	return out, nil
 }
 
 func decodeStrict(b []byte, v any) error {

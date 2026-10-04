@@ -21,8 +21,6 @@ type Intelligence interface {
 	Impact(ctx context.Context, project, baseBranch string, depth int) (string, error)
 	// Architecture returns an overview of the project.
 	Architecture(ctx context.Context, project string) (string, error)
-	// SearchCode is graph-ranked text search.
-	SearchCode(ctx context.Context, project, pattern string, limit int) (string, error)
 }
 
 // IndexResult summarizes an indexing run.

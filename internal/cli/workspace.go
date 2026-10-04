@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -112,6 +113,49 @@ func newWorkspaceCmd(app *App) *cobra.Command {
 	add.Flags().StringVarP(&wsFlag, "workspace", "w", "", "workspace")
 	add.Flags().StringVar(&repoName, "name", "", "repository name (default: directory name)")
 	cmd.AddCommand(add)
+	// repoCmd builds remove/disable/enable, which act on one repository.
+	repoCmd := func(use, short string, f func(ctx context.Context, ws workspace.Store, r workspace.Repository) (string, error)) *cobra.Command {
+		var wsFlag string
+		c := &cobra.Command{
+			Use: use + " REPO", Short: short, Args: cobra.ExactArgs(1),
+			RunE: func(cmd *cobra.Command, args []string) error {
+				ctx := cmd.Context()
+				w, err := app.resolveWorkspace(ctx, wsFlag)
+				if err != nil {
+					return err
+				}
+				ws, _ := app.workspaces(ctx)
+				r, err := ws.Repo(ctx, w.ID, args[0])
+				if err != nil {
+					return err
+				}
+				done, err := f(ctx, ws, r)
+				if err != nil {
+					return fmt.Errorf("%s %s: %w", use, r.Name, err)
+				}
+				rec, _ := app.Recorder(ctx)
+				rec.Emit(ctx, "", "workspace.repo_"+done, map[string]any{"workspace": w.Name, "repo": r.Name, "id": r.ID})
+				app.printf("%s %s (%s)\n", done, r.Name, r.ID)
+				return nil
+			},
+		}
+		c.Flags().StringVarP(&wsFlag, "workspace", "w", "", "workspace")
+		return c
+	}
+	cmd.AddCommand(
+		repoCmd("remove", "Remove a repository from the workspace (refused once tasks used it; disable it instead)",
+			func(ctx context.Context, ws workspace.Store, r workspace.Repository) (string, error) {
+				return "removed", ws.RemoveRepo(ctx, r.ID)
+			}),
+		repoCmd("disable", "Exclude a repository from new tasks, indexing and queries (keeps its id, index and history)",
+			func(ctx context.Context, ws workspace.Store, r workspace.Repository) (string, error) {
+				return "disabled", ws.SetEnabled(ctx, r.ID, false)
+			}),
+		repoCmd("enable", "Re-enable a disabled repository",
+			func(ctx context.Context, ws workspace.Store, r workspace.Repository) (string, error) {
+				return "enabled", ws.SetEnabled(ctx, r.ID, true)
+			}),
+	)
 	show := &cobra.Command{
 		Use: "show", Short: "Show workspaces and repositories",
 		RunE: func(cmd *cobra.Command, _ []string) error {
@@ -129,7 +173,7 @@ func newWorkspaceCmd(app *App) *cobra.Command {
 			}
 			var out []view
 			for _, w := range all {
-				repos, err := ws.Repos(cmd.Context(), w.ID)
+				repos, err := ws.AllRepos(cmd.Context(), w.ID)
 				if err != nil {
 					return err
 				}
@@ -149,6 +193,9 @@ func newWorkspaceCmd(app *App) *cobra.Command {
 					idx := "not indexed"
 					if r.IndexedAt != "" {
 						idx = "indexed " + r.IndexedAt[:19]
+					}
+					if !r.Enabled {
+						idx += " (disabled)"
 					}
 					app.printf("    %-24s %-50s %v %s\n", r.Name, r.Path, r.Languages, idx)
 				}
@@ -175,6 +222,11 @@ func newIndexCmd(app *App) *cobra.Command {
 			repos, err := ws.Repos(ctx, w.ID)
 			if err != nil {
 				return err
+			}
+			for _, a := range args {
+				if !slices.ContainsFunc(repos, func(r workspace.Repository) bool { return r.Name == a }) {
+					return fmt.Errorf("repository %q is not an enabled repository of %s (see `workspace show`)", a, w.Name)
+				}
 			}
 			rec, _ := app.Recorder(ctx)
 			st, _ := app.Store(ctx)

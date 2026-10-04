@@ -9,6 +9,8 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/akynte/boundedcode/internal/jsonrpc"
 )
@@ -21,6 +23,7 @@ type session struct {
 	peer  *jsonrpc.Peer
 	stdin io.WriteCloser
 	done  chan struct{}
+	once  sync.Once
 }
 
 // privateSettings are applied to our isolated cache dir: no web UI listener
@@ -34,9 +37,6 @@ func (c *Client) env() ([]string, error) {
 			return nil, err
 		}
 		env = append(env, "CBM_CACHE_DIR="+c.CacheDir)
-	}
-	if c.AllowedRoot != "" {
-		env = append(env, "CBM_ALLOWED_ROOT="+c.AllowedRoot)
 	}
 	return env, nil
 }
@@ -80,6 +80,7 @@ func (c *Client) Open(ctx context.Context) error {
 	}
 	cmd := exec.Command(c.Binary) //nolint:noctx // lives until Close
 	cmd.Env, cmd.Dir = env, os.TempDir()
+	cmd.SysProcAttr = procAttr()
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return err
@@ -96,7 +97,9 @@ func (c *Client) Open(ctx context.Context) error {
 	go func() { _ = cmd.Wait(); close(s.done) }()
 	init := map[string]any{"protocolVersion": "2025-06-18", "capabilities": map[string]any{},
 		"clientInfo": map[string]any{"name": "boundedcode", "version": "0"}}
-	if err := s.peer.Call(ctx, "initialize", init, nil); err != nil {
+	ictx, cancel := context.WithTimeout(ctx, startTimeout)
+	defer cancel()
+	if err := s.peer.Call(ictx, "initialize", init, nil); err != nil {
 		s.close()
 		return fmt.Errorf("mcp initialize: %w", err)
 	}
@@ -119,10 +122,52 @@ func (c *Client) Close() error {
 	return nil
 }
 
+// drop discards s if it is still the client's session.
+func (c *Client) drop(s *session) {
+	c.mu.Lock()
+	if c.sess == s {
+		c.sess = nil
+	}
+	c.mu.Unlock()
+	s.close()
+}
+
+// startTimeout bounds the MCP handshake; closeGrace is how long close waits
+// for the server to exit on stdin EOF before killing its process group.
+var (
+	startTimeout = time.Minute
+	closeGrace   = 3 * time.Second
+)
+
+// close ends the session; it never blocks longer than closeGrace plus the
+// time the kernel takes to reap a killed process. Safe to call twice.
 func (s *session) close() {
-	_ = s.stdin.Close()
-	<-s.done
-	<-s.peer.Done()
+	s.once.Do(func() {
+		_ = s.stdin.Close()
+		select {
+		case <-s.done:
+		case <-time.After(closeGrace):
+			killGroup(s.cmd.Process.Pid)
+			<-s.done
+		}
+		// The killed group no longer holds stdout, so the reader ends too.
+		select {
+		case <-s.peer.Done():
+		case <-time.After(closeGrace):
+		}
+	})
+}
+
+// dead reports whether err means the server process or its pipes are gone.
+func (s *session) dead(err error) bool {
+	select {
+	case <-s.done:
+		return true
+	case <-s.peer.Done():
+		return true
+	default:
+	}
+	return errors.Is(err, jsonrpc.ErrClosed) || errors.Is(err, os.ErrClosed) || errors.Is(err, io.ErrClosedPipe) || strings.Contains(err.Error(), "broken pipe")
 }
 
 type toolResult struct {
@@ -136,7 +181,7 @@ type toolResult struct {
 func (s *session) call(ctx context.Context, tool string, args map[string]any) ([]byte, error) {
 	var res toolResult
 	if err := s.peer.Call(ctx, "tools/call", map[string]any{"name": tool, "arguments": args}, &res); err != nil {
-		return nil, fmt.Errorf("codebase-memory-mcp %s: %w", tool, err)
+		return nil, fmt.Errorf("codebase-memory-mcp %s (session): %w", tool, err)
 	}
 	var b strings.Builder
 	for _, c := range res.Content {

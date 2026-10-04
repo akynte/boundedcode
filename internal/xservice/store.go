@@ -35,8 +35,10 @@ func SaveRepo(ctx context.Context, db *sql.DB, workspaceID, repositoryID string,
 
 // LoadWorkspace returns all endpoints of a workspace, sorted.
 func LoadWorkspace(ctx context.Context, db *sql.DB, workspaceID string) ([]Endpoint, error) {
-	rows, err := db.QueryContext(ctx, `SELECT repo, kind, file, line, symbol, method, path, topic, env, confidence, detail
-		FROM xservice_endpoints WHERE workspace_id = ?`, workspaceID)
+	// Disabled repositories are excluded (workspace disable).
+	rows, err := db.QueryContext(ctx, `SELECT e.repo, e.kind, e.file, e.line, e.symbol, e.method, e.path, e.topic, e.env, e.confidence, e.detail
+		FROM xservice_endpoints e JOIN repositories r ON r.id = e.repository_id
+		WHERE e.workspace_id = ? AND r.enabled = 1`, workspaceID)
 	if err != nil {
 		return nil, err
 	}

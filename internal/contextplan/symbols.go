@@ -1,13 +1,20 @@
 package contextplan
 
 import (
+	"bufio"
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
 
+	"github.com/akynte/boundedcode/internal/policy"
 	"github.com/akynte/boundedcode/internal/repointel"
 	"github.com/akynte/boundedcode/internal/task"
 )
@@ -24,6 +31,11 @@ type IntelStats struct {
 	GraphSymbols int     `json:"graph_symbols"` // symbols answered by the graph (default or fallback)
 	Fallbacks    int     `json:"fallbacks"`     // symbols Serena could not answer that the graph did
 	ReposSkipped int     `json:"repos_skipped"` // repositories not queried because the graph lacks the name
+	// Lexical search (ripgrep over the task worktrees) is the last stage,
+	// for names neither Serena nor the graph answered.
+	LexicalCalls   int     `json:"lexical_calls"`
+	LexicalMillis  float64 `json:"lexical_ms"`
+	LexicalSymbols int     `json:"lexical_symbols"` // symbols answered only by lexical search
 }
 
 // Limits keep symbol context compact: the point of LSP navigation is to send
@@ -34,6 +46,9 @@ const (
 	maxBodyLines      = 80
 	maxReferences     = 12
 	maxImplementation = 10
+	maxLexicalHits    = 10              // per name, across worktrees
+	lexicalRadius     = 3               // lines of context around a hit
+	lexicalTimeout    = 5 * time.Second // per name, across worktrees
 )
 
 // timed runs f and adds its duration to *ms.
@@ -50,16 +65,16 @@ func timed[T any](ms *float64, f func() (T, error)) (T, error) {
 // graph first decides which repositories mention X at all (breadth), then
 // Serena gives the precise symbols there (depth). When Serena is absent,
 // fails or finds nothing, the graph's snippet and callers are used, as before.
+// A name neither answers (or that has no index at all) falls back to a
+// bounded lexical search of the task worktrees.
 func requestSymbols(ctx context.Context, in Inputs, st *IntelStats) string {
-	if in.Intel == nil && in.Nav == nil {
-		return ""
-	}
 	var b strings.Builder
 	shown := 0
 	for _, n := range identifiers(in.Task.OriginalRequest + "\n" + in.Task.Goal) {
 		if shown >= maxSymbolsShown {
 			break
 		}
+		before := shown
 		for _, w := range in.Worktrees {
 			if shown >= maxSymbolsShown {
 				break
@@ -88,8 +103,102 @@ func requestSymbols(ctx context.Context, in Inputs, st *IntelStats) string {
 				}
 			}
 		}
+		if shown == before {
+			if text, ok := lexicalSymbol(ctx, in, n, st); ok {
+				b.WriteString(text)
+				st.LexicalSymbols++
+				shown++
+			}
+		}
 	}
 	return b.String()
+}
+
+// rgBinary is the ripgrep executable; lexical search is skipped without it.
+var rgBinary = "rg"
+
+// lexicalSymbol is the last retrieval stage: whole-word, fixed-string
+// ripgrep matches of name in the task worktrees, with a few lines of
+// context each. ripgrep skips hidden and git-ignored files and does not
+// follow symlinks; secret paths are dropped as well.
+func lexicalSymbol(ctx context.Context, in Inputs, name string, st *IntelStats) (string, bool) {
+	rg, err := exec.LookPath(rgBinary)
+	if err != nil || len(in.Worktrees) == 0 {
+		return "", false
+	}
+	ctx, cancel := context.WithTimeout(ctx, lexicalTimeout)
+	defer cancel()
+	t0 := time.Now()
+	defer func() { st.LexicalMillis += float64(time.Since(t0).Microseconds()) / 1000 }()
+	var b strings.Builder
+	hits := 0
+	for _, w := range in.Worktrees {
+		for _, pattern := range lexicalPatterns(name) {
+			if hits >= maxLexicalHits || ctx.Err() != nil {
+				break
+			}
+			st.LexicalCalls++
+			found := ripgrep(ctx, rg, w.Path, pattern, maxLexicalHits-hits)
+			for _, h := range found {
+				fmt.Fprintf(&b, "### %s: %s (lexical) ./%s/%s:%d\n```\n%s```\n", w.RepoName, pattern, w.RepoName, h.file, h.line,
+					readAround([]task.Worktree{w}, w.RepoName, h.file, h.line, lexicalRadius))
+			}
+			hits += len(found)
+			if len(found) > 0 {
+				break // the qualified name matched; skip the bare last segment
+			}
+		}
+	}
+	return b.String(), hits > 0
+}
+
+// lexicalPatterns searches a qualified name ("ledger.Post") literally, then
+// by its last segment, which is how a definition spells it.
+func lexicalPatterns(name string) []string {
+	if last := lastSegment(name); last != name {
+		return []string{name, last}
+	}
+	return []string{name}
+}
+
+type lexicalHit struct {
+	file string // slash-separated, relative to the worktree
+	line int
+}
+
+// ripgrep returns up to limit matches of pattern under root in path order,
+// excluding secret paths. Errors (including a timeout) yield what was found.
+func ripgrep(ctx context.Context, rg, root, pattern string, limit int) []lexicalHit {
+	cmd := exec.CommandContext(ctx, rg, "--json", "-n", "-w", "--fixed-strings", "--max-count", "3", "--max-columns", "200",
+		"--max-filesize", "1M", "--sort", "path", "-g", "!vendor", "-g", "!node_modules", "--", pattern, ".")
+	cmd.Dir = root
+	out, _ := cmd.Output() // exit 1 means no match
+	var hits []lexicalHit
+	sc := bufio.NewScanner(bytes.NewReader(out))
+	sc.Buffer(make([]byte, 64<<10), 4<<20)
+	for sc.Scan() && len(hits) < limit {
+		var m struct {
+			Type string `json:"type"`
+			Data struct {
+				Path struct {
+					Text string `json:"text"`
+				} `json:"path"`
+				LineNumber int `json:"line_number"`
+			} `json:"data"`
+		}
+		if json.Unmarshal(sc.Bytes(), &m) != nil || m.Type != "match" || m.Data.Path.Text == "" {
+			continue
+		}
+		rel := filepath.ToSlash(filepath.Clean(m.Data.Path.Text))
+		if policy.IsSecretPath(rel) || strings.HasPrefix(rel, "../") {
+			continue
+		}
+		if fi, err := os.Lstat(filepath.Join(root, rel)); err != nil || !fi.Mode().IsRegular() {
+			continue
+		}
+		hits = append(hits, lexicalHit{file: rel, line: m.Data.LineNumber})
+	}
+	return hits
 }
 
 // graphMentions asks the code graph whether a repository has a symbol with

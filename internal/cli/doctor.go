@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -12,6 +15,7 @@ import (
 
 	"github.com/akynte/boundedcode/internal/hw"
 	"github.com/akynte/boundedcode/internal/inference/llamacpp"
+	"github.com/akynte/boundedcode/internal/repointel/cbm"
 )
 
 // checkStatus is the outcome of one doctor check.
@@ -95,6 +99,7 @@ func runDoctor(ctx context.Context, app *App) []check {
 			add(check{"llama-server", statusFail, err.Error(), "build llama.cpp with CUDA (scripts/build-llama-cpp.sh) or pass `init --llama-server PATH`"})
 		} else {
 			add(check{"llama-server", statusOK, v + " (" + cfg.Inference.ServerBinary + ")", ""})
+			add(llamaCUDACheck(ctx, cfg.Inference.ServerBinary))
 		}
 	}
 	if p, err := app.Models.Get(cfg.DefaultModel); err != nil {
@@ -109,7 +114,10 @@ func runDoctor(ctx context.Context, app *App) []check {
 		}
 	}
 
-	add(versionCheck(ctx, "git", "git", []string{"--version"}, true, ""))
+	add(gitCheck(ctx))
+	add(versionCheck(ctx, "go", "go", []string{"version"}, false, "needed to build and verify Go repositories outside containers"))
+	add(versionCheck(ctx, "python3", "python3", []string{"--version"}, false, "the OpenHands adapter needs Python >= 3.12 (uv can provide it)"))
+	add(adapterCheck(app))
 	if cfg.Sandbox.Kind == "docker" {
 		c := versionCheck(ctx, "container engine", cfg.Sandbox.Engine, []string{"version", "--format", "{{.Server.Version}}"}, true,
 			"install Docker or Podman, or set sandbox.kind: none for development only")
@@ -118,15 +126,19 @@ func runDoctor(ctx context.Context, app *App) []check {
 		add(check{"container engine", statusWarn, "sandbox.kind is none: agent tools run unsandboxed", "use docker for autonomous tasks"})
 	}
 	add(versionCheck(ctx, "uv", "uv", []string{"--version"}, false, "needed to build the OpenHands adapter outside containers"))
-	add(versionCheck(ctx, "codebase-memory-mcp", cfg.RepoIntel.Binary, []string{"--version"}, false,
-		"install from https://github.com/DeusData/codebase-memory-mcp/releases (scripts/install-deps.sh)"))
+	add(cbmCheck(ctx, cfg.RepoIntel.Binary))
 	for _, c := range serenaChecks(ctx, app, true) {
+		add(c)
+	}
+	for _, c := range languageServerChecks(cfg.RepoIntel.Serena.Enabled) {
 		add(c)
 	}
 	add(versionCheck(ctx, "gitleaks", "gitleaks", []string{"version"}, false, "secret scanning stage is skipped without it"))
 	add(versionCheck(ctx, "ripgrep", "rg", []string{"--version"}, false, "used for exact lexical retrieval"))
 	if cfg.Sandbox.Kind == "docker" {
-		out, err := exec.CommandContext(ctx, cfg.Sandbox.Engine, "image", "inspect", "--format", "{{.Id}}", cfg.Agent.Image).Output()
+		ictx, cancel := context.WithTimeout(ctx, 15*time.Second)
+		out, err := exec.CommandContext(ictx, cfg.Sandbox.Engine, "image", "inspect", "--format", "{{.Id}}", cfg.Agent.Image).Output()
+		cancel()
 		if err != nil {
 			add(check{"sandbox image", statusWarn, cfg.Agent.Image + " not built", "run `boundedcode sandbox build --dir adapters/openhands`"})
 		} else {
@@ -134,6 +146,129 @@ func runDoctor(ctx context.Context, app *App) []check {
 		}
 	}
 	add(frontierCheck(ctx, app))
+	return out
+}
+
+// minGitVersion is the oldest git with the worktree commands tasks use
+// (`git worktree add/remove`, 2.17).
+var minGitVersion = [2]int{2, 17}
+
+func gitCheck(ctx context.Context) check {
+	c := versionCheck(ctx, "git", "git", []string{"--version"}, true, "install git >= 2.17 (worktree support)")
+	if c.Status != statusOK {
+		return c
+	}
+	m := regexp.MustCompile(`(\d+)\.(\d+)`).FindStringSubmatch(c.Detail)
+	if m == nil {
+		c.Status, c.Hint = statusWarn, "could not parse the git version; tasks need git >= 2.17"
+		return c
+	}
+	major, _ := strconv.Atoi(m[1])
+	minor, _ := strconv.Atoi(m[2])
+	if major < minGitVersion[0] || major == minGitVersion[0] && minor < minGitVersion[1] {
+		c.Status, c.Hint = statusFail, "tasks use git worktrees: install git >= 2.17"
+	}
+	return c
+}
+
+// cbmCheck compares the installed codebase-memory-mcp with the pin.
+func cbmCheck(ctx context.Context, binary string) check {
+	const hint = "install the pinned release with scripts/install-deps.sh (https://github.com/DeusData/codebase-memory-mcp/releases)"
+	got, err := cbm.CheckVersion(ctx, binary)
+	switch {
+	case err == nil:
+		return check{"codebase-memory-mcp", statusOK, fmt.Sprintf("%s (want %s)", got, cbm.RequiredVersion), ""}
+	case got != "":
+		return check{"codebase-memory-mcp", statusWarn, fmt.Sprintf("%s, want %s", got, cbm.RequiredVersion), hint}
+	default:
+		return check{"codebase-memory-mcp", statusWarn, fmt.Sprintf("%v (want %s)", err, cbm.RequiredVersion), hint}
+	}
+}
+
+// llamaCUDACheck asks llama-server which devices it can use; without a CUDA
+// device every layer runs on the CPU.
+func llamaCUDACheck(ctx context.Context, binary string) check {
+	bin, err := exec.LookPath(binary)
+	if err != nil {
+		return check{"llama.cpp CUDA", statusWarn, err.Error(), ""}
+	}
+	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, bin, "--list-devices")
+	// Backends are shared libraries next to the binary in a CMake build.
+	cmd.Env = append(os.Environ(), "LD_LIBRARY_PATH="+strings.Trim(filepath.Dir(bin)+string(os.PathListSeparator)+os.Getenv("LD_LIBRARY_PATH"), string(os.PathListSeparator)))
+	b, err := cmd.CombinedOutput()
+	if err != nil {
+		return check{"llama.cpp CUDA", statusWarn, fmt.Sprintf("--list-devices: %v %s", err, firstMeaningfulLine(string(b))),
+			"llama.cpp may be too old for --list-devices; rebuild with scripts/build-llama-cpp.sh"}
+	}
+	var devs []string
+	for l := range strings.SplitSeq(string(b), "\n") {
+		if l = strings.TrimSpace(l); strings.HasPrefix(l, "CUDA") {
+			devs = append(devs, l)
+		}
+	}
+	if len(devs) == 0 {
+		return check{"llama.cpp CUDA", statusWarn, "no CUDA device listed (CPU-only build or driver problem)", "build llama.cpp with CUDA (scripts/build-llama-cpp.sh)"}
+	}
+	return check{"llama.cpp CUDA", statusOK, strings.Join(devs, "; "), ""}
+}
+
+var openhandsPinRE = regexp.MustCompile(`"openhands-sdk==([^"]+)"`)
+
+// adapterCheck reports the OpenHands SDK pin of the adapter project and
+// whether its local environment exists (needed with sandbox.kind none).
+func adapterCheck(app *App) check {
+	dir := app.Config.Agent.AdapterDir
+	if dir == "" {
+		dir = filepath.Join("adapters", "openhands", "python") // running from a checkout
+	}
+	b, err := os.ReadFile(filepath.Join(dir, "pyproject.toml"))
+	if err != nil {
+		st := statusOK
+		if app.Config.Sandbox.Kind != "docker" {
+			st = statusWarn // the adapter runs from adapter_dir
+		}
+		return check{"openhands adapter", st, "adapter project not found (agent.adapter_dir unset or missing)",
+			"set agent.adapter_dir to adapters/openhands/python (`init --adapter-dir`)"}
+	}
+	pin := "unpinned"
+	if m := openhandsPinRE.FindSubmatch(b); m != nil {
+		pin = string(m[1])
+	}
+	venv := "venv absent"
+	if fi, err := os.Stat(filepath.Join(dir, ".venv")); err == nil && fi.IsDir() {
+		venv = "venv present"
+	}
+	where := "runs in sandbox image " + app.Config.Agent.Image
+	st := statusOK
+	if app.Config.Sandbox.Kind != "docker" {
+		where = "runs from " + dir
+		if venv == "venv absent" {
+			st = statusWarn
+		}
+	}
+	return check{"openhands adapter", st, fmt.Sprintf("openhands-sdk %s pinned; %s; %s", pin, venv, where), "run `uv sync --frozen` in " + dir}
+}
+
+// languageServerChecks reports the language servers Serena drives. They are
+// informational while Serena is disabled.
+func languageServerChecks(serenaEnabled bool) []check {
+	missing := statusOK
+	if serenaEnabled {
+		missing = statusWarn
+	}
+	var out []check
+	for _, ls := range []struct{ name, bin, hint string }{
+		{"gopls", "gopls", "go install golang.org/x/tools/gopls@latest"},
+		{"typescript LSP", "typescript-language-server", "`boundedcode serena setup` installs its own copy"},
+	} {
+		if p, err := exec.LookPath(ls.bin); err == nil {
+			out = append(out, check{ls.name, statusOK, p, ""})
+		} else {
+			out = append(out, check{ls.name, missing, ls.bin + " not on PATH (used by Serena)", ls.hint})
+		}
+	}
 	return out
 }
 

@@ -35,7 +35,15 @@ type Repository struct {
 	Languages     []string `json:"languages"`
 	IndexProject  string   `json:"index_project"`
 	IndexedAt     string   `json:"indexed_at"`
+	// Enabled repositories take part in new tasks, indexing and queries.
+	// A disabled one keeps its id and metadata, and tasks that already have
+	// a worktree in it keep working.
+	Enabled bool `json:"enabled"`
 }
+
+// ErrInUse means a repository cannot be removed because task worktrees
+// reference it; disable it instead.
+var ErrInUse = errors.New("repository is referenced by tasks")
 
 // Store persists workspaces.
 type Store struct{ DB *sql.DB }
@@ -98,7 +106,7 @@ func (s Store) AddRepo(ctx context.Context, w Workspace, path, name string) (Rep
 		name = filepath.Base(info.Root)
 	}
 	r := Repository{ID: ids.New("r"), WorkspaceID: w.ID, Name: name, Path: info.Root, Origin: info.Origin,
-		DefaultBranch: info.DefaultBranch, Languages: DetectLanguages(info.Root)}
+		DefaultBranch: info.DefaultBranch, Languages: DetectLanguages(info.Root), Enabled: true}
 	langs, _ := json.Marshal(r.Languages)
 	_, err = s.DB.ExecContext(ctx, `INSERT INTO repositories(id, workspace_id, name, path, origin, default_branch, languages, created_at)
 		VALUES(?,?,?,?,?,?,?,?)`, r.ID, r.WorkspaceID, r.Name, r.Path, r.Origin, r.DefaultBranch, string(langs), store.Now())
@@ -108,10 +116,24 @@ func (s Store) AddRepo(ctx context.Context, w Workspace, path, name string) (Rep
 	return r, err
 }
 
-// Repos lists the repositories of a workspace.
+// Repos lists the enabled repositories of a workspace: the ones new tasks,
+// indexing and queries use.
 func (s Store) Repos(ctx context.Context, workspaceID string) ([]Repository, error) {
-	rows, err := s.DB.QueryContext(ctx, `SELECT id, workspace_id, name, path, origin, default_branch, languages, index_project, indexed_at
-		FROM repositories WHERE workspace_id = ? ORDER BY name`, workspaceID)
+	return s.repos(ctx, workspaceID, true)
+}
+
+// AllRepos lists every repository of a workspace, disabled ones included.
+func (s Store) AllRepos(ctx context.Context, workspaceID string) ([]Repository, error) {
+	return s.repos(ctx, workspaceID, false)
+}
+
+func (s Store) repos(ctx context.Context, workspaceID string, enabledOnly bool) ([]Repository, error) {
+	q := `SELECT id, workspace_id, name, path, origin, default_branch, languages, index_project, indexed_at, enabled
+		FROM repositories WHERE workspace_id = ?`
+	if enabledOnly {
+		q += ` AND enabled = 1`
+	}
+	rows, err := s.DB.QueryContext(ctx, q+` ORDER BY name`, workspaceID)
 	if err != nil {
 		return nil, err
 	}
@@ -120,7 +142,7 @@ func (s Store) Repos(ctx context.Context, workspaceID string) ([]Repository, err
 	for rows.Next() {
 		var r Repository
 		var langs string
-		if err := rows.Scan(&r.ID, &r.WorkspaceID, &r.Name, &r.Path, &r.Origin, &r.DefaultBranch, &langs, &r.IndexProject, &r.IndexedAt); err != nil {
+		if err := rows.Scan(&r.ID, &r.WorkspaceID, &r.Name, &r.Path, &r.Origin, &r.DefaultBranch, &langs, &r.IndexProject, &r.IndexedAt, &r.Enabled); err != nil {
 			return nil, err
 		}
 		_ = json.Unmarshal([]byte(langs), &r.Languages)
@@ -129,9 +151,9 @@ func (s Store) Repos(ctx context.Context, workspaceID string) ([]Repository, err
 	return out, rows.Err()
 }
 
-// Repo finds one repository of a workspace by name or id.
+// Repo finds one repository of a workspace by name or id, enabled or not.
 func (s Store) Repo(ctx context.Context, workspaceID, nameOrID string) (Repository, error) {
-	repos, err := s.Repos(ctx, workspaceID)
+	repos, err := s.AllRepos(ctx, workspaceID)
 	if err != nil {
 		return Repository{}, err
 	}
@@ -141,6 +163,55 @@ func (s Store) Repo(ctx context.Context, workspaceID, nameOrID string) (Reposito
 		}
 	}
 	return Repository{}, fmt.Errorf("repository %q: %w", nameOrID, store.ErrNotFound)
+}
+
+// SetEnabled enables or disables a repository. Disabling is the reversible
+// way to take a repository out of a workspace: its id, metadata, index and
+// task history stay.
+func (s Store) SetEnabled(ctx context.Context, repoID string, enabled bool) error {
+	v := 0
+	if enabled {
+		v = 1
+	}
+	res, err := s.DB.ExecContext(ctx, `UPDATE repositories SET enabled = ? WHERE id = ?`, v, repoID)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return fmt.Errorf("repository %q: %w", repoID, store.ErrNotFound)
+	}
+	return nil
+}
+
+// RemoveRepo deletes a repository and its cross-service endpoints. It
+// refuses while any task, finished or not, has a worktree in it: task
+// history references the repository row, so such a repository can only be
+// disabled.
+func (s Store) RemoveRepo(ctx context.Context, repoID string) error {
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	var total, live int
+	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*), COALESCE(SUM(t.status IN ('active','blocked')), 0)
+		FROM task_worktrees w JOIN tasks t ON t.id = w.task_id WHERE w.repository_id = ?`, repoID).Scan(&total, &live); err != nil {
+		return err
+	}
+	if total > 0 {
+		return fmt.Errorf("%w: %d task(s), %d still active or blocked; disable the repository instead", ErrInUse, total, live)
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM xservice_endpoints WHERE repository_id = ?`, repoID); err != nil {
+		return err
+	}
+	res, err := tx.ExecContext(ctx, `DELETE FROM repositories WHERE id = ?`, repoID)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return fmt.Errorf("repository %q: %w", repoID, store.ErrNotFound)
+	}
+	return tx.Commit()
 }
 
 // MarkIndexed records the repository-intelligence project handle.

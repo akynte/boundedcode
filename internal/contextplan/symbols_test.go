@@ -3,6 +3,9 @@ package contextplan
 import (
 	"context"
 	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -199,5 +202,108 @@ func TestNamePatterns(t *testing.T) {
 	}
 	if got := clipLines("a\nb\nc\nd", 2); got != "a\nb\n… (2 more lines)" {
 		t.Fatalf("%q", got)
+	}
+}
+
+// lexicalWorktree writes a small checkout for lexical-search tests.
+func lexicalWorktree(t *testing.T, files map[string]string) task.Worktree {
+	t.Helper()
+	root := t.TempDir()
+	for name, body := range files {
+		p := filepath.Join(root, filepath.FromSlash(name))
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return task.Worktree{RepoName: "billing", Path: root, IndexProject: "ws.billing"}
+}
+
+func needRipgrep(t *testing.T) {
+	t.Helper()
+	if _, err := exec.LookPath("rg"); err != nil {
+		t.Skip("ripgrep not installed")
+	}
+}
+
+// TestLexicalFallback: names neither Serena nor the graph knows are found by
+// ripgrep in the worktree, with context, and never in secret paths.
+func TestLexicalFallback(t *testing.T) {
+	needRipgrep(t)
+	w := lexicalWorktree(t, map[string]string{
+		"internal/refund/refund.go": "package refund\n\n// RefundWindow is the refund period.\nconst RefundWindow = 30\n\nfunc a() int { return RefundWindow }\n",
+		"secrets/prod.go":           "package secrets\n\nconst RefundWindow = 1 // secret\n",
+		"config/credentials.json":   `{"RefundWindow": "hunter2"}`,
+		"vendor/x/x.go":             "package x\n\nconst RefundWindow = 2\n",
+		"node_modules/y/y.js":       "const RefundWindow = 3\n",
+		"internal/other.go":         "package internal\n\n// RefundWindowExtra must not match a whole-word search.\n",
+	})
+	if err := os.Symlink(filepath.Join(w.Path, "internal"), filepath.Join(w.Path, "linked")); err != nil {
+		t.Fatal(err)
+	}
+	in := Inputs{Task: &task.Task{ID: "t", OriginalRequest: "Extend `RefundWindow` to 60 days"}, Worktrees: []task.Worktree{w}}
+	in.Intel = &fakeGraph{has: map[string][]string{}}
+	in.Nav = &fakeNav{}
+	var st IntelStats
+	out := requestSymbols(context.Background(), in, &st)
+	if !strings.Contains(out, "### billing: RefundWindow (lexical) ./billing/internal/refund/refund.go:4") ||
+		!strings.Contains(out, ">    4 const RefundWindow = 30") || !strings.Contains(out, "     1 package refund") {
+		t.Fatalf("lexical hit with context expected:\n%s", out)
+	}
+	for _, bad := range []string{"secrets/", "credentials", "hunter2", "vendor/", "node_modules", "RefundWindowExtra", "linked/"} {
+		if strings.Contains(out, bad) {
+			t.Errorf("%q leaked into lexical context:\n%s", bad, out)
+		}
+	}
+	if st.LexicalSymbols != 1 || st.LexicalCalls != 1 || st.GraphSymbols != 0 || st.NavSymbols != 0 {
+		t.Fatalf("stats: %+v", st)
+	}
+}
+
+func TestLexicalNotUsedWhenGraphAnswers(t *testing.T) {
+	needRipgrep(t)
+	w := lexicalWorktree(t, map[string]string{"a.go": "package a\n\nfunc CreatePayment() {}\n"})
+	in := Inputs{Task: &task.Task{ID: "t", OriginalRequest: "Fix CreatePayment"}, Worktrees: []task.Worktree{w}}
+	in.Intel = &fakeGraph{has: map[string][]string{"ws.billing": {"CreatePayment"}}}
+	var st IntelStats
+	out := requestSymbols(context.Background(), in, &st)
+	if strings.Contains(out, "(lexical)") || st.LexicalCalls != 0 || st.GraphSymbols != 1 {
+		t.Fatalf("lexical stage ran although the graph answered: %+v\n%s", st, out)
+	}
+}
+
+func TestLexicalBounded(t *testing.T) {
+	needRipgrep(t)
+	files := map[string]string{}
+	for i := range 8 {
+		files[fmt.Sprintf("f%d.go", i)] = strings.Repeat("var _ = ledgerPost\n", 5)
+	}
+	w := lexicalWorktree(t, files)
+	// Qualified names fall back to their last segment.
+	in := Inputs{Task: &task.Task{ID: "t", OriginalRequest: "Fix `ledger.ledgerPost`"}, Worktrees: []task.Worktree{w}}
+	var st IntelStats
+	out := requestSymbols(context.Background(), in, &st)
+	if n := strings.Count(out, "(lexical)"); n != maxLexicalHits {
+		t.Fatalf("%d lexical hits, want %d:\n%s", n, maxLexicalHits, out)
+	}
+	if strings.Count(out, "./billing/f0.go:") != 3 { // --max-count 3 per file
+		t.Fatalf("per-file cap not applied:\n%s", out)
+	}
+	if st.LexicalCalls != 2 {
+		t.Fatalf("stats: %+v", st)
+	}
+}
+
+func TestLexicalSkippedWithoutRipgrep(t *testing.T) {
+	old := rgBinary
+	rgBinary = "boundedcode-no-such-rg"
+	t.Cleanup(func() { rgBinary = old })
+	w := lexicalWorktree(t, map[string]string{"a.go": "package a\n\nfunc CreatePayment() {}\n"})
+	in := Inputs{Task: &task.Task{ID: "t", OriginalRequest: "Fix CreatePayment"}, Worktrees: []task.Worktree{w}}
+	var st IntelStats
+	if out := requestSymbols(context.Background(), in, &st); out != "" || st.LexicalCalls != 0 {
+		t.Fatalf("%+v %q", st, out)
 	}
 }

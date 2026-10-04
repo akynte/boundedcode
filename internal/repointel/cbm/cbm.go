@@ -1,14 +1,18 @@
-// Package cbm implements repointel.Intelligence with the codebase-memory-mcp
-// CLI (`codebase-memory-mcp cli <tool> '<json args>'`).
+// Package cbm implements repointel.Intelligence with codebase-memory-mcp:
+// a persistent MCP stdio session when one is open, otherwise the one-shot
+// CLI (`codebase-memory-mcp cli <tool> '<json args>'`), which is also the
+// fallback when the session dies (ADR-0006).
 package cbm
 
 import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -16,15 +20,46 @@ import (
 	"github.com/akynte/boundedcode/internal/repointel"
 )
 
+// RequiredVersion is the codebase-memory-mcp release the integration is
+// built and tested against (the pin in scripts/install-deps.sh).
+const RequiredVersion = "0.11.0"
+
+var versionRE = regexp.MustCompile(`\b(\d+\.\d+\.\d+)\b`)
+
+// CheckVersion runs `binary --version` and fails unless it reports
+// RequiredVersion. got is the reported version when one was parsed.
+func CheckVersion(ctx context.Context, binary string) (got string, err error) {
+	path, err := exec.LookPath(binary)
+	if err != nil {
+		return "", fmt.Errorf("codebase-memory-mcp not found (%s): %w", binary, err)
+	}
+	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, path, "--version")
+	cmd.Dir = os.TempDir()
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("%s --version: %w: %s", path, err, lastN(strings.TrimSpace(string(out)), 200))
+	}
+	m := versionRE.FindStringSubmatch(string(out))
+	if m == nil {
+		return "", fmt.Errorf("%s --version: unrecognized output %q", path, lastN(strings.TrimSpace(string(out)), 200))
+	}
+	if m[1] != RequiredVersion {
+		return m[1], fmt.Errorf("codebase-memory-mcp %s at %s is not the supported %s (install the pinned release with scripts/install-deps.sh)", m[1], path, RequiredVersion)
+	}
+	return m[1], nil
+}
+
 // Client invokes the codebase-memory-mcp binary.
 type Client struct {
 	Binary string
 	// CacheDir isolates our graph store from any other codebase-memory-mcp
 	// use on the machine (CBM_CACHE_DIR).
 	CacheDir string
-	// AllowedRoot confines indexing (CBM_ALLOWED_ROOT); empty = unrestricted.
-	AllowedRoot string
-	Timeout     time.Duration
+	// Timeout bounds every call, over the session or the CLI (default 30m:
+	// indexing a large repository is the slowest call).
+	Timeout time.Duration
 
 	mu   sync.Mutex
 	sess *session
@@ -35,14 +70,37 @@ var _ repointel.Intelligence = (*Client)(nil)
 // Name implements repointel.Intelligence.
 func (c *Client) Name() string { return "codebase-memory-mcp" }
 
+func (c *Client) timeout() time.Duration {
+	if c.Timeout > 0 {
+		return c.Timeout
+	}
+	return 30 * time.Minute
+}
+
 // Call runs one tool with JSON args: over the persistent MCP session when
-// one is open, otherwise as a one-shot CLI process.
+// one is open, otherwise as a one-shot CLI process. A session that died is
+// dropped and the call is retried with the CLI; one that stopped answering
+// within Timeout is killed and the call fails.
 func (c *Client) Call(ctx context.Context, tool string, args map[string]any) ([]byte, error) {
 	c.mu.Lock()
 	s := c.sess
 	c.mu.Unlock()
 	if s != nil {
-		return s.call(ctx, tool, args)
+		cctx, cancel := context.WithTimeout(ctx, c.timeout())
+		b, err := s.call(cctx, tool, args)
+		cancel()
+		switch {
+		case err == nil || ctx.Err() != nil:
+			return b, err
+		case s.dead(err):
+			c.drop(s)
+			// fall through to the CLI
+		case errors.Is(err, context.DeadlineExceeded):
+			c.drop(s)
+			return nil, fmt.Errorf("codebase-memory-mcp %s: no answer within %s; session closed: %w", tool, c.timeout(), err)
+		default:
+			return nil, err
+		}
 	}
 	if err := c.configure(ctx); err != nil {
 		return nil, err
@@ -51,11 +109,7 @@ func (c *Client) Call(ctx context.Context, tool string, args map[string]any) ([]
 	if err != nil {
 		return nil, err
 	}
-	timeout := c.Timeout
-	if timeout == 0 {
-		timeout = 30 * time.Minute
-	}
-	ctx, cancel := context.WithTimeout(ctx, timeout)
+	ctx, cancel := context.WithTimeout(ctx, c.timeout())
 	defer cancel()
 	cmd := exec.CommandContext(ctx, c.Binary, "cli", "--quiet", tool, string(raw))
 	env, err := c.env()
@@ -65,6 +119,7 @@ func (c *Client) Call(ctx context.Context, tool string, args map[string]any) ([]
 	cmd.Env = env
 	// Run from a neutral directory: some tools infer context from cwd.
 	cmd.Dir = os.TempDir()
+	cmd.WaitDelay = 5 * time.Second // don't wait on pipes a killed child's children hold
 	var out, errb bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &errb
 	if err := cmd.Run(); err != nil {
@@ -134,11 +189,6 @@ func (c *Client) Impact(ctx context.Context, project, baseBranch string, depth i
 // Architecture implements repointel.Intelligence.
 func (c *Client) Architecture(ctx context.Context, project string) (string, error) {
 	return c.text(ctx, "get_architecture", map[string]any{"project": project, "aspects": []string{"overview"}})
-}
-
-// SearchCode implements repointel.Intelligence.
-func (c *Client) SearchCode(ctx context.Context, project, pattern string, limit int) (string, error) {
-	return c.text(ctx, "search_code", map[string]any{"project": project, "pattern": pattern, "limit": orInt(limit, 10), "max_output_tokens": 2500})
 }
 
 func orInt(v, d int) int {
