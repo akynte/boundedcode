@@ -515,12 +515,14 @@ func (e *Engine) spec(t RepoTarget, argv []string) (sandbox.Spec, error) {
 			env["GOFLAGS"] = "-buildvcs=false -mod=mod"
 		}
 	}
+	var scratch []string
 	if e.Sandbox != nil && e.Sandbox.Isolated() {
 		deps, err := sandbox.DependencyMounts(t.Source, t.Worktree)
 		if err != nil {
 			return sandbox.Spec{}, fmt.Errorf("dependency mounts: %w", err)
 		}
-		mounts = append(mounts, deps...)
+		mounts = append(mounts, deps.Mounts...)
+		scratch = deps.Scratch
 	}
 	var masks []string
 	secrets, err := policy.FindSecretPaths(t.Worktree, policy.MaxSecretMasks)
@@ -530,7 +532,7 @@ func (e *Engine) spec(t RepoTarget, argv []string) (sandbox.Spec, error) {
 	for _, s := range secrets {
 		masks = append(masks, filepath.Join(t.Worktree, s))
 	}
-	return sandbox.Spec{Argv: argv, Workdir: t.Worktree, Mounts: mounts, Env: env, Masks: masks}, nil
+	return sandbox.Spec{Argv: argv, Workdir: t.Worktree, Mounts: mounts, Scratch: scratch, Env: env, Masks: masks}, nil
 }
 
 // goImpactedPackages returns the Go packages containing changed files plus

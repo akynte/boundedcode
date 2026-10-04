@@ -107,11 +107,12 @@ func (r *Runtime) Open(ctx context.Context, req agent.OpenRequest) (agent.Sessio
 	for _, d := range req.GitAdminDirs {
 		mounts = append(mounts, sandbox.Mount{Host: d, Target: d})
 	}
-	for _, d := range req.DependencyMounts {
-		if !r.Sandbox.Isolated() {
-			break // no path translation without a container; nothing to add
+	var scratch []string
+	if r.Sandbox.Isolated() { // without a container there is no path translation
+		for _, d := range req.DependencyMounts {
+			mounts = append(mounts, sandbox.Mount{Host: d.Host, Target: d.Target, ReadOnly: true})
 		}
-		mounts = append(mounts, sandbox.Mount{Host: d.Host, Target: d.Target, ReadOnly: true})
+		scratch = req.DependencyScratch
 	}
 	var masks []string
 	for _, m := range req.Masks {
@@ -121,7 +122,7 @@ func (r *Runtime) Open(ctx context.Context, req agent.OpenRequest) (agent.Sessio
 		r.Log.Warn("sandbox is not isolated: secret path masks cannot be enforced", "masks", len(masks))
 	}
 	spec := sandbox.Spec{
-		Argv: r.Argv, Workdir: req.Workspace, Mounts: mounts, Masks: masks, Interactive: true,
+		Argv: r.Argv, Workdir: req.Workspace, Mounts: mounts, Scratch: scratch, Masks: masks, Interactive: true,
 		Env:  map[string]string{"OPENHANDS_SUPPRESS_BANNER": "1", "BC_ADAPTER_LOG": "INFO", "PYTHONUNBUFFERED": "1"},
 		Name: "bc-" + req.TaskID,
 	}

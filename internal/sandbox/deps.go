@@ -15,6 +15,18 @@ import (
 // tested offline. (Go needs no equivalent: its module cache is shared.)
 var DependencyDirNames = map[string]bool{"node_modules": true}
 
+// dependencyCacheDirs are the directories tools write inside a dependency
+// directory (Vite/Vitest, babel/eslint/terser loaders). They get a writable
+// scratch layer so the installed packages can stay read-only.
+var dependencyCacheDirs = []string{".cache", ".vite", ".vitest"}
+
+// Dependencies are the mounts that make a checkout's installed dependencies
+// available in a worktree's sandbox.
+type Dependencies struct {
+	Mounts  []Mount  // read-only
+	Scratch []string // writable tool-cache directories inside them
+}
+
 const (
 	// maxDependencyDepth bounds where dependency directories are looked for
 	// (root, packages/x, apps/a/b covers workspaces and monorepos).
@@ -40,13 +52,19 @@ var ErrUnsafeDependencyTarget = errors.New("sandbox: unsafe dependency mount tar
 // node_modules/.bin) for the installed ones. A target that is, or lies
 // below, a symlink, or exists as a non-directory, fails the call: callers
 // must neither follow the link nor silently run without the dependencies.
-func DependencyMounts(source, worktree string) ([]Mount, error) {
+//
+// Tool caches inside them (dependencyCacheDirs) get a writable scratch layer;
+// a missing cache directory is created, empty, in the checkout, because a
+// mount point cannot be made inside a read-only mount. Nothing else in the
+// checkout is written.
+func DependencyMounts(source, worktree string) (Dependencies, error) {
+	var deps Dependencies
 	if source == "" || worktree == "" {
-		return nil, nil
+		return deps, nil
 	}
 	source, worktree = filepath.Clean(source), filepath.Clean(worktree)
 	if source == worktree || !filepath.IsAbs(source) || !filepath.IsAbs(worktree) {
-		return nil, nil
+		return deps, nil
 	}
 	var out []Mount
 	err := filepath.WalkDir(source, func(p string, d fs.DirEntry, err error) error {
@@ -72,13 +90,30 @@ func DependencyMounts(source, worktree string) ([]Mount, error) {
 		if len(out) >= MaxDependencyMounts {
 			return fmt.Errorf("sandbox: more than %d dependency directories under %s", MaxDependencyMounts, source)
 		}
-		out = append(out, Mount{Host: p, Target: filepath.Join(worktree, rel), ReadOnly: true})
+		target := filepath.Join(worktree, rel)
+		out = append(out, Mount{Host: p, Target: target, ReadOnly: true})
+		for _, c := range dependencyCacheDirs {
+			if ensureCacheDir(filepath.Join(p, c)) {
+				deps.Scratch = append(deps.Scratch, filepath.Join(target, c))
+			}
+		}
 		return filepath.SkipDir
 	})
 	if err != nil {
-		return nil, err
+		return Dependencies{}, err
 	}
-	return out, nil
+	deps.Mounts = out
+	return deps, nil
+}
+
+// ensureCacheDir makes dir exist as a real directory; it reports false when
+// it cannot (then the tool sees the read-only mount and fails loudly).
+func ensureCacheDir(dir string) bool {
+	fi, err := os.Lstat(dir)
+	if errors.Is(err, fs.ErrNotExist) {
+		return os.Mkdir(dir, 0o755) == nil
+	}
+	return err == nil && fi.IsDir() && fi.Mode()&fs.ModeSymlink == 0
 }
 
 // safeDependencyTarget checks that no component of worktree/rel is a

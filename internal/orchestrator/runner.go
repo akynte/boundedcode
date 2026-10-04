@@ -230,7 +230,7 @@ func (r *Runner) Run(ctx context.Context, taskID string, opt RunOptions) (*task.
 	if err != nil {
 		return t, fmt.Errorf("refusing to start the agent: %w", err)
 	}
-	deps, err := dependencyMounts(wts)
+	deps, depScratch, err := dependencyMounts(wts)
 	if err != nil {
 		return t, fmt.Errorf("refusing to start the agent: %w", err)
 	}
@@ -241,7 +241,7 @@ func (r *Runner) Run(ctx context.Context, taskID string, opt RunOptions) (*task.
 	openReq := agent.OpenRequest{TaskID: t.ID, SessionID: t.AgentSessionID, Workspace: r.WorkDir(t.ID), GitCommonDirs: gitDirs, GitAdminDirs: adminDirs,
 		PersistenceDir: filepath.Join(r.Paths.TaskDir(t.ID), "runtime"), MaxIterations: r.Cfg.Agent.MaxIterations,
 		MaxInputTokens: r.CtxSize, MaxOutputTokens: 8192, CondenserMaxEvents: r.Cfg.Agent.CondenserMaxEvents,
-		CondenserMaxTokens: r.CtxSize * 7 / 10, Masks: masks, DependencyMounts: deps, OnEvent: onEvent, Gateway: gw,
+		CondenserMaxTokens: r.CtxSize * 7 / 10, Masks: masks, DependencyMounts: deps, DependencyScratch: depScratch, OnEvent: onEvent, Gateway: gw,
 		LLMTimeout: r.Cfg.Inference.RequestTimeout.D()}
 	sess, mode, err := r.openSession(ctx, t, openReq)
 	if err != nil {
@@ -709,18 +709,20 @@ func secretMasks(workDir string, wts []task.Worktree) ([]string, error) {
 // dependencyMounts returns the installed dependencies of each worktree's
 // repository checkout (see sandbox.DependencyMounts). The source path comes
 // from the ledger, not from the agent-writable worktree.
-func dependencyMounts(wts []task.Worktree) ([]agent.DependencyMount, error) {
+func dependencyMounts(wts []task.Worktree) ([]agent.DependencyMount, []string, error) {
 	var out []agent.DependencyMount
+	var scratch []string
 	for _, w := range wts {
-		ms, err := sandbox.DependencyMounts(w.RepoPath, w.Path)
+		deps, err := sandbox.DependencyMounts(w.RepoPath, w.Path)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-		for _, m := range ms {
+		for _, m := range deps.Mounts {
 			out = append(out, agent.DependencyMount{Host: m.Host, Target: m.Target})
 		}
+		scratch = append(scratch, deps.Scratch...)
 	}
-	return out, nil
+	return out, scratch, nil
 }
 
 func countRejected(st []task.Strategy) int {

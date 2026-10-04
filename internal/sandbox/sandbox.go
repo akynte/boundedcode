@@ -16,6 +16,10 @@ import (
 	"time"
 )
 
+// scratchSize bounds each scratch tmpfs; it counts against the container's
+// memory limit.
+const scratchSize = 512 << 20
+
 // Mount binds a host path into the sandbox.
 type Mount struct {
 	Host     string
@@ -25,9 +29,13 @@ type Mount struct {
 
 // Spec describes one command execution.
 type Spec struct {
-	Argv        []string
-	Workdir     string // path inside the sandbox
-	Mounts      []Mount
+	Argv    []string
+	Workdir string // path inside the sandbox
+	Mounts  []Mount
+	// Scratch are writable, per-run tmpfs directories layered over mounts
+	// (tool caches inside read-only dependency directories). They need an
+	// existing directory at the path and are ignored without isolation.
+	Scratch     []string
 	Env         map[string]string
 	Interactive bool // keep stdin open (needed for the stdio protocol)
 	// Masks are paths inside the sandbox hidden behind empty read-only
@@ -179,6 +187,12 @@ func (c *Container) Args(s Spec) ([]string, error) {
 			spec += ",readonly"
 		}
 		args = append(args, "--mount", spec)
+	}
+	for _, p := range s.Scratch {
+		if !filepath.IsAbs(p) {
+			return nil, fmt.Errorf("sandbox: scratch path must be absolute: %s", p)
+		}
+		args = append(args, "--mount", fmt.Sprintf("type=tmpfs,destination=%s,tmpfs-size=%d,tmpfs-mode=1777", p, scratchSize))
 	}
 	for _, p := range s.Masks {
 		// Mounts are identity-mapped, so the host path tells us the type.

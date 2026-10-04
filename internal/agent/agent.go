@@ -44,6 +44,8 @@ type OpenRequest struct {
 	// repository's own checkout) mounted read-only into the worktrees, so
 	// the agent can build and test offline. Host paths.
 	DependencyMounts []DependencyMount
+	// DependencyScratch are writable tool-cache directories inside them.
+	DependencyScratch []string
 	// OnEvent receives runtime events (may be nil). Called sequentially.
 	OnEvent func(Event)
 	// Gateway meters and forwards the session's model calls. The task runner

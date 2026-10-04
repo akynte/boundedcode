@@ -18,9 +18,12 @@ func TestAgentDependencyMounts(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(src, "node_modules", "m"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	ms, err := dependencyMounts([]task.Worktree{{RepoName: "web", RepoPath: src, Path: wt}})
+	ms, scratch, err := dependencyMounts([]task.Worktree{{RepoName: "web", RepoPath: src, Path: wt}})
 	if err != nil {
 		t.Fatal(err)
+	}
+	if len(scratch) != 3 || scratch[1] != filepath.Join(wt, "node_modules", ".vite") {
+		t.Fatalf("scratch = %v", scratch)
 	}
 	if len(ms) != 1 || ms[0].Host != filepath.Join(src, "node_modules") || ms[0].Target != filepath.Join(wt, "node_modules") {
 		t.Fatalf("mounts = %+v", ms)
@@ -28,7 +31,7 @@ func TestAgentDependencyMounts(t *testing.T) {
 	if err := os.Symlink("/usr/bin", filepath.Join(wt, "node_modules")); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := dependencyMounts([]task.Worktree{{RepoName: "web", RepoPath: src, Path: wt}}); !errors.Is(err, sandbox.ErrUnsafeDependencyTarget) {
+	if _, _, err := dependencyMounts([]task.Worktree{{RepoName: "web", RepoPath: src, Path: wt}}); !errors.Is(err, sandbox.ErrUnsafeDependencyTarget) {
 		t.Fatalf("want ErrUnsafeDependencyTarget, got %v", err)
 	}
 }

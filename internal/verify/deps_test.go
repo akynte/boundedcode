@@ -23,6 +23,15 @@ func (r *isolatedRecorder) Command(ctx context.Context, s sandbox.Spec) (*exec.C
 	return exec.CommandContext(ctx, "true"), nil
 }
 
+func slicesContains(s []string, v string) bool {
+	for _, x := range s {
+		if x == v {
+			return true
+		}
+	}
+	return false
+}
+
 func writeFiles(t *testing.T, root string, files map[string]string) {
 	t.Helper()
 	for p, c := range files {
@@ -58,6 +67,9 @@ func TestSpecMountsDependencies(t *testing.T) {
 	}
 	if !found[filepath.Join(wt, "node_modules")] || !found[filepath.Join(wt, "packages/a/node_modules")] {
 		t.Fatalf("mounts = %+v", spec.Mounts)
+	}
+	if !slicesContains(spec.Scratch, filepath.Join(wt, "node_modules", ".vite")) {
+		t.Fatalf("no writable tool cache: %v", spec.Scratch)
 	}
 	// Without a source (no ledger information) nothing is mounted.
 	spec, _ = e.spec(RepoTarget{Name: "r", Worktree: wt}, []string{"npm", "test"})
@@ -169,6 +181,15 @@ func TestDependencyMountInContainer(t *testing.T) {
 	}
 	if r := e.runStage(ctx, RepoTarget{Name: "r", Worktree: wt}, test, nil); r.Status != "fail" {
 		t.Fatalf("without dependencies the declared test must fail, got %+v", r)
+	}
+	// Tool caches inside the dependencies are writable (Vite/Vitest write
+	// node_modules/.vite); the packages themselves are not.
+	cache := Stage{Name: "c", Run: []string{"sh", "-c", "mkdir -p node_modules/.vite/deps && echo x > node_modules/.vite/deps/x"}}
+	if r := e.runStage(ctx, RepoTarget{Name: "r", Worktree: wt, Source: src}, cache, nil); r.Status != "pass" {
+		t.Fatalf("tool cache write: %+v", r)
+	}
+	if entries, _ := os.ReadDir(filepath.Join(src, "node_modules/.vite")); len(entries) != 0 {
+		t.Fatalf("tool cache leaked into the checkout: %v", entries)
 	}
 	// The mount is read-only: the stage cannot alter the checkout's deps.
 	write := Stage{Name: "w", Run: []string{"sh", "-c", "echo x > node_modules/answer/index.js"}}
