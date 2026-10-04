@@ -339,6 +339,13 @@ func (e *Engine) runStage(ctx context.Context, t RepoTarget, st Stage, packages 
 	switch {
 	case err == nil:
 		sr.Status = "pass"
+	case errors.Is(err, exec.ErrNotFound):
+		// Host execution (sandbox none) of a tool that is not installed.
+		if st.Optional {
+			sr.Status, sr.Output = "skipped", argv[0]+" not installed"
+		} else {
+			sr.Status, sr.Output = "error", argv[0]+" not installed (required by stage "+st.Name+")"
+		}
 	case sctx.Err() != nil:
 		sr.Status, sr.Output = "fail", "timeout after "+timeout.String()+"\n"+sr.Output
 	case errors.As(err, &ee):

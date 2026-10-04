@@ -89,3 +89,18 @@ func TestEngineGoRepo(t *testing.T) {
 		t.Fatalf("persisted runs = %d", len(runs))
 	}
 }
+
+func TestMissingTools(t *testing.T) {
+	ctx := context.Background()
+	repo := t.TempDir()
+	e := &Engine{Sandbox: sandbox.None{}}
+	tgt := RepoTarget{Name: "r", Worktree: repo}
+	opt := e.runStage(ctx, tgt, Stage{Name: "lint", Run: []string{"definitely-not-installed-tool-xyz"}, Optional: true}, nil)
+	if opt.Status != "skipped" {
+		t.Fatalf("optional missing tool: %+v", opt)
+	}
+	req := e.runStage(ctx, tgt, Stage{Name: "build", Run: []string{"definitely-not-installed-tool-xyz"}}, nil)
+	if req.Status != "error" || !strings.Contains(req.Output, "not installed") {
+		t.Fatalf("required missing tool: %+v", req)
+	}
+}
