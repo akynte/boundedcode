@@ -1,0 +1,16 @@
+{
+  "id": "vuejs__core-11899",
+  "category": "typescript",
+  "build": "0217d96 (frozen)",
+  "result": "FAILED",
+  "task_status": "never_started",
+  "primary_cause": "RUNTIME",
+  "product_defect": "xservice JavaScript constant evaluator expanded bindings exponentially (no memoization, cycle detection or size bound; semicolon-free bindings swallowed following statements). Scanning packages/reactivity/src/collectionHandlers.ts drove the BoundedCode process to ~58.9 GiB RSS during task setup.",
+  "attempts": [
+    {"started": "2026-10-04T13:49:47 local", "outcome": "run stopped at ~13:50 by the Claude Code background-shell memory reaper during setup (no memory sampler running; see memory-pressure.md)"},
+    {"started": "2026-10-04T15:38:28 local", "outcome": "process SIGKILLed (exit 137) at ~15:46:45 during setup; sampler: boundedcode RSS 9.9 GiB after 30 s, 58.9 GiB peak, host MemAvailable 328 MiB; llama-server 145 MiB, Docker VM stopped", "evidence": ["evidence/vuejs__core-11899-frozen-memory.log", "evidence/vuejs__core-11899-frozen-run.log"]}
+  ],
+  "accepted": false,
+  "human_intervention": "NONE",
+  "fixed_in": "see the commit 'Bound cross-service constant evaluation' (post-freeze)"
+}
