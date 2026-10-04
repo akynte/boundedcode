@@ -1,0 +1,882 @@
+[
+  {
+    "id": "grpc-go",
+    "language": "go",
+    "serena_version": "1.7.0",
+    "serena_commit": "949a27ef1e5fda1a6e7b561e777bcece345c6ffd",
+    "repository": "gomod:google.golang.org/grpc@v1.84.0",
+    "source_files": 938,
+    "started": "2026-10-04T03:57:22.092732265Z",
+    "answers": [
+      {
+        "question": "def-exponential",
+        "kind": "definition",
+        "backend": "serena",
+        "files": [
+          "internal/backoff/backoff.go"
+        ],
+        "recall": 1,
+        "precision": 1,
+        "decoy": false,
+        "calls": 2,
+        "ms": 867.76,
+        "context_tokens": 53
+      },
+      {
+        "question": "def-exponential",
+        "kind": "definition",
+        "backend": "codebase-memory",
+        "files": [
+          "internal/backoff/backoff.go",
+          "internal/xds/clients/internal/backoff/backoff.go"
+        ],
+        "recall": 1,
+        "precision": 0.5,
+        "decoy": false,
+        "calls": 1,
+        "ms": 11.867,
+        "context_tokens": 165
+      },
+      {
+        "question": "def-exponential",
+        "kind": "definition",
+        "backend": "grep+read",
+        "files": [
+          "internal/backoff/backoff.go"
+        ],
+        "recall": 1,
+        "precision": 1,
+        "decoy": false,
+        "calls": 2,
+        "ms": 7.576,
+        "context_tokens": 1045
+      },
+      {
+        "question": "impls-strategy",
+        "kind": "implementations",
+        "backend": "serena",
+        "files": [
+          "balancer/rls/helpers_test.go",
+          "clientconn_test.go",
+          "credentials/google/gcp_service_account_identity_credentials_test.go",
+          "internal/backoff/backoff.go",
+          "internal/xds/clients/internal/backoff/backoff.go"
+        ],
+        "recall": 1,
+        "precision": 1,
+        "decoy": false,
+        "calls": 3,
+        "ms": 2965.265,
+        "context_tokens": 107
+      },
+      {
+        "question": "impls-strategy",
+        "kind": "implementations",
+        "backend": "codebase-memory",
+        "files": [
+          "backoff.go",
+          "balancer/rls/helpers_test.go",
+          "clientconn_test.go",
+          "credentials/google/gcp_service_account_identity_credentials_test.go",
+          "internal/backoff/backoff.go",
+          "internal/xds/clients/internal/backoff/backoff.go"
+        ],
+        "recall": 1,
+        "precision": 0.8333333333333334,
+        "decoy": false,
+        "calls": 1,
+        "ms": 130.286,
+        "context_tokens": 128
+      },
+      {
+        "question": "impls-strategy",
+        "kind": "implementations",
+        "backend": "grep+read",
+        "files": [
+          "balancer/rls/helpers_test.go",
+          "clientconn_test.go",
+          "credentials/google/gcp_service_account_identity_credentials_test.go",
+          "internal/backoff/backoff.go",
+          "internal/xds/clients/internal/backoff/backoff.go"
+        ],
+        "recall": 1,
+        "precision": 1,
+        "decoy": false,
+        "calls": 6,
+        "ms": 6.873,
+        "context_tokens": 21740
+      },
+      {
+        "question": "refs-strategy",
+        "kind": "references",
+        "backend": "serena",
+        "files": [
+          "balancer/grpclb/grpclb.go",
+          "balancer/grpclb/grpclb_remote_balancer.go",
+          "balancer/rls/balancer.go",
+          "balancer/rls/cache.go",
+          "balancer/rls/cache_test.go",
+          "credentials/google/gcp_service_account_identity_credentials.go",
+          "credentials/google/internal/internal.go",
+          "credentials/jwt/token_file_call_creds.go",
+          "dialoptions.go"
+        ],
+        "recall": 1,
+        "precision": 1,
+        "decoy": false,
+        "calls": 3,
+        "ms": 1023.013,
+        "context_tokens": 298
+      },
+      {
+        "question": "refs-strategy",
+        "kind": "references",
+        "backend": "codebase-memory",
+        "files": [
+          "balancer/grpclb/grpclb.go",
+          "balancer/grpclb/grpclb_remote_balancer.go",
+          "balancer/rls/balancer.go",
+          "balancer/rls/cache.go",
+          "balancer/rls/cache_test.go",
+          "credentials/google/gcp_service_account_identity_credentials.go",
+          "credentials/google/internal/internal.go",
+          "credentials/jwt/token_file_call_creds.go",
+          "dialoptions.go"
+        ],
+        "recall": 1,
+        "precision": 1,
+        "decoy": false,
+        "calls": 2,
+        "ms": 704.514,
+        "context_tokens": 235
+      },
+      {
+        "question": "refs-strategy",
+        "kind": "references",
+        "backend": "grep+read",
+        "files": [
+          "balancer/grpclb/grpclb.go",
+          "balancer/grpclb/grpclb_remote_balancer.go",
+          "balancer/rls/balancer.go",
+          "balancer/rls/cache.go",
+          "balancer/rls/cache_test.go",
+          "balancer/rls/helpers_test.go",
+          "credentials/google/gcp_service_account_identity_credentials.go",
+          "credentials/google/internal/internal.go",
+          "credentials/jwt/token_file_call_creds.go",
+          "dialoptions.go",
+          "internal/backoff/backoff.go"
+        ],
+        "recall": 1,
+        "precision": 0.8181818181818182,
+        "decoy": false,
+        "calls": 12,
+        "ms": 6.076,
+        "context_tokens": 43892
+      },
+      {
+        "question": "refs-runf",
+        "kind": "references",
+        "backend": "serena",
+        "files": [
+          "internal/xds/clients/lrsclient/lrs_stream.go",
+          "orca/producer.go"
+        ],
+        "recall": 1,
+        "precision": 1,
+        "decoy": false,
+        "calls": 3,
+        "ms": 889.327,
+        "context_tokens": 57
+      },
+      {
+        "question": "refs-runf",
+        "kind": "references",
+        "backend": "codebase-memory",
+        "files": [
+          "internal/xds/clients/lrsclient/lrs_stream.go",
+          "internal/xds/clients/xdsclient/ads_stream.go",
+          "orca/producer.go"
+        ],
+        "recall": 1,
+        "precision": 0.6666666666666666,
+        "decoy": true,
+        "calls": 2,
+        "ms": 617.58,
+        "context_tokens": 140
+      },
+      {
+        "question": "refs-runf",
+        "kind": "references",
+        "backend": "grep+read",
+        "files": [
+          "internal/backoff/backoff.go",
+          "internal/xds/clients/internal/backoff/backoff.go",
+          "internal/xds/clients/lrsclient/lrs_stream.go",
+          "internal/xds/clients/xdsclient/ads_stream.go",
+          "orca/producer.go"
+        ],
+        "recall": 1,
+        "precision": 0.4,
+        "decoy": true,
+        "calls": 6,
+        "ms": 6.561,
+        "context_tokens": 16829
+      }
+    ],
+    "serena_start_s": 14.870728999999999,
+    "serena_usage": {
+      "processes": 3,
+      "rss_mib": 1170.2265625,
+      "cpu_seconds": 23.8
+    },
+    "graph_index_s": 4.019412003
+  },
+  {
+    "id": "symbol-nav-go",
+    "language": "go",
+    "serena_version": "1.7.0",
+    "serena_commit": "949a27ef1e5fda1a6e7b561e777bcece345c6ffd",
+    "repository": "symbol-nav/billing-service",
+    "source_files": 8,
+    "started": "2026-10-04T03:57:59.294668504Z",
+    "answers": [
+      {
+        "question": "def-createpayment",
+        "kind": "definition",
+        "backend": "serena",
+        "files": [
+          "internal/payment/service.go"
+        ],
+        "recall": 1,
+        "precision": 1,
+        "decoy": false,
+        "calls": 1,
+        "ms": 106.358,
+        "context_tokens": 166
+      },
+      {
+        "question": "def-createpayment",
+        "kind": "definition",
+        "backend": "codebase-memory",
+        "files": [
+          "internal/payment/service.go"
+        ],
+        "recall": 1,
+        "precision": 1,
+        "decoy": false,
+        "calls": 1,
+        "ms": 11.376,
+        "context_tokens": 261
+      },
+      {
+        "question": "def-createpayment",
+        "kind": "definition",
+        "backend": "grep+read",
+        "files": [
+          "internal/payment/service.go"
+        ],
+        "recall": 1,
+        "precision": 1,
+        "decoy": false,
+        "calls": 2,
+        "ms": 5.298,
+        "context_tokens": 407
+      },
+      {
+        "question": "refs-createpayment",
+        "kind": "references",
+        "backend": "serena",
+        "files": [
+          "internal/api/handler.go",
+          "internal/payment/service_test.go"
+        ],
+        "recall": 1,
+        "precision": 1,
+        "decoy": false,
+        "calls": 2,
+        "ms": 2196.174,
+        "context_tokens": 133
+      },
+      {
+        "question": "refs-createpayment",
+        "kind": "references",
+        "backend": "codebase-memory",
+        "files": [
+          "internal/api/handler.go",
+          "internal/payment/service_test.go"
+        ],
+        "recall": 1,
+        "precision": 1,
+        "decoy": false,
+        "calls": 2,
+        "ms": 60.72,
+        "context_tokens": 126
+      },
+      {
+        "question": "refs-createpayment",
+        "kind": "references",
+        "backend": "grep+read",
+        "files": [
+          "internal/api/handler.go",
+          "internal/payment/service.go",
+          "internal/payment/service_test.go"
+        ],
+        "recall": 1,
+        "precision": 0.6666666666666666,
+        "decoy": false,
+        "calls": 4,
+        "ms": 4.856,
+        "context_tokens": 929
+      },
+      {
+        "question": "impls-paymentrepository",
+        "kind": "implementations",
+        "backend": "serena",
+        "files": [
+          "internal/payment/memory.go",
+          "internal/payment/postgres.go"
+        ],
+        "recall": 1,
+        "precision": 1,
+        "decoy": false,
+        "calls": 2,
+        "ms": 150.795,
+        "context_tokens": 38
+      },
+      {
+        "question": "impls-paymentrepository",
+        "kind": "implementations",
+        "backend": "codebase-memory",
+        "files": [
+          "internal/payment/memory.go",
+          "internal/payment/postgres.go"
+        ],
+        "recall": 1,
+        "precision": 1,
+        "decoy": false,
+        "calls": 1,
+        "ms": 10.156,
+        "context_tokens": 64
+      },
+      {
+        "question": "impls-paymentrepository",
+        "kind": "implementations",
+        "backend": "grep+read",
+        "files": [
+          "internal/audit/audit.go",
+          "internal/payment/memory.go",
+          "internal/payment/postgres.go"
+        ],
+        "recall": 1,
+        "precision": 0.6666666666666666,
+        "decoy": true,
+        "calls": 4,
+        "ms": 4.603,
+        "context_tokens": 664
+      },
+      {
+        "question": "refs-paymentrepository-insert",
+        "kind": "references",
+        "backend": "serena",
+        "files": [
+          "internal/payment/service.go"
+        ],
+        "recall": 1,
+        "precision": 1,
+        "decoy": false,
+        "calls": 2,
+        "ms": 194.999,
+        "context_tokens": 30
+      },
+      {
+        "question": "refs-paymentrepository-insert",
+        "kind": "references",
+        "backend": "codebase-memory",
+        "files": [
+          "internal/payment/service.go"
+        ],
+        "recall": 1,
+        "precision": 1,
+        "decoy": false,
+        "calls": 2,
+        "ms": 19.177,
+        "context_tokens": 113
+      },
+      {
+        "question": "refs-paymentrepository-insert",
+        "kind": "references",
+        "backend": "grep+read",
+        "files": [
+          "internal/audit/audit.go",
+          "internal/payment/memory.go",
+          "internal/payment/postgres.go",
+          "internal/payment/repository.go",
+          "internal/payment/service.go"
+        ],
+        "recall": 1,
+        "precision": 0.2,
+        "decoy": true,
+        "calls": 6,
+        "ms": 4.336,
+        "context_tokens": 1284
+      },
+      {
+        "question": "impls-audit-sink",
+        "kind": "implementations",
+        "backend": "serena",
+        "files": [
+          "internal/audit/audit.go"
+        ],
+        "recall": 1,
+        "precision": 1,
+        "decoy": false,
+        "calls": 2,
+        "ms": 187.807,
+        "context_tokens": 15
+      },
+      {
+        "question": "impls-audit-sink",
+        "kind": "implementations",
+        "backend": "codebase-memory",
+        "files": [
+          "internal/audit/audit.go",
+          "internal/payment/memory.go",
+          "internal/payment/postgres.go"
+        ],
+        "recall": 1,
+        "precision": 0.3333333333333333,
+        "decoy": true,
+        "calls": 1,
+        "ms": 3.838,
+        "context_tokens": 75
+      },
+      {
+        "question": "impls-audit-sink",
+        "kind": "implementations",
+        "backend": "grep+read",
+        "files": [
+          "internal/audit/audit.go",
+          "internal/payment/memory.go",
+          "internal/payment/postgres.go"
+        ],
+        "recall": 1,
+        "precision": 0.3333333333333333,
+        "decoy": true,
+        "calls": 4,
+        "ms": 4.614,
+        "context_tokens": 664
+      }
+    ],
+    "serena_start_s": 3.2783510000000002,
+    "serena_usage": {
+      "processes": 3,
+      "rss_mib": 311.79296875,
+      "cpu_seconds": 1.85
+    },
+    "graph_index_s": 1.584484706
+  },
+  {
+    "id": "symbol-nav-ts",
+    "language": "typescript",
+    "serena_version": "1.7.0",
+    "serena_commit": "949a27ef1e5fda1a6e7b561e777bcece345c6ffd",
+    "repository": "symbol-nav/web-checkout",
+    "source_files": 5,
+    "started": "2026-10-04T03:58:18.285943898Z",
+    "answers": [
+      {
+        "question": "def-submitpayment",
+        "kind": "definition",
+        "backend": "serena",
+        "files": [
+          "src/services/paymentService.ts"
+        ],
+        "recall": 1,
+        "precision": 1,
+        "decoy": false,
+        "calls": 1,
+        "ms": 105.276,
+        "context_tokens": 89
+      },
+      {
+        "question": "def-submitpayment",
+        "kind": "definition",
+        "backend": "codebase-memory",
+        "files": [
+          "src/services/paymentService.ts"
+        ],
+        "recall": 1,
+        "precision": 1,
+        "decoy": false,
+        "calls": 1,
+        "ms": 7.627,
+        "context_tokens": 185
+      },
+      {
+        "question": "def-submitpayment",
+        "kind": "definition",
+        "backend": "grep+read",
+        "files": [
+          "src/services/paymentService.ts"
+        ],
+        "recall": 1,
+        "precision": 1,
+        "decoy": false,
+        "calls": 2,
+        "ms": 6.17,
+        "context_tokens": 228
+      },
+      {
+        "question": "refs-submitpayment",
+        "kind": "references",
+        "backend": "serena",
+        "files": [
+          "src/api/checkoutController.ts"
+        ],
+        "recall": 1,
+        "precision": 1,
+        "decoy": false,
+        "calls": 2,
+        "ms": 5230.549,
+        "context_tokens": 75
+      },
+      {
+        "question": "refs-submitpayment",
+        "kind": "references",
+        "backend": "codebase-memory",
+        "files": [
+          "src/api/checkoutController.ts"
+        ],
+        "recall": 1,
+        "precision": 1,
+        "decoy": false,
+        "calls": 2,
+        "ms": 53.986,
+        "context_tokens": 111
+      },
+      {
+        "question": "refs-submitpayment",
+        "kind": "references",
+        "backend": "grep+read",
+        "files": [
+          "src/api/checkoutController.ts",
+          "src/services/paymentService.ts"
+        ],
+        "recall": 1,
+        "precision": 0.5,
+        "decoy": false,
+        "calls": 3,
+        "ms": 4.143,
+        "context_tokens": 423
+      },
+      {
+        "question": "refs-paymentrequest",
+        "kind": "references",
+        "backend": "serena",
+        "files": [
+          "src/api/checkoutController.ts",
+          "src/gateways/cardGateway.ts",
+          "src/gateways/mockGateway.ts",
+          "src/services/paymentService.ts",
+          "src/types/payment.ts"
+        ],
+        "recall": 1,
+        "precision": 1,
+        "decoy": false,
+        "calls": 2,
+        "ms": 157.565,
+        "context_tokens": 388
+      },
+      {
+        "question": "refs-paymentrequest",
+        "kind": "references",
+        "backend": "codebase-memory",
+        "files": [
+          "src/api/checkoutController.ts",
+          "src/gateways/cardGateway.ts",
+          "src/gateways/mockGateway.ts",
+          "src/services/paymentService.ts",
+          "src/types/payment.ts"
+        ],
+        "recall": 1,
+        "precision": 1,
+        "decoy": false,
+        "calls": 2,
+        "ms": 15.912,
+        "context_tokens": 178
+      },
+      {
+        "question": "refs-paymentrequest",
+        "kind": "references",
+        "backend": "grep+read",
+        "files": [
+          "src/api/checkoutController.ts",
+          "src/gateways/cardGateway.ts",
+          "src/gateways/mockGateway.ts",
+          "src/services/paymentService.ts",
+          "src/types/payment.ts"
+        ],
+        "recall": 1,
+        "precision": 1,
+        "decoy": false,
+        "calls": 6,
+        "ms": 4.503,
+        "context_tokens": 828
+      },
+      {
+        "question": "impls-paymentgateway",
+        "kind": "implementations",
+        "backend": "serena",
+        "files": [
+          "src/gateways/cardGateway.ts",
+          "src/gateways/mockGateway.ts"
+        ],
+        "recall": 1,
+        "precision": 1,
+        "decoy": false,
+        "calls": 2,
+        "ms": 190.592,
+        "context_tokens": 34
+      },
+      {
+        "question": "impls-paymentgateway",
+        "kind": "implementations",
+        "backend": "codebase-memory",
+        "files": [
+          "src/gateways/cardGateway.ts",
+          "src/gateways/mockGateway.ts"
+        ],
+        "recall": 1,
+        "precision": 1,
+        "decoy": false,
+        "calls": 1,
+        "ms": 9.076,
+        "context_tokens": 60
+      },
+      {
+        "question": "impls-paymentgateway",
+        "kind": "implementations",
+        "backend": "grep+read",
+        "files": [
+          "src/gateways/cardGateway.ts",
+          "src/gateways/mockGateway.ts"
+        ],
+        "recall": 1,
+        "precision": 1,
+        "decoy": false,
+        "calls": 3,
+        "ms": 4.955,
+        "context_tokens": 278
+      },
+      {
+        "question": "refs-validaterequest",
+        "kind": "references",
+        "backend": "serena",
+        "files": [
+          "src/services/paymentService.ts"
+        ],
+        "recall": 1,
+        "precision": 1,
+        "decoy": false,
+        "calls": 2,
+        "ms": 196.573,
+        "context_tokens": 31
+      },
+      {
+        "question": "refs-validaterequest",
+        "kind": "references",
+        "backend": "codebase-memory",
+        "files": [
+          "src/services/paymentService.ts"
+        ],
+        "recall": 1,
+        "precision": 1,
+        "decoy": false,
+        "calls": 2,
+        "ms": 15.159,
+        "context_tokens": 114
+      },
+      {
+        "question": "refs-validaterequest",
+        "kind": "references",
+        "backend": "grep+read",
+        "files": [
+          "src/services/paymentService.ts"
+        ],
+        "recall": 1,
+        "precision": 1,
+        "decoy": false,
+        "calls": 2,
+        "ms": 4.499,
+        "context_tokens": 228
+      }
+    ],
+    "serena_start_s": 3.457745,
+    "serena_usage": {
+      "processes": 5,
+      "rss_mib": 668.69140625,
+      "cpu_seconds": 3.2500000000000004
+    },
+    "graph_index_s": 1.598297895
+  },
+  {
+    "id": "temporal-sdk",
+    "language": "go",
+    "serena_version": "1.7.0",
+    "serena_commit": "949a27ef1e5fda1a6e7b561e777bcece345c6ffd",
+    "repository": "gomod:go.temporal.io/sdk@v1.49.0",
+    "source_files": 285,
+    "started": "2026-10-04T03:58:39.542920507Z",
+    "answers": [
+      {
+        "question": "def-payloadconverter",
+        "kind": "definition",
+        "backend": "serena",
+        "files": [
+          "converter/payload_converter.go"
+        ],
+        "recall": 1,
+        "precision": 1,
+        "decoy": false,
+        "calls": 2,
+        "ms": 372.38,
+        "context_tokens": 259
+      },
+      {
+        "question": "def-payloadconverter",
+        "kind": "definition",
+        "backend": "codebase-memory",
+        "files": [
+          "converter/payload_converter.go"
+        ],
+        "recall": 1,
+        "precision": 1,
+        "decoy": false,
+        "calls": 1,
+        "ms": 12.172,
+        "context_tokens": 323
+      },
+      {
+        "question": "def-payloadconverter",
+        "kind": "definition",
+        "backend": "grep+read",
+        "files": [
+          "converter/payload_converter.go"
+        ],
+        "recall": 1,
+        "precision": 1,
+        "decoy": false,
+        "calls": 2,
+        "ms": 8.446,
+        "context_tokens": 459
+      },
+      {
+        "question": "impls-payloadconverter",
+        "kind": "implementations",
+        "backend": "serena",
+        "files": [
+          "converter/byte_slice_payload_converter.go",
+          "converter/json_payload_converter.go",
+          "converter/nil_payload_converter.go",
+          "converter/payload_converter.go",
+          "converter/proto_json_payload_converter.go",
+          "converter/proto_payload_converter.go"
+        ],
+        "recall": 1,
+        "precision": 0.8333333333333334,
+        "decoy": false,
+        "calls": 3,
+        "ms": 2530.618,
+        "context_tokens": 145
+      },
+      {
+        "question": "impls-payloadconverter",
+        "kind": "implementations",
+        "backend": "codebase-memory",
+        "files": [
+          "converter/byte_slice_payload_converter.go",
+          "converter/json_payload_converter.go",
+          "converter/nil_payload_converter.go",
+          "converter/proto_json_payload_converter.go",
+          "converter/proto_payload_converter.go"
+        ],
+        "recall": 1,
+        "precision": 1,
+        "decoy": false,
+        "calls": 1,
+        "ms": 91.049,
+        "context_tokens": 133
+      },
+      {
+        "question": "impls-payloadconverter",
+        "kind": "implementations",
+        "backend": "grep+read",
+        "files": [
+          "converter/byte_slice_payload_converter.go",
+          "converter/json_payload_converter.go",
+          "converter/nil_payload_converter.go",
+          "converter/proto_json_payload_converter.go",
+          "converter/proto_payload_converter.go"
+        ],
+        "recall": 1,
+        "precision": 1,
+        "decoy": false,
+        "calls": 6,
+        "ms": 5.225,
+        "context_tokens": 5369
+      },
+      {
+        "question": "refs-newcompositedataconverter",
+        "kind": "references",
+        "backend": "serena",
+        "files": [
+          "converter/default_data_converter.go"
+        ],
+        "recall": 1,
+        "precision": 1,
+        "decoy": false,
+        "calls": 3,
+        "ms": 406.983,
+        "context_tokens": 36
+      },
+      {
+        "question": "refs-newcompositedataconverter",
+        "kind": "references",
+        "backend": "codebase-memory",
+        "files": [
+          "converter/default_data_converter.go"
+        ],
+        "recall": 1,
+        "precision": 1,
+        "decoy": false,
+        "calls": 2,
+        "ms": 310.798,
+        "context_tokens": 119
+      },
+      {
+        "question": "refs-newcompositedataconverter",
+        "kind": "references",
+        "backend": "grep+read",
+        "files": [
+          "README.md",
+          "converter/composite_data_converter.go",
+          "converter/default_data_converter.go"
+        ],
+        "recall": 1,
+        "precision": 0.3333333333333333,
+        "decoy": false,
+        "calls": 4,
+        "ms": 6.283,
+        "context_tokens": 3931
+      }
+    ],
+    "serena_start_s": 5.810017,
+    "serena_usage": {
+      "processes": 3,
+      "rss_mib": 1007.37109375,
+      "cpu_seconds": 8.08
+    },
+    "graph_index_s": 2.633104413
+  }
+]

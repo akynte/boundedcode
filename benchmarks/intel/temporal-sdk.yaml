@@ -1,0 +1,27 @@
+# Temporal Go SDK v1.49.0 (MIT, 285 Go files) from the Go module cache.
+# Ground truth from ripgrep, checked by reading the code: five
+# PayloadConverters; DataConverters have same-named ToPayload methods but
+# are a different interface (decoys).
+id: temporal-sdk
+language: go
+source: gomod:go.temporal.io/sdk@v1.49.0
+questions:
+  - id: def-payloadconverter
+    kind: definition
+    symbol: converter.PayloadConverter
+    expect: [converter/payload_converter.go]
+  - id: impls-payloadconverter
+    kind: implementations
+    symbol: converter.PayloadConverter
+    method: Encoding
+    expect:
+      - converter/byte_slice_payload_converter.go
+      - converter/json_payload_converter.go
+      - converter/nil_payload_converter.go
+      - converter/proto_json_payload_converter.go
+      - converter/proto_payload_converter.go
+    forbid: [converter/codec.go, converter/composite_data_converter.go, internal/workflow_deadlock.go]
+  - id: refs-newcompositedataconverter
+    kind: references
+    symbol: converter.NewCompositeDataConverter
+    expect: [converter/default_data_converter.go]

@@ -1,0 +1,51 @@
+id: go-iface-add-method
+category: interface-change
+fixture: symbol-nav
+repos: [billing-service]
+request: >-
+  Payments can now be cancelled. In billing-service, add a method
+  `Cancel(ctx context.Context, id string) error` to the `PaymentRepository`
+  interface. It sets the stored payment's Status to "cancelled" and returns
+  ErrNotFound for unknown ids. Implement it in every implementation of the
+  interface, and add `func (s *Service) CancelPayment(ctx context.Context, id string) error`
+  that calls it. Do not change unrelated packages.
+criteria:
+  - PaymentRepository has Cancel(ctx, id) error, implemented by every implementation
+  - Service.CancelPayment delegates to the repository
+  - go test ./... passes; unrelated packages unchanged
+hidden:
+  - repo: billing-service
+    path: internal/payment/hidden_cancel_test.go
+    content: |
+      package payment
+
+      import (
+      	"context"
+      	"errors"
+      	"testing"
+      )
+
+      func TestHiddenCancel(t *testing.T) {
+      	ctx := context.Background()
+      	for _, repo := range []PaymentRepository{&MemoryRepository{}, NewPostgresRepository()} {
+      		svc := NewService(repo, func() string { return "p1" })
+      		if _, err := svc.CreatePayment(ctx, CreateRequest{AccountID: "a", AmountCents: 5, Currency: "EUR"}); err != nil {
+      			t.Fatal(err)
+      		}
+      		if err := svc.CancelPayment(ctx, "p1"); err != nil {
+      			t.Fatalf("%T: cancel: %v", repo, err)
+      		}
+      		if p, _ := repo.Get(ctx, "p1"); p.Status != "cancelled" {
+      			t.Fatalf("%T: status %q", repo, p.Status)
+      		}
+      		if err := repo.Cancel(ctx, "nope"); !errors.Is(err, ErrNotFound) {
+      			t.Fatalf("%T: unknown id: %v", repo, err)
+      		}
+      	}
+      }
+checks:
+  - repo: billing-service
+    run: [go, test, ./...]
+  - repo: billing-service
+    run: [sh, -c, "git diff --quiet main -- internal/audit internal/api cmd"]
+timeout: 40m

@@ -2,6 +2,7 @@ package benchmark
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,6 +15,7 @@ import (
 	"time"
 
 	"github.com/akynte/boundedcode/internal/config"
+	"github.com/akynte/boundedcode/internal/contextplan"
 	"github.com/akynte/boundedcode/internal/gitops"
 	"github.com/akynte/boundedcode/internal/orchestrator"
 	"github.com/akynte/boundedcode/internal/sandbox"
@@ -23,13 +25,17 @@ import (
 
 // TaskSpec is one engineering benchmark task (benchmarks/tasks/*.yaml).
 type TaskSpec struct {
-	ID       string   `yaml:"id"`
-	Category string   `yaml:"category"`
-	Fixture  string   `yaml:"fixture"` // directory under benchmarks/fixtures
-	Repos    []string `yaml:"repos"`   // repositories the task may change
-	Setup    []Edit   `yaml:"setup"`   // edits applied and committed before the task (planted defects)
-	Request  string   `yaml:"request"`
-	Criteria []string `yaml:"criteria"`
+	ID       string `yaml:"id"`
+	Category string `yaml:"category"`
+	Fixture  string `yaml:"fixture"` // directory under benchmarks/fixtures
+	// Sources adds repositories copied from elsewhere, by name. Supported:
+	// "gomod:<module>@<version>" copies a module from the Go module cache
+	// (large real-world repositories without vendoring them here).
+	Sources  map[string]string `yaml:"sources"`
+	Repos    []string          `yaml:"repos"` // repositories the task may change
+	Setup    []Edit            `yaml:"setup"` // edits applied and committed before the task (planted defects)
+	Request  string            `yaml:"request"`
+	Criteria []string          `yaml:"criteria"`
 	// Hidden files are written after the agent finishes, then Checks run.
 	Hidden  []File          `yaml:"hidden"`
 	Checks  []Check         `yaml:"checks"`
@@ -72,8 +78,8 @@ func LoadTasks(dir string) ([]TaskSpec, error) {
 		if err := config.DecodeStrict(b, &t); err != nil {
 			return fmt.Errorf("%s: %w", p, err)
 		}
-		if t.ID == "" || t.Request == "" || len(t.Checks) == 0 || t.Fixture == "" {
-			return fmt.Errorf("%s: id, fixture, request and checks are required", p)
+		if t.ID == "" || t.Request == "" || len(t.Checks) == 0 || (t.Fixture == "" && len(t.Sources) == 0) {
+			return fmt.Errorf("%s: id, fixture (or sources), request and checks are required", p)
 		}
 		out = append(out, t)
 		return nil
@@ -102,6 +108,26 @@ type TaskResult struct {
 	FailedChecks    []string `json:"failed_checks,omitempty"`
 	Error           string   `json:"error,omitempty"`
 	TaskID          string   `json:"task_id"`
+	// Intel summarizes repository intelligence and agent tool use, from the
+	// task's audit events.
+	Intel IntelMetrics `json:"intel"`
+}
+
+// IntelMetrics are per-task repository-intelligence measurements.
+type IntelMetrics struct {
+	Packs          int            `json:"context_packs"`
+	PackTokens     int            `json:"pack_tokens"` // all context packs sent
+	CodeTokens     int            `json:"code_tokens"` // their RELEVANT CODE sections (source placed into context)
+	NavCalls       int            `json:"serena_calls"`
+	NavErrors      int            `json:"serena_errors"`
+	NavMillis      float64        `json:"serena_ms"`
+	GraphCalls     int            `json:"graph_calls"`
+	GraphMillis    float64        `json:"graph_ms"`
+	NavSymbols     int            `json:"serena_symbols"`
+	GraphSymbols   int            `json:"graph_symbols"`
+	Fallbacks      int            `json:"fallbacks"`
+	AgentToolCalls int            `json:"agent_tool_calls"`
+	AgentTools     map[string]int `json:"agent_tools,omitempty"`
 }
 
 // SuiteReport aggregates a run.
@@ -176,7 +202,11 @@ func (s *SuiteRunner) runOne(ctx context.Context, model string, spec TaskSpec) (
 	start := time.Now()
 	defer func() { res.WallSeconds = time.Since(start).Seconds() }()
 	dir := filepath.Join(s.WorkRoot, fmt.Sprintf("%s-%d", spec.ID, time.Now().UnixNano()))
-	repos, err := materialize(ctx, filepath.Join(s.FixturesDir, spec.Fixture), filepath.Join(dir, "repos"), spec.Setup)
+	fixture := ""
+	if spec.Fixture != "" {
+		fixture = filepath.Join(s.FixturesDir, spec.Fixture)
+	}
+	repos, err := materialize(ctx, fixture, spec.Sources, filepath.Join(dir, "repos"), spec.Setup)
 	if err != nil {
 		res.Error = "materialize: " + err.Error()
 		return res
@@ -265,12 +295,7 @@ func (s *SuiteRunner) runOne(ctx context.Context, model string, spec TaskSpec) (
 			res.FailedChecks = append(res.FailedChecks, c.Repo+": repo not in task")
 			continue
 		}
-		mounts := []sandbox.Mount{{Host: wt.Path, Target: wt.Path}}
-		if common, err := gitops.CommonDir(ctx, wt.Path); err == nil {
-			mounts = append(mounts, sandbox.Mount{Host: common, Target: common, ReadOnly: true})
-		}
-		cmd, err := s.Sandbox.Command(ctx, sandbox.Spec{Argv: c.Run, Workdir: wt.Path, Mounts: mounts,
-			Env: map[string]string{"GOFLAGS": "-buildvcs=false", "GOTOOLCHAIN": "local"}})
+		cmd, err := s.Sandbox.Command(ctx, checkSpec(ctx, spec, wt.Path, c.Run))
 		if err != nil {
 			res.Success = false
 			res.FailedChecks = append(res.FailedChecks, err.Error())
@@ -283,17 +308,95 @@ func (s *SuiteRunner) runOne(ctx context.Context, model string, spec TaskSpec) (
 		}
 	}
 	res.LocalOnly = res.Success && res.Escalations == 0
+	res.Intel = collectIntel(ctx, r.DB, tk.ID)
 	return res
 }
 
-// materialize copies the fixture's repositories into dst as git repos,
-// applies setup edits and commits them as the base.
-func materialize(ctx context.Context, fixture, dst string, setup []Edit) (map[string]string, error) {
-	entries, err := os.ReadDir(fixture)
+// collectIntel aggregates context-pack and agent-tool events of a task.
+func collectIntel(ctx context.Context, db *sql.DB, taskID string) IntelMetrics {
+	m := IntelMetrics{AgentTools: map[string]int{}}
+	rows, err := db.QueryContext(ctx, `SELECT kind, data FROM events WHERE task_id = ? AND kind IN ('context.pack', 'agent.event')`, taskID)
 	if err != nil {
-		return nil, err
+		return m
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var kind, data string
+		if rows.Scan(&kind, &data) != nil {
+			continue
+		}
+		switch kind {
+		case "context.pack":
+			var p struct {
+				Tokens   int `json:"tokens"`
+				Sections []struct {
+					Key    string `json:"key"`
+					Tokens int    `json:"tokens"`
+				} `json:"sections"`
+				Intel contextplan.IntelStats `json:"intel"`
+			}
+			if json.Unmarshal([]byte(data), &p) != nil {
+				continue
+			}
+			m.Packs++
+			m.PackTokens += p.Tokens
+			for _, sec := range p.Sections {
+				if sec.Key == "code" {
+					m.CodeTokens += sec.Tokens
+				}
+			}
+			in := p.Intel
+			m.NavCalls += in.NavCalls
+			m.NavErrors += in.NavErrors
+			m.NavMillis += in.NavMillis
+			m.GraphCalls += in.GraphCalls
+			m.GraphMillis += in.GraphMillis
+			m.NavSymbols += in.NavSymbols
+			m.GraphSymbols += in.GraphSymbols
+			m.Fallbacks += in.Fallbacks
+		case "agent.event":
+			var e struct {
+				Kind string `json:"kind"`
+				Tool string `json:"tool"`
+			}
+			if json.Unmarshal([]byte(data), &e) == nil && e.Tool != "" && e.Kind == "ActionEvent" {
+				m.AgentToolCalls++
+				m.AgentTools[e.Tool]++
+			}
+		}
+	}
+	return m
+}
+
+// materialize copies the fixture's repositories (and extra sources) into dst
+// as git repos, applies setup edits and commits them as the base.
+func materialize(ctx context.Context, fixture string, sources map[string]string, dst string, setup []Edit) (map[string]string, error) {
+	var entries []os.DirEntry
+	if fixture != "" {
+		var err error
+		if entries, err = os.ReadDir(fixture); err != nil {
+			return nil, err
+		}
 	}
 	repos := map[string]string{}
+	for name, src := range sources {
+		dir, err := sourceDir(ctx, src)
+		if err != nil {
+			return nil, fmt.Errorf("source %s: %w", name, err)
+		}
+		target := filepath.Join(dst, name)
+		if err := os.MkdirAll(dst, 0o755); err != nil {
+			return nil, err
+		}
+		if out, err := exec.CommandContext(ctx, "cp", "-r", dir, target).CombinedOutput(); err != nil {
+			return nil, fmt.Errorf("cp: %s", out)
+		}
+		// Module cache files are read-only.
+		if out, err := exec.CommandContext(ctx, "chmod", "-R", "u+w", target).CombinedOutput(); err != nil {
+			return nil, fmt.Errorf("chmod: %s", out)
+		}
+		repos[name] = target
+	}
 	for _, e := range entries {
 		if !e.IsDir() {
 			continue
@@ -335,6 +438,64 @@ func materialize(ctx context.Context, fixture, dst string, setup []Edit) (map[st
 		}
 	}
 	return repos, nil
+}
+
+// checkSpec is the sandbox spec for one hidden check in a checkout.
+func checkSpec(ctx context.Context, spec TaskSpec, dir string, run []string) sandbox.Spec {
+	mounts := []sandbox.Mount{{Host: dir, Target: dir}}
+	if common, err := gitops.CommonDir(ctx, dir); err == nil && common != filepath.Join(dir, ".git") {
+		mounts = append(mounts, sandbox.Mount{Host: common, Target: common, ReadOnly: true})
+	}
+	env := map[string]string{"GOFLAGS": "-buildvcs=false", "GOTOOLCHAIN": "local"}
+	// Repositories with dependencies (Sources) build offline from the host
+	// module cache, mounted read-only as in verification.
+	if mc := goModCache(ctx); mc != "" && len(spec.Sources) > 0 {
+		mounts = append(mounts, sandbox.Mount{Host: mc, Target: mc, ReadOnly: true})
+		env["GOMODCACHE"], env["GOFLAGS"], env["GOPROXY"] = mc, "-buildvcs=false -mod=mod", "off"
+	}
+	return sandbox.Spec{Argv: run, Workdir: dir, Mounts: mounts, Env: env}
+}
+
+// sourceDir resolves a Sources entry to a local directory.
+func sourceDir(ctx context.Context, src string) (string, error) {
+	spec, ok := strings.CutPrefix(src, "gomod:")
+	if !ok {
+		return "", fmt.Errorf("unsupported source %q (want gomod:<module>@<version>)", src)
+	}
+	mod, ver, ok := strings.Cut(spec, "@")
+	if !ok || ver == "" || strings.Contains(ver, "latest") {
+		return "", fmt.Errorf("source %q must pin an exact version", src)
+	}
+	mc := goModCache(ctx)
+	if mc == "" {
+		return "", errors.New("no Go module cache")
+	}
+	dir := filepath.Join(mc, escapeModulePath(mod)+"@"+ver)
+	if _, err := os.Stat(filepath.Join(dir, "go.mod")); err != nil {
+		return "", fmt.Errorf("%s not in the module cache (run `go mod download %s@%s`)", dir, mod, ver)
+	}
+	return dir, nil
+}
+
+// escapeModulePath applies the module cache's case encoding ("A" -> "!a").
+func escapeModulePath(p string) string {
+	var b strings.Builder
+	for _, r := range p {
+		if r >= 'A' && r <= 'Z' {
+			b.WriteByte('!')
+			r += 'a' - 'A'
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
+}
+
+func goModCache(ctx context.Context) string {
+	out, err := exec.CommandContext(ctx, "go", "env", "GOMODCACHE").Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(out))
 }
 
 func summarize(rs []TaskResult) Summary {

@@ -1,0 +1,40 @@
+# grpc-go v1.84.0 (Apache-2.0, ~940 Go files) from the Go module cache.
+# Ground truth was derived with ripgrep and checked by reading the imports:
+# internal/xds/clients/internal/backoff defines a second, unrelated RunF and
+# a structurally compatible exponential type.
+id: grpc-go
+language: go
+source: gomod:google.golang.org/grpc@v1.84.0
+questions:
+  - id: def-exponential
+    kind: definition
+    symbol: backoff.Exponential
+    expect: [internal/backoff/backoff.go]
+  - id: impls-strategy
+    kind: implementations
+    symbol: backoff.Strategy
+    method: Backoff
+    expect:
+      - internal/backoff/backoff.go
+      - internal/xds/clients/internal/backoff/backoff.go
+      - clientconn_test.go
+      - balancer/rls/helpers_test.go
+      - credentials/google/gcp_service_account_identity_credentials_test.go
+  - id: refs-strategy
+    kind: references
+    symbol: backoff.Strategy
+    expect:
+      - balancer/grpclb/grpclb.go
+      - balancer/grpclb/grpclb_remote_balancer.go
+      - balancer/rls/balancer.go
+      - balancer/rls/cache.go
+      - balancer/rls/cache_test.go
+      - credentials/google/gcp_service_account_identity_credentials.go
+      - credentials/google/internal/internal.go
+      - credentials/jwt/token_file_call_creds.go
+      - dialoptions.go
+  - id: refs-runf
+    kind: references
+    symbol: backoff.RunF
+    expect: [orca/producer.go, internal/xds/clients/lrsclient/lrs_stream.go]
+    forbid: [internal/xds/clients/xdsclient/ads_stream.go]

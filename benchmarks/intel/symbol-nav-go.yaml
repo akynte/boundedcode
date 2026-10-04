@@ -1,0 +1,32 @@
+# Ground truth for benchmarks/fixtures/symbol-nav/billing-service (see its README).
+id: symbol-nav-go
+language: go
+fixture: symbol-nav/billing-service
+questions:
+  - id: def-createpayment
+    kind: definition
+    symbol: CreatePayment
+    expect: [internal/payment/service.go]
+  - id: refs-createpayment
+    kind: references
+    symbol: CreatePayment
+    expect: [internal/api/handler.go, internal/payment/service_test.go]
+  - id: impls-paymentrepository
+    kind: implementations
+    symbol: PaymentRepository
+    method: Insert
+    expect: [internal/payment/memory.go, internal/payment/postgres.go]
+    forbid: [internal/audit/audit.go]
+  - id: refs-paymentrepository-insert
+    kind: references
+    symbol: PaymentRepository.Insert
+    expect: [internal/payment/service.go]
+    forbid: [internal/audit/audit.go]
+  # audit.Sink has a same-named Insert method with a different parameter type:
+  # the payment repositories do not implement it.
+  - id: impls-audit-sink
+    kind: implementations
+    symbol: Sink
+    method: Insert
+    expect: [internal/audit/audit.go]
+    forbid: [internal/payment/memory.go, internal/payment/postgres.go]

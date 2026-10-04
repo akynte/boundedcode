@@ -1,0 +1,26 @@
+# Ground truth for benchmarks/fixtures/symbol-nav/web-checkout:
+# API component -> service function -> shared type.
+id: symbol-nav-ts
+language: typescript
+fixture: symbol-nav/web-checkout
+questions:
+  - id: def-submitpayment
+    kind: definition
+    symbol: submitPayment
+    expect: [src/services/paymentService.ts]
+  - id: refs-submitpayment
+    kind: references
+    symbol: submitPayment
+    expect: [src/api/checkoutController.ts]
+  - id: refs-paymentrequest
+    kind: references
+    symbol: PaymentRequest
+    expect: [src/types/payment.ts, src/services/paymentService.ts, src/api/checkoutController.ts, src/gateways/cardGateway.ts, src/gateways/mockGateway.ts]
+  - id: impls-paymentgateway
+    kind: implementations
+    symbol: PaymentGateway
+    expect: [src/gateways/cardGateway.ts, src/gateways/mockGateway.ts]
+  - id: refs-validaterequest
+    kind: references
+    symbol: validateRequest
+    expect: [src/services/paymentService.ts]

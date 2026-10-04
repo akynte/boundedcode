@@ -89,6 +89,14 @@ func WriteSuiteMarkdown(w io.Writer, r *SuiteReport) error {
 		fmt.Fprintf(&b, "| %s | %s | %v | %s | %v | %d | %d | %d | %.0f | %s |\n", t.ID, t.Category, t.Success, t.TaskStatus, t.SelfVerified,
 			t.Attempts, t.LocalTokens, t.Escalations, t.WallSeconds, strings.ReplaceAll(note, "|", "/"))
 	}
+	b.WriteString("\nRepository intelligence (context packs and agent tool use):\n\n" +
+		"| task | packs | pack tokens | code tokens | serena calls (err) | serena ms | graph calls | graph ms | symbols serena/graph | fallbacks | agent tool calls |\n" +
+		"|---|---|---|---|---|---|---|---|---|---|---|\n")
+	for _, t := range r.Results {
+		m := t.Intel
+		fmt.Fprintf(&b, "| %s | %d | %d | %d | %d (%d) | %.0f | %d | %.0f | %d/%d | %d | %d |\n", t.ID, m.Packs, m.PackTokens, m.CodeTokens,
+			m.NavCalls, m.NavErrors, m.NavMillis, m.GraphCalls, m.GraphMillis, m.NavSymbols, m.GraphSymbols, m.Fallbacks, m.AgentToolCalls)
+	}
 	_, err := io.WriteString(w, b.String())
 	return err
 }

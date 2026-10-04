@@ -1,0 +1,65 @@
+id: go-large-iface-method
+category: interface-change-large-repo
+# Temporal Go SDK v1.49.0 (MIT, 285 Go files, ~72k lines), copied from the
+# Go module cache: the "large repository" experiment of ADR-0008. Its
+# dependencies must be in the module cache (`go mod download` in the module
+# once). grpc-go was tried first and is unusable here: the sandbox's
+# secret-path heuristic masks its credentials/ packages, so it cannot build.
+sources:
+  temporal-sdk: gomod:go.temporal.io/sdk@v1.49.0
+repos: [temporal-sdk]
+setup:
+  # Scope verification: the default Go gate would run `go test ./...` on the
+  # whole module. `go vet ./...` still compiles every test file.
+  - repo: temporal-sdk
+    file: .boundedcode/verification.yaml
+    new: |
+      version: 1
+      max_changed_files: 30
+      stages:
+        - {name: gofmt, run: [sh, -c, "out=$(gofmt -l $(git ls-files '*.go')); [ -z \"$out\" ] || { echo \"$out\"; exit 1; }"]}
+        - {name: go-build, run: [go, build, ./...]}
+        - {name: go-vet, run: [go, vet, ./...], timeout: 20m}
+        - {name: go-test, run: [go, test, -count=1, ./converter/...], timeout: 10m}
+request: >-
+  In the Temporal Go SDK, add a method `MediaType() string` to the
+  `PayloadConverter` interface in package converter. It returns the MIME type
+  of the payloads the converter produces: "application/json" for
+  JSONPayloadConverter and ProtoJSONPayloadConverter,
+  "application/x-protobuf" for ProtoPayloadConverter,
+  "application/octet-stream" for ByteSlicePayloadConverter, and "" for
+  NilPayloadConverter. Every implementation of PayloadConverter in the
+  repository must implement it. Do not change DataConverter implementations.
+  Everything, including all test files, must still compile.
+criteria:
+  - PayloadConverter has MediaType() string, implemented by every implementation
+  - DataConverter implementations unchanged; go vet ./... passes
+hidden:
+  - repo: temporal-sdk
+    path: converter/hidden_mediatype_test.go
+    content: |
+      package converter
+
+      import "testing"
+
+      func TestHiddenMediaType(t *testing.T) {
+      	for pc, want := range map[PayloadConverter]string{
+      		NewJSONPayloadConverter():      "application/json",
+      		NewProtoJSONPayloadConverter(): "application/json",
+      		NewProtoPayloadConverter():     "application/x-protobuf",
+      		NewByteSlicePayloadConverter(): "application/octet-stream",
+      		NewNilPayloadConverter():       "",
+      	} {
+      		if got := pc.MediaType(); got != want {
+      			t.Errorf("%T: got %q, want %q", pc, got, want)
+      		}
+      	}
+      }
+checks:
+  - repo: temporal-sdk
+    run: [go, test, -count=1, -run, TestHiddenMediaType, ./converter/]
+  - repo: temporal-sdk
+    run: [go, vet, ./converter/..., ./internal/...]
+  - repo: temporal-sdk
+    run: [sh, -c, "git diff --quiet main -- converter/codec.go converter/composite_data_converter.go internal/workflow_deadlock.go internal/converter"]
+timeout: 60m
