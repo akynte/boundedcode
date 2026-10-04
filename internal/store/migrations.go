@@ -158,4 +158,16 @@ CREATE TABLE xservice_endpoints (
 CREATE INDEX xservice_endpoints_ws ON xservice_endpoints(workspace_id);
 CREATE INDEX xservice_endpoints_repo ON xservice_endpoints(repository_id);
 `,
+	// 3: repository enable/disable, task run leases (one live runner per
+	// task; stale leases are reconciled on the next run) and richer
+	// escalation telemetry.
+	`
+ALTER TABLE repositories ADD COLUMN enabled INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE tasks ADD COLUMN lease_owner TEXT NOT NULL DEFAULT '';
+ALTER TABLE tasks ADD COLUMN lease_heartbeat TEXT NOT NULL DEFAULT '';
+ALTER TABLE escalations ADD COLUMN model TEXT NOT NULL DEFAULT '';
+ALTER TABLE escalations ADD COLUMN diff_before TEXT NOT NULL DEFAULT '';
+ALTER TABLE escalations ADD COLUMN diff_after TEXT NOT NULL DEFAULT '';
+ALTER TABLE escalations ADD COLUMN task_outcome TEXT NOT NULL DEFAULT '';
+`,
 }

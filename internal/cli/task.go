@@ -107,7 +107,7 @@ func (a *App) buildRunnerWith(ctx context.Context, f runFlags, db *sql.DB, paths
 	var rt agent.Runtime
 	switch a.Config.Agent.Runtime {
 	case "openhands":
-		rt = &openhands.Runtime{Sandbox: sb, Argv: argv, Log: a.Log, LogDir: filepath.Join(paths.State, "adapter"),
+		rt = &openhands.Runtime{Sandbox: sb, Argv: argv, Log: a.Log,
 			Gateway: func(taskID string) *inference.Gateway { return newGW(taskID, 0) }}
 	default:
 		return nil, nil, fmt.Errorf("agent runtime %q cannot run tasks from the CLI", a.Config.Agent.Runtime)
@@ -144,6 +144,9 @@ func (a *App) buildRunnerWith(ctx context.Context, f runFlags, db *sql.DB, paths
 		r.Nav = nav // assigned only when usable: a nil *Navigator is a non-nil interface
 	}
 	r.WS = workspace.Store{DB: db}
+	if rt := a.inferenceRuntime(); rt != nil {
+		r.EnsureModel = func(ctx context.Context) error { _, err := rt.Ensure(ctx, p); return err }
+	}
 	// Gateway budget is per task; the runner passes the remaining allowance.
 	r.NewGateway = newGW
 	if a.Config.Frontier.Enabled {
@@ -161,7 +164,7 @@ func (a *App) buildRunnerWith(ctx context.Context, f runFlags, db *sql.DB, paths
 			r.Frontier = frontier.Manual{}
 		}
 	}
-	r.Approve = func(_ context.Context, tr frontier.Trigger, packetPath string, tokens int) bool {
+	r.Approve = func(ctx context.Context, tr frontier.Trigger, packetPath string, tokens int) bool {
 		if f.approveFrontier {
 			return true
 		}
@@ -170,8 +173,17 @@ func (a *App) buildRunnerWith(ctx context.Context, f runFlags, db *sql.DB, paths
 			return false
 		}
 		fmt.Fprintf(a.Err, "\nFrontier escalation %s: %s\nPacket (%d tokens): %s\nSend to %s? [y/N] ", tr.Code, tr.Reason, tokens, packetPath, a.Config.Frontier.Provider)
-		line, _ := bufio.NewReader(os.Stdin).ReadString('\n')
-		return strings.EqualFold(strings.TrimSpace(line), "y")
+		answer := make(chan string, 1)
+		go func() {
+			line, _ := bufio.NewReader(os.Stdin).ReadString('\n')
+			answer <- line
+		}()
+		select {
+		case line := <-answer:
+			return strings.EqualFold(strings.TrimSpace(line), "y")
+		case <-ctx.Done():
+			return false
+		}
 	}
 	return r, cleanup, nil
 }
@@ -203,6 +215,9 @@ func newTaskCmd(app *App) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			if app.Config, err = app.Config.WithWorkspace(app.Paths.Config, w.Name); err != nil {
+				return err
+			}
 			r, cleanup, err := app.taskRunner(ctx, rf, run)
 			if err != nil {
 				return err
@@ -232,6 +247,9 @@ func newTaskCmd(app *App) *cobra.Command {
 		Short:   "Run or resume a task until it completes, blocks or is interrupted",
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := app.applyTaskWorkspace(cmd.Context(), args[0]); err != nil {
+				return err
+			}
 			r, cleanup, err := app.taskRunner(cmd.Context(), rf2, true)
 			if err != nil {
 				return err
@@ -337,6 +355,9 @@ func newTaskCmd(app *App) *cobra.Command {
 				return err
 			}
 			wts, _ := l.Worktrees(ctx, t.ID)
+			if err := checkWorktrees(ctx, wts); err != nil {
+				return err
+			}
 			for _, w := range wts {
 				d, err := gitops.Diff(ctx, w.Path, w.BaseCommit, false)
 				if err != nil {
@@ -368,12 +389,103 @@ func newTaskCmd(app *App) *cobra.Command {
 				return err
 			}
 			orchestrator.FinishEscalations(ctx, s.DB, t.ID, "no_effect")
-			app.printf("cancelled %s; branch %s kept\n", t.ID, gitops.TaskBranch(t.ID))
+			telemetry.New(s.DB, app.Log).Emit(ctx, t.ID, "task.cancelled", map[string]any{"phase": t.Phase, "attempts": t.AttemptCount})
+			if ls, _ := l.LeaseOf(ctx, t.ID); ls.Owner != "" {
+				app.printf("a run of this task is in progress (%s); it stops within ~15s\n", ls.Owner)
+			}
+			app.printf("cancelled %s; branch %s kept (`task cleanup %s` removes the worktrees)\n", t.ID, gitops.TaskBranch(t.ID), t.ID)
 			return nil
 		},
 	}
-	cmd.AddCommand(create, runCmd, status, events, diff, cancel)
+	var deleteBranch bool
+	cleanupCmd := &cobra.Command{
+		Use:   "cleanup TASK",
+		Short: "Remove a finished task's worktrees and caches (branch kept unless --delete-branch)",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := cmd.Context()
+			s, err := app.Store(ctx)
+			if err != nil {
+				return err
+			}
+			l := task.Ledger{DB: s.DB}
+			t, err := l.Get(ctx, args[0])
+			if err != nil {
+				return err
+			}
+			switch t.Status {
+			case task.StatusCompleted, task.StatusCancelled, task.StatusFailed:
+			default:
+				return fmt.Errorf("task %s is %s; cancel it first (cleanup only removes finished tasks)", t.ID, t.Status)
+			}
+			if ls, _ := l.LeaseOf(ctx, t.ID); ls.Owner != "" {
+				return fmt.Errorf("task %s is still being run by %s", t.ID, ls.Owner)
+			}
+			wts, err := l.Worktrees(ctx, t.ID)
+			if err != nil {
+				return err
+			}
+			intel := &cbm.Client{Binary: app.Config.RepoIntel.Binary, CacheDir: filepath.Join(app.Paths.Cache, "codebase-memory")}
+			for _, w := range wts {
+				if _, err := os.Stat(w.Path); err == nil {
+					if err := gitops.RemoveWorktree(ctx, w.RepoPath, w.Path); err != nil {
+						return fmt.Errorf("%s: %w", w.RepoName, err)
+					}
+				}
+				_ = gitops.PruneWorktrees(ctx, w.RepoPath)
+				if deleteBranch {
+					if err := gitops.DeleteTaskBranch(ctx, w.RepoPath, w.Branch); err != nil {
+						return fmt.Errorf("%s: %w", w.RepoName, err)
+					}
+				}
+				// The worktree's code-graph project, if one was built.
+				_, _ = intel.Call(ctx, "delete_project", map[string]any{"project": orchestrator.WorktreeProject(t.ID, w.RepoName)})
+				app.printf("%s: removed worktree %s%s\n", w.RepoName, w.Path, map[bool]string{true: " and branch " + w.Branch}[deleteBranch])
+			}
+			_ = intel.Close()
+			_ = os.RemoveAll(filepath.Join(app.Paths.Cache, "build", "gocache", t.ID))
+			_ = os.RemoveAll(filepath.Join(app.Paths.TaskDir(t.ID), "work"))
+			telemetry.New(s.DB, app.Log).Emit(ctx, t.ID, "task.cleaned", map[string]any{"delete_branch": deleteBranch, "worktrees": len(wts)})
+			app.printf("ledger, audit log and frontier packets of %s are kept\n", t.ID)
+			return nil
+		},
+	}
+	cleanupCmd.Flags().BoolVar(&deleteBranch, "delete-branch", false, "also delete the agent/<task> branch (discards its commits)")
+	cmd.AddCommand(create, runCmd, status, events, diff, cancel, cleanupCmd)
 	return cmd
+}
+
+// applyTaskWorkspace applies the per-workspace config override of the
+// task's workspace (config.WithWorkspace).
+func (a *App) applyTaskWorkspace(ctx context.Context, id string) error {
+	s, err := a.Store(ctx)
+	if err != nil {
+		return err
+	}
+	t, err := task.Ledger{DB: s.DB}.Get(ctx, id)
+	if err != nil {
+		return err
+	}
+	w, err := workspace.Store{DB: s.DB}.Get(ctx, t.WorkspaceID)
+	if err != nil {
+		return err
+	}
+	a.Config, err = a.Config.WithWorkspace(a.Paths.Config, w.Name)
+	return err
+}
+
+// checkWorktrees verifies task worktrees before host git runs in them.
+func checkWorktrees(ctx context.Context, wts []task.Worktree) error {
+	for _, w := range wts {
+		common, err := gitops.CommonDir(ctx, w.RepoPath)
+		if err != nil {
+			return err
+		}
+		if err := gitops.CheckTaskWorktree(w.Path, common, w.Branch); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // taskRunner builds a runner; when it will not run the agent (create without
@@ -437,6 +549,9 @@ func newVerifyCmd(app *App) *cobra.Command {
 				scope = verify.Full
 			}
 			wts, _ := l.Worktrees(ctx, t.ID)
+			if err := checkWorktrees(ctx, wts); err != nil {
+				return err
+			}
 			ok := true
 			for _, w := range wts {
 				res, err := e.Run(ctx, verify.RepoTarget{Name: w.RepoName, Worktree: w.Path, Base: w.BaseCommit, TaskID: t.ID}, scope)
@@ -475,6 +590,9 @@ func newFrontierCmd(app *App) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if !app.Config.Frontier.Enabled {
 				return errors.New("frontier is disabled (set frontier.enabled: true in config.yaml)")
+			}
+			if err := app.applyTaskWorkspace(cmd.Context(), args[0]); err != nil {
+				return err
 			}
 			r, cleanup, err := app.buildRunner(cmd.Context(), rf)
 			if err != nil {
@@ -539,8 +657,77 @@ func newFrontierCmd(app *App) *cobra.Command {
 			return rows.Err()
 		},
 	}
-	cmd.AddCommand(review, answer, status)
+	list := &cobra.Command{
+		Use: "list [TASK]", Short: "List escalations with trigger, model, outcome and whether the advice changed the code", Args: cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := cmd.Context()
+			s, err := app.Store(ctx)
+			if err != nil {
+				return err
+			}
+			q := `SELECT id, task_id, trigger, provider, model, status, outcome, task_outcome, packet_tokens, diff_before, diff_after, created_at, reason
+				FROM escalations`
+			var qargs []any
+			if len(args) == 1 {
+				t, err := task.Ledger{DB: s.DB}.Get(ctx, args[0])
+				if err != nil {
+					return err
+				}
+				q += ` WHERE task_id = ?`
+				qargs = append(qargs, t.ID)
+			}
+			rows, err := s.DB.QueryContext(ctx, q+` ORDER BY id`, qargs...)
+			if err != nil {
+				return err
+			}
+			defer rows.Close()
+			type esc struct {
+				ID                                              int64
+				Task, Trigger, Provider, Model, Status, Outcome string
+				TaskOutcome                                     string
+				PacketTokens                                    int
+				DiffBefore, DiffAfter, Created, Reason          string
+				AdviceChangedCode                               *bool
+			}
+			var out []esc
+			for rows.Next() {
+				var e esc
+				if err := rows.Scan(&e.ID, &e.Task, &e.Trigger, &e.Provider, &e.Model, &e.Status, &e.Outcome, &e.TaskOutcome,
+					&e.PacketTokens, &e.DiffBefore, &e.DiffAfter, &e.Created, &e.Reason); err != nil {
+					return err
+				}
+				if e.DiffBefore != "" && e.DiffAfter != "" {
+					changed := e.DiffBefore != e.DiffAfter
+					e.AdviceChangedCode = &changed
+				}
+				out = append(out, e)
+			}
+			if err := rows.Err(); err != nil {
+				return err
+			}
+			if app.jsonOut {
+				return app.printJSON(out)
+			}
+			for _, e := range out {
+				changed := "-"
+				if e.AdviceChangedCode != nil {
+					changed = fmt.Sprint(*e.AdviceChangedCode)
+				}
+				app.printf("%3d %s %s %-9s %-18s model=%s tokens=%d outcome=%s task=%s changed_code=%s  %s\n", e.ID, e.Created[:min(19, len(e.Created))],
+					e.Trigger, e.Status, e.Task, orDash(e.Model), e.PacketTokens, orDash(e.Outcome), orDash(e.TaskOutcome), changed, oneLine(e.Reason, 60))
+			}
+			return nil
+		},
+	}
+	cmd.AddCommand(review, answer, status, list)
 	return cmd
+}
+
+func orDash(s string) string {
+	if s == "" {
+		return "-"
+	}
+	return s
 }
 
 func newSandboxCmd(app *App) *cobra.Command {

@@ -32,8 +32,10 @@ func Open(ctx context.Context, path string) (*Store, error) {
 		}
 		dsn = "file:" + path
 	}
-	// WAL + busy timeout let a CLI and a long-running task process share the DB.
-	dsn += "?_pragma=journal_mode(WAL)&_pragma=busy_timeout(10000)&_pragma=foreign_keys(ON)&_pragma=synchronous(NORMAL)"
+	// WAL + busy timeout let a CLI and a long-running task process share the
+	// DB. Immediate transactions take the write lock up front, so concurrent
+	// writers queue on busy_timeout instead of failing on lock upgrade.
+	dsn += "?_pragma=journal_mode(WAL)&_pragma=busy_timeout(10000)&_pragma=foreign_keys(ON)&_pragma=synchronous(NORMAL)&_txlock=immediate"
 	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("open sqlite: %w", err)
@@ -74,6 +76,17 @@ func (s *Store) migrate(ctx context.Context) error {
 		tx, err := s.DB.BeginTx(ctx, nil)
 		if err != nil {
 			return err
+		}
+		// Another process may have applied this migration since we read the
+		// version; re-check under the write lock.
+		var applied int
+		if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM schema_migrations WHERE version = ?`, version).Scan(&applied); err != nil {
+			_ = tx.Rollback()
+			return err
+		}
+		if applied > 0 {
+			_ = tx.Rollback()
+			continue
 		}
 		if _, err := tx.ExecContext(ctx, migrations[i]); err != nil {
 			_ = tx.Rollback()

@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/akynte/boundedcode/internal/ids"
@@ -152,17 +153,103 @@ func (l Ledger) Save(ctx context.Context, t *Task) error {
 	res, err := l.DB.ExecContext(ctx, `UPDATE tasks SET goal=?, acceptance_criteria=?, status=?, phase=?, completed_steps=?,
 		remaining_steps=?, attempt_count=?, decisions=?, verification_state=?, changed_repositories=?, changed_files=?,
 		changed_symbols=?, agent_runtime=?, agent_session_id=?, model_profile=?, budget=?, updated_at=?, finished_at=?
-		WHERE id=?`,
+		WHERE id=? AND (status != 'cancelled' OR ? = 'cancelled')`,
 		t.Goal, j(nonNil(t.AcceptanceCriteria)), t.Status, t.Phase, j(nonNil(t.CompletedSteps)), j(nonNil(t.RemainingSteps)),
 		t.AttemptCount, j(nonNilD(t.Decisions)), t.VerificationState, j(nonNil(t.ChangedRepositories)), j(nonNil(t.ChangedFiles)),
-		j(nonNil(t.ChangedSymbols)), t.AgentRuntime, t.AgentSessionID, t.ModelProfile, j(t.Budget), t.UpdatedAt, t.FinishedAt, t.ID)
+		j(nonNil(t.ChangedSymbols)), t.AgentRuntime, t.AgentSessionID, t.ModelProfile, j(t.Budget), t.UpdatedAt, t.FinishedAt, t.ID,
+		string(t.Status))
 	if err != nil {
 		return err
 	}
 	if n, _ := res.RowsAffected(); n != 1 {
+		// A cancellation recorded by another process wins over a runner's
+		// in-memory copy: never resurrect a cancelled task.
+		if st, err := l.Status(ctx, t.ID); err == nil && st == StatusCancelled {
+			return fmt.Errorf("task %s: %w", t.ID, ErrCancelled)
+		}
 		return fmt.Errorf("task %s: %w", t.ID, store.ErrNotFound)
 	}
 	return nil
+}
+
+// ErrCancelled is returned by Save when the task was cancelled elsewhere.
+var ErrCancelled = errors.New("task was cancelled")
+
+// ErrLeased is returned by AcquireLease when another live process runs the task.
+var ErrLeased = errors.New("task is being run by another process")
+
+// Status reads only the task's current status.
+func (l Ledger) Status(ctx context.Context, id string) (Status, error) {
+	var st Status
+	err := l.DB.QueryRowContext(ctx, `SELECT status FROM tasks WHERE id = ?`, id).Scan(&st)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", fmt.Errorf("task %s: %w", id, store.ErrNotFound)
+	}
+	return st, err
+}
+
+// Lease describes the process currently running a task.
+type Lease struct {
+	Owner     string `json:"owner"`
+	Heartbeat string `json:"heartbeat"`
+}
+
+// AcquireLease makes owner the only runner of task id. A lease whose
+// heartbeat is older than staleAfter belongs to a dead process and is taken
+// over; the previous lease is returned so the caller can reconcile the
+// state that process left behind.
+func (l Ledger) AcquireLease(ctx context.Context, id, owner string, staleAfter time.Duration) (prev Lease, err error) {
+	if err := l.DB.QueryRowContext(ctx, `SELECT lease_owner, lease_heartbeat FROM tasks WHERE id = ?`, id).Scan(&prev.Owner, &prev.Heartbeat); err != nil {
+		return prev, err
+	}
+	now := time.Now().UTC()
+	stale := now.Add(-staleAfter).Format(time.RFC3339Nano)
+	res, err := l.DB.ExecContext(ctx, `UPDATE tasks SET lease_owner = ?, lease_heartbeat = ?
+		WHERE id = ? AND (lease_owner = '' OR lease_owner = ? OR lease_heartbeat < ?)`,
+		owner, now.Format(time.RFC3339Nano), id, owner, stale)
+	if err != nil {
+		return prev, err
+	}
+	if n, _ := res.RowsAffected(); n != 1 {
+		return prev, fmt.Errorf("%w (%s, last heartbeat %s)", ErrLeased, prev.Owner, prev.Heartbeat)
+	}
+	return prev, nil
+}
+
+// Heartbeat renews owner's lease; it fails if the lease was lost.
+func (l Ledger) Heartbeat(ctx context.Context, id, owner string) error {
+	res, err := l.DB.ExecContext(ctx, `UPDATE tasks SET lease_heartbeat = ? WHERE id = ? AND lease_owner = ?`, store.Now(), id, owner)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n != 1 {
+		return fmt.Errorf("task %s: lease lost", id)
+	}
+	return nil
+}
+
+// ReleaseLease clears owner's lease.
+func (l Ledger) ReleaseLease(ctx context.Context, id, owner string) error {
+	_, err := l.DB.ExecContext(ctx, `UPDATE tasks SET lease_owner = '', lease_heartbeat = '' WHERE id = ? AND lease_owner = ?`, id, owner)
+	return err
+}
+
+// LeaseOf returns the task's current lease (empty owner: not running).
+func (l Ledger) LeaseOf(ctx context.Context, id string) (Lease, error) {
+	var ls Lease
+	err := l.DB.QueryRowContext(ctx, `SELECT lease_owner, lease_heartbeat FROM tasks WHERE id = ?`, id).Scan(&ls.Owner, &ls.Heartbeat)
+	return ls, err
+}
+
+// RejectActiveStrategies resolves strategies left active by a process that
+// died mid-attempt, and returns how many there were.
+func (l Ledger) RejectActiveStrategies(ctx context.Context, taskID, reason string) (int, error) {
+	res, err := l.DB.ExecContext(ctx, `UPDATE strategies SET outcome = 'rejected', reason = ? WHERE task_id = ? AND outcome = 'active'`, reason, taskID)
+	if err != nil {
+		return 0, err
+	}
+	n, _ := res.RowsAffected()
+	return int(n), nil
 }
 
 func nonNil(s []string) []string {
@@ -323,12 +410,22 @@ func (t *Task) Decide(source, text string) {
 }
 
 // MarkStep moves a step from remaining to completed (adds it if unknown).
+// Marking a completed step again is a no-op.
 func (t *Task) MarkStep(step string) {
-	for i, s := range t.RemainingSteps {
-		if s == step {
-			t.RemainingSteps = append(t.RemainingSteps[:i], t.RemainingSteps[i+1:]...)
-			break
-		}
+	t.RemainingSteps = slices.DeleteFunc(t.RemainingSteps, func(s string) bool { return s == step })
+	if !slices.Contains(t.CompletedSteps, step) {
+		t.CompletedSteps = append(t.CompletedSteps, step)
 	}
-	t.CompletedSteps = append(t.CompletedSteps, step)
+}
+
+// ReopenStep moves a completed step back to remaining (e.g. targeted
+// verification passed earlier but the latest attempt broke it).
+func (t *Task) ReopenStep(step string) {
+	if !slices.Contains(t.CompletedSteps, step) {
+		return
+	}
+	t.CompletedSteps = slices.DeleteFunc(t.CompletedSteps, func(s string) bool { return s == step })
+	if !slices.Contains(t.RemainingSteps, step) {
+		t.RemainingSteps = append([]string{step}, t.RemainingSteps...)
+	}
 }

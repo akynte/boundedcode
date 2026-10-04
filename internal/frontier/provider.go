@@ -3,6 +3,8 @@ package frontier
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
@@ -148,7 +150,12 @@ func (c *Codex) containerCmd(ctx context.Context, args []string, dir string) (*e
 		codexHome = filepath.Join(h, ".codex")
 	}
 	cc := c.Container
-	run := []string{"run", "--rm", "-i", "--init",
+	// A named container is removed on cancellation; killing only the engine
+	// CLI would leave it running.
+	var rnd [6]byte
+	_, _ = rand.Read(rnd[:])
+	name := "bc-codex-" + hex.EncodeToString(rnd[:])
+	run := []string{"run", "--rm", "-i", "--init", "--name", name,
 		"--cap-drop", "ALL", "--security-opt", "no-new-privileges",
 		"--user", fmt.Sprintf("%d:%d", cc.UID, cc.GID),
 		"--tmpfs", "/home/agent:rw,exec,size=256m,mode=1777", "-e", "HOME=/home/agent",
@@ -158,5 +165,13 @@ func (c *Codex) containerCmd(ctx context.Context, args []string, dir string) (*e
 		"-e", "CODEX_HOME=/home/agent/.codex",
 		"-w", dir,
 		cc.Image, "/usr/local/bin/codex-host"}
-	return exec.CommandContext(ctx, cc.Engine, append(run, args...)...), nil
+	cmd := exec.CommandContext(ctx, cc.Engine, append(run, args...)...)
+	cmd.Cancel = func() error {
+		rctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+		_ = exec.CommandContext(rctx, cc.Engine, "rm", "-f", name).Run()
+		return cmd.Process.Kill()
+	}
+	cmd.WaitDelay = 10 * time.Second
+	return cmd, nil
 }

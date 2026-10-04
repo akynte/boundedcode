@@ -2,7 +2,9 @@ package orchestrator
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
@@ -12,6 +14,7 @@ import (
 	"github.com/akynte/boundedcode/internal/config"
 	"github.com/akynte/boundedcode/internal/contextplan"
 	"github.com/akynte/boundedcode/internal/frontier"
+	"github.com/akynte/boundedcode/internal/gitops"
 	"github.com/akynte/boundedcode/internal/store"
 	"github.com/akynte/boundedcode/internal/task"
 )
@@ -70,6 +73,13 @@ func (r *Runner) escalate(ctx context.Context, t *task.Task, wts []task.Worktree
 	t.Budget.UsedEscalations++
 	_ = r.Ledger.Save(ctx, t)
 	r.setEscalation(ctx, id, "sent", "", "")
+	// Record the model and the state of the code when advice was asked for,
+	// so "did the advice change the solution" is measured, not assumed.
+	model := r.Cfg.Frontier.Model
+	if model == "" {
+		model = "(provider default)"
+	}
+	_, _ = r.DB.ExecContext(ctx, `UPDATE escalations SET model = ?, diff_before = ? WHERE id = ?`, model, diffHash(ctx, wts), id)
 	r.say("escalating %s to %s (%d-token packet): %s", tr.Code, r.Frontier.Name(), tokens, trunc(tr.Reason, 160))
 	answer, err := r.Frontier.Ask(ctx, packet, dir)
 	if errors.Is(err, frontier.ErrPending) {
@@ -120,12 +130,14 @@ func (r *Runner) hasEscalation(ctx context.Context, taskID string, code frontier
 	return n > 0
 }
 
-// pendingAdvice returns an answered-but-unused escalation response (e.g. a
-// manual answer supplied while the task was stopped).
+// pendingAdvice returns an answered-but-unused escalation response: a manual
+// answer supplied while the task was stopped, or an answer no attempt has
+// applied yet (the run stopped or blocked right after receiving it).
 func (r *Runner) pendingAdvice(ctx context.Context, taskID string) string {
 	var id int64
 	var path string
-	err := r.DB.QueryRowContext(ctx, `SELECT id, response_path FROM escalations WHERE task_id = ? AND status = 'answered_manual'
+	err := r.DB.QueryRowContext(ctx, `SELECT id, response_path FROM escalations WHERE task_id = ? AND
+		(status = 'answered_manual' OR status = 'answered' AND diff_before != '' AND diff_after = '')
 		ORDER BY id DESC LIMIT 1`, taskID).Scan(&id, &path)
 	if errors.Is(err, sql.ErrNoRows) || err != nil {
 		return ""
@@ -172,4 +184,28 @@ func AnswerEscalation(ctx context.Context, db *sql.DB, taskDir, taskID string, a
 func FinishEscalations(ctx context.Context, db *sql.DB, taskID, outcome string) {
 	_, _ = db.ExecContext(ctx, `UPDATE escalations SET outcome = ?, updated_at = ? WHERE task_id = ? AND status = 'answered' AND outcome = ''`,
 		outcome, store.Now(), taskID)
+	SetEscalationTaskOutcome(ctx, db, taskID, "cancelled")
+}
+
+// SetEscalationTaskOutcome records the task's final status on all of its
+// escalations (sent, declined or failed alike).
+func SetEscalationTaskOutcome(ctx context.Context, db *sql.DB, taskID, outcome string) {
+	_, _ = db.ExecContext(ctx, `UPDATE escalations SET task_outcome = ?, updated_at = ? WHERE task_id = ?`, outcome, store.Now(), taskID)
+}
+
+// recordDiffAfter stores, on answered escalations still waiting for it, the
+// code state after the first attempt that followed the advice.
+func (r *Runner) recordDiffAfter(ctx context.Context, taskID string, wts []task.Worktree) {
+	_, _ = r.DB.ExecContext(ctx, `UPDATE escalations SET diff_after = ? WHERE task_id = ? AND status = 'answered' AND diff_after = '' AND diff_before != ''`,
+		diffHash(ctx, wts), taskID)
+}
+
+// diffHash fingerprints the task's combined diff against its base commits.
+func diffHash(ctx context.Context, wts []task.Worktree) string {
+	h := sha256.New()
+	for _, w := range wts {
+		d, _ := gitops.Diff(ctx, w.Path, w.BaseCommit, false)
+		fmt.Fprintf(h, "%s\x00%s\x00", w.RepoName, d)
+	}
+	return hex.EncodeToString(h.Sum(nil))[:16]
 }

@@ -39,3 +39,31 @@ func TestForeignKeysEnforced(t *testing.T) {
 		t.Fatal("expected foreign key violation")
 	}
 }
+
+func TestConcurrentFirstOpen(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "state.db")
+	errs := make(chan error, 8)
+	for range 8 {
+		go func() {
+			s, err := Open(context.Background(), path)
+			if err == nil {
+				err = s.Close()
+			}
+			errs <- err
+		}()
+	}
+	for range 8 {
+		if err := <-errs; err != nil {
+			t.Fatalf("concurrent open: %v", err)
+		}
+	}
+	s, err := Open(context.Background(), path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	var n int
+	if err := s.DB.QueryRow(`SELECT COUNT(*) FROM schema_migrations`).Scan(&n); err != nil || n != len(migrations) {
+		t.Fatalf("migrations recorded = %d (%v), want %d", n, err, len(migrations))
+	}
+}

@@ -11,7 +11,10 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math"
+	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -21,6 +24,7 @@ import (
 	"github.com/akynte/boundedcode/internal/contextplan"
 	"github.com/akynte/boundedcode/internal/frontier"
 	"github.com/akynte/boundedcode/internal/gitops"
+	"github.com/akynte/boundedcode/internal/hw"
 	"github.com/akynte/boundedcode/internal/inference"
 	"github.com/akynte/boundedcode/internal/policy"
 	"github.com/akynte/boundedcode/internal/repointel"
@@ -58,7 +62,22 @@ type Runner struct {
 	CondenseEachRetry bool
 	// CrossService enables cross-service contract analysis (internal/xservice).
 	CrossService bool
+	// EnsureModel (re)starts the local model server after an infrastructure
+	// failure; nil means the runner cannot repair it and blocks instead.
+	EnsureModel func(ctx context.Context) error
+	// LeaseOwner identifies this process in task leases (default host:pid).
+	LeaseOwner string
 }
+
+// Lease timing: a runner renews its lease every leaseHeartbeat; a lease not
+// renewed for leaseStale belongs to a dead process.
+var (
+	leaseHeartbeat = 15 * time.Second
+	leaseStale     = 2 * time.Minute
+)
+
+// maxInfraRetries bounds model-server repairs per run.
+const maxInfraRetries = 3
 
 // RunOptions modify one run.
 type RunOptions struct {
@@ -85,6 +104,11 @@ func (r *Runner) Create(ctx context.Context, w workspace.Workspace, request stri
 	for _, repo := range all {
 		if len(repos) == 0 || contains(repos, repo.Name) {
 			chosen = append(chosen, repo)
+		}
+	}
+	for _, n := range repos {
+		if !slices.ContainsFunc(all, func(r workspace.Repository) bool { return r.Name == n }) {
+			return nil, fmt.Errorf("repository %q is not an enabled repository of workspace %s", n, w.Name)
 		}
 	}
 	if len(chosen) == 0 {
@@ -126,7 +150,28 @@ func (r *Runner) Run(ctx context.Context, taskID string, opt RunOptions) (*task.
 	switch t.Status {
 	case task.StatusCompleted, task.StatusCancelled, task.StatusFailed:
 		return t, fmt.Errorf("task %s is %s", t.ID, t.Status)
-	case task.StatusBlocked:
+	}
+	// One live runner per task. A stale lease means the previous runner died
+	// (SIGKILL, crash, reboot): reconcile what it left behind.
+	owner := r.LeaseOwner
+	if owner == "" {
+		host, _ := os.Hostname()
+		owner = fmt.Sprintf("%s:%d", host, os.Getpid())
+	}
+	prev, err := r.Ledger.AcquireLease(ctx, t.ID, owner, leaseStale)
+	if err != nil {
+		return t, err
+	}
+	defer func() { _ = r.Ledger.ReleaseLease(context.WithoutCancel(ctx), t.ID, owner) }()
+	ctx, stopRun := context.WithCancelCause(ctx)
+	defer stopRun(nil)
+	go r.keepLease(ctx, t.ID, owner, stopRun)
+	if n, _ := r.Ledger.RejectActiveStrategies(ctx, t.ID, "interrupted: the previous run stopped without finishing this attempt"); n > 0 || prev.Owner != "" && prev.Owner != owner {
+		r.Rec.Emit(ctx, t.ID, "task.recovered", map[string]any{"previous_owner": prev.Owner, "last_heartbeat": prev.Heartbeat, "orphaned_attempts": n, "phase": t.Phase})
+		t.Decide("policy", fmt.Sprintf("recovered after an unclean stop (phase %s, %d unfinished attempt(s))", t.Phase, n))
+		r.say("recovering task %s after an unclean stop of the previous run", t.ID)
+	}
+	if t.Status == task.StatusBlocked {
 		t.Status = task.StatusActive // explicit resume re-arms a blocked task
 		t.Decide("user", "resumed after block")
 	}
@@ -136,7 +181,9 @@ func (r *Runner) Run(ctx context.Context, taskID string, opt RunOptions) (*task.
 	}
 	var gitDirs, adminDirs []string
 	for _, w := range wts {
-		// Recreate missing worktrees from their branch: git is the persistence layer.
+		// Recreate missing worktrees from their branch: git is the persistence
+		// layer. An existing worktree is integrity-checked before host git
+		// runs in it.
 		if err := gitops.EnsureWorktree(ctx, w.RepoPath, w.Path, w.Branch, w.BaseCommit); err != nil {
 			return t, err
 		}
@@ -144,7 +191,7 @@ func (r *Runner) Run(ctx context.Context, taskID string, opt RunOptions) (*task.
 		if err != nil {
 			return t, err
 		}
-		if err := gitops.CheckWorktree(w.Path, common); err != nil {
+		if err := gitops.CheckTaskWorktree(w.Path, common, w.Branch); err != nil {
 			return t, err
 		}
 		admin, err := gitops.AdminDir(ctx, w.Path)
@@ -178,7 +225,10 @@ func (r *Runner) Run(ctx context.Context, taskID string, opt RunOptions) (*task.
 		}
 		r.Rec.Emit(context.WithoutCancel(ctx), t.ID, "agent.event", data)
 	}
-	masks := secretMasks(r.WorkDir(t.ID), wts)
+	masks, err := secretMasks(r.WorkDir(t.ID), wts)
+	if err != nil {
+		return t, fmt.Errorf("refusing to start the agent: %w", err)
+	}
 	if r.Nav != nil {
 		r.prepareNav(wts)
 		defer r.releaseNav(wts)
@@ -186,7 +236,8 @@ func (r *Runner) Run(ctx context.Context, taskID string, opt RunOptions) (*task.
 	openReq := agent.OpenRequest{TaskID: t.ID, SessionID: t.AgentSessionID, Workspace: r.WorkDir(t.ID), GitCommonDirs: gitDirs, GitAdminDirs: adminDirs,
 		PersistenceDir: filepath.Join(r.Paths.TaskDir(t.ID), "runtime"), MaxIterations: r.Cfg.Agent.MaxIterations,
 		MaxInputTokens: r.CtxSize, MaxOutputTokens: 8192, CondenserMaxEvents: r.Cfg.Agent.CondenserMaxEvents,
-		CondenserMaxTokens: r.CtxSize * 7 / 10, Masks: masks, OnEvent: onEvent, Gateway: gw}
+		CondenserMaxTokens: r.CtxSize * 7 / 10, Masks: masks, OnEvent: onEvent, Gateway: gw,
+		LLMTimeout: r.Cfg.Inference.RequestTimeout.D()}
 	sess, mode, err := r.openSession(ctx, t, openReq)
 	if err != nil {
 		return t, err
@@ -200,6 +251,7 @@ func (r *Runner) Run(ctx context.Context, taskID string, opt RunOptions) (*task.
 	contractChecked := false
 	reviewedZ1 := r.hasEscalation(ctx, t.ID, frontier.Z1)
 	reviewedZ3 := r.hasEscalation(ctx, t.ID, frontier.Z3)
+	infraRetries := 0
 
 	save := func() error {
 		used, gen, cached := gw.Stats()
@@ -230,10 +282,19 @@ func (r *Runner) Run(ctx context.Context, taskID string, opt RunOptions) (*task.
 		}
 	}
 
+	interrupted := func(reason string) (*task.Task, error) {
+		err := context.Cause(ctx)
+		serr := save()
+		r.Rec.Emit(context.WithoutCancel(ctx), t.ID, "task.interrupted", map[string]any{"reason": reason, "cause": fmt.Sprint(err),
+			"attempt": t.AttemptCount, "phase": t.Phase, "wall_s": round1(t.Budget.UsedWallClockS)})
+		if errors.Is(serr, task.ErrCancelled) {
+			return t, serr
+		}
+		return t, err
+	}
 	for {
-		if err := ctx.Err(); err != nil {
-			_ = save()
-			return t, err
+		if ctx.Err() != nil {
+			return interrupted("before attempt")
 		}
 		if reason := r.budgetExceeded(t, gw); reason != "" {
 			return t, r.block(t, save, reason)
@@ -243,25 +304,39 @@ func (r *Runner) Run(ctx context.Context, taskID string, opt RunOptions) (*task.
 		if err := save(); err != nil {
 			return t, err
 		}
+		attemptStart := time.Now()
 		stratID, _ := r.Ledger.AddStrategy(ctx, t.ID, t.AttemptCount, "(in progress)")
+		r.Rec.Emit(ctx, t.ID, "attempt.started", map[string]any{"attempt": t.AttemptCount, "mode": mode, "resources": r.resources(ctx)})
 		results := r.latestVerification(ctx, t.ID, wts)
 		strategies, _ := r.Ledger.Strategies(ctx, t.ID)
 		contracts := r.contracts(ctx, t, wts)
-		pack, err := contextplan.Build(ctx, contextplan.Inputs{Task: t, Worktrees: wts, WorkDir: r.WorkDir(t.ID),
+		pack, err := contextplan.Build(ctx, contextplan.Inputs{Task: t, Worktrees: r.packWorktrees(ctx, t, wts), WorkDir: r.WorkDir(t.ID),
 			Strategies: strategies, Verification: results, Intel: r.Intel, Nav: r.Nav, Mode: mode,
 			BudgetTokens: r.Cfg.Budgets.ContextPackTokens, MaxAttempts: t.Budget.MaxAttempts, Advice: advice,
-			Contracts: contracts, ChangedFiles: t.ChangedFiles})
+			Contracts: contracts, ChangedFiles: t.ChangedFiles, Heads: heads(ctx, wts)})
 		if err != nil {
 			return t, err
 		}
-		r.Rec.Emit(ctx, t.ID, "context.pack", map[string]any{"mode": pack.Mode, "tokens": pack.Tokens, "sections": pack.Sections, "dropped": pack.Dropped, "intel": pack.Intel})
+		r.Rec.Emit(ctx, t.ID, "context.pack", map[string]any{"attempt": t.AttemptCount, "mode": pack.Mode, "tokens": pack.Tokens, "sections": pack.Sections, "dropped": pack.Dropped, "intel": pack.Intel})
 		r.say("attempt %d/%d: sending %s context pack (%d tokens)", t.AttemptCount, t.Budget.MaxAttempts, mode, pack.Tokens)
-		res, err := sess.Send(ctx, pack.Render())
+		// The attempt is bounded by the remaining wall-clock budget, not only
+		// checked between attempts.
+		sendCtx, cancelSend := ctx, context.CancelFunc(func() {})
+		if b := t.Budget; b.MaxWallClockS > 0 {
+			left := time.Duration((b.MaxWallClockS-b.UsedWallClockS)*float64(time.Second)) - time.Since(runStart)
+			sendCtx, cancelSend = context.WithTimeout(ctx, max(left, time.Second))
+		}
+		res, err := sess.Send(sendCtx, pack.Render())
+		budgetHit := sendCtx.Err() != nil && ctx.Err() == nil
+		cancelSend()
 		if err != nil {
 			if ctx.Err() != nil {
 				_ = r.Ledger.ResolveStrategy(context.WithoutCancel(ctx), stratID, "rejected", "interrupted before completion")
-				_ = save()
-				return t, ctx.Err()
+				return interrupted("during agent turn")
+			}
+			if budgetHit {
+				_ = r.Ledger.ResolveStrategy(ctx, stratID, "rejected", "wall-clock budget exhausted during the attempt")
+				return t, r.block(t, save, "wall-clock budget exhausted")
 			}
 			// Runtime failure (adapter crash, model server down): record, reopen
 			// the session from persistence and continue with a resume pack.
@@ -284,18 +359,44 @@ func (r *Runner) Run(ctx context.Context, taskID string, opt RunOptions) (*task.
 			_ = r.Ledger.ResolveStrategy(ctx, stratID, "rejected", "token budget exhausted")
 			return t, r.block(t, save, "local token budget exhausted")
 		}
+		// A model server failure is infrastructure, not a failed strategy: it
+		// must not burn attempts or count toward Z2. Repair and retry.
+		if n := r.transportErrors(ctx, t.ID, attemptStart); n > 0 && res.Error != "" {
+			infraRetries++
+			_ = r.Ledger.ResolveStrategy(ctx, stratID, "rejected", "infrastructure: model server unavailable ("+trunc(res.Error, 160)+")")
+			t.AttemptCount-- // not a real attempt
+			r.Rec.Emit(ctx, t.ID, "infra.failure", map[string]any{"transport_errors": n, "retry": infraRetries, "error": trunc(res.Error, 300)})
+			r.say("model server failure (%d transport errors); repairing (%d/%d)", n, infraRetries, maxInfraRetries)
+			if infraRetries > maxInfraRetries || r.EnsureModel == nil {
+				return t, r.block(t, save, "local model server unavailable")
+			}
+			if err := r.EnsureModel(ctx); err != nil {
+				r.Rec.Emit(ctx, t.ID, "infra.repair_failed", map[string]any{"error": trunc(err.Error(), 300)})
+				return t, r.block(t, save, "local model server could not be restarted: "+trunc(err.Error(), 200))
+			}
+			if err := save(); err != nil {
+				return t, err
+			}
+			continue
+		}
 
 		// Git checkpoint: persist the attempt's work on the task branch. The
 		// worktree pointer is re-checked first: the agent could have tampered with it.
 		changedAny := false
 		var changedFiles, changedRepos []string
+		var changedSyms []string
 		for i, w := range wts {
-			if err := gitops.CheckWorktree(w.Path, gitDirs[i]); err != nil {
+			if err := gitops.CheckTaskWorktree(w.Path, gitDirs[i], w.Branch); err != nil {
 				r.Rec.Emit(ctx, t.ID, "policy.violation", map[string]any{"repo": w.RepoName, "error": err.Error()})
+				_ = r.Ledger.ResolveStrategy(ctx, stratID, "rejected", "worktree integrity check failed")
 				return t, r.block(t, save, "worktree integrity check failed: "+err.Error())
 			}
+			// A checkpoint that cannot be committed would let verification
+			// pass on work the task branch does not contain.
 			if _, err := gitops.CommitAll(ctx, w.Path, fmt.Sprintf("boundedcode %s: attempt %d", t.ID, t.AttemptCount)); err != nil {
-				r.Log.Warn("checkpoint commit failed", "repo", w.RepoName, "err", err)
+				r.Rec.Emit(ctx, t.ID, "checkpoint.failed", map[string]any{"repo": w.RepoName, "error": trunc(err.Error(), 400)})
+				_ = r.Ledger.ResolveStrategy(ctx, stratID, "rejected", "checkpoint commit failed")
+				return t, r.block(t, save, fmt.Sprintf("checkpoint commit failed in %s: %s", w.RepoName, trunc(err.Error(), 200)))
 			}
 			files, _ := gitops.ChangedFiles(ctx, w.Path, w.BaseCommit)
 			if len(files) > 0 {
@@ -304,9 +405,17 @@ func (r *Runner) Run(ctx context.Context, taskID string, opt RunOptions) (*task.
 				for _, f := range files {
 					changedFiles = append(changedFiles, w.RepoName+"/"+f)
 				}
+				syms, _ := gitops.ChangedSymbols(ctx, w.Path, w.BaseCommit)
+				for _, sym := range syms {
+					changedSyms = append(changedSyms, w.RepoName+"/"+sym)
+				}
 			}
 		}
-		t.ChangedFiles, t.ChangedRepositories = changedFiles, changedRepos
+		t.ChangedFiles, t.ChangedRepositories, t.ChangedSymbols = changedFiles, changedRepos, changedSyms
+		if changedAny {
+			t.MarkStep("implement")
+		}
+		r.recordDiffAfter(ctx, t.ID, wts)
 		t.Phase = task.PhaseVerifying
 		if err := save(); err != nil {
 			return t, err
@@ -325,8 +434,7 @@ func (r *Runner) Run(ctx context.Context, taskID string, opt RunOptions) (*task.
 		}
 		if ctx.Err() != nil {
 			_ = r.Ledger.ResolveStrategy(context.WithoutCancel(ctx), stratID, "rejected", "interrupted during verification")
-			_ = save()
-			return t, ctx.Err()
+			return interrupted("during verification")
 		}
 		t.Budget.VerificationRuns++
 		summary := trunc(res.FinalMessage, 500)
@@ -349,15 +457,22 @@ func (r *Runner) Run(ctx context.Context, taskID string, opt RunOptions) (*task.
 				mode = contextplan.ModeRetry
 				continue
 			}
-			// Z3: high-risk changes get one frontier review before merge.
-			if !reviewedZ3 && roundsLeft {
+			// Z3: high-risk changes get one frontier review before merge. The
+			// review happens even on the last attempt; advice that cannot be
+			// applied then blocks the task instead of being dropped.
+			if !reviewedZ3 {
 				trs := frontier.Evaluate(r.Cfg.Escalation, frontier.Signals{Text: t.OriginalRequest, ChangedFiles: changedFiles,
 					ChangedRepos: len(changedRepos), PreMerge: true, EscalationsUsed: t.Budget.UsedEscalations,
-					MaxEscalations: t.Budget.MaxEscalations, AlreadyReviewedZ1: true, UserRequested: userFrontier,
+					MaxEscalations: t.Budget.MaxEscalations, AlreadyReviewedZ1: reviewedZ1, UserRequested: userFrontier,
 					UnupdatedCounterparts: outside})
 				if tr, ok := find(trs, frontier.Z3, frontier.Z4); ok {
 					reviewedZ3, userFrontier = true, false
-					if a := r.escalate(ctx, t, wts, tr, contextplan.ModeRetry); a != "" {
+					if a := r.escalate(ctx, t, wts, tr, contextplan.ModeRetry); a != "" && !roundsLeft {
+						// The answer stays pending (no attempt applied it yet), so
+						// the next run picks it up (pendingAdvice).
+						_ = r.Ledger.ResolveStrategy(ctx, stratID, "succeeded", "verification passed; frontier review pending")
+						return t, r.block(t, save, "pre-merge review returned advice but no attempts are left; `task resume` applies it with a larger budget")
+					} else if a != "" {
 						advice = "Pre-merge review from the frontier model. Apply findings that are real defects; ignore ones that are not. If nothing needs fixing, finish without changes.\n\n" + a
 						_ = r.Ledger.ResolveStrategy(ctx, stratID, "succeeded", "verification passed; frontier review requested")
 						mode = contextplan.ModeRetry
@@ -376,13 +491,15 @@ func (r *Runner) Run(ctx context.Context, taskID string, opt RunOptions) (*task.
 				return t, err
 			}
 			r.finishEscalations(ctx, t.ID, "helped")
+			SetEscalationTaskOutcome(ctx, r.DB, t.ID, string(task.StatusCompleted))
 			r.Rec.Emit(ctx, t.ID, "task.completed", map[string]any{"attempts": t.AttemptCount, "tokens": t.Budget.UsedLocalTokens,
-				"escalations": t.Budget.UsedEscalations, "condensations": t.Budget.Condensations})
+				"escalations": t.Budget.UsedEscalations, "condensations": t.Budget.Condensations, "wall_s": round1(t.Budget.UsedWallClockS)})
 			r.say("task %s is a verified merge candidate on %s", t.ID, gitops.TaskBranch(t.ID))
 			return t, nil
 		}
 
 		// Failure path.
+		t.ReopenStep("verify (targeted)")
 		consecutive++
 		t.Budget.FailedVerifyRuns++
 		t.VerificationState = "failing"
@@ -400,8 +517,11 @@ func (r *Runner) Run(ctx context.Context, taskID string, opt RunOptions) (*task.
 			RepeatedFailure: repeated, Stuck: res.Stuck || res.Status == "stuck", EscalationsUsed: t.Budget.UsedEscalations,
 			MaxEscalations: t.Budget.MaxEscalations, AlreadyReviewedZ1: reviewedZ1, UserRequested: userFrontier})
 		advice = ""
-		if tr, ok := find(trs, frontier.Z2, frontier.Z4); ok {
+		if tr, ok := find(trs, frontier.Z2, frontier.Z1, frontier.Z4); ok {
 			userFrontier = false
+			if tr.Code == frontier.Z1 {
+				reviewedZ1 = true
+			}
 			advice = r.escalate(ctx, t, wts, tr, contextplan.ModeRetry)
 		}
 		mode = contextplan.ModeRetry
@@ -471,7 +591,8 @@ func (r *Runner) block(t *task.Task, save func() error, reason string) error {
 	}
 	// Blocked is not terminal: escalation outcomes are decided when the task
 	// completes ("helped") or is abandoned ("no_effect", see task cancel).
-	r.Rec.Emit(context.Background(), t.ID, "task.blocked", map[string]any{"reason": reason})
+	SetEscalationTaskOutcome(context.Background(), r.DB, t.ID, string(task.StatusBlocked))
+	r.Rec.Emit(context.Background(), t.ID, "task.blocked", map[string]any{"reason": reason, "attempts": t.AttemptCount, "wall_s": round1(t.Budget.UsedWallClockS)})
 	r.say("task %s blocked: %s (work preserved on %s; `task resume` to continue)", t.ID, reason, gitops.TaskBranch(t.ID))
 	return nil
 }
@@ -547,7 +668,7 @@ func (r *Runner) prepareNav(wts []task.Worktree) {
 		return
 	}
 	for _, w := range wts {
-		found, _ := policy.FindSecretPaths(w.Path, 200)
+		found, _ := policy.FindSecretPaths(w.Path, policy.MaxSecretMasks)
 		ig.Ignore(w.Path, found)
 	}
 }
@@ -565,16 +686,19 @@ func (r *Runner) releaseNav(wts []task.Worktree) {
 	rel.Release(roots...)
 }
 
-func secretMasks(workDir string, wts []task.Worktree) []string {
+func secretMasks(workDir string, wts []task.Worktree) ([]string, error) {
 	var out []string
 	for _, w := range wts {
-		found, _ := policy.FindSecretPaths(w.Path, 200)
+		found, err := policy.FindSecretPaths(w.Path, policy.MaxSecretMasks)
+		if err != nil {
+			return nil, err
+		}
 		rel, _ := filepath.Rel(workDir, w.Path)
 		for _, f := range found {
 			out = append(out, filepath.Join(rel, f))
 		}
 	}
-	return out
+	return out, nil
 }
 
 func countRejected(st []task.Strategy) int {
@@ -697,3 +821,89 @@ func (r *Runner) unupdatedCounterparts(ctx context.Context, t *task.Task, wts []
 	}
 	return inTask, outside
 }
+
+// keepLease renews the run lease and stops the run when the lease is lost or
+// the task is cancelled from another process (`task cancel`).
+func (r *Runner) keepLease(ctx context.Context, taskID, owner string, stop context.CancelCauseFunc) {
+	tick := time.NewTicker(leaseHeartbeat)
+	defer tick.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-tick.C:
+		}
+		if err := r.Ledger.Heartbeat(ctx, taskID, owner); err != nil && ctx.Err() == nil {
+			stop(fmt.Errorf("lease lost: %w", err))
+			return
+		}
+		if st, err := r.Ledger.Status(ctx, taskID); err == nil && st == task.StatusCancelled {
+			stop(task.ErrCancelled)
+			return
+		}
+	}
+}
+
+// transportErrors counts model calls of the task that failed to reach the
+// model server since t.
+func (r *Runner) transportErrors(ctx context.Context, taskID string, since time.Time) int {
+	var n int
+	_ = r.DB.QueryRowContext(ctx, `SELECT COUNT(*) FROM model_calls WHERE task_id = ? AND status = 'transport_error' AND created_at >= ?`,
+		taskID, since.UTC().Format(time.RFC3339Nano)).Scan(&n)
+	return n
+}
+
+// packWorktrees returns the worktrees as the context planner should see
+// them. codebase-memory-mcp's change impact only diffs the checkout a project
+// was indexed from, so once a task has changes each worktree is indexed as
+// its own project (fast mode, ~5 s on the fixtures) and the pack's impact,
+// graph snippets and callers describe the task's code, not the primary
+// checkout. Index failures fall back to the primary project.
+func (r *Runner) packWorktrees(ctx context.Context, t *task.Task, wts []task.Worktree) []task.Worktree {
+	out := append([]task.Worktree(nil), wts...)
+	if r.Intel == nil || len(t.ChangedFiles) == 0 {
+		return out
+	}
+	for i, w := range out {
+		if w.IndexProject == "" {
+			continue
+		}
+		start := time.Now()
+		res, err := r.Intel.Index(ctx, w.Path, WorktreeProject(t.ID, w.RepoName), "fast")
+		if err != nil || res.Project == "" {
+			r.Log.Warn("worktree index failed; using the primary checkout's graph", "repo", w.RepoName, "err", err)
+			continue
+		}
+		out[i].IndexProject = res.Project
+		r.Rec.Emit(ctx, t.ID, "intel.worktree_indexed", map[string]any{"repo": w.RepoName, "project": res.Project,
+			"nodes": res.Nodes, "ms": time.Since(start).Milliseconds()})
+	}
+	return out
+}
+
+// WorktreeProject names the code-graph project of a task worktree.
+func WorktreeProject(taskID, repo string) string { return "bc-task-" + taskID + "-" + repo }
+
+// heads returns each worktree's current commit.
+func heads(ctx context.Context, wts []task.Worktree) map[string]string {
+	out := map[string]string{}
+	for _, w := range wts {
+		if h, err := gitops.Run(ctx, w.Path, "rev-parse", "HEAD"); err == nil && h != w.BaseCommit {
+			out[w.RepoName] = h
+		}
+	}
+	return out
+}
+
+// resources is a compact resource sample for attempt events.
+func (r *Runner) resources(ctx context.Context) map[string]any {
+	snap := hw.Probe(ctx)
+	out := map[string]any{"mem_available_mib": snap.MemAvailMiB, "swap_used_mib": snap.SwapUsedMiB}
+	for _, g := range snap.GPUs {
+		out[fmt.Sprintf("gpu%d_mem_used_mib", g.Index)] = g.MemUsedMiB
+		out[fmt.Sprintf("gpu%d_temp_c", g.Index)] = g.TempC
+	}
+	return out
+}
+
+func round1(f float64) float64 { return math.Round(f*10) / 10 }
