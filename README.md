@@ -85,10 +85,12 @@ getting-started guide).
 * **Platform.** Linux x86-64 with an NVIDIA GPU, tested only on the
   reference laptop below. Other platforms and GPUs are untested.
 * **CLI only.** There is no daemon and no GUI.
-* **Verification presets** exist only for Go and TypeScript. The TypeScript
-  preset is limited: `tsc`, `lint`, `test` and `build` run only when the
-  repository's `node_modules` and `package.json` scripts provide them. Other
-  languages need a `.boundedcode/verification.yaml`.
+* **Verification presets** exist only for Go and JavaScript/TypeScript.
+  Verification is offline: install a JavaScript project's dependencies in
+  your checkout (`npm ci`), and its `node_modules` are mounted read-only
+  into task worktrees; a declared `test` script with nothing installed
+  fails. `npm test` must work offline without a browser, or set the stages
+  in `.boundedcode/verification.yaml`. Other languages need that file.
 * **Cross-service analysis** covers HTTP routes and calls, Kafka-style
   topics, environment variables and Terraform topic/queue resources, in Go
   and TypeScript/JavaScript. gRPC, OpenAPI, protobuf and SQL contracts are

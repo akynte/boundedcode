@@ -28,6 +28,7 @@ import (
 	"github.com/akynte/boundedcode/internal/inference"
 	"github.com/akynte/boundedcode/internal/policy"
 	"github.com/akynte/boundedcode/internal/repointel"
+	"github.com/akynte/boundedcode/internal/sandbox"
 	"github.com/akynte/boundedcode/internal/store"
 	"github.com/akynte/boundedcode/internal/task"
 	"github.com/akynte/boundedcode/internal/telemetry"
@@ -229,6 +230,10 @@ func (r *Runner) Run(ctx context.Context, taskID string, opt RunOptions) (*task.
 	if err != nil {
 		return t, fmt.Errorf("refusing to start the agent: %w", err)
 	}
+	deps, err := dependencyMounts(wts)
+	if err != nil {
+		return t, fmt.Errorf("refusing to start the agent: %w", err)
+	}
 	if r.Nav != nil {
 		r.prepareNav(wts)
 		defer r.releaseNav(wts)
@@ -236,7 +241,7 @@ func (r *Runner) Run(ctx context.Context, taskID string, opt RunOptions) (*task.
 	openReq := agent.OpenRequest{TaskID: t.ID, SessionID: t.AgentSessionID, Workspace: r.WorkDir(t.ID), GitCommonDirs: gitDirs, GitAdminDirs: adminDirs,
 		PersistenceDir: filepath.Join(r.Paths.TaskDir(t.ID), "runtime"), MaxIterations: r.Cfg.Agent.MaxIterations,
 		MaxInputTokens: r.CtxSize, MaxOutputTokens: 8192, CondenserMaxEvents: r.Cfg.Agent.CondenserMaxEvents,
-		CondenserMaxTokens: r.CtxSize * 7 / 10, Masks: masks, OnEvent: onEvent, Gateway: gw,
+		CondenserMaxTokens: r.CtxSize * 7 / 10, Masks: masks, DependencyMounts: deps, OnEvent: onEvent, Gateway: gw,
 		LLMTimeout: r.Cfg.Inference.RequestTimeout.D()}
 	sess, mode, err := r.openSession(ctx, t, openReq)
 	if err != nil {
@@ -606,7 +611,7 @@ func (r *Runner) verifyAll(ctx context.Context, t *task.Task, wts []task.Worktre
 		if len(files) == 0 && scope == verify.Targeted {
 			continue
 		}
-		res, err := r.Verify.Run(ctx, verify.RepoTarget{Name: w.RepoName, Worktree: w.Path, Base: w.BaseCommit, TaskID: t.ID}, scope)
+		res, err := r.Verify.Run(ctx, verify.RepoTarget{Name: w.RepoName, Worktree: w.Path, Base: w.BaseCommit, TaskID: t.ID, Source: w.RepoPath}, scope)
 		if err != nil {
 			return false, "verify-error", err.Error()
 		}
@@ -696,6 +701,23 @@ func secretMasks(workDir string, wts []task.Worktree) ([]string, error) {
 		rel, _ := filepath.Rel(workDir, w.Path)
 		for _, f := range found {
 			out = append(out, filepath.Join(rel, f))
+		}
+	}
+	return out, nil
+}
+
+// dependencyMounts returns the installed dependencies of each worktree's
+// repository checkout (see sandbox.DependencyMounts). The source path comes
+// from the ledger, not from the agent-writable worktree.
+func dependencyMounts(wts []task.Worktree) ([]agent.DependencyMount, error) {
+	var out []agent.DependencyMount
+	for _, w := range wts {
+		ms, err := sandbox.DependencyMounts(w.RepoPath, w.Path)
+		if err != nil {
+			return nil, err
+		}
+		for _, m := range ms {
+			out = append(out, agent.DependencyMount{Host: m.Host, Target: m.Target})
 		}
 	}
 	return out, nil

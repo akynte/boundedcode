@@ -40,11 +40,21 @@ type OpenRequest struct {
 	LLMTimeout time.Duration
 	// Masks are workspace-relative paths hidden from the agent.
 	Masks []string
+	// DependencyMounts are installed dependencies (node_modules of the
+	// repository's own checkout) mounted read-only into the worktrees, so
+	// the agent can build and test offline. Host paths.
+	DependencyMounts []DependencyMount
 	// OnEvent receives runtime events (may be nil). Called sequentially.
 	OnEvent func(Event)
 	// Gateway meters and forwards the session's model calls. The task runner
 	// supplies it so token budgets are enforced on the same counter.
 	Gateway *inference.Gateway
+}
+
+// DependencyMount maps an installed-dependency directory read-only to Target.
+type DependencyMount struct {
+	Host   string
+	Target string
 }
 
 // Session is an open agent conversation.

@@ -554,7 +554,7 @@ func newVerifyCmd(app *App) *cobra.Command {
 			}
 			ok := true
 			for _, w := range wts {
-				res, err := e.Run(ctx, verify.RepoTarget{Name: w.RepoName, Worktree: w.Path, Base: w.BaseCommit, TaskID: t.ID}, scope)
+				res, err := e.Run(ctx, verify.RepoTarget{Name: w.RepoName, Worktree: w.Path, Base: w.BaseCommit, TaskID: t.ID, Source: w.RepoPath}, scope)
 				if err != nil {
 					return err
 				}

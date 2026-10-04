@@ -107,6 +107,12 @@ func (r *Runtime) Open(ctx context.Context, req agent.OpenRequest) (agent.Sessio
 	for _, d := range req.GitAdminDirs {
 		mounts = append(mounts, sandbox.Mount{Host: d, Target: d})
 	}
+	for _, d := range req.DependencyMounts {
+		if !r.Sandbox.Isolated() {
+			break // no path translation without a container; nothing to add
+		}
+		mounts = append(mounts, sandbox.Mount{Host: d.Host, Target: d.Target, ReadOnly: true})
+	}
 	var masks []string
 	for _, m := range req.Masks {
 		masks = append(masks, filepath.Join(req.Workspace, m))

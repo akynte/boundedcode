@@ -124,6 +124,10 @@ type RepoTarget struct {
 	Worktree string
 	Base     string // base commit for diff scope
 	TaskID   string
+	// Source is the repository's own checkout (from the task ledger, never
+	// derived from the agent-writable worktree). Dependencies installed there
+	// (node_modules) are mounted read-only into the worktree's sandbox.
+	Source string
 }
 
 // ConfigPath is the repository-relative verification config.
@@ -244,16 +248,23 @@ func presetFor(files map[string]bool) Config {
 			Stage{Name: "golangci-lint", Run: []string{"golangci-lint", "run", "./..."}, Scope: "full", Optional: true, Requires: []string{"go.mod"}},
 		)
 	}
-	if files["package.json"] && files["tsconfig.json"] {
-		// Dependencies are not installed by verification (no network); the
-		// stages are skipped when node_modules is absent.
+	if files["package.json"] {
+		// Dependencies are never installed by verification (no network): they
+		// come read-only from the repository's own checkout (see
+		// sandbox.DependencyMounts). A script the project declares, with no
+		// dependencies installed, fails: skipping it would pass the change
+		// with no tests run. A script the project lacks is skipped.
+		const missingDeps = `{ echo "node_modules missing: install the project's dependencies in the repository checkout (e.g. npm ci) so verification can run them"; exit 1; }`
 		npmScript := func(name string) string {
-			return `[ -d node_modules ] || { echo "node_modules missing"; exit 127; }; ` +
-				`node -e 'process.exit(require("./package.json").scripts?.["` + name + `"] ? 0 : 3)'; rc=$?; ` +
-				`[ $rc = 3 ] && { echo "no ` + name + ` script"; exit 127; }; npm run --silent ` + name
+			return `node -e 'process.exit(require("./package.json").scripts?.["` + name + `"] ? 0 : 3)'; rc=$?; ` +
+				`[ $rc = 3 ] && { echo "no ` + name + ` script"; exit 127; }; [ $rc = 0 ] || exit $rc; ` +
+				`[ -d node_modules ] || ` + missingDeps + `; npm run --silent ` + name
 		}
+		tsc := `if [ -x node_modules/.bin/tsc ]; then node_modules/.bin/tsc --noEmit; ` +
+			`elif [ ! -d node_modules ] && grep -q '"typescript"' package.json; then ` + missingDeps + `; ` +
+			`else echo "tsc not installed"; exit 127; fi`
 		c.Stages = append(c.Stages,
-			Stage{Name: "tsc", Run: []string{"sh", "-c", `if [ -x node_modules/.bin/tsc ]; then node_modules/.bin/tsc --noEmit; else echo "tsc not installed (node_modules missing)"; exit 127; fi`}, Optional: true, Requires: []string{"tsconfig.json"}},
+			Stage{Name: "tsc", Run: []string{"sh", "-c", tsc}, Optional: true, Requires: []string{"tsconfig.json"}},
 			Stage{Name: "npm-lint", Run: []string{"sh", "-c", npmScript("lint")}, Optional: true, Requires: []string{"package.json"}},
 			Stage{Name: "npm-test", Run: []string{"sh", "-c", npmScript("test")}, Optional: true, Requires: []string{"package.json"}, Timeout: config.Duration(20 * time.Minute)},
 			Stage{Name: "npm-build", Run: []string{"sh", "-c", npmScript("build")}, Scope: "full", Optional: true, Requires: []string{"package.json"}},
@@ -503,6 +514,13 @@ func (e *Engine) spec(t RepoTarget, argv []string) (sandbox.Spec, error) {
 			env["GOPROXY"] = "off"
 			env["GOFLAGS"] = "-buildvcs=false -mod=mod"
 		}
+	}
+	if e.Sandbox != nil && e.Sandbox.Isolated() {
+		deps, err := sandbox.DependencyMounts(t.Source, t.Worktree)
+		if err != nil {
+			return sandbox.Spec{}, fmt.Errorf("dependency mounts: %w", err)
+		}
+		mounts = append(mounts, deps...)
 	}
 	var masks []string
 	secrets, err := policy.FindSecretPaths(t.Worktree, policy.MaxSecretMasks)
