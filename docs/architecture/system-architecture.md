@@ -169,6 +169,8 @@ See [SECURITY.md](../../SECURITY.md) and [sandbox design](../design/sandbox.md).
 ## 9. Package map
 
 `cli` → `orchestrator` → {`task`, `contextplan`, `verify`, `policy`,
-`frontier`, `agent/*`, `inference/*`, `repointel/*`, `sandbox`, `gitops`,
-`workspace`, `telemetry`, `store`}. Lower layers never import `cli` or
+`frontier`, `agent/*`, `inference/*`, `repointel/*`, `xservice`, `sandbox`,
+`gitops`, `workspace`, `telemetry`, `store`}. `xservice` extracts and links
+cross-service contracts (HTTP, topics, env, Terraform) to complement the
+code graph. Lower layers never import `cli` or
 `orchestrator`.

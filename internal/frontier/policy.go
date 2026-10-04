@@ -43,6 +43,10 @@ type Signals struct {
 	MaxEscalations      int
 	AlreadyReviewedZ1   bool // Z1 fires at most once per task
 	AlreadyReviewedZ3   bool
+	// UnupdatedCounterparts describes cross-service contracts touched by the
+	// change whose other side lives in a repository the task did not change
+	// (e.g. "topic payments.charged consumed by ledger-service").
+	UnupdatedCounterparts []string
 }
 
 var contractPaths = []string{"*.proto", "*openapi*.yaml", "*openapi*.json", "*swagger*", "*.sql", "*/migrations/*", "*.avsc", "*schema*.graphql"}
@@ -97,8 +101,14 @@ func Evaluate(cfg config.EscalationConfig, s Signals) []Trigger {
 				}
 			}
 		}
-		if len(hits) > 0 {
+		switch {
+		case len(hits) > 0 && len(s.UnupdatedCounterparts) > 0:
+			out = append(out, Trigger{Z3, "high-risk change before merge: " + strings.Join(first(hits, 5), ", ") +
+				"; cross-service counterparts not updated: " + strings.Join(first(s.UnupdatedCounterparts, 5), "; ")})
+		case len(hits) > 0:
 			out = append(out, Trigger{Z3, "high-risk change before merge: " + strings.Join(first(hits, 5), ", ")})
+		case len(s.UnupdatedCounterparts) > 0:
+			out = append(out, Trigger{Z3, "cross-service contract changed but its counterpart was not: " + strings.Join(first(s.UnupdatedCounterparts, 5), "; ")})
 		}
 	}
 	return out

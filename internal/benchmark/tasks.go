@@ -18,6 +18,7 @@ import (
 	"github.com/akynte/boundedcode/internal/orchestrator"
 	"github.com/akynte/boundedcode/internal/sandbox"
 	"github.com/akynte/boundedcode/internal/task"
+	"github.com/akynte/boundedcode/internal/xservice"
 )
 
 // TaskSpec is one engineering benchmark task (benchmarks/tasks/*.yaml).
@@ -197,7 +198,12 @@ func (s *SuiteRunner) runOne(ctx context.Context, model string, spec TaskSpec) (
 			res.Error = err.Error()
 			return res
 		}
-		// Index so the agent gets graph context, as in normal use.
+		// Index so the agent gets graph and contract context, as in normal use.
+		if r.CrossService {
+			if eps, _, err := xservice.Scan(name, repo.Path, xservice.ScanOptions{}); err == nil {
+				_ = xservice.SaveRepo(ctx, r.DB, w.ID, repo.ID, eps)
+			}
+		}
 		if r.Intel != nil {
 			if ir, err := r.Intel.Index(ctx, repo.Path, "bench."+spec.ID+"."+name, "full"); err == nil {
 				_ = r.WS.MarkIndexed(ctx, repo.ID, ir.Project)

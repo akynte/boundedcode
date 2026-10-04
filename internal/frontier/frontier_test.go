@@ -35,6 +35,9 @@ func TestEvaluate(t *testing.T) {
 		{"budget spent", Signals{Text: "x", ConsecutiveFailures: 5, EscalationsUsed: 2, MaxEscalations: 2}, ""},
 		{"user overrides budget", Signals{UserRequested: true, EscalationsUsed: 2, MaxEscalations: 2}, "Z4"},
 		{"z1 once", Signals{Text: "idempotency for payments", ChangedRepos: 3, AlreadyReviewedZ1: true}, ""},
+		{"contract counterpart not updated", Signals{Text: "x", PreMerge: true, ChangedFiles: []string{"svc/internal/events/kafka.go"},
+			UnupdatedCounterparts: []string{"topic payments.charged consumed by ledger-service"}}, "Z3"},
+		{"counterpart without pre-merge", Signals{Text: "x", UnupdatedCounterparts: []string{"x"}}, ""},
 	}
 	for _, c := range cases {
 		if got := codes(Evaluate(cfg, c.s)); got != c.want {

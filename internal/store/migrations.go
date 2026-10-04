@@ -135,4 +135,27 @@ CREATE TABLE benchmark_runs (
 	created_at  TEXT NOT NULL
 );
 `,
+	// 2: cross-service contract endpoints (internal/xservice), refreshed per
+	// repository on index.
+	`
+CREATE TABLE xservice_endpoints (
+	id            INTEGER PRIMARY KEY AUTOINCREMENT,
+	workspace_id  TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+	repository_id TEXT NOT NULL REFERENCES repositories(id) ON DELETE CASCADE,
+	repo          TEXT NOT NULL,
+	kind          TEXT NOT NULL,
+	file          TEXT NOT NULL,
+	line          INTEGER NOT NULL,
+	symbol        TEXT NOT NULL DEFAULT '',
+	method        TEXT NOT NULL DEFAULT '',
+	path          TEXT NOT NULL DEFAULT '',
+	topic         TEXT NOT NULL DEFAULT '',
+	env           TEXT NOT NULL DEFAULT '',
+	confidence    TEXT NOT NULL,
+	detail        TEXT NOT NULL DEFAULT '',
+	scanned_at    TEXT NOT NULL
+);
+CREATE INDEX xservice_endpoints_ws ON xservice_endpoints(workspace_id);
+CREATE INDEX xservice_endpoints_repo ON xservice_endpoints(repository_id);
+`,
 }

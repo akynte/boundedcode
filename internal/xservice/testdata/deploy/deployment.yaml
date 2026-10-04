@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: api}
+spec:
+  template:
+    spec:
+      containers:
+        - name: api
+          env:
+            - name: PAYMENTS_URL
+              value: http://payments:8080
+            - name: REGION
+              valueFrom: {configMapKeyRef: {name: c, key: region}}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata: {name: c}
+data:
+  LOG_LEVEL: info

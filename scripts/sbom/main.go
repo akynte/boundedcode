@@ -80,7 +80,7 @@ func main() {
 	sort.Strings(names)
 	root := pkg{SPDXID: "SPDXRef-Package-boundedcode", Name: "boundedcode", VersionInfo: *version,
 		DownloadLocation: "NOASSERTION", LicenseConcluded: "Apache-2.0", LicenseDeclared: "Apache-2.0",
-		CopyrightText: "Copyright 2026 The boundedcode Authors"}
+		CopyrightText: "Copyright 2026 The BoundedCode Authors"}
 	if *binary != "" {
 		b, err := os.ReadFile(*binary)
 		if err != nil {

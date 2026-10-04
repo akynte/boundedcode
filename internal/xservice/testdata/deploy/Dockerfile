@@ -1,0 +1,3 @@
+FROM scratch
+ENV REGION=eu-west-1 FEATURE_X=on
+ENV LEGACY_MODE 1

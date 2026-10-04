@@ -123,6 +123,7 @@ func (a *App) buildRunnerWith(ctx context.Context, f runFlags, db *sql.DB, paths
 		Verify: &verify.Engine{Sandbox: sb, CacheDir: filepath.Join(paths.Cache, "build"), GoModCache: strings.TrimSpace(string(gomodcache)), DB: db, Rec: rec},
 		Cfg:    a.Config, Paths: paths, Model: p.Name, CtxSize: p.Server.CtxSize, Log: a.Log, Out: a.Err,
 		CondenseEachRetry: f.condenseRetry,
+		CrossService:      a.Config.RepoIntel.CrossService,
 	}
 	r.WS = workspace.Store{DB: db}
 	// Gateway budget is per task; the runner passes the remaining allowance.

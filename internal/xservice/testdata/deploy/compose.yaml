@@ -1,0 +1,8 @@
+services:
+  api:
+    environment:
+      - PAYMENTS_TIMEOUT=5
+    image: x
+  worker:
+    environment:
+      INVENTORY_TOKEN_FILE: /run/token

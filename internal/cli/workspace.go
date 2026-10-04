@@ -14,6 +14,7 @@ import (
 	"github.com/akynte/boundedcode/internal/repointel/cbm"
 	"github.com/akynte/boundedcode/internal/store"
 	"github.com/akynte/boundedcode/internal/workspace"
+	"github.com/akynte/boundedcode/internal/xservice"
 )
 
 func (a *App) workspaces(ctx context.Context) (workspace.Store, error) {
@@ -176,7 +177,12 @@ func newIndexCmd(app *App) *cobra.Command {
 				return err
 			}
 			rec, _ := app.Recorder(ctx)
+			st, _ := app.Store(ctx)
 			intel := app.intel()
+			if err := intel.Open(ctx); err != nil {
+				app.Log.Warn("persistent MCP session unavailable; using one-shot CLI", "err", err)
+			}
+			defer intel.Close()
 			for _, r := range repos {
 				if len(args) > 0 && !contains(args, r.Name) {
 					continue
@@ -190,8 +196,26 @@ func newIndexCmd(app *App) *cobra.Command {
 				if err := ws.MarkIndexed(ctx, r.ID, res.Project); err != nil {
 					return err
 				}
+				line := fmt.Sprintf("%-24s graph: nodes=%d edges=%d", r.Name, res.Nodes, res.Edges)
+				if app.Config.RepoIntel.CrossService {
+					eps, diags, err := xservice.Scan(r.Name, r.Path, xservice.ScanOptions{})
+					if err != nil {
+						return fmt.Errorf("cross-service scan %s: %w", r.Name, err)
+					}
+					if err := xservice.SaveRepo(ctx, st.DB, w.ID, r.ID, eps); err != nil {
+						return err
+					}
+					line += fmt.Sprintf("  contracts: %d endpoints (%d diagnostics)", len(eps), len(diags))
+				}
 				rec.Emit(ctx, "", "repointel.indexed", map[string]any{"repo": r.Name, "project": res.Project, "nodes": res.Nodes, "edges": res.Edges, "seconds": time.Since(t0).Seconds()})
-				app.printf("%-24s project=%s nodes=%d edges=%d %.1fs\n", r.Name, res.Project, res.Nodes, res.Edges, time.Since(t0).Seconds())
+				app.printf("%s  %.1fs\n", line, time.Since(t0).Seconds())
+			}
+			if app.Config.RepoIntel.CrossService {
+				eps, err := xservice.LoadWorkspace(ctx, st.DB, w.ID)
+				if err != nil {
+					return err
+				}
+				app.printf("cross-service links in workspace %s: %d (see `intel links`)\n", w.Name, len(xservice.LinkAll(eps, xservice.LinkOptions{})))
 			}
 			return nil
 		},
@@ -252,6 +276,53 @@ func newIntelCmd(app *App) *cobra.Command {
 		RunE: run(func(ctx context.Context, p string) (string, error) { return app.intel().Impact(ctx, p, "", 2) })})
 	cmd.AddCommand(&cobra.Command{Use: "architecture", Short: "Architecture overview",
 		RunE: run(func(ctx context.Context, p string) (string, error) { return app.intel().Architecture(ctx, p) })})
+	var kindFilter string
+	links := &cobra.Command{Use: "links", Short: "Cross-service contract links (HTTP, topics, env) across the workspace",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			eps, err := app.workspaceEndpoints(cmd.Context(), wsFlag)
+			if err != nil {
+				return err
+			}
+			ls := xservice.LinkAll(eps, xservice.LinkOptions{})
+			if kindFilter != "" {
+				var f []xservice.Link
+				for _, l := range ls {
+					if l.Kind == kindFilter {
+						f = append(f, l)
+					}
+				}
+				ls = f
+			}
+			if app.jsonOut {
+				return app.printJSON(ls)
+			}
+			for _, l := range ls {
+				app.printf("%s\n", l)
+			}
+			if u := xservice.Unresolved(eps); len(u) > 0 {
+				app.printf("(%d endpoints with unresolved values are not linked; see `intel endpoints`)\n", len(u))
+			}
+			return nil
+		}}
+	links.Flags().StringVar(&kindFilter, "kind", "", "http | topic | topic_infra | env")
+	endpoints := &cobra.Command{Use: "endpoints", Short: "Cross-service contract endpoints found by the analyzers",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			eps, err := app.workspaceEndpoints(cmd.Context(), wsFlag)
+			if err != nil {
+				return err
+			}
+			if app.jsonOut {
+				return app.printJSON(eps)
+			}
+			for _, e := range eps {
+				if repoFlag != "" && e.Repo != repoFlag {
+					continue
+				}
+				app.printf("%-15s %-34s %-9s %s %s\n", e.Kind, e.Key(), e.Confidence, e.Where(), e.Symbol)
+			}
+			return nil
+		}}
+	cmd.AddCommand(links, endpoints)
 	return cmd
 }
 
@@ -262,4 +333,20 @@ func contains(xs []string, s string) bool {
 		}
 	}
 	return false
+}
+
+func (a *App) workspaceEndpoints(ctx context.Context, wsFlag string) ([]xservice.Endpoint, error) {
+	w, err := a.resolveWorkspace(ctx, wsFlag)
+	if err != nil {
+		return nil, err
+	}
+	s, err := a.Store(ctx)
+	if err != nil {
+		return nil, err
+	}
+	eps, err := xservice.LoadWorkspace(ctx, s.DB, w.ID)
+	if err == nil && len(eps) == 0 {
+		return nil, fmt.Errorf("no cross-service endpoints indexed for %s; run `index`", w.Name)
+	}
+	return eps, err
 }

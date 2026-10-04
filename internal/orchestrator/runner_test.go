@@ -189,3 +189,63 @@ func TestRunFailEscalateCrashResumeAndComplete(t *testing.T) {
 		}
 	}
 }
+
+// TestContractCheck: the agent changes the event producer only; the
+// cross-service analyzer finds the consumer in another task repository and
+// the runner asks for one targeted contract-check round before completing.
+func TestContractCheck(t *testing.T) {
+	if _, err := exec.LookPath("go"); err != nil || testing.Short() {
+		t.Skip("needs go toolchain")
+	}
+	ctx := context.Background()
+	root := t.TempDir()
+	s, err := store.Open(ctx, filepath.Join(root, "state.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	ws := workspace.Store{DB: s.DB}
+	w, _ := ws.Create(ctx, "pp")
+	for _, name := range []string{"payment-service", "ledger-service"} {
+		dir := filepath.Join(root, "repos", name)
+		_ = os.MkdirAll(filepath.Dir(dir), 0o755)
+		if out, err := exec.Command("cp", "-r", "../../benchmarks/fixtures/payment-platform/"+name, dir).CombinedOutput(); err != nil {
+			t.Fatal(string(out))
+		}
+		for _, a := range [][]string{{"init", "-q", "-b", "main"}, {"add", "-A"}, {"-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "i"}} {
+			if _, err := gitops.Run(ctx, dir, a...); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if _, err := ws.AddRepo(ctx, w, dir, name); err != nil {
+			t.Fatal(err)
+		}
+	}
+	touchProducer := func(wsDir, _ string) (string, error) {
+		return "documented the producer", replaceIn(filepath.Join(wsDir, "payment-service/internal/events/kafka.go"),
+			"// PaymentCharged publishes", "// PaymentCharged (v2 schema) publishes")
+	}
+	checked := func(wsDir, msg string) (string, error) {
+		if !strings.Contains(msg, "Contract check") || !strings.Contains(msg, "ledger-service") || !strings.Contains(msg, "topic payments.charged") {
+			return "", os.ErrInvalid
+		}
+		return "consumer unaffected", nil
+	}
+	rt := &scripted.Runtime{Steps: []scripted.Step{touchProducer, checked}}
+	r := newRunner(s, root, rt, nil)
+	r.CrossService = true
+	tk, err := r.Create(ctx, w, "Document the payment event schema in payment-service", []string{"payment-service", "ledger-service"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := r.Run(ctx, tk.ID, RunOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Status != task.StatusCompleted || len(rt.Messages) != 2 {
+		t.Fatalf("status=%s messages=%d\n%s", got.Status, len(rt.Messages), strings.Join(rt.Messages, "\n---\n"))
+	}
+	if !strings.Contains(rt.Messages[0], "CROSS-SERVICE CONTRACTS") || !strings.Contains(rt.Messages[0], "topic payments.charged") {
+		t.Fatalf("initial pack lacks contracts:\n%s", rt.Messages[0])
+	}
+}

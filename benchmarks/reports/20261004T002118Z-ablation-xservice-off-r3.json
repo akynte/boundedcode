@@ -1,0 +1,41 @@
+{
+  "id": "suite-20261004T002118Z",
+  "model": "qwen3.6-35b-a3b",
+  "started": "2026-10-04T00:21:18.553039707Z",
+  "finished": "2026-10-04T00:23:41.187832539Z",
+  "results": [
+    {
+      "id": "event-field-rename",
+      "category": "cross-service-discovery",
+      "model": "qwen3.6-35b-a3b",
+      "success": false,
+      "task_status": "completed",
+      "self_verified": true,
+      "attempts": 1,
+      "local_tokens": 16973,
+      "generated_tokens": 1925,
+      "cached_prompt_tokens": 86890,
+      "escalations": 0,
+      "local_only": false,
+      "condensations": 0,
+      "resumes": 0,
+      "wall_seconds": 142.629316479,
+      "failed_checks": [
+        "ledger-service: go test ./...: --- FAIL: TestHiddenConsumesSchemaV2 (0.00s)\n    hidden_accept_test.go:18: balance = 0, want 500 (consumer still reads the old field?)\nFAIL\nFAIL\texample.com/ledger-service/internal/consumer\t0.002s\n?   \texample.com/ledger-service/internal/ledger\t[no test files]\nFAIL\n"
+      ],
+      "task_id": "t20261004-b71a49"
+    }
+  ],
+  "summary": {
+    "tasks": 1,
+    "verified": 0,
+    "success_rate": 0,
+    "local_only_completion_rate": 0,
+    "frontier_escalation_rate": 0,
+    "verified_tasks_per_hour": 0,
+    "attempts_per_successful_task": 0,
+    "wall_seconds_per_task": 142.629316479,
+    "local_tokens_per_task": 16973,
+    "self_verified_but_hidden_failed": 1
+  }
+}

@@ -29,7 +29,8 @@ func (r *Runner) escalate(ctx context.Context, t *task.Task, wts []task.Worktree
 	strategies, _ := r.Ledger.Strategies(ctx, t.ID)
 	pack, err := contextplan.Build(ctx, contextplan.Inputs{Task: t, Worktrees: wts, WorkDir: r.WorkDir(t.ID), Strategies: strategies,
 		Verification: r.latestVerification(ctx, t.ID, wts), Intel: r.Intel, Mode: mode,
-		BudgetTokens: r.Cfg.Frontier.MaxPacketTokens, MaxAttempts: t.Budget.MaxAttempts})
+		BudgetTokens: r.Cfg.Frontier.MaxPacketTokens, MaxAttempts: t.Budget.MaxAttempts,
+		Contracts: r.contracts(ctx, t, wts), ChangedFiles: t.ChangedFiles})
 	if err != nil {
 		r.Log.Error("build frontier pack", "err", err)
 		return ""

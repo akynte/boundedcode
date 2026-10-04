@@ -1,6 +1,4 @@
-# boundedcode
-
-> Temporary codename. The public name is not decided yet.
+# BoundedCode
 
 A local-first control plane for AI-assisted software engineering on large,
 long-running, multi-repository projects. It runs on commodity hardware and
@@ -18,11 +16,12 @@ reports. Nothing is claimed without a measurement.
 ## How it fits together
 
 ```text
-boundedcode (Go CLI / control plane)
+boundedcode CLI (Go control plane)
  ├─ task ledger + audit log (SQLite)
  ├─ git worktrees  agent/<task-id>
  ├─ verification engine (gofmt, go test, tsc, eslint, gitleaks, ...)
  ├─ repository intelligence ──> codebase-memory-mcp (external)
+ │                               + cross-service contract analyzers (HTTP, Kafka, env, Terraform)
  ├─ agent runtime ── JSON-RPC/stdio ──> OpenHands SDK adapter (in a container)
  │                                         └─ LLM calls tunnelled back to Go
  ├─ inference runtime ──> llama.cpp llama-server (external, supervised)
@@ -51,6 +50,10 @@ indicative, not general claims.
   ([report](benchmarks/reports/milestone-1/)).
 * Frontier escalation (Codex, ChatGPT sign-in) fixed the hard task for
   Qwen3.6 with 2 messages ([report](benchmarks/reports/phase7-frontier/)).
+* Cross-service contract analysis: an event-field rename that names only
+  the producer passed hidden checks 3/3 with the analyzers and 0/3 without
+  them. All three runs without them passed per-repo tests while breaking the
+  consumer ([evaluation](docs/design/phase9-analyzers.md)).
 * Details: [infrastructure reports](benchmarks/reports/) and
   [model evaluation](docs/design/model-evaluation.md).
 

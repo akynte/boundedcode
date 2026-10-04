@@ -62,6 +62,9 @@ type AgentConfig struct {
 type RepoIntelConfig struct {
 	Provider string `yaml:"provider"` // "codebase-memory-mcp"
 	Binary   string `yaml:"binary"`
+	// CrossService enables the built-in cross-service contract analyzers
+	// (internal/xservice) in indexing, context packs and escalation policy.
+	CrossService bool `yaml:"cross_service"`
 }
 
 // FrontierConfig configures frontier escalation.
@@ -124,7 +127,7 @@ func Defaults() Config {
 			Runtime: "openhands", Image: "boundedcode-openhands:local",
 			MaxIterations: 150, CondenserMaxEvents: 80,
 		},
-		RepoIntel: RepoIntelConfig{Provider: "codebase-memory-mcp", Binary: "codebase-memory-mcp"},
+		RepoIntel: RepoIntelConfig{Provider: "codebase-memory-mcp", Binary: "codebase-memory-mcp", CrossService: true},
 		Frontier: FrontierConfig{
 			Enabled: false, Provider: "codex", Binary: "codex",
 			RequireApproval: true, MaxPacketTokens: 24000, Timeout: Duration(15 * time.Minute), Contain: true,

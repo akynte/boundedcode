@@ -19,6 +19,7 @@ import (
 	"github.com/akynte/boundedcode/internal/repointel"
 	"github.com/akynte/boundedcode/internal/task"
 	"github.com/akynte/boundedcode/internal/verify"
+	"github.com/akynte/boundedcode/internal/xservice"
 )
 
 // Mode says why the pack is built.
@@ -44,6 +45,11 @@ type Inputs struct {
 	MaxAttempts  int
 	// Advice is frontier guidance to apply (Z1-Z4), if any.
 	Advice string
+	// Contracts are cross-service links (HTTP, topics, env) involving the
+	// task's repositories; nil disables the section.
+	Contracts []xservice.Link
+	// ChangedFiles are repo-qualified paths changed so far ("repo/file").
+	ChangedFiles []string
 }
 
 // Section is one block of the pack.
@@ -80,6 +86,7 @@ var plan = []struct {
 	{"rejected", 0.06},
 	{"diff", 0.25},
 	{"impact", 0.10},
+	{"contracts", 0.10},
 	{"code", 0.30},
 	{"adr", 0.08},
 	{"rules", 0.05},
@@ -97,11 +104,12 @@ func Build(ctx context.Context, in Inputs) (Pack, error) {
 		"rejected": func() (string, string) {
 			return "STRATEGIES ALREADY TRIED (do not repeat)", rejectedSection(in.Strategies)
 		},
-		"diff":   func() (string, string) { return "CURRENT CHANGES", diffSection(ctx, in) },
-		"impact": func() (string, string) { return "IMPACT OF CURRENT CHANGES", impactSection(ctx, in) },
-		"code":   func() (string, string) { return "RELEVANT CODE", codeSection(ctx, in) },
-		"adr":    func() (string, string) { return "ARCHITECTURE DECISIONS", adrSection(in) },
-		"rules":  func() (string, string) { return "RULES", rulesSection() },
+		"diff":      func() (string, string) { return "CURRENT CHANGES", diffSection(ctx, in) },
+		"impact":    func() (string, string) { return "IMPACT OF CURRENT CHANGES", impactSection(ctx, in) },
+		"contracts": func() (string, string) { return "CROSS-SERVICE CONTRACTS", contractsSection(in) },
+		"code":      func() (string, string) { return "RELEVANT CODE", codeSection(ctx, in) },
+		"adr":       func() (string, string) { return "ARCHITECTURE DECISIONS", adrSection(in) },
+		"rules":     func() (string, string) { return "RULES", rulesSection() },
 	}
 	p := Pack{Mode: in.Mode, Budget: in.BudgetTokens}
 	remaining := in.BudgetTokens
@@ -436,3 +444,52 @@ func oneLine(s string, n int) string {
 }
 
 func atoi(s string) int { n, _ := strconv.Atoi(s); return n }
+
+// contractsSection lists cross-service links: first those touching files the
+// task changed (with the counterpart that may need updating), then the other
+// contracts of the task's repositories.
+func contractsSection(in Inputs) string {
+	if len(in.Contracts) == 0 {
+		return ""
+	}
+	touched := xservice.Touching(in.Contracts, in.ChangedFiles)
+	isTouched := map[string]bool{}
+	var b strings.Builder
+	if len(touched) > 0 {
+		b.WriteString("Your changes touch these contracts. Check that the other side still works, and update it if it is in your workspace:\n")
+		for _, l := range touched {
+			isTouched[linkID(l)] = true
+			fmt.Fprintf(&b, "- %s\n", formatLink(l))
+		}
+		b.WriteString("\n")
+	}
+	n := 0
+	for _, l := range in.Contracts {
+		if isTouched[linkID(l)] {
+			continue
+		}
+		if n == 0 {
+			b.WriteString("Contracts between services in this workspace (producer/caller -> consumer/handler):\n")
+		}
+		if n >= 40 {
+			fmt.Fprintf(&b, "- … %d more\n", len(in.Contracts)-len(touched)-n)
+			break
+		}
+		fmt.Fprintf(&b, "- %s\n", formatLink(l))
+		n++
+	}
+	return b.String()
+}
+
+func linkID(l xservice.Link) string { return l.Kind + "|" + l.From.Where() + "|" + l.To.Where() }
+
+func formatLink(l xservice.Link) string {
+	side := func(e xservice.Endpoint) string {
+		s := fmt.Sprintf("%s ./%s/%s:%d", e.Kind, e.Repo, e.File, e.Line)
+		if e.Symbol != "" {
+			s += " (" + e.Symbol + ")"
+		}
+		return s
+	}
+	return fmt.Sprintf("[%s] %s: %s -> %s", l.Kind, l.Contract, side(l.From), side(l.To))
+}

@@ -1,31 +1,58 @@
-# Phase 9: Cross-service analyzers (decision: none yet)
+# Phase 9: Cross-service analyzers
 
-Rule (roadmap): add a custom analyzer only when **real task failures**
-prove that the missing knowledge caused them.
+Rule (roadmap): add a custom analyzer only when evidence shows it is needed,
+and prove that it improves outcomes.
 
-Evidence to date:
+## Evidence that motivated it
 
-| Source | Failures | Caused by missing graph knowledge? |
-|---|---|---|
-| 11-task suite × 3 models (33 runs) | 2 (both `cross-service-idempotency`) | No. The bug was a concurrency race inside one handler, and both repos were in the task. |
-| 6 repeat runs of that task | 3 | No (same race) |
-| Milestone 1 and Phase 7 runs | 1 | No (same race) |
+The [gap report](repointel-gap-report.md) measured that codebase-memory-mcp
+v0.11.0 does not link:
 
-The Phase 3 gap report found real **capability** gaps in codebase-memory-mcp
-v0.11.0:
+* Kafka producers to consumers;
+* Go 1.22 method-pattern routes;
+* HTTP calls built from constants;
+* Helm/env configuration to the code that reads it.
 
-* no Kafka producer→consumer topic linking;
-* no Go 1.22 method-pattern routes;
-* no Helm↔EnvVar links.
+On the `payment-platform` fixture it linked 0 of 7 documented cross-service
+relationships.
 
-None of them has yet caused a measured task failure. The fixture tasks name
-the affected repositories explicitly, which masks the gaps.
+## What was built
 
-**Decision:** no analyzer is implemented now.
+`internal/xservice` ([design](cross-service-analysis.md)) extracts HTTP
+routes and calls, topic producers, consumers and provisioning, and env reads
+and providers. It links them across repositories and feeds them into:
 
-**Next step to collect evidence:** add benchmark tasks where the *agent must
-discover* the affected service. An example is "rename the PaymentCharged
-field `amount_cents`" given only payment-service, which must find the
-ledger consumer. Measure failure with and without impact context. If the
-topic linker proves necessary, contributing it upstream (MIT) is preferred
-over a local analyzer.
+* context packs;
+* a local **contract check** round;
+* Z3 pre-merge escalation.
+
+It finds 7/7 fixture links with no extra links.
+
+## Proof of benefit (ablation)
+
+Task `event-field-rename`: rename the `PaymentCharged` event's JSON field
+"in payment-service". The request names only the producer. The ledger
+consumer in another repository silently breaks unless the agent discovers
+it. Model: Qwen3.6-35B-A3B, local only, 3 runs per arm, alternating.
+Reports: `benchmarks/reports/*-ablation-xservice-*`.
+
+| `repointel.cross_service` | Hidden checks passed | Our verification passed | Mean wall s | Mean generated tokens |
+|---|---|---|---|---|
+| **on** | **3/3** | 3/3 | 267 | 4.9K |
+| off | 0/3 | 3/3 (**all false passes**) | 154 | 2.3K |
+
+With the analyzers off, every run passed our per-repository verification
+while leaving the consumer reading the old field, which would break in
+production. With them on, the agent either updated the consumer directly
+from the contracts section (1 run) or after the contract-check round
+(2 runs).
+
+Cost: about 110 s and 2.6K generated tokens per task. No frontier use in
+either arm.
+
+## Limits
+
+* One fixture and one task family, three runs per arm. The effect is
+  large and consistent, but more task types (HTTP path change, env rename)
+  should be added.
+* See the limits section of [cross-service-analysis.md](cross-service-analysis.md).

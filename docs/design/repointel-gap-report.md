@@ -47,7 +47,16 @@ command or task. One-shot CLI calls remain the fallback.
   there, so the user's global settings are never touched.
 * `XDG_CONFIG_HOME` does **not** isolate settings; `CBM_CACHE_DIR` does.
 
-## What this means for the roadmap
+## Resolution (2026-10-03)
+
+The HTTP, topic, Terraform and env gaps are now closed by BoundedCode's own
+analyzers ([cross-service-analysis.md](cross-service-analysis.md)). They
+complement codebase-memory-mcp, which still provides the code graph,
+search, tracing and same-repo impact. On this fixture they find 7/7
+documented cross-service links, against 0/7 linked by codebase-memory-mcp
+v0.11.0.
+
+## What this meant for the roadmap (original analysis)
 
 * No custom analyzer is written yet. Phase 9 requires a real task failure
   to justify one. The probes show **where** failures will come from:

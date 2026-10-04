@@ -29,6 +29,7 @@ import (
 	"github.com/akynte/boundedcode/internal/telemetry"
 	"github.com/akynte/boundedcode/internal/verify"
 	"github.com/akynte/boundedcode/internal/workspace"
+	"github.com/akynte/boundedcode/internal/xservice"
 )
 
 // Runner executes tasks.
@@ -54,6 +55,8 @@ type Runner struct {
 	// CondenseEachRetry forces a context condensation before every retry
 	// (used by continuity tests and benchmarks).
 	CondenseEachRetry bool
+	// CrossService enables cross-service contract analysis (internal/xservice).
+	CrossService bool
 }
 
 // RunOptions modify one run.
@@ -189,6 +192,7 @@ func (r *Runner) Run(ctx context.Context, taskID string, opt RunOptions) (*task.
 	lastSig := ""
 	advice := r.pendingAdvice(ctx, t.ID)
 	userFrontier := opt.UserRequestedFrontier
+	contractChecked := false
 	reviewedZ1 := r.hasEscalation(ctx, t.ID, frontier.Z1)
 	reviewedZ3 := r.hasEscalation(ctx, t.ID, frontier.Z3)
 
@@ -237,9 +241,11 @@ func (r *Runner) Run(ctx context.Context, taskID string, opt RunOptions) (*task.
 		stratID, _ := r.Ledger.AddStrategy(ctx, t.ID, t.AttemptCount, "(in progress)")
 		results := r.latestVerification(ctx, t.ID, wts)
 		strategies, _ := r.Ledger.Strategies(ctx, t.ID)
+		contracts := r.contracts(ctx, t, wts)
 		pack, err := contextplan.Build(ctx, contextplan.Inputs{Task: t, Worktrees: wts, WorkDir: r.WorkDir(t.ID),
 			Strategies: strategies, Verification: results, Intel: r.Intel, Mode: mode,
-			BudgetTokens: r.Cfg.Budgets.ContextPackTokens, MaxAttempts: t.Budget.MaxAttempts, Advice: advice})
+			BudgetTokens: r.Cfg.Budgets.ContextPackTokens, MaxAttempts: t.Budget.MaxAttempts, Advice: advice,
+			Contracts: contracts, ChangedFiles: t.ChangedFiles})
 		if err != nil {
 			return t, err
 		}
@@ -323,11 +329,27 @@ func (r *Runner) Run(ctx context.Context, taskID string, opt RunOptions) (*task.
 			summary = fmt.Sprintf("attempt %d (status %s, %d events)", t.AttemptCount, res.Status, res.EventsNew)
 		}
 		if passed {
+			inTask, outside := r.unupdatedCounterparts(ctx, t, wts, changedFiles, changedRepos)
+			// Local contract check first: a counterpart the agent can edit gets
+			// one targeted round before any frontier use.
+			roundsLeft := t.Budget.MaxAttempts == 0 || t.AttemptCount < t.Budget.MaxAttempts
+			if len(inTask) > 0 && !contractChecked && roundsLeft {
+				contractChecked = true
+				r.Rec.Emit(ctx, t.ID, "contract.check", map[string]any{"counterparts": inTask})
+				r.say("contract check: %d cross-service counterpart(s) not updated; asking the agent to verify", len(inTask))
+				_ = r.Ledger.ResolveStrategy(ctx, stratID, "succeeded", "verification passed; contract check requested")
+				_ = r.updateStrategySummary(ctx, stratID, summary)
+				advice = "Contract check (deterministic analysis, not a test failure): your change touches cross-service contracts whose other side you did not modify:\n- " +
+					strings.Join(inTask, "\n- ") + "\nInspect each counterpart. If it must change for the system to keep working end to end (field names, payload shape, paths, topics, env names), update it and its tests. If it is unaffected, finish without changes."
+				mode = contextplan.ModeRetry
+				continue
+			}
 			// Z3: high-risk changes get one frontier review before merge.
-			if !reviewedZ3 {
+			if !reviewedZ3 && roundsLeft {
 				trs := frontier.Evaluate(r.Cfg.Escalation, frontier.Signals{Text: t.OriginalRequest, ChangedFiles: changedFiles,
 					ChangedRepos: len(changedRepos), PreMerge: true, EscalationsUsed: t.Budget.UsedEscalations,
-					MaxEscalations: t.Budget.MaxEscalations, AlreadyReviewedZ1: true, UserRequested: userFrontier})
+					MaxEscalations: t.Budget.MaxEscalations, AlreadyReviewedZ1: true, UserRequested: userFrontier,
+					UnupdatedCounterparts: outside})
 				if tr, ok := find(trs, frontier.Z3, frontier.Z4); ok {
 					reviewedZ3, userFrontier = true, false
 					if a := r.escalate(ctx, t, wts, tr, contextplan.ModeRetry); a != "" {
@@ -567,4 +589,78 @@ func firstLine(s string) string {
 		}
 	}
 	return ""
+}
+
+// contracts returns cross-service links involving the task's repositories.
+// Task repositories are rescanned from their worktrees (so the agent's edits
+// are reflected); other workspace repositories come from the index.
+func (r *Runner) contracts(ctx context.Context, t *task.Task, wts []task.Worktree) []xservice.Link {
+	if !r.CrossService {
+		return nil
+	}
+	inTask := map[string]bool{}
+	var eps []xservice.Endpoint
+	for _, w := range wts {
+		inTask[w.RepoName] = true
+		e, _, err := xservice.Scan(w.RepoName, w.Path, xservice.ScanOptions{})
+		if err != nil {
+			r.Log.Warn("cross-service scan failed", "repo", w.RepoName, "err", err)
+			continue
+		}
+		eps = append(eps, e...)
+	}
+	stored, err := xservice.LoadWorkspace(ctx, r.DB, t.WorkspaceID)
+	if err != nil {
+		r.Log.Warn("load cross-service index", "err", err)
+	}
+	for _, e := range stored {
+		if !inTask[e.Repo] {
+			eps = append(eps, e)
+		}
+	}
+	var out []xservice.Link
+	for _, l := range xservice.LinkAll(eps, xservice.LinkOptions{}) {
+		if inTask[l.From.Repo] || inTask[l.To.Repo] {
+			out = append(out, l)
+		}
+	}
+	return out
+}
+
+// unupdatedCounterparts lists HTTP/topic contracts touched by the change
+// whose other side is in a repository the task did not change, split into
+// counterparts the agent can edit (task repos) and ones it cannot.
+func (r *Runner) unupdatedCounterparts(ctx context.Context, t *task.Task, wts []task.Worktree, changedFiles, changedRepos []string) (inTask, outside []string) {
+	links := xservice.Touching(r.contracts(ctx, t, wts), changedFiles)
+	changed := map[string]bool{}
+	for _, c := range changedRepos {
+		changed[c] = true
+	}
+	taskRepo := map[string]bool{}
+	for _, w := range wts {
+		taskRepo[w.RepoName] = true
+	}
+	seen := map[string]bool{}
+	for _, l := range links {
+		if l.Kind != "http" && l.Kind != "topic" {
+			continue
+		}
+		for _, pair := range [][2]xservice.Endpoint{{l.From, l.To}, {l.To, l.From}} {
+			mine, other := pair[0], pair[1]
+			if !changed[mine.Repo] || changed[other.Repo] || mine.Repo == other.Repo {
+				continue
+			}
+			d := fmt.Sprintf("%s: %s side in ./%s/%s:%d", l.Contract, other.Kind, other.Repo, other.File, other.Line)
+			if seen[d] {
+				continue
+			}
+			seen[d] = true
+			if taskRepo[other.Repo] {
+				inTask = append(inTask, d)
+			} else {
+				outside = append(outside, d)
+			}
+		}
+	}
+	return inTask, outside
 }
