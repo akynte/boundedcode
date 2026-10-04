@@ -120,6 +120,9 @@ func runDoctor(ctx context.Context, app *App) []check {
 	add(versionCheck(ctx, "uv", "uv", []string{"--version"}, false, "needed to build the OpenHands adapter outside containers"))
 	add(versionCheck(ctx, "codebase-memory-mcp", cfg.RepoIntel.Binary, []string{"--version"}, false,
 		"install from https://github.com/DeusData/codebase-memory-mcp/releases (scripts/install-deps.sh)"))
+	for _, c := range serenaChecks(ctx, app, true) {
+		add(c)
+	}
 	add(versionCheck(ctx, "gitleaks", "gitleaks", []string{"version"}, false, "secret scanning stage is skipped without it"))
 	add(versionCheck(ctx, "ripgrep", "rg", []string{"--version"}, false, "used for exact lexical retrieval"))
 	if cfg.Sandbox.Kind == "docker" {

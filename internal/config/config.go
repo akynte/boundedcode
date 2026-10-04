@@ -65,7 +65,33 @@ type RepoIntelConfig struct {
 	// CrossService enables the built-in cross-service contract analyzers
 	// (internal/xservice) in indexing, context packs and escalation policy.
 	CrossService bool `yaml:"cross_service"`
+	// Serena adds LSP-backed symbol navigation (ADR-0008).
+	Serena SerenaConfig `yaml:"serena"`
 }
+
+// SerenaConfig governs the optional Serena integration. It sets policy only;
+// Serena's own options are generated per instance by internal/repointel/serena.
+type SerenaConfig struct {
+	Enabled bool `yaml:"enabled"`
+	// Command is the serena executable; empty means the environment installed
+	// by `serena setup` under the data directory.
+	Command string `yaml:"command"`
+	// Version must be the pinned release. It is not a selector: changing it
+	// fails validation until the integration is reviewed for a new release.
+	Version string `yaml:"version"`
+	// AutoUpgrade must stay false; upgrades are manual and need a license review.
+	AutoUpgrade bool `yaml:"auto_upgrade"`
+	// Transport is "stdio" (the only supported value; no network listener).
+	Transport      string   `yaml:"transport"`
+	MaxInstances   int      `yaml:"max_instances"`
+	IdleTimeout    Duration `yaml:"idle_timeout"`
+	StartupTimeout Duration `yaml:"startup_timeout"`
+	CallTimeout    Duration `yaml:"call_timeout"`
+}
+
+// SerenaVersion is the only Serena release the integration accepts (the
+// last MIT-licensed release; see internal/repointel/serena).
+const SerenaVersion = "1.7.0"
 
 // FrontierConfig configures frontier escalation.
 type FrontierConfig struct {
@@ -127,7 +153,9 @@ func Defaults() Config {
 			Runtime: "openhands", Image: "boundedcode-openhands:local",
 			MaxIterations: 150, CondenserMaxEvents: 80,
 		},
-		RepoIntel: RepoIntelConfig{Provider: "codebase-memory-mcp", Binary: "codebase-memory-mcp", CrossService: true},
+		RepoIntel: RepoIntelConfig{Provider: "codebase-memory-mcp", Binary: "codebase-memory-mcp", CrossService: true,
+			Serena: SerenaConfig{Enabled: false, Version: SerenaVersion, Transport: "stdio", MaxInstances: 2,
+				IdleTimeout: Duration(10 * time.Minute), StartupTimeout: Duration(90 * time.Second), CallTimeout: Duration(30 * time.Second)}},
 		Frontier: FrontierConfig{
 			Enabled: false, Provider: "codex", Binary: "codex",
 			RequireApproval: true, MaxPacketTokens: 24000, Timeout: Duration(15 * time.Minute), Contain: true,
@@ -223,6 +251,20 @@ func (c Config) Validate() error {
 	case "codex", "manual":
 	default:
 		errs = append(errs, fmt.Errorf("frontier.provider: %q is not codex|manual", c.Frontier.Provider))
+	}
+	if sc := c.RepoIntel.Serena; true {
+		if sc.Version != SerenaVersion {
+			errs = append(errs, fmt.Errorf("repointel.serena.version: %q is not supported; the integration is pinned to the MIT-licensed Serena %s (upgrades need a license review, see docs/licensing/policy.md)", sc.Version, SerenaVersion))
+		}
+		if sc.AutoUpgrade {
+			errs = append(errs, errors.New("repointel.serena.auto_upgrade: must be false; Serena upgrades are manual and require a license review"))
+		}
+		if sc.Transport != "stdio" {
+			errs = append(errs, fmt.Errorf("repointel.serena.transport: %q is not supported (stdio only; Serena is never exposed on a network interface)", sc.Transport))
+		}
+		if sc.MaxInstances < 1 {
+			errs = append(errs, errors.New("repointel.serena.max_instances: must be >= 1"))
+		}
 	}
 	if c.Budgets.MaxAttempts < 1 {
 		errs = append(errs, errors.New("budgets.max_attempts: must be >= 1"))

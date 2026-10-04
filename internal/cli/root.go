@@ -51,6 +51,7 @@ func newRoot(app *App) *cobra.Command {
 		newVerifyCmd(app),
 		newFrontierCmd(app),
 		newSandboxCmd(app),
+		newSerenaCmd(app),
 	)
 	return root
 }

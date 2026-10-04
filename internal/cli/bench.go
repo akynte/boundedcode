@@ -16,12 +16,14 @@ import (
 	"github.com/akynte/boundedcode/internal/benchmark"
 	"github.com/akynte/boundedcode/internal/config"
 	"github.com/akynte/boundedcode/internal/orchestrator"
+	"github.com/akynte/boundedcode/internal/repointel/cbm"
+	"github.com/akynte/boundedcode/internal/repointel/serena"
 	"github.com/akynte/boundedcode/internal/store"
 )
 
 func newBenchCmd(app *App) *cobra.Command {
 	cmd := &cobra.Command{Use: "bench", Short: "Run reproducible benchmarks"}
-	cmd.AddCommand(newBenchInfraCmd(app), newBenchTasksCmd(app))
+	cmd.AddCommand(newBenchInfraCmd(app), newBenchTasksCmd(app), newBenchIntelCmd(app))
 	return cmd
 }
 
@@ -233,5 +235,78 @@ func newBenchTasksCmd(app *App) *cobra.Command {
 	f.StringSliceVar(&only, "only", nil, "task ids or categories to run")
 	f.StringVar(&out, "out", "", "report path (.json; .md written alongside)")
 	addRunFlags(cmd, &rf)
+	return cmd
+}
+
+func newBenchIntelCmd(app *App) *cobra.Command {
+	var dir, fixtures, out string
+	var only []string
+	cmd := &cobra.Command{
+		Use:   "intel",
+		Short: "Overlap study: ask Serena, codebase-memory-mcp and a grep baseline the same ground-truth navigation questions",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			ctx := cmd.Context()
+			specs, err := benchmark.LoadIntelSpecs(dir)
+			if err != nil {
+				return err
+			}
+			if len(only) > 0 {
+				var sel []benchmark.IntelSpec
+				for _, s := range specs {
+					if contains(only, s.ID) {
+						sel = append(sel, s)
+					}
+				}
+				specs = sel
+			}
+			work := filepath.Join(app.Paths.Cache, "bench-work")
+			if err := os.MkdirAll(work, 0o700); err != nil {
+				return err
+			}
+			study := &benchmark.IntelStudy{FixturesDir: fixtures, WorkRoot: work,
+				Progress: func(s string) { fmt.Fprintf(app.Err, "%s %s\n", time.Now().Format("15:04:05"), s) },
+				Serena: func(root string) *serena.Manager {
+					m := app.serenaManager(app.Paths)
+					m.Root, m.MaxInstances = root, 1
+					return m
+				},
+				Graph: func(cacheDir string) *cbm.Client {
+					return &cbm.Client{Binary: app.Config.RepoIntel.Binary, CacheDir: cacheDir}
+				},
+			}
+			if err := study.Serena("").Verify(ctx); err != nil {
+				return fmt.Errorf("serena: %w (run `boundedcode serena setup`)", err)
+			}
+			var reps []*benchmark.IntelReport
+			for _, s := range specs {
+				r, err := study.Run(ctx, s)
+				if err != nil {
+					return fmt.Errorf("%s: %w", s.ID, err)
+				}
+				reps = append(reps, r)
+			}
+			stamp := time.Now().UTC().Format("20060102T150405Z")
+			if out == "" {
+				out = filepath.Join("benchmarks", "reports", stamp+"-intel-overlap.json")
+			}
+			b, _ := json.MarshalIndent(reps, "", "  ")
+			if err := config.WriteFileAtomic(out, b, 0o644); err != nil {
+				return err
+			}
+			var md bytes.Buffer
+			_ = benchmark.WriteIntelMarkdown(&md, reps)
+			mdPath := strings.TrimSuffix(out, ".json") + ".md"
+			if err := os.WriteFile(mdPath, md.Bytes(), 0o644); err != nil {
+				return err
+			}
+			app.printf("%s\nreport: %s\n", md.String(), mdPath)
+			return nil
+		},
+	}
+	f := cmd.Flags()
+	f.StringVar(&dir, "specs", "benchmarks/intel", "study definitions directory")
+	f.StringVar(&fixtures, "fixtures", "benchmarks/fixtures", "fixtures directory")
+	f.StringSliceVar(&only, "only", nil, "study ids to run")
+	f.StringVar(&out, "out", "", "report path (.json; .md written alongside)")
 	return cmd
 }

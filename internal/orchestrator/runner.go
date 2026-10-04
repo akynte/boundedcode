@@ -41,6 +41,7 @@ type Runner struct {
 	Agent    agent.Runtime
 	Verify   *verify.Engine
 	Intel    repointel.Intelligence // optional
+	Nav      repointel.Navigator    // optional: Serena symbol navigation per task worktree (ADR-0008)
 	Frontier frontier.Provider      // nil: frontier disabled
 	// Approve is asked before any packet leaves the machine. nil denies.
 	Approve func(ctx context.Context, tr frontier.Trigger, packetPath string, tokens int) bool
@@ -178,6 +179,10 @@ func (r *Runner) Run(ctx context.Context, taskID string, opt RunOptions) (*task.
 		r.Rec.Emit(context.WithoutCancel(ctx), t.ID, "agent.event", data)
 	}
 	masks := secretMasks(r.WorkDir(t.ID), wts)
+	if r.Nav != nil {
+		r.prepareNav(wts)
+		defer r.releaseNav(wts)
+	}
 	openReq := agent.OpenRequest{TaskID: t.ID, SessionID: t.AgentSessionID, Workspace: r.WorkDir(t.ID), GitCommonDirs: gitDirs, GitAdminDirs: adminDirs,
 		PersistenceDir: filepath.Join(r.Paths.TaskDir(t.ID), "runtime"), MaxIterations: r.Cfg.Agent.MaxIterations,
 		MaxInputTokens: r.CtxSize, MaxOutputTokens: 8192, CondenserMaxEvents: r.Cfg.Agent.CondenserMaxEvents,
@@ -243,13 +248,13 @@ func (r *Runner) Run(ctx context.Context, taskID string, opt RunOptions) (*task.
 		strategies, _ := r.Ledger.Strategies(ctx, t.ID)
 		contracts := r.contracts(ctx, t, wts)
 		pack, err := contextplan.Build(ctx, contextplan.Inputs{Task: t, Worktrees: wts, WorkDir: r.WorkDir(t.ID),
-			Strategies: strategies, Verification: results, Intel: r.Intel, Mode: mode,
+			Strategies: strategies, Verification: results, Intel: r.Intel, Nav: r.Nav, Mode: mode,
 			BudgetTokens: r.Cfg.Budgets.ContextPackTokens, MaxAttempts: t.Budget.MaxAttempts, Advice: advice,
 			Contracts: contracts, ChangedFiles: t.ChangedFiles})
 		if err != nil {
 			return t, err
 		}
-		r.Rec.Emit(ctx, t.ID, "context.pack", map[string]any{"mode": pack.Mode, "tokens": pack.Tokens, "sections": pack.Sections, "dropped": pack.Dropped})
+		r.Rec.Emit(ctx, t.ID, "context.pack", map[string]any{"mode": pack.Mode, "tokens": pack.Tokens, "sections": pack.Sections, "dropped": pack.Dropped, "intel": pack.Intel})
 		r.say("attempt %d/%d: sending %s context pack (%d tokens)", t.AttemptCount, t.Budget.MaxAttempts, mode, pack.Tokens)
 		res, err := sess.Send(ctx, pack.Render())
 		if err != nil {
@@ -530,6 +535,34 @@ func (r *Runner) recentFailures(ctx context.Context, taskID string) int {
 func (r *Runner) updateStrategySummary(ctx context.Context, id int64, summary string) error {
 	_, err := r.DB.ExecContext(ctx, `UPDATE strategies SET summary = ? WHERE id = ?`, summary, id)
 	return err
+}
+
+// prepareNav hides each worktree's secret paths from the navigator, the same
+// paths the sandbox masks for the agent.
+func (r *Runner) prepareNav(wts []task.Worktree) {
+	ig, ok := r.Nav.(interface {
+		Ignore(root string, paths []string)
+	})
+	if !ok {
+		return
+	}
+	for _, w := range wts {
+		found, _ := policy.FindSecretPaths(w.Path, 200)
+		ig.Ignore(w.Path, found)
+	}
+}
+
+// releaseNav stops the navigator's processes for this task's worktrees.
+func (r *Runner) releaseNav(wts []task.Worktree) {
+	rel, ok := r.Nav.(interface{ Release(roots ...string) })
+	if !ok {
+		return
+	}
+	roots := make([]string, 0, len(wts))
+	for _, w := range wts {
+		roots = append(roots, w.Path)
+	}
+	rel.Release(roots...)
 }
 
 func secretMasks(workDir string, wts []task.Worktree) []string {

@@ -40,6 +40,9 @@ type Inputs struct {
 	Strategies   []task.Strategy
 	Verification []verify.Result // latest results, any order
 	Intel        repointel.Intelligence
+	// Nav is LSP-backed symbol navigation over the task worktrees (Serena);
+	// nil keeps graph-only symbol context.
+	Nav          repointel.Navigator
 	Mode         Mode
 	BudgetTokens int
 	MaxAttempts  int
@@ -68,6 +71,8 @@ type Pack struct {
 	Tokens   int       `json:"tokens"`
 	Budget   int       `json:"budget"`
 	Dropped  []string  `json:"dropped,omitempty"`
+	// Intel records which backend served the symbol context.
+	Intel IntelStats `json:"intel"`
 }
 
 // EstimateTokens is a conservative chars-per-token estimate for code-heavy
@@ -97,6 +102,7 @@ func Build(ctx context.Context, in Inputs) (Pack, error) {
 	if in.BudgetTokens <= 0 {
 		in.BudgetTokens = 24000
 	}
+	var stats IntelStats
 	gen := map[string]func() (string, string){
 		"task":         func() (string, string) { return "TASK", taskSection(in) },
 		"advice":       func() (string, string) { return "FRONTIER GUIDANCE (apply it; verify locally)", in.Advice },
@@ -107,7 +113,7 @@ func Build(ctx context.Context, in Inputs) (Pack, error) {
 		"diff":      func() (string, string) { return "CURRENT CHANGES", diffSection(ctx, in) },
 		"impact":    func() (string, string) { return "IMPACT OF CURRENT CHANGES", impactSection(ctx, in) },
 		"contracts": func() (string, string) { return "CROSS-SERVICE CONTRACTS", contractsSection(in) },
-		"code":      func() (string, string) { return "RELEVANT CODE", codeSection(ctx, in) },
+		"code":      func() (string, string) { return "RELEVANT CODE", codeSection(ctx, in, &stats) },
 		"adr":       func() (string, string) { return "ARCHITECTURE DECISIONS", adrSection(in) },
 		"rules":     func() (string, string) { return "RULES", rulesSection() },
 	}
@@ -134,6 +140,7 @@ func Build(ctx context.Context, in Inputs) (Pack, error) {
 		p.Tokens += sec.Tokens
 		p.Sections = append(p.Sections, sec)
 	}
+	p.Intel = stats
 	return p, nil
 }
 
@@ -266,8 +273,8 @@ var (
 )
 
 // codeSection prefers exact sources: lines referenced by failures, then
-// symbols named in the request, looked up in the graph.
-func codeSection(ctx context.Context, in Inputs) string {
+// symbols named in the request (see requestSymbols for backend routing).
+func codeSection(ctx context.Context, in Inputs, st *IntelStats) string {
 	var b strings.Builder
 	// 1. file:line references from verification output, read from disk.
 	refs := map[string]bool{}
@@ -286,30 +293,7 @@ func codeSection(ctx context.Context, in Inputs) string {
 		}
 	}
 	// 2. Symbols named in the request.
-	if in.Intel != nil {
-		names := identifiers(in.Task.OriginalRequest + "\n" + in.Task.Goal)
-		shown := 0
-		for _, n := range names {
-			if shown >= 6 {
-				break
-			}
-			for _, w := range in.Worktrees {
-				if w.IndexProject == "" {
-					continue
-				}
-				snip, err := in.Intel.Snippet(ctx, w.IndexProject, n)
-				if err != nil || strings.TrimSpace(snip) == "" || strings.Contains(snip, "not found") {
-					continue
-				}
-				fmt.Fprintf(&b, "### %s: %s\n%s\n", w.RepoName, n, strings.TrimSpace(snip))
-				if callers, err := in.Intel.Trace(ctx, w.IndexProject, n, "inbound", 1); err == nil {
-					fmt.Fprintf(&b, "callers:\n%s\n", strings.TrimSpace(callers))
-				}
-				shown++
-				break
-			}
-		}
-	}
+	b.WriteString(requestSymbols(ctx, in, st))
 	return b.String()
 }
 

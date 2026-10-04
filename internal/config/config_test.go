@@ -29,6 +29,12 @@ func TestLoadRejectsUnknownAndInvalid(t *testing.T) {
 		"mode":    "version: 1\ninference:\n  mode: cloud\n",
 		"dur":     "version: 1\ninference:\n  startup_timeout: soon\n",
 		"version": "version: 9\n",
+		// Serena is pinned to the MIT-licensed 1.7.0; no other version,
+		// automatic upgrades or network transports are accepted.
+		"serena-v2":        "version: 1\nrepointel:\n  serena:\n    version: \"2.0.0\"\n",
+		"serena-upgrade":   "version: 1\nrepointel:\n  serena:\n    auto_upgrade: true\n",
+		"serena-http":      "version: 1\nrepointel:\n  serena:\n    transport: streamable-http\n",
+		"serena-instances": "version: 1\nrepointel:\n  serena:\n    max_instances: 0\n",
 	}
 	for name, body := range cases {
 		p := filepath.Join(dir, name+".yaml")
@@ -38,6 +44,22 @@ func TestLoadRejectsUnknownAndInvalid(t *testing.T) {
 		if _, err := Load(p); err == nil {
 			t.Errorf("%s: expected error", name)
 		}
+	}
+}
+
+func TestSerenaEnabledLoads(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "c.yaml")
+	body := "version: 1\nrepointel:\n  serena:\n    enabled: true\n    idle_timeout: 2m\n"
+	if err := os.WriteFile(p, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	c, err := Load(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := c.RepoIntel.Serena
+	if !s.Enabled || s.Version != SerenaVersion || s.Transport != "stdio" || s.IdleTimeout.D().Minutes() != 2 {
+		t.Fatalf("%+v", s)
 	}
 }
 

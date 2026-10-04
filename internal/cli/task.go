@@ -36,6 +36,7 @@ type runFlags struct {
 	approveFrontier bool
 	condenseRetry   bool
 	model           string
+	serena          string // "", "on", "off": override repointel.serena.enabled
 }
 
 func (a *App) sandbox(allowNone bool) (sandbox.Sandbox, error) {
@@ -117,6 +118,20 @@ func (a *App) buildRunnerWith(ctx context.Context, f runFlags, db *sql.DB, paths
 		a.Log.Warn("repository intelligence unavailable; continuing without graph context", "err", err)
 		cleanup = func() {}
 	}
+	switch f.serena {
+	case "on":
+		a.Config.RepoIntel.Serena.Enabled = true
+	case "off":
+		a.Config.RepoIntel.Serena.Enabled = false
+	case "":
+	default:
+		return nil, nil, fmt.Errorf("--serena: %q is not on|off", f.serena)
+	}
+	nav, closeNav := a.serenaNavigator(ctx, paths)
+	if nav != nil {
+		closeIntel := cleanup
+		cleanup = func() { closeNav(); closeIntel() }
+	}
 	gomodcache, _ := exec.CommandContext(ctx, "go", "env", "GOMODCACHE").Output()
 	r := &orchestrator.Runner{
 		DB: db, Ledger: task.Ledger{DB: db}, Rec: rec, Agent: rt, Intel: intel,
@@ -124,6 +139,9 @@ func (a *App) buildRunnerWith(ctx context.Context, f runFlags, db *sql.DB, paths
 		Cfg:    a.Config, Paths: paths, Model: p.Name, CtxSize: p.Server.CtxSize, Log: a.Log, Out: a.Err,
 		CondenseEachRetry: f.condenseRetry,
 		CrossService:      a.Config.RepoIntel.CrossService,
+	}
+	if nav != nil {
+		r.Nav = nav // assigned only when usable: a nil *Navigator is a non-nil interface
 	}
 	r.WS = workspace.Store{DB: db}
 	// Gateway budget is per task; the runner passes the remaining allowance.
@@ -163,6 +181,7 @@ func addRunFlags(cmd *cobra.Command, f *runFlags) {
 	cmd.Flags().BoolVar(&f.approveFrontier, "approve-frontier", false, "pre-approve frontier escalations (otherwise asked interactively)")
 	cmd.Flags().BoolVar(&f.condenseRetry, "condense-each-retry", false, "force context condensation before every retry (continuity testing)")
 	cmd.Flags().StringVarP(&f.model, "model", "m", "", "model profile")
+	cmd.Flags().StringVar(&f.serena, "serena", "", "override repointel.serena.enabled for this run: on|off")
 }
 
 func newTaskCmd(app *App) *cobra.Command {

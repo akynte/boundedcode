@@ -2,6 +2,7 @@ package orchestrator
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log/slog"
 	"os"
@@ -15,6 +16,7 @@ import (
 	"github.com/akynte/boundedcode/internal/frontier"
 	"github.com/akynte/boundedcode/internal/gitops"
 	"github.com/akynte/boundedcode/internal/inference"
+	"github.com/akynte/boundedcode/internal/repointel"
 	"github.com/akynte/boundedcode/internal/sandbox"
 	"github.com/akynte/boundedcode/internal/store"
 	"github.com/akynte/boundedcode/internal/task"
@@ -247,5 +249,74 @@ func TestContractCheck(t *testing.T) {
 	}
 	if !strings.Contains(rt.Messages[0], "CROSS-SERVICE CONTRACTS") || !strings.Contains(rt.Messages[0], "topic payments.charged") {
 		t.Fatalf("initial pack lacks contracts:\n%s", rt.Messages[0])
+	}
+}
+
+// flakyNav is a navigator that works, then dies (as when Serena crashes).
+type flakyNav struct {
+	dead              bool
+	finds             int
+	ignored, released []string
+}
+
+func (n *flakyNav) Name() string { return "flaky" }
+func (n *flakyNav) FindSymbol(_ context.Context, root, name string, _ repointel.FindOptions) ([]repointel.Symbol, error) {
+	n.finds++
+	if n.dead {
+		return nil, fmt.Errorf("%w: serena exited", repointel.ErrUnavailable)
+	}
+	return []repointel.Symbol{{NamePath: name, Kind: "Method", File: "internal/consumer/consumer.go", StartLine: 1, EndLine: 2, Body: "// from serena " + root}}, nil
+}
+func (n *flakyNav) References(context.Context, string, repointel.Symbol) ([]repointel.Reference, error) {
+	if n.dead {
+		return nil, repointel.ErrUnavailable
+	}
+	return nil, nil
+}
+func (n *flakyNav) Implementations(context.Context, string, repointel.Symbol) ([]repointel.Symbol, error) {
+	return nil, repointel.ErrUnavailable
+}
+func (n *flakyNav) Ignore(root string, _ []string) { n.ignored = append(n.ignored, root) }
+func (n *flakyNav) Release(roots ...string)        { n.released = append(n.released, roots...) }
+
+// TestNavigatorFailureDoesNotBlockTask: Serena answers for the task
+// worktree, dies mid-task, and the task still completes.
+func TestNavigatorFailureDoesNotBlockTask(t *testing.T) {
+	_, w, s, root := setup(t)
+	defer s.Close()
+	ctx := context.Background()
+	nav := &flakyNav{}
+	var packs []string
+	wrongFix := func(ws, msg string) (string, error) {
+		packs = append(packs, msg)
+		nav.dead = true // Serena crashes after the first pack
+		return "renamed variable", replaceIn(filepath.Join(ws, consumerFile), "var ev PaymentCharged", "var ev PaymentCharged // decoded event")
+	}
+	rightFix := func(ws, msg string) (string, error) {
+		packs = append(packs, msg)
+		return "negated the settlement amount", replaceIn(filepath.Join(ws, consumerFile), "AmountCents: ev.AmountCents, Currency: ev.Currency},\n\t)", "AmountCents: -ev.AmountCents, Currency: ev.Currency},\n\t)")
+	}
+	r := newRunner(s, root, &scripted.Runtime{Steps: []scripted.Step{wrongFix, rightFix}}, nil)
+	r.Nav = nav
+	tk, err := r.Create(ctx, w, "Fix the unbalanced ledger posting in HandlePaymentCharged", nil, []string{"go test ./... passes"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := r.Run(ctx, tk.ID, RunOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Status != task.StatusCompleted {
+		t.Fatalf("status %s", got.Status)
+	}
+	wts, _ := r.Ledger.Worktrees(ctx, tk.ID)
+	if len(packs) != 2 || !strings.Contains(packs[0], "// from serena "+wts[0].Path) {
+		t.Fatalf("first pack must carry Serena context from the task worktree %s", wts[0].Path)
+	}
+	if strings.Contains(packs[1], "from serena") || nav.finds < 2 {
+		t.Fatalf("second pack must be built without Serena after it died (finds=%d)", nav.finds)
+	}
+	if len(nav.ignored) != 1 || nav.ignored[0] != wts[0].Path || len(nav.released) != 1 || nav.released[0] != wts[0].Path {
+		t.Fatalf("ignore/release not applied to the task worktree: %+v", nav)
 	}
 }

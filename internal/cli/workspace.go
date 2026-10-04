@@ -272,6 +272,7 @@ func newIntelCmd(app *App) *cobra.Command {
 		RunE: func(c *cobra.Command, a []string) error {
 			return run(func(ctx context.Context, p string) (string, error) { return app.intel().Snippet(ctx, p, a[0]) })(c, a)
 		}})
+	addSerenaIntelCmds(app, cmd, &wsFlag, &repoFlag)
 	cmd.AddCommand(&cobra.Command{Use: "impact", Short: "Change impact of the working tree vs. the default branch",
 		RunE: run(func(ctx context.Context, p string) (string, error) { return app.intel().Impact(ctx, p, "", 2) })})
 	cmd.AddCommand(&cobra.Command{Use: "architecture", Short: "Architecture overview",
