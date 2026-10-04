@@ -54,7 +54,7 @@ func TestPacketCompactAndRedacted(t *testing.T) {
 		{Key: "task", Title: "TASK", Body: "do x with key sk-proj-abcdefghijklmnopqrstuvwxyz123456"},
 		{Key: "rules", Title: "RULES", Body: "internal rules"},
 	}}
-	p := BuildPacket(Trigger{Z2, "repeated failure"}, pack, DefaultQuestion(Trigger{Code: Z2}), nil)
+	p := BuildPacket(Trigger{Z2, "repeated failure"}, pack, DefaultQuestion(Trigger{Code: Z2}), nil, "")
 	if strings.Contains(p, "abcdefghijklmnop") || strings.Contains(p, "internal rules") || !strings.Contains(p, "SPECIFIC QUESTION") {
 		t.Fatalf("bad packet:\n%s", p)
 	}
@@ -64,7 +64,7 @@ func TestPacketRewritesHostPaths(t *testing.T) {
 	pack := contextplan.Pack{Sections: []contextplan.Section{{Key: "code", Title: "CODE",
 		Body: "file_path: /home/u/.cache/w/repos/svc/internal/a.go\nworktree /home/u/.local/share/bc/tasks/t1/work/svc/x.go"}}}
 	p := BuildPacket(Trigger{Z2, "x"}, pack, "q", PathMap{
-		"/home/u/.cache/w/repos/svc": "svc", "/home/u/.local/share/bc/tasks/t1/work": "."})
+		"/home/u/.cache/w/repos/svc": "svc", "/home/u/.local/share/bc/tasks/t1/work": "."}, "/home/u")
 	if strings.Contains(p, "/home/u") || !strings.Contains(p, "svc/internal/a.go") || !strings.Contains(p, "./svc/x.go") {
 		t.Fatalf("paths not rewritten:\n%s", p)
 	}

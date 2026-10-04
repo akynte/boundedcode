@@ -25,10 +25,13 @@ type Summary struct {
 	EscalationRate      float64 `json:"escalation_rate"`
 	EscalationsSent     int     `json:"escalations_sent"`
 	EscalationsDeclined int     `json:"escalations_declined"`
-	LocalTokens         int     `json:"local_tokens_processed"`
-	GeneratedTokens     int     `json:"local_tokens_generated"`
-	CachedPromptTokens  int     `json:"local_cached_prompt_tokens"`
-	FrontierPacketTok   int     `json:"frontier_packet_tokens"`
+	// EscalationsBlocked were refused before sending because the packet
+	// still contained host paths (frontier.CheckPacket).
+	EscalationsBlocked int `json:"escalations_blocked"`
+	LocalTokens        int `json:"local_tokens_processed"`
+	GeneratedTokens    int `json:"local_tokens_generated"`
+	CachedPromptTokens int `json:"local_cached_prompt_tokens"`
+	FrontierPacketTok  int `json:"frontier_packet_tokens"`
 	// FrontierTokenShare is frontier packet tokens / (local processed +
 	// frontier packet tokens). Frontier responses are not tokenized locally
 	// and are excluded.
@@ -50,6 +53,7 @@ func Compute(ctx context.Context, db *sql.DB, since string) (Summary, error) {
 		(SELECT COUNT(*) FROM escalations e WHERE e.task_id = t.id AND e.status IN ('sent','answered','answered_manual','failed')),
 		(SELECT COUNT(*) FROM escalations e WHERE e.task_id = t.id AND e.status IN ('answered','answered_manual')),
 		(SELECT COUNT(*) FROM escalations e WHERE e.task_id = t.id AND e.status = 'declined'),
+		(SELECT COUNT(*) FROM escalations e WHERE e.task_id = t.id AND e.status = 'blocked'),
 		(SELECT COALESCE(SUM(packet_tokens),0) FROM escalations e WHERE e.task_id = t.id AND e.status IN ('sent','answered','answered_manual','failed'))
 		FROM tasks t WHERE t.created_at >= ?`, since)
 	if err != nil {
@@ -59,8 +63,8 @@ func Compute(ctx context.Context, db *sql.DB, since string) (Summary, error) {
 	escalated, attempts := 0, 0
 	for rows.Next() {
 		var id, status, budget string
-		var att, sent, answered, declined, packet int
-		if err := rows.Scan(&id, &status, &att, &budget, &sent, &answered, &declined, &packet); err != nil {
+		var att, sent, answered, declined, blocked, packet int
+		if err := rows.Scan(&id, &status, &att, &budget, &sent, &answered, &declined, &blocked, &packet); err != nil {
 			return s, err
 		}
 		var b task.Budget
@@ -69,6 +73,7 @@ func Compute(ctx context.Context, db *sql.DB, since string) (Summary, error) {
 		s.ByStatus[status]++
 		s.EscalationsSent += sent
 		s.EscalationsDeclined += declined
+		s.EscalationsBlocked += blocked
 		s.FrontierPacketTok += packet
 		if sent > 0 {
 			escalated++

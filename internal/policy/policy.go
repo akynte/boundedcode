@@ -27,14 +27,35 @@ var secretGlobs = []string{
 }
 
 // sourceExts are source-code files. They are code, not secret stores, so a
-// secret-sounding name (credentials.go, kubeconfig.go, a "secrets" package)
-// does not make them secret; literal secrets inside code are the secret
-// scanner's job. Dot directories (.ssh, .aws, ...) stay secret regardless.
+// secret-sounding name (credentials.go, kubeconfig.go, a "credentials"
+// package) does not make them secret; literal secrets inside code are the
+// secret scanner's job. Under a strongSecretDir (secrets/, .ssh/, .aws/, ...)
+// they stay secret.
 var sourceExts = map[string]bool{
 	".go": true, ".ts": true, ".tsx": true, ".js": true, ".jsx": true, ".mjs": true, ".cjs": true,
 	".py": true, ".rb": true, ".java": true, ".kt": true, ".scala": true, ".rs": true, ".c": true,
 	".h": true, ".cc": true, ".cpp": true, ".hpp": true, ".cs": true, ".swift": true, ".php": true,
 	".vue": true, ".svelte": true,
+}
+
+// strongSecretDir reports whether a directory name declares secret content
+// outright: "secrets" and the secret dot directories (.ssh, .aws, ...). Their
+// contents stay masked whole, source code included. Other secret-sounding
+// directory names ("credentials") are also common package names, so source
+// code in them stays visible.
+func strongSecretDir(name string) bool {
+	if name == "secrets" || name == ".secrets" {
+		return true
+	}
+	if !strings.HasPrefix(name, ".") {
+		return false
+	}
+	for _, g := range secretGlobs {
+		if g == name {
+			return true
+		}
+	}
+	return false
 }
 
 // isSourceFile reports whether base names a source file (not a dotfile).
@@ -58,10 +79,8 @@ func IsSecretPath(rel string) bool {
 	parts := strings.Split(rel, "/")
 	if isSourceFile(base) {
 		for _, p := range parts[:len(parts)-1] {
-			for _, g := range secretGlobs {
-				if strings.HasPrefix(g, ".") && p == g {
-					return true // e.g. .aws/helper.py
-				}
+			if strongSecretDir(p) {
+				return true // e.g. .aws/helper.py, secrets/prod.go
 			}
 		}
 		return false
@@ -112,7 +131,7 @@ func FindSecretPaths(root string, limit int) ([]string, error) {
 			// A secret-named directory holding source code (a Go package
 			// named "credentials") is walked file by file: its code stays
 			// visible, its other files are masked individually.
-			if d.IsDir() && !strings.HasPrefix(d.Name(), ".") && containsSource(p) {
+			if d.IsDir() && !strongSecretDir(d.Name()) && !strings.HasPrefix(d.Name(), ".") && containsSource(p) {
 				return nil
 			}
 			if len(out) >= limit {

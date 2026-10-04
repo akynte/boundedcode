@@ -2,6 +2,7 @@ package frontier
 
 import (
 	"fmt"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -9,14 +10,16 @@ import (
 	"github.com/akynte/boundedcode/internal/telemetry"
 )
 
-// PathMap rewrites host paths to workspace-relative names in packets
-// (e.g. /home/u/.cache/.../repos/payment-service -> payment-service).
+// PathMap maps host directories to the names a packet shows instead (e.g.
+// /home/u/.cache/.../repos/payment-service -> payment-service, the module
+// cache -> $GOMODCACHE). Longer paths win, so nested locations map first.
 type PathMap map[string]string
 
 // BuildPacket turns a context pack into a compact escalation packet with a
 // specific question. The pack is built with the frontier budget; host paths
-// are rewritten via paths and the packet is redacted again.
-func BuildPacket(trigger Trigger, pack contextplan.Pack, question string, paths PathMap) string {
+// are rewritten (Sanitize) and the packet is redacted again. Callers must
+// still run CheckPacket before sending: it is the fail-closed gate.
+func BuildPacket(trigger Trigger, pack contextplan.Pack, question string, paths PathMap, home string) string {
 	var b strings.Builder
 	b.WriteString("You are a senior software architect advising a local coding agent. ")
 	b.WriteString("You cannot run code or see the repository beyond what is below. ")
@@ -30,23 +33,109 @@ func BuildPacket(trigger Trigger, pack contextplan.Pack, question string, paths 
 		fmt.Fprintf(&b, "## %s\n%s\n\n", s.Title, s.Body)
 	}
 	fmt.Fprintf(&b, "## SPECIFIC QUESTION\n%s\n", question)
-	out := b.String()
-	// Longest prefixes first so nested paths map correctly.
-	keys := make([]string, 0, len(paths))
-	for k := range paths {
-		keys = append(keys, k)
-	}
-	sort.Slice(keys, func(i, j int) bool { return len(keys[i]) > len(keys[j]) })
-	for _, k := range keys {
-		out = strings.ReplaceAll(out, k, paths[k])
-	}
-	return telemetry.Redact(out)
+	return telemetry.Redact(Sanitize(b.String(), paths, home))
 }
 
-// CheckPacket refuses packets that still reveal host filesystem locations.
+// Sanitize removes host filesystem locations from text bound for a remote
+// model. Every packet section can carry them: verification output, stack
+// traces, compiler errors, tool output and the agent's own diff.
+//
+//   - Each mapped directory, and its symlink-resolved form, is replaced by
+//     its name, longest first.
+//   - Anything left under home becomes $HOME (the user name and layout above
+//     it are not sent; the rest of the path stays useful).
+//
+// Replacement only happens at path boundaries, so /home/dev never rewrites
+// /home/devon, and repository-relative paths are untouched. JSON-escaped
+// (\/home\/u) and URL-encoded (%2Fhome%2Fu) spellings are handled too.
+func Sanitize(text string, paths PathMap, home string) string {
+	type rule struct{ from, to string }
+	var rules []rule
+	add := func(from, to string) {
+		from = strings.TrimRight(from, "/")
+		if from == "" || !strings.HasPrefix(from, "/") {
+			return
+		}
+		rules = append(rules, rule{from, to})
+		if real, err := filepath.EvalSymlinks(from); err == nil && real != from {
+			rules = append(rules, rule{real, to})
+		}
+	}
+	for from, to := range paths {
+		add(from, to)
+	}
+	if home != "" {
+		add(home, "$HOME")
+	}
+	sort.SliceStable(rules, func(i, j int) bool { return len(rules[i].from) > len(rules[j].from) })
+	for _, r := range rules {
+		for _, enc := range pathEncodings {
+			text = replaceAtBoundary(text, enc(r.from), enc(r.to))
+		}
+	}
+	return text
+}
+
+// pathEncodings are the spellings a path takes in tool output: plain,
+// JSON-escaped and URL-encoded.
+var pathEncodings = []func(string) string{
+	func(p string) string { return p },
+	func(p string) string { return strings.ReplaceAll(p, "/", `\/`) },
+	func(p string) string { return strings.ReplaceAll(p, "/", "%2F") },
+}
+
+// replaceAtBoundary replaces from with to where from is a whole path prefix:
+// the next character is not one that continues a path component.
+func replaceAtBoundary(text, from, to string) string {
+	if from == "" || !strings.Contains(text, from) {
+		return text
+	}
+	var b strings.Builder
+	for {
+		i := strings.Index(text, from)
+		if i < 0 {
+			b.WriteString(text)
+			return b.String()
+		}
+		end := i + len(from)
+		b.WriteString(text[:i])
+		if end < len(text) && continuesComponent(text[end]) {
+			b.WriteString(from)
+		} else {
+			b.WriteString(to)
+		}
+		text = text[end:]
+	}
+}
+
+func continuesComponent(c byte) bool {
+	return c == '.' || c == '-' || c == '_' || c == '@' || c == '+' || c == '~' ||
+		'0' <= c && c <= '9' || 'a' <= c && c <= 'z' || 'A' <= c && c <= 'Z'
+}
+
+// CheckPacket refuses packets that still reveal the host home directory, in
+// any of the spellings Sanitize handles. It is the fail-closed gate after
+// sanitizing; the error names where the residue was found.
 func CheckPacket(packet, home string) error {
-	if home != "" && strings.Contains(packet, home) {
-		return fmt.Errorf("frontier packet still contains the host home directory %q; refusing to send", home)
+	home = strings.TrimRight(home, "/")
+	if home == "" {
+		return nil
+	}
+	for _, enc := range pathEncodings {
+		h := enc(home)
+		for off := 0; ; {
+			i := strings.Index(packet[off:], h)
+			if i < 0 {
+				break
+			}
+			i += off
+			end := i + len(h)
+			if end >= len(packet) || !continuesComponent(packet[end]) {
+				lo, hi := max(0, i-40), min(len(packet), end+60)
+				return fmt.Errorf("frontier packet still contains the host home directory %q (near %q); refusing to send", home, packet[lo:hi])
+			}
+			off = end
+		}
 	}
 	return nil
 }

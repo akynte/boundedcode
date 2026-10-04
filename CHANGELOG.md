@@ -12,10 +12,20 @@ implemented, experimental and planned.
     with no installed dependencies fails instead of being skipped, which
     had let an untested change pass. npm stages also apply to JavaScript
     projects without `tsconfig.json`.
+  * Frontier escalation packets are sanitized of all host paths (task
+    state, toolchain caches, stack traces, tool output, the agent's diff,
+    and any other path under the home directory), not only the workspace.
+    A surviving host path used to block the escalation silently and leave
+    no record; a refused packet is now kept locally and recorded as a
+    `blocked` escalation, counted by `stats`.
+  * Cross-service scanning no longer runs out of memory: JavaScript
+    constant bindings were expanded exponentially (vuejs/core reached
+    ~58 GiB) and, in semicolon-free code, swallowed later statements. Both
+    analyzers now bound evaluation work and value size.
   * Secret masking no longer hides source code: a Go package named
     `credentials` (grpc-go), `credentials.go` or `kubeconfig.go` are
-    visible and editable; non-code files in such directories, and dot
-    directories, stay masked.
+    visible and editable; non-code files in such directories stay masked,
+    and `secrets/` and dot directories stay masked whole, code included.
 
 * Optional Serena v1.7.0 (MIT, pinned) integration for LSP-backed symbol
   navigation per task worktree: `repointel.Navigator`, process manager,

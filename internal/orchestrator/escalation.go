@@ -38,25 +38,24 @@ func (r *Runner) escalate(ctx context.Context, t *task.Task, wts []task.Worktree
 		r.Log.Error("build frontier pack", "err", err)
 		return ""
 	}
-	paths := frontier.PathMap{r.WorkDir(t.ID): "."}
-	for _, w := range wts {
-		paths[w.RepoPath] = w.RepoName
-		paths[w.Path] = w.RepoName
-	}
-	packet := frontier.BuildPacket(tr, pack, frontier.DefaultQuestion(tr), paths)
-	if home, err := os.UserHomeDir(); err == nil {
-		if err := frontier.CheckPacket(packet, home); err != nil {
-			r.Rec.Emit(ctx, t.ID, "frontier.blocked", map[string]any{"error": err.Error()})
-			r.say("escalation %s not sent: %v", tr.Code, err)
-			return ""
-		}
-	}
-	tokens := contextplan.EstimateTokens(packet)
+	home, _ := os.UserHomeDir()
+	packet := frontier.BuildPacket(tr, pack, frontier.DefaultQuestion(tr), r.packetPaths(t, wts), home)
 	dir := filepath.Join(r.Paths.TaskDir(t.ID), "frontier")
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return ""
 	}
 	n := r.escalationCount(ctx, t.ID) + 1
+	if err := checkPacket(packet, home); err != nil {
+		// Fail closed, but visibly: keep the refused packet on this host for
+		// diagnosis and record the escalation as blocked.
+		blocked := filepath.Join(dir, fmt.Sprintf("%03d-%s-blocked-packet.md", n, tr.Code))
+		_ = config.WriteFileAtomic(blocked, []byte(packet), 0o600)
+		r.recordEscalation(ctx, t.ID, tr, r.Frontier.Name(), "blocked", blocked, contextplan.EstimateTokens(packet), "", "")
+		r.Rec.Emit(ctx, t.ID, "frontier.blocked", map[string]any{"code": tr.Code, "error": trunc(err.Error(), 400), "packet": blocked})
+		r.say("escalation %s not sent: %v (packet kept at %s)", tr.Code, trunc(err.Error(), 200), blocked)
+		return ""
+	}
+	tokens := contextplan.EstimateTokens(packet)
 	packetPath := filepath.Join(dir, fmt.Sprintf("%03d-%s-packet.md", n, tr.Code))
 	if err := config.WriteFileAtomic(packetPath, []byte(packet), 0o600); err != nil {
 		return ""
@@ -99,6 +98,38 @@ func (r *Runner) escalate(ctx context.Context, t *task.Task, wts []task.Worktree
 	_ = r.Ledger.Save(ctx, t)
 	r.Rec.Emit(ctx, t.ID, "frontier.answered", map[string]any{"code": tr.Code, "packet_tokens": tokens, "answer_chars": len(answer)})
 	return answer
+}
+
+// checkPacket is the fail-closed gate (a variable so tests can reach the
+// blocked path, which sanitization otherwise makes unreachable).
+var checkPacket = frontier.CheckPacket
+
+// packetPaths names every host location a packet may mention: the task's
+// work tree and repositories, its state, BoundedCode's own directories and
+// the toolchain caches verification output and stack traces refer to.
+// Anything else under the home directory is rewritten to $HOME by Sanitize.
+func (r *Runner) packetPaths(t *task.Task, wts []task.Worktree) frontier.PathMap {
+	paths := frontier.PathMap{r.WorkDir(t.ID): "."}
+	for _, w := range wts {
+		paths[w.RepoPath] = w.RepoName
+		paths[w.Path] = w.RepoName
+	}
+	paths[r.Paths.TaskDir(t.ID)] = "<task-state>"
+	for from, to := range map[string]string{r.Paths.Data: "<boundedcode-data>", r.Paths.Cache: "<boundedcode-cache>",
+		r.Paths.State: "<boundedcode-state>", r.Paths.Config: "<boundedcode-config>", r.Paths.Runtime: "<boundedcode-runtime>"} {
+		if from != "" {
+			paths[from] = to
+		}
+	}
+	if r.Verify != nil {
+		if r.Verify.CacheDir != "" {
+			paths[r.Verify.CacheDir] = "<build-cache>"
+		}
+		if r.Verify.GoModCache != "" {
+			paths[r.Verify.GoModCache] = "$GOMODCACHE"
+		}
+	}
+	return paths
 }
 
 func (r *Runner) recordEscalation(ctx context.Context, taskID string, tr frontier.Trigger, provider, status, packet string, tokens int, resp, outcome string) int64 {

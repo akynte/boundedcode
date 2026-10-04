@@ -34,7 +34,7 @@ part of this boundary.
 | 14 | Host-side reads of agent-written files (context packs, ADRs, cross-service scans) never follow symlinks out of the worktree and never read secret paths; packs are redacted before they reach the model or a frontier packet, and diffs omit secret paths. codebase-memory-mcp and ripgrep do not follow symlinks (verified 2026-10-04). | `contextplan.ReadConfined`, `xservice.Scan` |
 | 15 | More secret paths than can be masked (500) refuses to start the agent instead of masking only some. | `policy.FindSecretPaths` |
 | 16 | Containers are named and removed on cancellation or timeout (killing `docker run` alone leaves the container running); a stale adapter container is removed before reuse. | `sandbox.Container.Command` |
-| 12 | Frontier: packets are redacted, host paths are rewritten to workspace-relative names, and a packet still containing `$HOME` is not sent. `codex exec` runs **in a container** with only an empty workdir and the Codex credential dir mounted. Codex's own `read-only` sandbox restricts writes, not reads, so containment is required. API-key auth is refused. | `frontier.Codex`, `frontier.CheckPacket` |
+| 12 | Frontier: packets are redacted, and host paths are rewritten: the work dir, worktrees and checkouts to workspace-relative names, task state, BoundedCode's directories and the Go caches to placeholders, and anything else under the home directory to `$HOME` (plain, JSON-escaped and URL-encoded spellings, symlink-resolved forms, at path boundaries only). A packet that still contains the home directory is not sent: it is kept on the host (0600) and recorded as a `blocked` escalation, which `stats` reports. `codex exec` runs **in a container** with only an empty workdir and the Codex credential dir mounted. Codex's own `read-only` sandbox restricts writes, not reads, so containment is required. API-key auth is refused. | `frontier.Codex`, `frontier.Sanitize`, `frontier.CheckPacket` |
 | 13 | Audit events are redacted (`telemetry.Redact`), and prompts and source are not logged by default. | `telemetry` |
 
 ## Adversarial tests (all must fail to escape)
@@ -80,9 +80,10 @@ part of this boundary.
    `credentials.go` or `kubeconfig.go` were masked and rejected by the diff
    scope, so tasks there could not be done (found by the ADR-0008 benchmark
    and the small real-world validation). A secret-named directory that holds
-   source is walked file by file (its non-code files stay masked); dot
-   directories (`.ssh`, `.aws`, ...) stay masked whole. Literal secrets
-   inside code are left to gitleaks on the diff.
+   source (such as `credentials/`) is walked file by file: its code is
+   visible, its non-code files stay masked. `secrets/` directories and dot
+   directories (`.ssh`, `.aws`, ...) stay masked whole, code included.
+   Literal secrets inside other code are left to gitleaks on the diff.
 5. **Persistence directory.** The OpenHands conversation store is writable
    by the agent. It holds data, not executables, and the control plane
    treats it as untrusted. The task ledger in SQLite is the source of truth
