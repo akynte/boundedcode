@@ -43,11 +43,14 @@ can reach:
 | Execution sandbox | Agent tools run in a container. Only the task worktree is mounted read-write, and there is no host `$HOME`, SSH agent or credentials. | see [docs/design/sandbox.md](docs/design/sandbox.md) |
 | Network | The container runs with `--network none`. LLM traffic is tunnelled through the control plane over stdio. | see sandbox doc |
 | Secret files | `.env*`, `secrets/`, key material, cloud credentials and kubeconfigs are masked inside the sandbox and denied by path policy. | see sandbox doc |
-| Dangerous commands | A deterministic policy runs in Go and is evaluated before verification commands. It blocks push, force-push, protected-branch resets/merges, `terraform apply/destroy` and `kubectl` against non-local contexts. | see policy doc |
-| Git | Work happens on `agent/<task-id>` worktrees. Nothing is pushed automatically. | |
-| Frontier credentials | Codex/ChatGPT credentials stay on the host. They are never mounted into, or exported to, agent environments. | |
-| Secret scanning | gitleaks runs on task diffs as a verification stage when installed. | |
-| Logging | Audit events are redacted. Full source and prompts are not logged by default. | |
+| Dangerous commands | A deterministic policy in Go (`internal/policy`) checks verification commands. It blocks push, force-push, hard resets, protected-branch merges, `terraform apply/destroy`, mutating `kubectl`/`helm`/cloud CLI calls (any context), publishing and `curl \| sh`, after normalizing global flags and `sh -c` bodies. The agent's own commands run inside the network-less container and are not filtered. | [sandbox doc](docs/design/sandbox.md) control 7 |
+| Verification integrity | Verification config and presets are read from the task's base commit, so the agent cannot weaken its own gate. Changes to `.boundedcode/`, CI workflows or CODEOWNERS fail verification. | sandbox doc controls 10–11 |
+| Git | Work happens on `agent/<task-id>` worktrees. Nothing is pushed automatically. Before host git touches a worktree, its `.git` pointer, admin dir and `HEAD` are verified. | sandbox doc control 8 |
+| Host-side reads | Context packs never follow symlinks out of a worktree or read secret paths, and are redacted. | sandbox doc control 14 |
+| Host-side tools | codebase-memory-mcp, Serena (optional) with its language servers, ripgrep and gitleaks run on the host against agent-written files. They do not execute repository code or follow symlinks. | sandbox doc residual risk 9 |
+| Frontier credentials | Codex/ChatGPT credentials stay on the host and are never mounted into, or exported to, agent environments. Contained `codex exec` runs in its own container that holds the Codex credential directory and has network access (it must reach OpenAI), with only the packet and an empty workdir inside. API keys are refused. | [ADR-0009](docs/architecture/adr/0009-frontier-escalation.md) |
+| Secret scanning | gitleaks scans task diffs; the full verification gate fails if it is not installed. | |
+| Logging | Audit events, adapter logs and context packs are redacted. Full source and prompts are not logged by default. | |
 
 Residual risks are listed in [docs/design/sandbox.md](docs/design/sandbox.md).
 Agent-level permission prompts are **not** treated as a security boundary.
@@ -61,10 +64,15 @@ against real backends, for example) must be configured explicitly.
 
 ## Supply chain
 
-* Upstream components are pinned by tag and commit, and their licenses are
-  verified per version
+* Upstream components are pinned by version, tag or commit (llama.cpp's
+  build script verifies the commit; codebase-memory-mcp and gitleaks are
+  checked by sha256; Serena by version, wheel hash and LICENSE hash; Codex
+  is installed by the user and only its version is recorded), and their
+  licenses are verified per version
   ([docs/licensing/upstream-license-matrix.md](docs/licensing/upstream-license-matrix.md)).
-* Go dependencies are pinned in `go.sum`. CI runs `govulncheck` and a
-  license check.
+* Go dependencies are pinned in `go.sum`, Python environments in `uv.lock`
+  files used with `--frozen`. CI runs a pinned `govulncheck` and license
+  checks for Go and both Python environments. There is no Python
+  vulnerability scan yet.
 * Model weights are never redistributed. Users download them from the
   original publisher.

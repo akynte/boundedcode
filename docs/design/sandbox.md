@@ -26,11 +26,14 @@ part of this boundary.
 | 4 | Private tmpfs `$HOME`. The host home, `~/.ssh`, cloud CLIs, kubeconfig, `~/.codex` and the Docker socket are never mounted, and an explicit refusal list is enforced in code. | `forbiddenHostMount` |
 | 5 | Secret masking: `.env*`, `secrets/`, keys, kubeconfigs, tfstate/tfvars and service-account JSON inside worktrees are hidden behind empty read-only mounts (tmpfs for directories, an empty bind for files) | `policy.FindSecretPaths`, `sandbox` |
 | 6 | Environment: containers get only the variables we set. Host-side runners scrub credential-like variables (`*_TOKEN`, `*SECRET*`, `AWS_*`, `OPENAI_*`, `SSH_AUTH_SOCK`, `KUBECONFIG`, `LMNR_*`, `OTEL_*`, …). | `sandbox.ScrubbedEnv` |
-| 7 | Deterministic command policy blocks push/force-push, hard resets, protected-branch merges, `terraform apply/destroy`, mutating `kubectl`/`helm`/cloud CLIs, publishing, and `curl … \| sh`. It applies to configured verification commands. | `policy.CheckCommand` |
-| 8 | Host-side git hardening: hooks disabled (`core.hooksPath=/dev/null`), `core.fsmonitor=false`, and `--no-ext-diff --no-textconv`. The worktree `.git` pointer is verified before every host git operation, and a tampered pointer blocks the task. | `gitops.Run`, `gitops.CheckWorktree` |
+| 7 | Deterministic command policy blocks push/force-push, hard resets, protected-branch merges, `terraform apply/destroy`, mutating `kubectl`/`helm`/cloud CLIs, publishing, and `curl … \| sh`. Command lines are normalized first (global flags such as `git -C`, `kubectl --context`, `terraform -chdir`; env assignments; wrappers; `sh -c` bodies). It applies to verification commands. The agent's own commands are not filtered: inside the container they cannot reach a remote, credentials or the host. | `policy.CheckCommand` |
+| 8 | Host-side git hardening: hooks disabled (`core.hooksPath=/dev/null`), `core.fsmonitor=false`, `--no-ext-diff --no-textconv`, no commit signing. Before any host git runs in a worktree (run, resume, `task verify`, `task diff`, checkpoints) the control plane verifies the `.git` pointer, that the agent-writable admin dir's `commondir` still points at the real (read-only) common dir, that there is no `config.worktree`, and that `HEAD` is the task branch. A redirected `commondir` would otherwise let host `git add` run an agent-defined filter (reproduced in `TestAdminDirTamperingDetected`). | `gitops.CheckTaskWorktree` |
 | 9 | Commits happen host-side on `agent/<task-id>` only. `CommitAll` refuses other branches. There are no pushes. | `gitops.CommitAll` |
-| 10 | Verification runs in the same image with the worktree mounted and the git dirs read-only. The module cache is mounted read-only, with `GOPROXY=off`. | `verify.Engine.spec` |
-| 11 | Diff-scope gate: changes touching secret paths, or more than N files, fail verification. gitleaks scans the task diff. | `verify` |
+| 10 | Verification runs in the same image with the worktree mounted and the git dirs read-only. The module cache is mounted read-only, with `GOPROXY=off`. Each task has its own Go build cache. Its config and language presets come from the task's **base commit**, never from the agent-writable worktree; deleting a stage's required file (e.g. `go.mod`) fails the stage. | `verify.LoadConfig`, `verify.Engine.spec` |
+| 11 | Diff-scope gate: changes touching secret paths, protected paths (`.boundedcode/`, CI workflows, CODEOWNERS, `.gitmodules`), or more than N files fail verification. gitleaks scans the task diff; without gitleaks the full gate fails. | `verify`, `policy.IsProtectedPath` |
+| 14 | Host-side reads of agent-written files (context packs, ADRs, cross-service scans) never follow symlinks out of the worktree and never read secret paths; packs are redacted before they reach the model or a frontier packet, and diffs omit secret paths. codebase-memory-mcp and ripgrep do not follow symlinks (verified 2026-10-04). | `contextplan.ReadConfined`, `xservice.Scan` |
+| 15 | More secret paths than can be masked (500) refuses to start the agent instead of masking only some. | `policy.FindSecretPaths` |
+| 16 | Containers are named and removed on cancellation or timeout (killing `docker run` alone leaves the container running); a stale adapter container is removed before reuse. | `sandbox.Container.Command` |
 | 12 | Frontier: packets are redacted, host paths are rewritten to workspace-relative names, and a packet still containing `$HOME` is not sent. `codex exec` runs **in a container** with only an empty workdir and the Codex credential dir mounted. Codex's own `read-only` sandbox restricts writes, not reads, so containment is required. API-key auth is refused. | `frontier.Codex`, `frontier.CheckPacket` |
 | 13 | Audit events are redacted (`telemetry.Redact`), and prompts and source are not logged by default. | `telemetry` |
 
@@ -48,6 +51,10 @@ part of this boundary.
 | overwrite masked `.env` | host file unchanged |
 | plant `.git/hooks/pre-commit`, then host commit | hook not executed |
 | redirect worktree `.git` to a crafted gitdir | rejected by `CheckWorktree` |
+| redirect the admin dir's `commondir` to a gitdir with a clean filter; `HEAD` to another branch; add `config.worktree` | rejected; task blocks; filter never runs (`TestAdminDirTamperingDetected`, `TestAdminDirTamperingBlocksTask`) |
+| prompt-injected agent rewrites `.boundedcode/verification.yaml`, plants `leak.go -> ~/.ssh/id_ed25519` and a failing test naming `leak.go:2` | config ignored (base commit), attempt rejected for the protected path, key never in a pack (`TestPromptInjectedAgentIsContained`) |
+| `git -C . push`, `kubectl --context=prod apply`, `terraform -chdir=x apply`, `rm -r -f /` in a verification stage | denied (`TestCheckCommandBypasses`) |
+| cancel a long verification stage | container removed (`TestContainerCancelRemovesContainer`) |
 | containerized codex: list host repos / `$HOME` | not visible (only the empty workdir) |
 
 ## Residual risks (known, accepted for now)
@@ -81,7 +88,14 @@ part of this boundary.
 8. **The frontier container has network access** (it must reach OpenAI) and
    holds the Codex credentials. Only the packet and an empty workdir are
    inside it.
-9. **Prompt injection steering the work itself.** A malicious repository
+9. **Host-side tools read agent-written worktrees.** codebase-memory-mcp
+   (worktree indexing for impact), Serena and its language servers
+   (ADR-0008; `gopls` runs `go list`), ripgrep and gitleaks run on the
+   host, outside the container, against files the agent wrote. They do not
+   execute repository code (toolchain downloads and network are disabled
+   for Serena's language servers) and do not follow symlinks, but a parser
+   bug in one of them would be reachable by the agent.
+10. **Prompt injection steering the work itself.** A malicious repository
    can make the agent write wrong code. The defence is deterministic
    verification plus human review of the merge candidate. Nothing merges
    automatically.

@@ -1,6 +1,9 @@
 package frontier
 
 import (
+	"context"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -67,5 +70,27 @@ func TestPacketRewritesHostPaths(t *testing.T) {
 	}
 	if CheckPacket(p, "/home/u") != nil || CheckPacket("see /home/u/secret", "/home/u") == nil {
 		t.Fatal("CheckPacket wrong")
+	}
+}
+
+func TestCodexContainerIsNamedAndRemovedOnCancel(t *testing.T) {
+	bin := filepath.Join(t.TempDir(), "codex")
+	if err := os.WriteFile(bin, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("CODEX_HOME", t.TempDir())
+	c := &Codex{Binary: bin, Container: &CodexContainer{Engine: "docker", Image: "img", UID: 1, GID: 1}}
+	cmd, err := c.containerCmd(context.Background(), []string{"exec"}, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	name := ""
+	for i, a := range cmd.Args {
+		if a == "--name" && i+1 < len(cmd.Args) {
+			name = cmd.Args[i+1]
+		}
+	}
+	if !strings.HasPrefix(name, "bc-codex-") || cmd.Cancel == nil || cmd.WaitDelay == 0 {
+		t.Fatalf("name=%q cancel=%v waitdelay=%v", name, cmd.Cancel != nil, cmd.WaitDelay)
 	}
 }

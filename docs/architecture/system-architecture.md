@@ -47,17 +47,20 @@ Keep these markers accurate when code changes.
 | Process | Owner | Lifetime |
 |---|---|---|
 | `boundedcode` CLI | user | per command; long-running for `task run` |
-| `llama-server` | supervised by `inference/llamacpp` or user-supplied | long-lived; reused across tasks |
+| `llama-server` | supervised by `inference/llamacpp` or user-supplied | long-lived; reused across tasks. A managed server unloads the model after `inference.idle_sleep` (default 30 min; measured: RSS 19.3 GiB → 0.8 GiB, VRAM 7.1 → 0.2 GiB) and reloads it on the next request (1.7 s with a warm page cache); `runtime stop` ends it |
 | OpenHands adapter | spawned per task session by `agent/openhands` | per session; may crash or restart without losing the task |
-| `codebase-memory-mcp` | `repointel/cbm` keeps one persistent MCP stdio session per command or task (ADR-0006), with a private cache dir and UI/watchers disabled | per command/task |
+| `codebase-memory-mcp` | `repointel/cbm` keeps one persistent MCP stdio session per command or task (ADR-0006), with a private cache dir and UI/watchers disabled; own process group with a parent-death signal; calls are time-bounded and a dead or hung session falls back to the CLI | per command/task |
 | `serena start-mcp-server` + language servers (optional) | `repointel/serena.Manager`: one MCP stdio instance per checkout root (task worktree), at most `max_instances` (default 2, LRU), stopped after `idle_timeout` (10 min), at the end of a task run, on call timeout or cancellation; read-only tool set; private `SERENA_HOME` outside the worktree (ADR-0008) | per worktree while in use |
-| `codex exec` | spawned by `frontier/codex` per escalation | per escalation |
-| verification commands | `verify` (inside sandbox when configured) | per stage |
+| `codex exec` | spawned by `frontier/codex` per escalation, in a named container removed on cancel | per escalation |
+| verification commands | `verify`, in named sandbox containers removed on cancel or stage timeout | per stage |
 
 A daemon is **[plan]**. Everything else in this document is **[impl]**
 unless marked otherwise. Version 1 runs the control loop in the foreground CLI
 process. Because state is in SQLite, Git and the OpenHands persistence
-directory, a killed CLI can be resumed with `task resume`.
+directory, a killed CLI can be resumed with `task resume`. A run holds a
+lease on its task (heartbeat every 15 s); a second `task run` is refused,
+a lease older than 2 minutes is taken over after a crash, and `task cancel`
+stops a running task within one heartbeat (ADR-0002).
 
 ## 3. Boundaries (interfaces)
 
@@ -68,6 +71,7 @@ Interfaces exist only where replacement is plausible:
 | `inference.Runtime` | `internal/inference` | `llamacpp` (managed or external) |
 | `agent.Runtime` | `internal/agent` | `openhands` (adapter) and `scripted` (deterministic, for tests) |
 | `repointel.Intelligence` | `internal/repointel` | `cbm` (codebase-memory-mcp) |
+| — (concrete) | `internal/stats` | success metrics from the ledger (`boundedcode stats`) |
 | `repointel.Navigator` | `internal/repointel` | `serena` (Serena v1.7.0 over language servers; keyed by checkout root) |
 | `frontier.Provider` | `internal/frontier` | `codex` (subscription CLI) and a manual/clipboard provider |
 | `sandbox.Sandbox` | `internal/sandbox` | `docker` and `none` (development only, refused for autonomous tasks unless explicitly overridden) |
@@ -81,13 +85,21 @@ implementation, and the stage list is data rather than code.
 JSON-RPC 2.0 over the adapter process's stdin/stdout. Both sides act as
 peers:
 
-* Go → adapter: `session.start`, `session.resume`, `session.send`,
-  `session.interrupt`, `session.state`, `shutdown`.
+* Go → adapter: `session.open` (start a conversation, or resume
+  `conversation_id` from the persistence directory), `session.send`,
+  `session.condense`, `session.interrupt`, `session.state`, `shutdown`.
 * adapter → Go (requests): `llm.complete`. This carries OpenAI-compatible
   chat-completion requests that the adapter's in-container loopback proxy
   receives from LiteLLM.
-* adapter → Go (notifications): `event`, which carries OpenHands event
+* adapter → Go (notifications): `ready`, sent once the SDK has loaded and
+  carrying `protocol_version`, and `event`, which carries OpenHands event
   summaries (action, observation, condensation, error, stuck, finish).
+
+Go refuses an adapter whose `protocol_version` differs from its own (or is
+missing) and asks for the sandbox image to be rebuilt; versioning rules are
+in ADR-0004. A `session.send` whose context ends is interrupted with
+`session.interrupt`; if the agent does not stop within a grace period the
+adapter is killed (container removed, or host process group killed).
 
 stdio was chosen over a Unix socket or HTTP for three reasons:
 
@@ -97,7 +109,8 @@ stdio was chosen over a Unix socket or HTTP for three reasons:
 3. It lets the container run with `--network none` while LLM traffic still
    flows, because the only egress is through the Go gateway.
 
-stderr is free-form adapter logging.
+stderr is free-form adapter logging. Go redacts it line by line and writes
+it to a per-task `adapter.log` beside the task's runtime directory.
 
 ## 5. Data and state
 
@@ -134,24 +147,45 @@ create task ──> create worktree ──> plan context pack (ledger + graph + 
 ```
 
 Budgets bound every loop (attempts, wall clock, local tokens, frontier
-escalations). Exhausting a budget parks the task in `blocked`; it never
-deletes work.
+escalations). Each agent turn is bounded by the remaining wall-clock budget.
+Exhausting a budget parks the task in `blocked`; it never deletes work.
+
+Failure handling inside the loop:
+
+* A model-server outage during a turn (transport errors recorded by the
+  gateway) is repaired with `Ensure` and retried; it does not count as an
+  attempt or toward Z2. After 3 repairs the task blocks.
+* An adapter crash reopens the persisted conversation (or a fresh one with
+  a resume pack).
+* A checkpoint commit that fails, or a worktree whose `.git`, admin dir or
+  `HEAD` was tampered with, blocks the task.
+* After each checkpoint the ledger records changed files, repositories and
+  symbols (from the diff), step progress and verification state.
 
 ## 7. Context planning
 
 Context packs are built from authoritative sources in a fixed priority order
 with a token budget:
 
-1. task goal, acceptance criteria, phase, remaining steps
-2. latest verification failures (truncated, deduplicated)
-3. current diff (stat first, then hunks for files under change)
-4. impact summary from the graph (callers/callees of changed symbols)
-5. relevant source: lines named by failures, then symbols named in the task
+1. task: goal, acceptance criteria, phase, completed/remaining steps,
+   decisions, verification state, changed files and symbols, and each
+   repository's branch and HEAD
+2. frontier guidance to apply, if any
+3. latest verification failures (truncated, deduplicated)
+4. rejected strategies (so the model doesn't repeat them)
+5. current diff (stat first, then hunks, at most 150 lines per file; secret
+   paths omitted)
+6. impact of the change from the graph (the task worktree is indexed as its
+   own project, because `detect_changes` only diffs the indexed checkout)
+7. cross-service contracts touching the task's repositories
+8. relevant source: lines named by failures, then symbols named in the task
    (see 7.1)
-6. relevant ADRs and decisions
-7. rejected strategies (so the model doesn't repeat them)
+9. relevant ADRs
+10. rules
 
-Packs are deterministic for a given state, which makes them testable.
+Packs are deterministic for a given state, which makes them testable. Files
+are read only inside the worktree (no symlink escapes, no secret paths) and
+the rendered pack is redacted.
 
 ### 7.1 Repository intelligence: breadth and depth [impl]
 
@@ -164,6 +198,7 @@ Two backends, one owner per question (measured in
 | Who references X? | Serena | graph callers (`trace_path`) | the graph matched a same-named function from another package in grpc-go |
 | Which types implement interface X? | Serena | graph `IMPLEMENTS` | the graph's `IMPLEMENTS` is method-name based (false positives) |
 | Which repositories mention X? | graph (`search_graph`) | all task repositories | cheap (~12 ms), avoids starting language servers |
+| X not found by Serena or the graph | ripgrep (whole word, ≤10 hits, ±3 lines, no secret paths or symlinks) | none | exact lexical stage of the retrieval order |
 | What does this diff affect? | graph (`detect_changes`) | none | blast radius is a graph question |
 | Cross-service and cross-repository contracts | `internal/xservice` + graph | none | Serena is per repository |
 | Architecture, ADRs | graph and repository ADRs | none | |

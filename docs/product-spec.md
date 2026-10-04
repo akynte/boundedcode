@@ -89,6 +89,19 @@ only for gaps that a documented gap report proves.
 Retrieval preference: exact symbol lookup → dependency/impact graph → exact
 lexical search → hybrid lexical+semantic → reranking → LLM exploration.
 
+Implementation status (2026-10-04):
+
+| Level / stage | Status |
+|---|---|
+| Exact symbol lookup (Serena/LSP, optional; graph fallback) | implemented |
+| Dependency and change-impact graph (codebase-memory-mcp, per task worktree) | implemented |
+| Exact lexical search (ripgrep) when symbol and graph lookups miss | implemented |
+| Hybrid lexical+semantic retrieval, reranking | not implemented; no measured gap yet |
+| LLM exploration | the agent's own tools inside the sandbox |
+| Symbol, call and interface level | implemented (Serena, graph) |
+| HTTP routes and calls, Kafka-style topics, env → Helm values/K8s/compose/Dockerfile, Terraform topic resources | implemented (`internal/xservice`) |
+| gRPC/protobuf, OpenAPI, outbox, SQL schema/migrations, Helm templates, Terraform beyond topics | not implemented (no analyzer; Phase 9 found no proven gap, see `docs/design/phase9-analyzers.md`) |
+
 ### 4.3 Task continuity
 The *task* is the source of truth, not the conversation. The ledger stores:
 task/workspace ids, original request, goal, acceptance criteria, phase,
