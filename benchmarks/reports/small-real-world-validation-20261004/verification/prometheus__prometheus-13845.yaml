@@ -1,0 +1,27 @@
+# Repository verification config for this benchmark task, committed into the
+# task's base commit (ENVIRONMENT_ONLY setup). It is the default Go preset,
+# minus checks that already fail on the untouched base in the offline
+# sandbox with Go 1.27 (measured before any agent run):
+#   go vet: stdmethods (Seek signatures) and unreachable (generated lexers) findings at base
+#   go test: scrape TestNewHTTPCACert, TestNewHTTPClientCert, TestNewHTTPWithServerName (expired test certificates)
+#            + TestNewHTTPWithBadServerName (scrape/testdata/*.key hidden by BoundedCode's secret masking)
+version: 1
+stages:
+  - name: gofmt
+    run: ["sh", "-c", "out=$(gofmt -l $(git ls-files '*.go' | grep -v '^vendor/') 2>&1); [ -z \"$out\" ] || { echo \"files need gofmt:\"; echo \"$out\"; exit 1; }"]
+    requires: [go.mod]
+  - name: go-build
+    run: [go, build, ./...]
+    requires: [go.mod]
+  - name: go-vet
+    run: [go, vet, -stdmethods=false, -unreachable=false, "{packages}"]
+    requires: [go.mod]
+  - name: go-test
+    run: [go, test, -count=1, -skip, "^(TestNewHTTPCACert|TestNewHTTPClientCert|TestNewHTTPWithServerName|TestNewHTTPWithBadServerName)$", "{packages}"]
+    requires: [go.mod]
+    timeout: 20m
+  - name: golangci-lint
+    run: [golangci-lint, run, ./...]
+    scope: full
+    optional: true
+    requires: [go.mod]

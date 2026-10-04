@@ -30,7 +30,9 @@ type TaskSpec struct {
 	Fixture  string `yaml:"fixture"` // directory under benchmarks/fixtures
 	// Sources adds repositories copied from elsewhere, by name. Supported:
 	// "gomod:<module>@<version>" copies a module from the Go module cache
-	// (large real-world repositories without vendoring them here).
+	// (large real-world repositories without vendoring them here);
+	// "git:<url>@<commit>" checks out a public repository at an exact commit
+	// (benchmark datasets such as SWE-bench), without its history.
 	Sources  map[string]string `yaml:"sources"`
 	Repos    []string          `yaml:"repos"` // repositories the task may change
 	Setup    []Edit            `yaml:"setup"` // edits applied and committed before the task (planted defects)
@@ -40,6 +42,11 @@ type TaskSpec struct {
 	Hidden  []File          `yaml:"hidden"`
 	Checks  []Check         `yaml:"checks"`
 	Timeout config.Duration `yaml:"timeout"`
+	// InterruptAfter cancels the run after this long, then resumes the same
+	// task with a freshly built runner (context-continuity evidence).
+	InterruptAfter config.Duration `yaml:"interrupt_after"`
+	// Source records where the task comes from (dataset and instance id).
+	Source string `yaml:"source"`
 }
 
 // Edit replaces text in a fixture file (or writes a file when Old is empty).
@@ -50,11 +57,14 @@ type Edit struct {
 	New  string `yaml:"new"`
 }
 
-// File is a hidden acceptance file.
+// File is a hidden acceptance file, or a hidden acceptance patch: the files
+// a Patch touches are reset to the base commit, then the patch is applied
+// (the SWE-bench test_patch convention).
 type File struct {
 	Repo    string `yaml:"repo"`
 	Path    string `yaml:"path"`
 	Content string `yaml:"content"`
+	Patch   string `yaml:"patch"`
 }
 
 // Check is a command whose exit status decides acceptance.
@@ -108,6 +118,9 @@ type TaskResult struct {
 	FailedChecks    []string `json:"failed_checks,omitempty"`
 	Error           string   `json:"error,omitempty"`
 	TaskID          string   `json:"task_id"`
+	Interrupted     bool     `json:"interrupted,omitempty"` // a controlled interruption and resume happened
+	// StateDir holds the task's state database and agent persistence.
+	StateDir string `json:"state_dir,omitempty"`
 	// Intel summarizes repository intelligence and agent tool use, from the
 	// task's audit events.
 	Intel IntelMetrics `json:"intel"`
@@ -167,6 +180,15 @@ type SuiteRunner struct {
 
 // Run executes the given tasks sequentially.
 func (s *SuiteRunner) Run(ctx context.Context, model string, tasks []TaskSpec, out string) (*SuiteReport, error) {
+	return s.run(ctx, model, tasks, out, s.runOne)
+}
+
+// RunBaselines runs the given tasks with RunBaseline.
+func (s *SuiteRunner) RunBaselines(ctx context.Context, model string, tasks []TaskSpec, out string) (*SuiteReport, error) {
+	return s.run(ctx, model, tasks, out, s.RunBaseline)
+}
+
+func (s *SuiteRunner) run(ctx context.Context, model string, tasks []TaskSpec, out string, one func(context.Context, string, TaskSpec) TaskResult) (*SuiteReport, error) {
 	rep := &SuiteReport{ID: "suite-" + time.Now().UTC().Format("20060102T150405Z"), Model: model, Started: time.Now().UTC()}
 	save := func() {
 		rep.Summary = summarize(rep.Results)
@@ -180,7 +202,7 @@ func (s *SuiteRunner) Run(ctx context.Context, model string, tasks []TaskSpec, o
 			break
 		}
 		s.progress("task %s (%s)", t.ID, t.Category)
-		res := s.runOne(ctx, model, t)
+		res := one(ctx, model, t)
 		s.progress("task %s: success=%v status=%s attempts=%d tokens=%d escalations=%d %.0fs %s",
 			t.ID, res.Success, res.TaskStatus, res.Attempts, res.LocalTokens, res.Escalations, res.WallSeconds, res.Error)
 		rep.Results = append(rep.Results, res)
@@ -216,7 +238,7 @@ func (s *SuiteRunner) runOne(ctx context.Context, model string, spec TaskSpec) (
 		res.Error = "runner: " + err.Error()
 		return res
 	}
-	defer cleanup()
+	defer func() { cleanup() }()
 	w, err := r.WS.Create(ctx, "bench")
 	if err != nil {
 		res.Error = err.Error()
@@ -247,14 +269,36 @@ func (s *SuiteRunner) runOne(ctx context.Context, model string, spec TaskSpec) (
 		res.Error = err.Error()
 		return res
 	}
-	res.TaskID = tk.ID
+	res.TaskID, res.StateDir = tk.ID, filepath.Join(dir, "state")
 	tctx := ctx
 	if spec.Timeout > 0 {
 		var cancel context.CancelFunc
 		tctx, cancel = context.WithTimeout(ctx, spec.Timeout.D())
 		defer cancel()
 	}
-	final, runErr := r.Run(tctx, tk.ID, orchestrator.RunOptions{})
+	var final *task.Task
+	var runErr error
+	if spec.InterruptAfter > 0 {
+		// Controlled interruption: stop the run, discard the runner (as a
+		// process restart would), then resume the same task from the
+		// persisted ledger and agent session with a new runner.
+		ictx, icancel := context.WithTimeout(tctx, spec.InterruptAfter.D())
+		final, runErr = r.Run(ictx, tk.ID, orchestrator.RunOptions{})
+		icancel()
+		if tctx.Err() == nil && (final == nil || final.Status == task.StatusActive) {
+			s.progress("task %s: interrupted after %s (status %v, err %v); resuming with a new runner", spec.ID, spec.InterruptAfter.D(), statusOf(final), runErr)
+			res.Interrupted = true
+			cleanup()
+			r, cleanup, err = s.NewRunner(ctx, filepath.Join(dir, "state"))
+			if err != nil {
+				res.Error = "runner: " + err.Error()
+				return res
+			}
+			final, runErr = r.Run(tctx, tk.ID, orchestrator.RunOptions{})
+		}
+	} else {
+		final, runErr = r.Run(tctx, tk.ID, orchestrator.RunOptions{})
+	}
 	if final != nil {
 		res.TaskStatus = string(final.Status)
 		res.SelfVerified = final.VerificationState == "full_pass"
@@ -280,6 +324,13 @@ func (s *SuiteRunner) runOne(ctx context.Context, model string, spec TaskSpec) (
 	// Hidden acceptance: write files, run checks in the sandbox.
 	for _, h := range spec.Hidden {
 		wt := byRepo[h.Repo]
+		if h.Patch != "" {
+			if err := applyHiddenPatch(ctx, wt.Path, wt.BaseCommit, h.Patch); err != nil {
+				res.Error = "hidden patch: " + err.Error()
+				return res
+			}
+			continue
+		}
 		p := filepath.Join(wt.Path, h.Path)
 		_ = os.MkdirAll(filepath.Dir(p), 0o755)
 		if err := os.WriteFile(p, []byte(h.Content), 0o644); err != nil {
@@ -295,7 +346,12 @@ func (s *SuiteRunner) runOne(ctx context.Context, model string, spec TaskSpec) (
 			res.FailedChecks = append(res.FailedChecks, c.Repo+": repo not in task")
 			continue
 		}
-		cmd, err := s.Sandbox.Command(ctx, checkSpec(ctx, spec, wt.Path, c.Run))
+		cs := checkSpec(ctx, spec, wt.Path, c.Run)
+		// Dependencies installed in the materialized repository (ignored by
+		// git, so absent from the worktree) are mounted read-only for the
+		// acceptance check only, as a dataset's evaluation image provides them.
+		cs.Mounts = append(cs.Mounts, depMounts(repos[c.Repo], wt.Path)...)
+		cmd, err := s.Sandbox.Command(ctx, cs)
 		if err != nil {
 			res.Success = false
 			res.FailedChecks = append(res.FailedChecks, err.Error())
@@ -395,6 +451,7 @@ func materialize(ctx context.Context, fixture string, sources map[string]string,
 		if out, err := exec.CommandContext(ctx, "chmod", "-R", "u+w", target).CombinedOutput(); err != nil {
 			return nil, fmt.Errorf("chmod: %s", out)
 		}
+		_ = os.Remove(filepath.Join(target, ".bc-source-ready"))
 		repos[name] = target
 	}
 	for _, e := range entries {
@@ -458,9 +515,12 @@ func checkSpec(ctx context.Context, spec TaskSpec, dir string, run []string) san
 
 // sourceDir resolves a Sources entry to a local directory.
 func sourceDir(ctx context.Context, src string) (string, error) {
+	if g, ok := strings.CutPrefix(src, "git:"); ok {
+		return gitSourceDir(ctx, g)
+	}
 	spec, ok := strings.CutPrefix(src, "gomod:")
 	if !ok {
-		return "", fmt.Errorf("unsupported source %q (want gomod:<module>@<version>)", src)
+		return "", fmt.Errorf("unsupported source %q (want gomod:<module>@<version> or git:<url>@<commit>)", src)
 	}
 	mod, ver, ok := strings.Cut(spec, "@")
 	if !ok || ver == "" || strings.Contains(ver, "latest") {
@@ -541,4 +601,133 @@ func tailStr(s string, n int) string {
 		return "…" + s[len(s)-n:]
 	}
 	return s
+}
+
+// SourcesDir caches "git:" sources (under $HOME so the container engine can
+// see them). Dependencies a dataset's evaluation environment provides (Go
+// modules, node_modules) are installed there once by the preparation script.
+func SourcesDir() string {
+	home, _ := os.UserHomeDir()
+	return filepath.Join(home, ".cache", "boundedcode", "bench-sources")
+}
+
+// gitSourceDir checks out url at an exact commit into the sources cache,
+// without .git, so the task repository has no upstream history (and no
+// future commits that could contain the fix).
+func gitSourceDir(ctx context.Context, spec string) (string, error) {
+	i := strings.LastIndex(spec, "@")
+	if i < 0 {
+		return "", fmt.Errorf("git source %q: want <url>@<commit>", spec)
+	}
+	url, commit := spec[:i], spec[i+1:]
+	if len(commit) != 40 || strings.Trim(commit, "0123456789abcdef") != "" {
+		return "", fmt.Errorf("git source %q must pin a full commit hash", spec)
+	}
+	name := strings.NewReplacer("https://github.com/", "", "/", "__", ".git", "").Replace(url)
+	dir := filepath.Join(SourcesDir(), name+"@"+commit[:12])
+	if _, err := os.Stat(filepath.Join(dir, ".bc-source-ready")); err == nil {
+		return dir, nil
+	}
+	tmp := dir + ".partial"
+	_ = os.RemoveAll(tmp)
+	if err := os.MkdirAll(tmp, 0o755); err != nil {
+		return "", err
+	}
+	for _, a := range [][]string{{"init", "-q"}, {"fetch", "-q", "--depth", "1", url, commit}, {"-c", "advice.detachedHead=false", "checkout", "-q", "FETCH_HEAD"}} {
+		if _, err := gitops.Run(ctx, tmp, a...); err != nil {
+			return "", err
+		}
+	}
+	if head, err := gitops.Run(ctx, tmp, "rev-parse", "HEAD"); err != nil || head != commit {
+		return "", fmt.Errorf("git source %s: checked out %q", spec, head)
+	}
+	if err := os.RemoveAll(filepath.Join(tmp, ".git")); err != nil {
+		return "", err
+	}
+	if err := os.WriteFile(filepath.Join(tmp, ".bc-source-ready"), []byte(spec+"\n"), 0o644); err != nil {
+		return "", err
+	}
+	_ = os.RemoveAll(dir)
+	return dir, os.Rename(tmp, dir)
+}
+
+// applyHiddenPatch resets the files a patch touches to the base commit and
+// applies it, so the acceptance tests are exactly the dataset's, whatever
+// the agent did to those files.
+func applyHiddenPatch(ctx context.Context, dir, base, patch string) error {
+	f, err := os.CreateTemp("", "bc-hidden-*.patch")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(f.Name())
+	if _, err := f.WriteString(patch); err != nil {
+		return err
+	}
+	f.Close()
+	for _, p := range patchFiles(patch) {
+		if _, err := gitops.Run(ctx, dir, "cat-file", "-e", base+":"+p); err == nil {
+			if _, err := gitops.Run(ctx, dir, "checkout", base, "--", p); err != nil {
+				return err
+			}
+		} else if err := os.Remove(filepath.Join(dir, p)); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return err
+		}
+	}
+	_, err = gitops.Run(ctx, dir, "apply", "--whitespace=nowarn", f.Name())
+	return err
+}
+
+// patchFiles lists the paths a unified git diff touches.
+func patchFiles(patch string) []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, l := range strings.Split(patch, "\n") {
+		rest, ok := strings.CutPrefix(l, "diff --git a/")
+		if !ok {
+			continue
+		}
+		a, b, ok := strings.Cut(rest, " b/")
+		if !ok {
+			continue
+		}
+		for _, p := range []string{a, b} {
+			if !seen[p] {
+				seen[p] = true
+				out = append(out, p)
+			}
+		}
+	}
+	return out
+}
+
+// depMounts maps installed dependency directories (node_modules, at most
+// three levels deep, for workspaces/monorepos) of the materialized repository
+// read-only onto the same relative paths in a worktree.
+func depMounts(repo, worktree string) []sandbox.Mount {
+	if repo == "" || repo == worktree {
+		return nil
+	}
+	var out []sandbox.Mount
+	_ = filepath.WalkDir(repo, func(p string, d fs.DirEntry, err error) error {
+		if err != nil || !d.IsDir() {
+			return nil //nolint:nilerr // unreadable entries are skipped
+		}
+		rel, _ := filepath.Rel(repo, p)
+		if d.Name() == ".git" || strings.Count(rel, string(filepath.Separator)) > 3 {
+			return filepath.SkipDir
+		}
+		if d.Name() == "node_modules" {
+			out = append(out, sandbox.Mount{Host: p, Target: filepath.Join(worktree, rel), ReadOnly: true})
+			return filepath.SkipDir
+		}
+		return nil
+	})
+	return out
+}
+
+func statusOf(t *task.Task) string {
+	if t == nil {
+		return "none"
+	}
+	return string(t.Status)
 }

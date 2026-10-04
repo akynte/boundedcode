@@ -1,0 +1,28 @@
+# Repository verification config for this benchmark task, committed into the
+# task's base commit (ENVIRONMENT_ONLY setup). It is the default Go preset,
+# minus checks that already fail on the untouched base in the offline
+# sandbox with Go 1.27 (measured before any agent run):
+#   gofmt: 56 files are not gofmt-clean at base -> gofmt checks changed files only
+#   go vet: printf and stringintconv findings at base (2019 code, newer vet)
+#   go test: those vet findings make 9 test packages fail to build -> -vet=off in tests (vet runs as its own stage);
+#            google.golang.org/grpc/test (end-to-end) exceeds the 10-minute test timeout at base -> excluded
+version: 1
+stages:
+  - name: gofmt
+    run: ["sh", "-c", "b=$(git rev-list --max-parents=0 HEAD); f=$( { git diff --name-only --diff-filter=AM \"$b\" -- \"*.go\"; git ls-files --others --exclude-standard -- \"*.go\"; } | sort -u); [ -z \"$f\" ] && exit 0; out=$(gofmt -l $f 2>&1); [ -z \"$out\" ] || { echo \"files need gofmt:\"; echo \"$out\"; exit 1; }"]
+    requires: [go.mod]
+  - name: go-build
+    run: [go, build, ./...]
+    requires: [go.mod]
+  - name: go-vet
+    run: [go, vet, -printf=false, -stringintconv=false, "{packages}"]
+    requires: [go.mod]
+  - name: go-test
+    run: ["sh", "-c", "pk=$(go list \"$@\" | grep -v -x google.golang.org/grpc/test); [ -z \"$pk\" ] && exit 0; go test -count=1 -vet=off $pk", "sh", "{packages}"]
+    requires: [go.mod]
+    timeout: 20m
+  - name: golangci-lint
+    run: [golangci-lint, run, ./...]
+    scope: full
+    optional: true
+    requires: [go.mod]

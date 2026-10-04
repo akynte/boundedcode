@@ -1,0 +1,203 @@
+{
+  "name": "small-real-world-validation-20261004",
+  "frozen_at": "2026-10-04",
+  "boundedcode_commit": "991ec3c2b1bfb3734a6b9e4f4a28896649129862",
+  "purpose": "Small validation sample (8 tasks) demonstrating practical operation; not a statistically comprehensive benchmark.",
+  "datasets": {
+    "swe-bench-multilingual": {
+      "hf": "SWE-bench/SWE-bench_Multilingual",
+      "revision": "846e647b9f33c0b51b739d005d13d85493c9af09",
+      "license": "MIT"
+    },
+    "multi-swe-bench": {
+      "hf": "ByteDance-Seed/Multi-SWE-bench",
+      "revision": "56ff018c04a38e27ada1e9d0a6d5839a51f88f0d",
+      "license": "CC0 (data adapted from the listed projects)",
+      "files": [
+        "go/zeromicro__go-zero_dataset.jsonl",
+        "go/grpc__grpc-go_dataset.jsonl"
+      ]
+    }
+  },
+  "selection_rule": [
+    "Selected before any BoundedCode run, without looking at agent performance.",
+    "Slots: 3 Go, 1 JavaScript, 1 TypeScript, 1 large repository, 1 DevOps/infrastructure, 1 difficult.",
+    "Per slot, candidates are ranked by sha256('boundedcode-small-validation-2026-10-04:' + instance_id) ascending; the first candidate that passes environment screening is used.",
+    "Eligibility: the gold patch does not change dependency manifests (go.mod, go.sum, package.json, lock files): task sandboxes are offline and cannot fetch new dependencies.",
+    "Screening (environment validity only): in the offline sandbox, the dataset's acceptance tests must fail on the base commit and pass with the gold patch. A slot moves to its next-ranked candidate only when screening fails.",
+    "Difficult slot: any instance from the selected repositories whose gold patch touches >= 3 files and >= 50 changed lines.",
+    "Excluded repositories: hashicorp/terraform (all instances are from 2024, when Terraform was BUSL-1.1, not an open-source license); preactjs/preact (tests need a browser, which the sandbox image does not have).",
+    "Dataset content (issue text, test and gold patches) is generated into ~/.cache by scripts/bench-swe-tasks.py and not committed. The agent never sees gold patches."
+  ],
+  "slot_rankings": {
+    "go-gin": [
+      "gin-gonic__gin-3227",
+      "gin-gonic__gin-1957",
+      "gin-gonic__gin-2121"
+    ],
+    "go-hugo": [
+      "gohugoio__hugo-12562",
+      "gohugoio__hugo-12204",
+      "gohugoio__hugo-12579",
+      "gohugoio__hugo-12171",
+      "gohugoio__hugo-12448",
+      "gohugoio__hugo-12343",
+      "gohugoio__hugo-12768"
+    ],
+    "go-go-zero": [
+      "zeromicro__go-zero-2283",
+      "zeromicro__go-zero-1964",
+      "zeromicro__go-zero-990"
+    ],
+    "js-axios": [
+      "axios__axios-5085",
+      "axios__axios-6539",
+      "axios__axios-4738"
+    ],
+    "ts-vue": [
+      "vuejs__core-11899",
+      "vuejs__core-11589",
+      "vuejs__core-11739"
+    ],
+    "large-prometheus": [
+      "prometheus__prometheus-13845",
+      "prometheus__prometheus-12874",
+      "prometheus__prometheus-10633"
+    ],
+    "devops-caddy": [
+      "caddyserver__caddy-4943",
+      "caddyserver__caddy-5995",
+      "caddyserver__caddy-6345",
+      "caddyserver__caddy-6115",
+      "caddyserver__caddy-6288"
+    ],
+    "difficult": [
+      "zeromicro__go-zero-990",
+      "zeromicro__go-zero-1821",
+      "zeromicro__go-zero-1456"
+    ],
+    "go-grpc-go (fallback for go-hugo)": [
+      "grpc__grpc-go-2744",
+      "grpc__grpc-go-3201",
+      "grpc__grpc-go-2735",
+      "grpc__grpc-go-3258",
+      "grpc__grpc-go-3361"
+    ]
+  },
+  "context_continuity": "prometheus__prometheus-13845 runs with a controlled interruption after 5 minutes, then resumes with a freshly built runner.",
+  "baseline_tasks": [
+    "gin-gonic__gin-3227",
+    "caddyserver__caddy-6288"
+  ],
+  "tasks": [
+    {
+      "slot": "go-gin",
+      "instance_id": "gin-gonic__gin-3227",
+      "category": "go"
+    },
+    {
+      "slot": "go-grpc-go",
+      "instance_id": "grpc__grpc-go-2744",
+      "category": "go"
+    },
+    {
+      "slot": "go-go-zero",
+      "instance_id": "zeromicro__go-zero-2283",
+      "category": "go"
+    },
+    {
+      "slot": "js-axios",
+      "instance_id": "axios__axios-6539",
+      "category": "javascript"
+    },
+    {
+      "slot": "ts-vue",
+      "instance_id": "vuejs__core-11899",
+      "category": "typescript"
+    },
+    {
+      "slot": "large-prometheus",
+      "instance_id": "prometheus__prometheus-13845",
+      "category": "large-repo",
+      "interrupt_after": "5m"
+    },
+    {
+      "slot": "devops-caddy",
+      "instance_id": "caddyserver__caddy-6288",
+      "category": "devops-infra"
+    },
+    {
+      "slot": "difficult",
+      "instance_id": "zeromicro__go-zero-990",
+      "category": "difficult"
+    }
+  ],
+  "dependencies": {
+    "gin-gonic/gin": [
+      "go mod download && go list -deps -test ./... >/dev/null"
+    ],
+    "gohugoio/hugo": [
+      "go mod download && go list -deps -test ./... >/dev/null"
+    ],
+    "zeromicro/go-zero": [
+      "go mod download && go list -deps -test ./... >/dev/null"
+    ],
+    "prometheus/prometheus": [
+      "go mod download && go list -deps -test ./... >/dev/null"
+    ],
+    "caddyserver/caddy": [
+      "go mod download && go list -deps -test ./... >/dev/null"
+    ],
+    "axios/axios": [
+      "npm ci --ignore-scripts --no-audit --no-fund"
+    ],
+    "vuejs/core": [
+      "npx -y \"$(node -p 'require(\"./package.json\").packageManager.split(\"+\")[0]')\" install --frozen-lockfile --ignore-scripts"
+    ],
+    "grpc/grpc-go": [
+      "go mod download && go list -deps -test ./... >/dev/null"
+    ]
+  },
+  "screening": {
+    "files": [
+      "screening.json",
+      "screening-alternates.json",
+      "screening-alternates-2.json",
+      "screening-alternates-3.json"
+    ],
+    "substitutions": [
+      {
+        "slot": "js-axios",
+        "rejected": "axios__axios-5085",
+        "reason": "pass-to-pass test 'issues 4999' calls postman-echo.com; the sandbox is offline",
+        "selected": "axios__axios-6539"
+      },
+      {
+        "slot": "devops-caddy",
+        "rejected": [
+          "caddyserver__caddy-4943",
+          "caddyserver__caddy-5995",
+          "caddyserver__caddy-6345",
+          "caddyserver__caddy-6115"
+        ],
+        "reason": "4943: pinned quic-go v0.28.1 refuses to build on Go >= 1.20 (sandbox has Go 1.27); 5995/6345/6115: server-starting tests panic in Caddy's config loader under Go 1.27",
+        "selected": "caddyserver__caddy-6288"
+      },
+      {
+        "slot": "go-hugo",
+        "rejected": "all 7 eligible gohugoio/hugo instances",
+        "reason": "go vet (printf analyzer) in Go 1.27 panics on hugo's resources/page package, so every acceptance run fails",
+        "selected": "fallback: next Go repository from the requested list that is neither excluded nor used: grpc/grpc-go (Multi-SWE-bench), first valid by rank: grpc__grpc-go-2744"
+      }
+    ],
+    "note": "Screening uses only acceptance tests and gold patches; no BoundedCode run had happened when the set was finalized."
+  },
+  "verification": {
+    "zeromicro__go-zero-2283": "verification/zeromicro__go-zero-2283.yaml",
+    "zeromicro__go-zero-990": "verification/zeromicro__go-zero-990.yaml",
+    "prometheus__prometheus-13845": "verification/prometheus__prometheus-13845.yaml",
+    "caddyserver__caddy-6288": "verification/caddyserver__caddy-6288.yaml",
+    "grpc__grpc-go-2744": "verification/grpc__grpc-go-2744.yaml",
+    "gin-gonic__gin-3227": "verification/gin-gonic__gin-3227.yaml"
+  }
+}

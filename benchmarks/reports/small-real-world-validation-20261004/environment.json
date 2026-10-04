@@ -1,0 +1,64 @@
+{
+  "boundedcode_product_commit": "991ec3c2b1bfb3734a6b9e4f4a28896649129862",
+  "note_harness": "Benchmark-harness additions (git sources, dataset test-patch acceptance, node_modules for acceptance checks, controlled interrupt/resume, raw-agent baseline, screening) are committed separately; product code under internal/ (except internal/benchmark) and the bench CLI flags are otherwise unchanged.",
+  "date": "2026-10-04",
+  "host": {
+    "cpu": "13th Gen Intel(R) Core(TM) i7-13620H",
+    "threads": 16,
+    "ram_gib": 62.5,
+    "gpu": "NVIDIA GeForce RTX 4060 Laptop GPU, 8188 MiB, 615.71.09",
+    "os": "Linux 7.1.13+deb13-amd64"
+  },
+  "model": {
+    "profile": "qwen3.6-35b-a3b",
+    "file": "Qwen3.6-35B-A3B-UD-Q4_K_M.gguf",
+    "source": "unsloth/Qwen3.6-35B-A3B-GGUF",
+    "quantization": "UD-Q4_K_M",
+    "ctx_size": 131072,
+    "n_cpu_moe": 35,
+    "kv_cache": "q8_0",
+    "sampling": {
+      "temperature": 0.6,
+      "top_p": 0.95,
+      "top_k": 20
+    }
+  },
+  "llama_server": "version: 0.5.0-dev (build 1, commit 7fe450e)\nbuilt with GNU 14.2.0 for Linux x86_64",
+  "agent": {
+    "runtime": "openhands",
+    "sdk": "openhands-sdk 1.51.0",
+    "image": "boundedcode-openhands:local sha256:63220bfe6bf8788c45c72976c6a26dd5e05d948b59165eea487f46d0c4f4e5cb",
+    "max_iterations": 150,
+    "condenser_max_events": 80
+  },
+  "repointel": {
+    "codebase_memory_mcp": "codebase-memory-mcp 0.11.0",
+    "serena": "v1.7.0 (commit 949a27ef), enabled for this benchmark",
+    "cross_service": true
+  },
+  "frontier": {
+    "enabled": true,
+    "provider": "codex (ChatGPT subscription, contained)",
+    "codex_cli": "codex-cli 0.156.1",
+    "policy": "existing Z1-Z4 escalation policy; approvals pre-granted with --approve-frontier so policy-triggered calls run unattended; no paid API keys",
+    "max_escalations_per_task": 2
+  },
+  "sandbox": {
+    "kind": "docker",
+    "network": "none",
+    "memory": "8g",
+    "cpus": "8",
+    "engine": "29.8.0"
+  },
+  "toolchains_in_sandbox": {
+    "go": "go1.27.1",
+    "node": "v24.21.0"
+  },
+  "budgets": {
+    "max_attempts": 6,
+    "max_wall_clock": "4h",
+    "max_escalations": 2,
+    "task_timeout": "90m (harness)"
+  },
+  "config": "copy of the user's config with frontier.enabled=true and repointel.serena.enabled=true, used via XDG_CONFIG_HOME; the user's own config is unchanged"
+}

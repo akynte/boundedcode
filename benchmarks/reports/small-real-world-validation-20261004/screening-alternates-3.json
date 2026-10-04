@@ -1,0 +1,52 @@
+[
+  {
+    "id": "grpc__grpc-go-2735",
+    "base_fails": true,
+    "gold_passes": false,
+    "valid": false,
+    "base_output": "…nal/backoff/backoff_test.go:27:12: undefined: NewExponentialBuilder\ninternal/backoff/backoff_test.go:29:3: unknown field baseDelay in struct literal of type Exponential\ninternal/backoff/backoff_test.go:30:3: unknown field multiplier in struct literal of type Exponential\ninternal/backoff/backoff_test.go:30:15: undefined: multiplier\ninternal/backoff/backoff_test.go:31:3: unknown field jitter in struct literal of type Exponential\ninternal/backoff/backoff_test.go:32:3: unknown field maxDelay in struct literal of type Exponential, but does have MaxDelay\ninternal/backoff/backoff_test.go:32:15: undefined: maxDelay\ninternal/backoff/backoff_test.go:42:12: undefined: NewExponentialBuilder\ninternal/backoff/backoff_test.go:44:3: unknown field baseDelay in struct literal of type Exponential\ninternal/backoff/backoff_test.go:45:3: unknown field multiplier in struct literal of type Exponential\ninternal/backoff/backoff_test.go:45:3: too many errors\n# google.golang.org/grpc [google.golang.org/grpc.test]\n./clientconn_test.go:823:36: undefined: backoff.NewExponentialBuilder\n./clientconn_test.go:828:22: undefined: backoff.NewExponentialBuilder\n./clientconn_test.go:834:22: undefined: backoff.NewExponentialBuilder\n./clientconn_test.go:842:9: undefined: ConnectParams\n./clientconn_test.go:843:22: undefined: backoff.NewExponentialBuilder\n./clientconn_test.go:844:38: undefined: WithConnectParams\nFAIL\tgoogle.golang.org/grpc [build failed]\nFAIL\tgoogle.golang.org/grpc/internal/backoff [build failed]\nFAIL\n",
+    "gold_output": "# google.golang.org/grpc\n# [google.golang.org/grpc]\n./stream.go:1472:40: non-constant format string in call to google.golang.org/grpc/status.Errorf\nFAIL\tgoogle.golang.org/grpc [build failed]\n=== RUN   TestNewExponentialBuilderDefault\n--- PASS: TestNewExponentialBuilderDefault (0.00s)\n=== RUN   TestNewExponentialBuilderOverride\n--- PASS: TestNewExponentialBuilderOverride (0.00s)\nPASS\nok  \tgoogle.golang.org/grpc/internal/backoff\t0.002s\nFAIL\n",
+    "wall_seconds": 28.677097169,
+    "source_tokens": 918520
+  },
+  {
+    "id": "grpc__grpc-go-2744",
+    "base_fails": true,
+    "gold_passes": true,
+    "valid": true,
+    "base_output": "# google.golang.org/grpc/credentials [google.golang.org/grpc/credentials.test]\ncredentials/credentials_test.go:238:14: undefined: appendH2ToNextProtos\nFAIL\tgoogle.golang.org/grpc/credentials [build failed]\nFAIL\n",
+    "gold_output": "=== RUN   TestTLSOverrideServerName\n--- PASS: TestTLSOverrideServerName (0.00s)\n=== RUN   TestTLSClone\n--- PASS: TestTLSClone (0.00s)\n=== RUN   TestClientHandshakeReturnsAuthInfo\n--- PASS: TestClientHandshakeReturnsAuthInfo (0.00s)\n=== RUN   TestServerHandshakeReturnsAuthInfo\n--- PASS: TestServerHandshakeReturnsAuthInfo (0.00s)\n=== RUN   TestServerAndClientHandshake\n--- PASS: TestServerAndClientHandshake (0.00s)\n=== RUN   TestAppendH2ToNextProtos\n=== RUN   TestAppendH2ToNextProtos/empty\n=== RUN   TestAppendH2ToNextProtos/only_h2\n=== RUN   TestAppendH2ToNextProtos/with_h2\n=== RUN   TestAppendH2ToNextProtos/no_h2\n--- PASS: TestAppendH2ToNextProtos (0.00s)\n    --- PASS: TestAppendH2ToNextProtos/empty (0.00s)\n    --- PASS: TestAppendH2ToNextProtos/only_h2 (0.00s)\n    --- PASS: TestAppendH2ToNextProtos/with_h2 (0.00s)\n    --- PASS: TestAppendH2ToNextProtos/no_h2 (0.00s)\nPASS\nok  \tgoogle.golang.org/grpc/credentials\t0.007s\n",
+    "wall_seconds": 44.038322355,
+    "source_tokens": 918520
+  },
+  {
+    "id": "grpc__grpc-go-3201",
+    "base_fails": true,
+    "gold_passes": true,
+    "valid": true,
+    "base_output": "=== RUN   TestDisableServiceConfig\n    dns_resolver_test.go:1054: Resolver reported a service config even though lookups are disabled: sc=, cnt=1\n--- FAIL: TestDisableServiceConfig (0.00s)\nFAIL\nFAIL\tgoogle.golang.org/grpc/internal/resolver/dns\t0.004s\nFAIL\n",
+    "gold_output": "=== RUN   TestDisableServiceConfig\n--- PASS: TestDisableServiceConfig (0.00s)\nPASS\nok  \tgoogle.golang.org/grpc/internal/resolver/dns\t0.004s\n",
+    "wall_seconds": 45.403911132,
+    "source_tokens": 1060377
+  },
+  {
+    "id": "grpc__grpc-go-3258",
+    "base_fails": true,
+    "gold_passes": true,
+    "valid": true,
+    "base_output": "=== RUN   TestReportError\n    dns_resolver_test.go:1308: did not receive error after 1s\n--- FAIL: TestReportError (1.00s)\nFAIL\nFAIL\tgoogle.golang.org/grpc/internal/resolver/dns\t1.002s\nFAIL\n",
+    "gold_output": "=== RUN   TestReportError\n--- PASS: TestReportError (0.00s)\nPASS\nok  \tgoogle.golang.org/grpc/internal/resolver/dns\t0.003s\n",
+    "wall_seconds": 41.130771735,
+    "source_tokens": 1101685
+  },
+  {
+    "id": "grpc__grpc-go-3361",
+    "base_fails": true,
+    "gold_passes": false,
+    "valid": false,
+    "base_output": "…le.golang.org/grpc.Dial(...)\n\t$HOME/.cache/boundedcode/bench-work/screen-grpc__grpc-go-3361-1791116280016857734/repos/grpc-go/clientconn.go:106\ngoogle.golang.org/grpc/test.(*test).clientConn(0x1977edca0008, {0x0?, 0x1977ed0879c0?, 0x1097360?})\n\t$HOME/.cache/boundedcode/bench-work/screen-grpc__grpc-go-3361-1791116280016857734/repos/grpc-go/test/end2end_test.go:897 +0xad\ngoogle.golang.org/grpc/test.s.TestCZSocketGetSecurityValueTLS({}, 0x1977ece98008)\n\t$HOME/.cache/boundedcode/bench-work/screen-grpc__grpc-go-3361-1791116280016857734/repos/grpc-go/test/channelz_test.go:1350 +0x185\ngoogle.golang.org/grpc/internal/grpctest.RunSubTests.func1(0x1977ece98008)\n\t$HOME/.cache/boundedcode/bench-work/screen-grpc__grpc-go-3361-1791116280016857734/repos/grpc-go/internal/grpctest/grpctest.go:66 +0x7b\ntesting.tRunner(0x1977ece98008, 0x1977ecdfe000)\n\t/usr/local/go/src/testing/testing.go:2193 +0xea\ncreated by testing.(*T).Run in goroutine 7\n\t/usr/local/go/src/testing/testing.go:2258 +0x4d4\n\ngoroutine 4845 [select, 2 minutes]:\ngoogle.golang.org/grpc.(*ccBalancerWrapper).watcher(0x1977ed04c540)\n\t$HOME/.cache/boundedcode/bench-work/screen-grpc__grpc-go-3361-1791116280016857734/repos/grpc-go/balancer_conn_wrappers.go:69 +0x85\ncreated by google.golang.org/grpc.newCCBalancerWrapper in goroutine 4898\n\t$HOME/.cache/boundedcode/bench-work/screen-grpc__grpc-go-3361-1791116280016857734/repos/grpc-go/balancer_conn_wrappers.go:60 +0x1d9\nFAIL\tgoogle.golang.org/grpc/test\t600.013s\nFAIL\n",
+    "gold_output": "…2)\n\t/usr/local/go/src/runtime/netpoll.go:351 +0x85\ninternal/poll.(*pollDesc).wait(0xabaafc80780?, 0x100?, 0x0)\n\t/usr/local/go/src/internal/poll/fd_poll_runtime.go:84 +0x27\ninternal/poll.(*pollDesc).waitRead(...)\n\t/usr/local/go/src/internal/poll/fd_poll_runtime.go:89\ninternal/poll.(*FD).Accept(0xabaafc80780)\n\t/usr/local/go/src/internal/poll/fd_unix.go:618 +0x27d\nnet.(*netFD).accept(0xabaafc80780)\n\t/usr/local/go/src/net/fd_unix.go:149 +0x29\nnet.(*TCPListener).accept(0xabab0f906c0)\n\t/usr/local/go/src/net/tcpsock_posix.go:159 +0x1b\nnet.(*TCPListener).Accept(0xabab0f906c0)\n\t/usr/local/go/src/net/tcpsock.go:387 +0x30\ngoogle.golang.org/grpc.(*Server).Serve(0xabab0e58480, {0x1092b38, 0xabab0f906c0})\n\t$HOME/.cache/boundedcode/bench-work/screen-grpc__grpc-go-3361-1791116280016857734/repos/grpc-go/server.go:597 +0x31a\ncreated by google.golang.org/grpc/test.(*test).listenAndServe in goroutine 4138\n\t$HOME/.cache/boundedcode/bench-work/screen-grpc__grpc-go-3361-1791116280016857734/repos/grpc-go/test/end2end_test.go:709 +0x1ea9\n\ngoroutine 4142 [select]:\ngoogle.golang.org/grpc.(*addrConn).resetTransport(0xabab0b78008)\n\t$HOME/.cache/boundedcode/bench-work/screen-grpc__grpc-go-3361-1791116280016857734/repos/grpc-go/clientconn.go:1149 +0x5b3\ncreated by google.golang.org/grpc.(*addrConn).connect in goroutine 4138\n\t$HOME/.cache/boundedcode/bench-work/screen-grpc__grpc-go-3361-1791116280016857734/repos/grpc-go/clientconn.go:815 +0x12f\nFAIL\tgoogle.golang.org/grpc/test\t600.035s\nFAIL\n",
+    "wall_seconds": 1248.014569934,
+    "source_tokens": 1147253
+  }
+]

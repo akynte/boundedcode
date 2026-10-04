@@ -154,6 +154,8 @@ func hostname() string {
 func newBenchTasksCmd(app *App) *cobra.Command {
 	var (
 		dir, out, fixtures string
+		screenGold         string
+		baseline           bool
 		only               []string
 		rf                 runFlags
 	)
@@ -193,6 +195,16 @@ func newBenchTasksCmd(app *App) *cobra.Command {
 				return err
 			}
 			stamp := time.Now().UTC().Format("20060102T150405Z")
+			if screenGold != "" {
+				res := benchmark.Screen(ctx, sb, fixtures, work, screenGold, tasks,
+					func(s string) { fmt.Fprintf(app.Err, "%s %s\n", time.Now().Format("15:04:05"), s) })
+				b, _ := json.MarshalIndent(res, "", "  ")
+				if out == "" {
+					app.printf("%s\n", b)
+					return nil
+				}
+				return config.WriteFileAtomic(out, b, 0o644)
+			}
 			if out == "" {
 				out = filepath.Join("benchmarks", "reports", fmt.Sprintf("%s-tasks-%s.json", stamp, p.Name))
 			}
@@ -215,7 +227,11 @@ func newBenchTasksCmd(app *App) *cobra.Command {
 					r.Out = app.Err
 					return r, func() { cleanup(); st.Close() }, nil
 				}}
-			rep, err := sr.Run(ctx, p.Name, tasks, out)
+			run := sr.Run
+			if baseline {
+				run = sr.RunBaselines
+			}
+			rep, err := run(ctx, p.Name, tasks, out)
 			if rep != nil {
 				md := strings.TrimSuffix(out, ".json") + ".md"
 				var b bytes.Buffer
@@ -234,6 +250,8 @@ func newBenchTasksCmd(app *App) *cobra.Command {
 	f.StringVar(&fixtures, "fixtures", "benchmarks/fixtures", "fixtures directory")
 	f.StringSliceVar(&only, "only", nil, "task ids or categories to run")
 	f.StringVar(&out, "out", "", "report path (.json; .md written alongside)")
+	f.BoolVar(&baseline, "baseline", false, "run the plain agent runtime with the same model and no control plane (comparison baseline)")
+	f.StringVar(&screenGold, "screen-gold", "", "validate tasks instead of running them: acceptance must fail on base and pass with DIR/<id>.patch applied")
 	addRunFlags(cmd, &rf)
 	return cmd
 }

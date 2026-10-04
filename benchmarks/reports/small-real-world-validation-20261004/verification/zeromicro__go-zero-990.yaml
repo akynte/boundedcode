@@ -1,0 +1,28 @@
+# Repository verification config for this benchmark task, committed into the
+# task's base commit (ENVIRONMENT_ONLY setup). It is the default Go preset,
+# minus checks that already fail on the untouched base in the offline
+# sandbox with Go 1.27 (measured before any agent run):
+#   gofmt: 16 files are not gofmt-clean at base -> gofmt checks changed files only
+#   go vet: testinggoroutine finding in core/syncx/pool_test.go
+#   go test: TestInternalIp, TestFigureOutListenOn (no non-loopback interface), TestRotateLoggerRotate,
+#            TestParseWrappedGetRequestWithJsonHeader, TestParseWrappedHeadRequestWithJsonHeader fail at base
+version: 1
+stages:
+  - name: gofmt
+    run: ["sh", "-c", "b=$(git rev-list --max-parents=0 HEAD); f=$( { git diff --name-only --diff-filter=AM \"$b\" -- \"*.go\"; git ls-files --others --exclude-standard -- \"*.go\"; } | sort -u); [ -z \"$f\" ] && exit 0; out=$(gofmt -l $f 2>&1); [ -z \"$out\" ] || { echo \"files need gofmt:\"; echo \"$out\"; exit 1; }"]
+    requires: [go.mod]
+  - name: go-build
+    run: [go, build, ./...]
+    requires: [go.mod]
+  - name: go-vet
+    run: [go, vet, -testinggoroutine=false, "{packages}"]
+    requires: [go.mod]
+  - name: go-test
+    run: [go, test, -count=1, -skip, "^(TestInternalIp|TestFigureOutListenOn|TestRotateLoggerRotate|TestParseWrappedGetRequestWithJsonHeader|TestParseWrappedHeadRequestWithJsonHeader)$", "{packages}"]
+    requires: [go.mod]
+    timeout: 20m
+  - name: golangci-lint
+    run: [golangci-lint, run, ./...]
+    scope: full
+    optional: true
+    requires: [go.mod]
