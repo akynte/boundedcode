@@ -21,8 +21,9 @@ routes, literal URLs, real `github.com/IBM/sarama` imports). That separates
 | Environment variables | ◐ partial | `EnvVar` nodes plus `CONFIGURES` edges (3 in payment-service) | no link from Helm `values.yaml` env to `EnvVar` |
 | Terraform | ◐ partial | resources indexed as `Class` nodes | no link to the topic name or the DB it configures |
 | Protobuf | ◐ partial | rpc indexed as `Route` + `HANDLES` | no link from messages to Go/TS structs |
-| Cross-repo HTTP | ◐ idiom-dependent | conventional variant: literal `fetch("http://svc-a:8080/v1/payments")` + `http.HandleFunc("/v1/payments")` gives `HTTP_CALLS` and `CROSS_HTTP_CALLS` ✅ | ❌ Go 1.22 method patterns (`"POST /v1/payments"`) produce **no Route** ❌; URLs built from constants or template interpolation are not resolved |
-| Kafka / async | ◐ consumer only | sarama `ConsumerGroup.Consume(..., ["payments.charged"])` gives `ASYNC_CALLS` | ❌ sarama `SyncProducer.SendMessage(&ProducerMessage{Topic: ...})` is not detected, so there is **no producer→consumer link** (`cross_async_calls: 0`). Local wrapper interfaces are not detected. |
+| Cross-repo HTTP | ◐ idiom-dependent | conventional variant: literal TS `fetch("http://svc-a:8080/v1/payments")` + Go `http.HandleFunc("/v1/payments")` gives `HTTP_CALLS` and `CROSS_HTTP_CALLS` ✅ | ❌ Go 1.22 method patterns (`"POST /v1/payments"`) produce **no Route** ❌; URLs built from constants or template interpolation are not resolved |
+| Kafka / async | ❌ no (corrected 2026-10-03) | The `ASYNC_CALLS` edge first read as "consumer detected" is a **false positive**: it comes from `sarama.NewConsumerGroup(brokers, groupID, cfg)` and treats the **consumer-group ID** as the topic | ❌ The topic in `ConsumerGroup.Consume(ctx, []string{"t"}, h)` is not extracted. ❌ `SyncProducer.SendMessage(&ProducerMessage{Topic: "t"})` is not detected (the `Topic` field is not in the composite-field whitelist, and the method call on a sarama-typed variable is not classified). So there is **no producer→consumer link** (`cross_async_calls: 0`). |
+| Go stdlib HTTP client | ❌ no (found 2026-10-03) | `http.Get/Post/NewRequest(..., "http://host/path")` produce no `HTTP_CALLS`; the URL is extracted, but classification of external calls uses the raw callee text (`http.Get`), which never matches the `net/http` pattern | Go callers are never linked cross-repo |
 | Cross-repo change impact | ❌ no | a diff in payment-service does not reach ledger-service | follows from the async and HTTP gaps above |
 | ADR storage | ✅ yes (not yet exercised) | `manage_adr` | |
 
@@ -46,6 +47,20 @@ command or task. One-shot CLI calls remain the fallback.
   cache dir and disables `ui_enabled`, `auto_watch` and `watcher_enabled`
   there, so the user's global settings are never touched.
 * `XDG_CONFIG_HOME` does **not** isolate settings; `CBM_CACHE_DIR` does.
+
+## Re-verification (2026-10-03, before reporting upstream)
+
+Every gap was re-checked with minimal two-repository reproductions and
+controls, against both the v0.11.0 release and `main` @ `96c3f41c` built
+from source (identical results). Root causes were confirmed with an
+instrumented build. This corrected one earlier finding (the "consumer
+detected" result was a false positive) and found one more gap (Go stdlib
+HTTP clients). The four confirmed defects, with reproductions and drafted
+reports, are summarized in
+[upstream-reports.md](upstream-reports.md). The Helm/env and Terraform
+items are feature requests, not defects, and are not reported. An observed
+`name`-override anomaly could not be reproduced deterministically, so it is
+not reported either.
 
 ## Resolution (2026-10-03)
 
