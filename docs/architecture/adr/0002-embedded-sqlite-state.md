@@ -24,8 +24,11 @@ PostgreSQL.
 ## Concurrency and recovery (added 2026-10-04)
 * Transactions are `BEGIN IMMEDIATE` (`_txlock=immediate`), so concurrent
   writers queue on the 10 s busy timeout instead of failing on a lock
-  upgrade. Migrations re-check their version under that lock, so several
-  processes can open a fresh database at once (`TestConcurrentFirstOpen`).
+  upgrade. All pending migrations run in one immediate transaction. SQLite
+  does not call the busy handler while another connection converts a fresh
+  file to WAL, so a first open retries briefly on `SQLITE_BUSY`; several
+  processes can open a fresh database at once (`TestConcurrentFirstOpen`,
+  1,000 runs).
 * One process runs a task at a time: `task run` takes a lease (owner and
   heartbeat columns, renewed every 15 s). A lease not renewed for 2 minutes
   belongs to a dead process and is taken over; the new runner reconciles

@@ -114,6 +114,8 @@ type Engine struct {
 	GoModCache string
 	DB         *sql.DB
 	Rec        *telemetry.Recorder
+	// Gitleaks is the secret scanner binary ("" = gitleaks on PATH).
+	Gitleaks string
 }
 
 // RepoTarget identifies what to verify.
@@ -359,7 +361,11 @@ func diffScope(changed []string, cfg Config) StageResult {
 // in the full gate: a merge candidate is never produced unscanned.
 func (e *Engine) secretScan(ctx context.Context, t RepoTarget, scope Scope) StageResult {
 	sr := StageResult{Name: "secret-scan", Command: "git diff | gitleaks stdin"}
-	bin, err := exec.LookPath("gitleaks")
+	name := e.Gitleaks
+	if name == "" {
+		name = "gitleaks"
+	}
+	bin, err := exec.LookPath(name)
 	if err != nil {
 		sr.Status, sr.Output = "skipped", "gitleaks not installed"
 		if scope == Full {

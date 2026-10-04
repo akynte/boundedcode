@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	_ "modernc.org/sqlite" // pure-Go SQLite driver (no cgo)
@@ -35,7 +36,7 @@ func Open(ctx context.Context, path string) (*Store, error) {
 	// WAL + busy timeout let a CLI and a long-running task process share the
 	// DB. Immediate transactions take the write lock up front, so concurrent
 	// writers queue on busy_timeout instead of failing on lock upgrade.
-	dsn += "?_pragma=journal_mode(WAL)&_pragma=busy_timeout(10000)&_pragma=foreign_keys(ON)&_pragma=synchronous(NORMAL)&_txlock=immediate"
+	dsn += "?_pragma=busy_timeout(10000)&_pragma=journal_mode(WAL)&_pragma=foreign_keys(ON)&_pragma=synchronous(NORMAL)&_txlock=immediate"
 	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("open sqlite: %w", err)
@@ -45,7 +46,7 @@ func Open(ctx context.Context, path string) (*Store, error) {
 		db.SetMaxOpenConns(1)
 	}
 	s := &Store{DB: db, path: path}
-	if err := s.migrate(ctx); err != nil {
+	if err := s.migrateRetry(ctx); err != nil {
 		_ = db.Close()
 		return nil, err
 	}
@@ -58,14 +59,42 @@ func (s *Store) Close() error { return s.DB.Close() }
 // Path returns the database file path.
 func (s *Store) Path() string { return s.path }
 
+// migrateRetry retries migrate while the database is busy. SQLite does not
+// call the busy handler while another connection converts a fresh file to
+// WAL or recovers its WAL, so concurrent first opens can see SQLITE_BUSY
+// even with busy_timeout; this only happens around the first open.
+func (s *Store) migrateRetry(ctx context.Context) error {
+	deadline := time.Now().Add(15 * time.Second)
+	for wait := 5 * time.Millisecond; ; wait = min(wait*2, 250*time.Millisecond) {
+		err := s.migrate(ctx)
+		if err == nil || !strings.Contains(err.Error(), "SQLITE_BUSY") || time.Now().After(deadline) {
+			return err
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(wait):
+		}
+	}
+}
+
 func (s *Store) migrate(ctx context.Context) error {
-	if _, err := s.DB.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS schema_migrations (
+	// One immediate transaction takes the write lock before reading the
+	// schema version. A read that later upgrades to a write gets SQLITE_BUSY
+	// without waiting when another process commits in between (two CLIs
+	// opening a fresh database), so the whole migration holds the lock.
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin migration: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	if _, err := tx.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS schema_migrations (
 		version INTEGER PRIMARY KEY,
 		applied_at TEXT NOT NULL)`); err != nil {
 		return fmt.Errorf("create schema_migrations: %w", err)
 	}
 	var current int
-	if err := s.DB.QueryRowContext(ctx, `SELECT COALESCE(MAX(version),0) FROM schema_migrations`).Scan(&current); err != nil {
+	if err := tx.QueryRowContext(ctx, `SELECT COALESCE(MAX(version),0) FROM schema_migrations`).Scan(&current); err != nil {
 		return fmt.Errorf("read schema version: %w", err)
 	}
 	if current > len(migrations) {
@@ -73,33 +102,16 @@ func (s *Store) migrate(ctx context.Context) error {
 	}
 	for i := current; i < len(migrations); i++ {
 		version := i + 1
-		tx, err := s.DB.BeginTx(ctx, nil)
-		if err != nil {
-			return err
-		}
-		// Another process may have applied this migration since we read the
-		// version; re-check under the write lock.
-		var applied int
-		if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM schema_migrations WHERE version = ?`, version).Scan(&applied); err != nil {
-			_ = tx.Rollback()
-			return err
-		}
-		if applied > 0 {
-			_ = tx.Rollback()
-			continue
-		}
 		if _, err := tx.ExecContext(ctx, migrations[i]); err != nil {
-			_ = tx.Rollback()
 			return fmt.Errorf("apply migration %d: %w", version, err)
 		}
 		if _, err := tx.ExecContext(ctx, `INSERT INTO schema_migrations(version, applied_at) VALUES(?, ?)`,
 			version, time.Now().UTC().Format(time.RFC3339Nano)); err != nil {
-			_ = tx.Rollback()
 			return fmt.Errorf("record migration %d: %w", version, err)
 		}
-		if err := tx.Commit(); err != nil {
-			return fmt.Errorf("commit migration %d: %w", version, err)
-		}
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit migrations: %w", err)
 	}
 	return nil
 }

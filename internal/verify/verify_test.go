@@ -58,7 +58,7 @@ func TestEngineGoRepo(t *testing.T) {
 	base, _ := gitops.Run(ctx, repo, "rev-parse", "HEAD")
 	s, _ := store.Open(ctx, ":memory:")
 	defer s.Close()
-	e := &Engine{Sandbox: sandbox.None{}, CacheDir: t.TempDir(), DB: s.DB}
+	e := &Engine{Sandbox: sandbox.None{}, CacheDir: t.TempDir(), DB: s.DB, Gitleaks: fakeGitleaks(t)}
 	tgt := RepoTarget{Name: "ledger-service", Worktree: repo, Base: base, TaskID: "t1"}
 
 	res, err := e.Run(ctx, tgt, Full)
@@ -131,7 +131,7 @@ func TestAgentCannotWeakenVerification(t *testing.T) {
 		}
 	}
 	base, _ := gitops.Run(ctx, repo, "rev-parse", "HEAD")
-	e := &Engine{Sandbox: sandbox.None{}, CacheDir: t.TempDir()}
+	e := &Engine{Sandbox: sandbox.None{}, CacheDir: t.TempDir(), Gitleaks: fakeGitleaks(t)}
 	tgt := RepoTarget{Name: "x", Worktree: repo, Base: base, TaskID: "t1"}
 
 	// Break the code and neuter the config in the worktree.
@@ -165,5 +165,28 @@ func TestPresetFromBaseFiles(t *testing.T) {
 		if !got[want] {
 			t.Errorf("missing preset stage %s", want)
 		}
+	}
+}
+
+// fakeGitleaks is a secret scanner that finds nothing, so tests don't depend
+// on gitleaks being installed.
+func fakeGitleaks(t *testing.T) string {
+	p := filepath.Join(t.TempDir(), "fake-gitleaks")
+	if err := os.WriteFile(p, []byte("#!/bin/sh\ncat >/dev/null\nexit 0\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return p
+}
+
+// TestFullGateRequiresSecretScanner: without a secret scanner the full gate
+// fails; iteration (targeted) only skips the scan.
+func TestFullGateRequiresSecretScanner(t *testing.T) {
+	e := &Engine{Sandbox: sandbox.None{}, Gitleaks: filepath.Join(t.TempDir(), "missing-gitleaks")}
+	tgt := RepoTarget{Name: "r", Worktree: t.TempDir()}
+	if sr := e.secretScan(context.Background(), tgt, Full); sr.Status != "error" {
+		t.Fatalf("full gate without scanner: %+v", sr)
+	}
+	if sr := e.secretScan(context.Background(), tgt, Targeted); sr.Status != "skipped" {
+		t.Fatalf("targeted without scanner: %+v", sr)
 	}
 }

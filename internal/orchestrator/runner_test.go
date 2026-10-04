@@ -87,13 +87,22 @@ func newRunner(s *store.Store, root string, rt *scripted.Runtime, fr frontier.Pr
 	log := slog.New(slog.DiscardHandler)
 	rec := telemetry.New(s.DB, log)
 	return &Runner{DB: s.DB, Ledger: task.Ledger{DB: s.DB}, WS: workspace.Store{DB: s.DB}, Rec: rec,
-		Agent: rt, Verify: &verify.Engine{Sandbox: sandbox.None{}, CacheDir: filepath.Join(root, "cache"), DB: s.DB, Rec: rec},
+		Agent: rt, Verify: &verify.Engine{Sandbox: sandbox.None{}, CacheDir: filepath.Join(root, "cache"), DB: s.DB, Rec: rec,
+			Gitleaks: fakeGitleaks(root)},
 		Frontier: fr, Approve: func(context.Context, frontier.Trigger, string, int) bool { return true },
 		NewGateway: func(string, int) *inference.Gateway { return &inference.Gateway{Model: "m"} },
 		Cfg:        cfg, Paths: config.Paths{Data: filepath.Join(root, "data")}, Model: "m", CtxSize: 65536, Log: log, Out: io.Discard}
 }
 
 const consumerFile = "ledger-service/internal/consumer/consumer.go"
+
+// fakeGitleaks writes a secret scanner that finds nothing, so tests don't
+// depend on gitleaks being installed (the full gate requires a scanner).
+func fakeGitleaks(dir string) string {
+	p := filepath.Join(dir, "fake-gitleaks")
+	_ = os.WriteFile(p, []byte("#!/bin/sh\ncat >/dev/null\nexit 0\n"), 0o755)
+	return p
+}
 
 func TestRunFailEscalateCrashResumeAndComplete(t *testing.T) {
 	_, w, s, root := setup(t)
