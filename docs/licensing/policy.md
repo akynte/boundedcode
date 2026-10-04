@@ -42,6 +42,15 @@ An upgrade requires:
 If the license changed, stop and document the discrepancy before adopting the
 new version.
 
+**Serena** is pinned to v1.7.0, its last MIT-licensed release (ADR-0008).
+Serena upgrades are manual and require license review: a request, a license
+review (v2 relicenses the application to GPL-3.0-or-later, which this policy
+does not permit in the core), a compatibility review, `boundedcode bench
+intel` on the new version, and explicit maintainer approval. CI
+(`scripts/serenaguard`) fails if the pin changes without the matrix,
+notices, ADR and benchmark changing with it, or if anything installs Serena
+unpinned. Dependency updaters must ignore `serena-agent`.
+
 ## Copied or derived code
 
 Prefer writing our own adapters. If a file is derived from upstream code, add

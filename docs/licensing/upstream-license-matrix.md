@@ -13,6 +13,7 @@ live in [`LICENSES/`](../../LICENSES). Re-verify on every upgrade (see
 | [OpenHands Software Agent SDK](https://github.com/OpenHands/software-agent-sdk) (`openhands-sdk`, `openhands-tools` on PyPI) | `v1.51.0` | `a955aa5d3188d4b0a44ad7eb4e5c4bba6e6238d9` | MIT, (c) 2026 OpenHands contributors | `14a9b631…59cc5ce86` | MIT | ✅ ⚠ PyPI wheels carry **no** license metadata or file. The MIT grant comes from the repo LICENSE, which we ship in `LICENSES/upstream/`. |
 | [codebase-memory-mcp](https://github.com/DeusData/codebase-memory-mcp) | `v0.11.0` | `8972ea69c6ad94b1ef1d4ffbf0a92d78d2db1798` | MIT, (c) 2025 DeusData | `1f58f991…a152146bb` | MIT | ✅ |
 | [gitleaks](https://github.com/gitleaks/gitleaks) | `v8.30.1` | `83d9cd684c87d95d656c1458ef04895a7f1cbd8e` | MIT, (c) 2019 Zachary Rice | `e3884b25…62ebc6` | MIT | ✅ |
+| [Serena](https://github.com/oraios/serena) (PyPI `serena-agent`), optional | `v1.7.0` (`serena-agent==1.7.0`) | `949a27ef1e5fda1a6e7b561e777bcece345c6ffd` | MIT, (c) 2025 Oraios AI | `16017e50…b1c195b0c` | MIT | ✅ Verified 2026-10-03: the tag resolves to the commit; the PyPI wheel (sha256 `6dbf1459…c76e891`) carries the same LICENSE and all 213 packaged files are byte-identical to `src/` at the commit. ⚠ `main` (`2.0.0.dev0`) is **GPL-3.0-or-later** for the application (SolidLSP stays MIT); that change is not retroactive. Pinned, manual upgrades only (ADR-0008, `scripts/serenaguard`). |
 | [Codex CLI](https://github.com/openai/codex) | user-installed (verified against `rust-v0.160.0`, `a956835d…`) | | Apache-2.0, (c) 2025 OpenAI | `d17f227e…d8dc` | n/a | ✅ optional frontier provider |
 
 ## Models (downloaded by the user, never redistributed)
@@ -28,7 +29,6 @@ live in [`LICENSES/`](../../LICENSES). Re-verify on every upgrade (see
 | Component | Verified state | Decision |
 |---|---|---|
 | [OpenCode](https://github.com/anomalyco/opencode) (`sst/opencode` redirects here) | `v1.18.34`, MIT | Not integrated. It may become an optional front end later. |
-| [Serena](https://github.com/oraios/serena) | **Discrepancy vs. expectation.** The latest *release* `v1.7.0` (`949a27ef`) is **MIT**. On `main`, commit `6707cd9b7e` (2026-09-14) relicensed the *application* to **GPL-3.0-or-later** from v2 (unreleased). SolidLSP stays MIT but is not packaged separately (no PyPI project). | **Excluded from core**, as decided. Future Serena v2 is GPL, so any integration must be an optional, externally installed process with its own license review. No code is copied. |
 
 ## Go modules linked into the `boundedcode` binary
 
@@ -56,8 +56,29 @@ Notes:
   individually and skips aggregated inventory files.
 * `github.com/google/licensecheck` (BSD-3-Clause) is used only by the
   build-time checker. It is not linked into the shipped binary.
-* We do **not** depend on an MCP SDK. codebase-memory-mcp is driven through
-  its one-shot CLI mode (see ADR-0005).
+* We do **not** depend on an MCP SDK. codebase-memory-mcp and Serena are
+  driven over MCP stdio by our own minimal client (`internal/jsonrpc`; see
+  ADR-0006 and ADR-0008).
+
+## Serena environment
+
+Serena is installed by `boundedcode serena setup` into a uv environment from
+the embedded lock [`configs/serena/uv.lock`](../../configs/serena/uv.lock)
+(exact versions and hashes). It is not redistributed. The environment is
+classified by `scripts/pylicensecheck.py`; the result is
+[`configs/serena/THIRD_PARTY.md`](../../configs/serena/THIRD_PARTY.md).
+
+Findings (2026-10-03):
+
+| Package | Pulled in by | License | Decision |
+|---|---|---|---|
+| `pystray` 0.19.5, `python-xlib` 0.33 | `serena-agent` (system-tray icon) | LGPL-3.0, LGPL-2.0-or-later | **Excluded** with a uv `override-dependencies` entry. Serena imports pystray lazily, only from the dashboard/GUI code, which we always disable. `pillow` (MIT-CMU), which pystray brought in and Serena's dashboard module imports at load time, is listed directly. The integration tests pass in this environment. |
+| `dotenv` 0.9.9 | `serena-agent` | no PyPI license metadata | MIT per github.com/pedroburon/dotenv (GitHub license API); a shim over `python-dotenv` (BSD-3-Clause). |
+| `certifi`, `pathspec`, `tqdm` | `requests`, `serena-agent` | MPL-2.0 (tqdm: MPL-2.0 AND MIT) | Same decision as for the adapter: used unmodified as separate packages. |
+| `anthropic` 0.117.0 | `serena-agent` | MIT | Present because Serena depends on it (optional API-based token counting). Our generated Serena config sets `token_count_estimator: CHAR_COUNT` and the scrubbed environment carries no `ANTHROPIC_*` variables, so no paid API is ever called. |
+
+No GPL, AGPL or SSPL packages are present. The Serena application itself is
+MIT at the pinned release.
 
 ## Python adapter dependencies
 

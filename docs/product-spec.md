@@ -56,6 +56,7 @@ Hard rules:
 | Inference | llama.cpp `llama-server` | `inference.Runtime` (supervised external process, OpenAI-compatible HTTP) |
 | Agent loop, tools, conversation persistence, condensation, stuck detection | OpenHands Software Agent SDK | `agent.Runtime` (thin Python adapter over JSON-RPC/stdio) |
 | Code graph, search, impact | codebase-memory-mcp | `repointel.Intelligence` (external MCP process) |
+| Symbol navigation: definitions, references, implementations (optional) | Serena v1.7.0 (MIT, pinned) over language servers | `repointel.Navigator` (external MCP processes per worktree, ADR-0008) |
 | Frontier reasoning | Codex CLI with ChatGPT sign-in | `frontier.Provider` |
 | Secret scanning | gitleaks | verification stage (external binary) |
 
@@ -64,7 +65,9 @@ Hard rules:
 * TypeSafe Jev, in any form. Bounded decisions use deterministic rules,
   repository metadata, verification outcomes, constrained local-model
   decisions, and frontier escalation, in that order.
-* The Serena application (GPL-3.0-or-later) as a core dependency.
+* The Serena application from v2 on (GPL-3.0-or-later). The optional
+  integration is pinned to the MIT-licensed v1.7.0 and runs as a separate
+  process (ADR-0008); moving past it needs a legal and architectural review.
 * A GUI before the core is stable.
 * A zoo of hot-swapped large local models.
 

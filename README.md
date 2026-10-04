@@ -20,8 +20,9 @@ boundedcode CLI (Go control plane)
  ├─ task ledger + audit log (SQLite)
  ├─ git worktrees  agent/<task-id>
  ├─ verification engine (gofmt, go test, tsc, eslint, gitleaks, ...)
- ├─ repository intelligence ──> codebase-memory-mcp (external)
+ ├─ repository intelligence ──> codebase-memory-mcp (external): graph, impact (breadth)
  │                               + cross-service contract analyzers (HTTP, Kafka, env, Terraform)
+ │                               + Serena v1.7.0 (optional, MIT-pinned): LSP symbols per worktree (depth)
  ├─ agent runtime ── JSON-RPC/stdio ──> OpenHands SDK adapter (in a container)
  │                                         └─ LLM calls tunnelled back to Go
  ├─ inference runtime ──> llama.cpp llama-server (external, supervised)

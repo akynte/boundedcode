@@ -15,6 +15,7 @@ limited validation or unstable interfaces), **planned**.
 | Agent runs against the local model end to end | implemented | milestone 1 (kill/resume, condensation, local-only); 11-task suite on 3 models |
 | Workspaces + codebase-memory-mcp (persistent MCP session) | implemented | Phase 3 gap report |
 | Cross-service contract analysis (HTTP, topics, env, Terraform) | implemented | `docs/design/cross-service-analysis.md`: 7/7 fixture links, idiom tests, fuzzing, contract check in the run loop |
+| Serena v1.7.0 symbol navigation (optional, MIT-pinned) | implemented | ADR-0008: per-worktree MCP instances, read-only, graph-for-breadth routing with per-symbol fallback; fake and real-Serena tests (Go, TS, worktree freshness, malicious repo config, multi-repo, crash, cancellation, resume); `bench intel` overlap study; Stage 2 edit experiment; CI pin guard. Optional, off by default: A/B 9/9 vs 9/9, efficiency trend only (`benchmarks/reports/*-ab-serena-summary.md`) |
 | Task ledger + context planner (resume packs) | implemented | determinism and budget tests, end-to-end resume test |
 | Verification engine (Go/TS presets, impact-selected Go packages, diff scope, gitleaks) | implemented | |
 | Sandbox + policy (container, masks, read-only git, host git hardening) | implemented | adversarial tests; residual risks in `docs/design/sandbox.md` |

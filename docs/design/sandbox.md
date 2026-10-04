@@ -65,7 +65,11 @@ part of this boundary.
 4. **Secret detection is pattern-based.** A secret stored under an
    innocuous name (for example `config/prod.yaml`) is not masked. gitleaks
    on the diff catches *new* secrets only. Mitigation: keep production
-   secrets out of development checkouts (see SECURITY.md).
+   secrets out of development checkouts (see SECURITY.md). The heuristic
+   also has false positives: grpc-go's `credentials/` packages and
+   `credentials.go` files are masked, so that repository cannot build in the
+   sandbox (found by the ADR-0008 benchmark, 2026-10-03; not changed here,
+   since loosening the masks is a security decision of its own).
 5. **Persistence directory.** The OpenHands conversation store is writable
    by the agent. It holds data, not executables, and the control plane
    treats it as untrusted. The task ledger in SQLite is the source of truth

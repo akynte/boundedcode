@@ -23,6 +23,8 @@ jobs:
         run: go test -race ./...
       - name: license policy
         run: go run ./scripts/licensecheck
+      - name: serena pin guard (MIT-licensed v1.7.0 only; upgrades need a license review)
+        run: go run ./scripts/serenaguard
       - name: govulncheck
         run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
       - name: build

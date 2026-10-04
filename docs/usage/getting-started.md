@@ -83,3 +83,18 @@ frontier:
 Run `codex login` once. Each escalation shows the packet path and asks
 before sending. `boundedcode frontier status` shows the history and
 outcomes.
+
+## 7. Serena symbol navigation (optional)
+
+Serena v1.7.0 (MIT, pinned) adds type-aware definitions, references and
+implementations from language servers, read against each task's worktree.
+It needs `uv`, and `gopls` (Go) and/or `node` + `npm` (TypeScript):
+
+```bash
+./bin/boundedcode serena setup        # asks before installing the locked environment
+./bin/boundedcode serena status       # version, license check, MCP start, Go/TS language servers
+```
+
+Then set `repointel.serena.enabled: true` (or pass `--serena on` to `task
+run` / `bench tasks`). See [serena.md](serena.md) for configuration,
+troubleshooting and the upgrade policy.

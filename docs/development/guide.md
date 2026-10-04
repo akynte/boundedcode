@@ -27,7 +27,14 @@ go test -short ./...                           # fast unit tests only
 go test ./...                                  # + integration tests needing go/git/uv/cbm
 BC_TEST_DOCKER_IMAGE=boundedcode-openhands:local go test ./internal/sandbox/ ./internal/agent/openhands/ ./internal/benchmark/
 (cd adapters/openhands/python && uv run --group dev pytest -q)
+go run ./scripts/serenaguard                   # Serena pin and license-review guard (CI)
+BC_SERENA_STAGE2=1 go test ./internal/repointel/serena -run TestStage2 -v   # Serena edit experiment
 ```
+
+`internal/repointel/serena` has unit tests against a fake Serena (always
+run) and integration tests against the real Serena v1.7.0 installed by
+`boundedcode serena setup` (or `BOUNDEDCODE_SERENA=/path/to/serena`); they
+start gopls and the TypeScript server.
 
 Integration tests skip themselves when a tool is missing. Tests that need a
 GPU or a real model live behind the `bench` commands, not `go test`.

@@ -11,6 +11,7 @@ entries were last verified on **2026-10-03**.
 | OpenHands Software Agent SDK | github.com/OpenHands/software-agent-sdk, PyPI `openhands-sdk`, `openhands-tools` | `1.51.0` (`a955aa5d`) | Python dependency of our adapter (`adapters/openhands/python`) | Pin exact versions in `pyproject.toml` and `uv.lock`. Re-run the adapter acceptance test on upgrade. |
 | codebase-memory-mcp | github.com/DeusData/codebase-memory-mcp | `v0.11.0` (`8972ea69`) | external binary, used through its `cli <tool> --format json` mode | Pin a release asset by checksum (`scripts/install-deps.sh`). Re-run the repointel benchmark on upgrade. |
 | gitleaks | github.com/gitleaks/gitleaks | `v8.30.1` (`83d9cd68`) | external binary, used as a verification stage and in CI | Pin a release asset by checksum. |
+| Serena (optional) | github.com/oraios/serena, PyPI `serena-agent` | `v1.7.0` (`949a27ef`) | external `serena start-mcp-server` processes (MCP over stdio), one per task worktree, managed by `internal/repointel/serena` (ADR-0008) | **Manual only.** Exact pin in `configs/serena/pyproject.toml` + `uv.lock` (wheel hash); `scripts/serenaguard` enforces it in CI. No updater may change it. Upgrades need a license review (v2 is GPL-3.0-or-later), a compatibility review, `bench intel` and explicit approval. |
 | Codex CLI | github.com/openai/codex | user-installed (tested 0.156.1) | external `codex exec` process for frontier escalation, with ChatGPT sign-in | User-managed. We depend only on documented `exec` flags. |
 
 ## Observed facts used by the integration
@@ -66,6 +67,33 @@ memory.
   Kafka/SQS/PubSub `ASYNC_CALLS`), cross-repo `CROSS_*` edges, and IaC
   (Docker, K8s, Kustomize). These claims are **measured**, not assumed, in
   the [Phase 3 gap report](../design/repointel-gap-report.md).
+
+### Serena v1.7.0
+Verified from the tagged source and the installed wheel (not from `main`):
+* CLI: `serena start-mcp-server --project PATH --context FILE --transport
+  stdio|sse|streamable-http --enable-web-dashboard false
+  --open-web-dashboard false …`; `serena --version` prints `Serena 1.7.0`
+  plus `-<HEAD>` of any git repository that encloses the install directory.
+* MCP `serverInfo.version` reports the MCP SDK (`1.28.1`), not Serena.
+* Tools used: `find_symbol`, `find_referencing_symbols`,
+  `find_implementations`, `get_symbols_overview`, `get_current_config`.
+  Editing tools (`replace_symbol_body`, `insert_after_symbol`,
+  `rename_symbol`, …), shell, file and memory tools are excluded through a
+  context file with `fixed_tools`.
+* Line numbers in results are 0-based. Go methods have flat name paths
+  (`CreatePayment`, not `Service/CreatePayment`); interface methods nest
+  (`PaymentRepository/Insert`).
+* `SERENA_HOME` (default `~/.serena`) holds the global config, logs and
+  language servers it downloads (TypeScript via npm). The per-project folder
+  defaults to `<project>/.serena` and is configurable with
+  `project_serena_folder_location`; an existing configured folder wins over
+  the in-repository one. `trusted_project_path_patterns` gates a project's
+  `activation_command`.
+* `SERENA_USAGE_REPORTING=false` disables a start-up request to
+  oraios-software.de. The dashboard (on by default) listens on a port and
+  fetches news.
+* Language servers start in a new session with `PR_SET_PDEATHSIG(SIGTERM)`.
+* Go needs `gopls` on `PATH`; TypeScript needs `node` and `npm`.
 
 ### Codex CLI
 * `codex exec` reads the prompt from an argument or stdin, defaults to a

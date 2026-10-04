@@ -1,8 +1,9 @@
 // Command sbom writes an SPDX 2.3 JSON SBOM for the boundedcode binary: the
 // main module plus every Go module linked into ./cmd/..., with licenses
-// classified by github.com/google/licensecheck. External runtimes (llama.cpp,
-// OpenHands, codebase-memory-mcp) are not part of the binary and are listed in
-// THIRD_PARTY_NOTICES.md instead.
+// classified by github.com/google/licensecheck. Pinned external runtime
+// components (llama.cpp, OpenHands, codebase-memory-mcp, gitleaks, Serena)
+// are not part of the binary; they are listed as runtime or optional
+// dependencies with their exact pins (see THIRD_PARTY_NOTICES.md).
 package main
 
 import (
@@ -22,7 +23,51 @@ import (
 	"time"
 
 	"github.com/google/licensecheck"
+
+	"github.com/akynte/boundedcode/internal/repointel/serena"
 )
+
+// external is a pinned runtime component invoked as a separate process.
+type external struct {
+	name, version, location, license, purl, rel, sha256, source string
+}
+
+// externals lists pinned runtime components. Pins match
+// docs/licensing/upstream-license-matrix.md; scripts/serenaguard checks Serena.
+func externals() []external {
+	return []external{
+		{"llama.cpp", "v0.5.0", "git+https://github.com/ggml-org/llama.cpp@7fe450e19305b828c199d602c23a8337aaa1f03b", "MIT", "pkg:github/ggml-org/llama.cpp@v0.5.0", "RUNTIME_DEPENDENCY_OF", "", ""},
+		{"openhands-sdk", "1.51.0", "git+https://github.com/OpenHands/software-agent-sdk@a955aa5d3188d4b0a44ad7eb4e5c4bba6e6238d9", "MIT", "pkg:pypi/openhands-sdk@1.51.0", "RUNTIME_DEPENDENCY_OF", "", ""},
+		{"codebase-memory-mcp", "v0.11.0", "git+https://github.com/DeusData/codebase-memory-mcp@8972ea69c6ad94b1ef1d4ffbf0a92d78d2db1798", "MIT", "pkg:github/DeusData/codebase-memory-mcp@v0.11.0", "RUNTIME_DEPENDENCY_OF", "", ""},
+		{"gitleaks", "v8.30.1", "git+https://github.com/gitleaks/gitleaks@83d9cd684c87d95d656c1458ef04895a7f1cbd8e", "MIT", "pkg:github/gitleaks/gitleaks@v8.30.1", "OPTIONAL_DEPENDENCY_OF", "", ""},
+		// Installed by `serena setup` from PyPI with the locked hash; the wheel
+		// was verified byte-identical to the tagged source (ADR-0008).
+		{serena.PackageName, serena.RequiredVersion,
+			"https://files.pythonhosted.org/packages/py3/s/serena-agent/serena_agent-" + serena.RequiredVersion + "-py3-none-any.whl",
+			serena.ExpectedLicense, "pkg:pypi/" + serena.PackageName + "@" + serena.RequiredVersion, "OPTIONAL_DEPENDENCY_OF", serenaWheelSHA256(),
+			"built from git+https://github.com/oraios/serena@" + serena.PinnedCommit + " (tag v" + serena.RequiredVersion + ")"},
+	}
+}
+
+// serenaWheelSHA256 reads the pinned wheel hash from the embedded lock file.
+func serenaWheelSHA256() string {
+	b, err := os.ReadFile(filepath.Join("configs", "serena", "uv.lock"))
+	if err != nil {
+		fatal(err)
+	}
+	wheel := serena.PackageName
+	wheel = strings.ReplaceAll(wheel, "-", "_") + "-" + serena.RequiredVersion + "-py3-none-any.whl"
+	for line := range strings.SplitSeq(string(b), "\n") {
+		if i := strings.Index(line, wheel+`", hash = "sha256:`); i >= 0 {
+			rest := line[i+len(wheel+`", hash = "sha256:`):]
+			if j := strings.IndexByte(rest, '"'); j == 64 {
+				return rest[:j]
+			}
+		}
+	}
+	fatal(fmt.Errorf("no hash for %s in configs/serena/uv.lock", wheel))
+	return ""
+}
 
 type pkg struct {
 	SPDXID           string   `json:"SPDXID"`
@@ -35,6 +80,7 @@ type pkg struct {
 	CopyrightText    string   `json:"copyrightText"`
 	ExternalRefs     []extRef `json:"externalRefs,omitempty"`
 	Checksums        []sum    `json:"checksums,omitempty"`
+	SourceInfo       string   `json:"sourceInfo,omitempty"`
 }
 
 type extRef struct {
@@ -99,6 +145,18 @@ func main() {
 			LicenseConcluded: lic, LicenseDeclared: lic, CopyrightText: "NOASSERTION",
 			ExternalRefs: []extRef{{"PACKAGE-MANAGER", "purl", "pkg:golang/" + n + "@" + v}}})
 		rels = append(rels, rel{root.SPDXID, "DEPENDS_ON", id})
+	}
+	for i, e := range externals() {
+		id := fmt.Sprintf("SPDXRef-Package-external-%d", i)
+		p := pkg{SPDXID: id, Name: e.name, VersionInfo: e.version, DownloadLocation: e.location,
+			LicenseConcluded: e.license, LicenseDeclared: e.license, CopyrightText: "NOASSERTION",
+			ExternalRefs: []extRef{{"PACKAGE-MANAGER", "purl", e.purl}}}
+		if e.sha256 != "" {
+			p.Checksums = []sum{{"SHA256", e.sha256}}
+		}
+		p.SourceInfo = e.source
+		pkgs = append(pkgs, p)
+		rels = append(rels, rel{id, e.rel, root.SPDXID})
 	}
 	doc := map[string]any{
 		"spdxVersion": "SPDX-2.3", "dataLicense": "CC0-1.0", "SPDXID": "SPDXRef-DOCUMENT",
