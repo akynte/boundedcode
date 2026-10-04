@@ -1,11 +1,13 @@
 // Package buildinfo is the single source of truth for the project's name and
-// version. The name is a temporary codename; see docs/development/renaming.md.
+// version. See docs/development/renaming.md.
 package buildinfo
 
 import "runtime/debug"
 
 const (
-	// Name is the CLI and project name.
+	// ProductName is the human-facing project name.
+	ProductName = "BoundedCode"
+	// Name is the CLI binary name (lowercase).
 	Name = "boundedcode"
 	// EnvPrefix prefixes every environment variable the tool reads.
 	EnvPrefix = "BOUNDEDCODE_"

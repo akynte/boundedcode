@@ -1,6 +1,6 @@
 # Third-Party Notices
 
-boundedcode is licensed under Apache-2.0. It integrates with, but does not
+BoundedCode is licensed under Apache-2.0. It integrates with, but does not
 contain, the components below. Verified licenses and pins are in
 [docs/licensing/upstream-license-matrix.md](docs/licensing/upstream-license-matrix.md).
 

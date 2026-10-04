@@ -1,11 +1,11 @@
 # Product Specification
 
-Status: living document. Codename: **boundedcode** (temporary; see
-[renaming](development/renaming.md)).
+Status: living document. Product name: **BoundedCode**. The CLI binary,
+module and data directories use `boundedcode`.
 
 ## 1. Mission
 
-boundedcode is a local-first control plane for AI-assisted software
+BoundedCode is a local-first control plane for AI-assisted software
 engineering on large, long-running, multi-repository projects. It runs on
 commodity hardware and keeps dependence on paid frontier subscriptions low.
 
