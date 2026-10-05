@@ -24,6 +24,12 @@ implemented, experimental and planned.
     are dropped or demoted; file links resolve to the file; lexical hits
     prefer code over docs and build output, and skip source maps and
     minified bundles.
+* Second independent validation (2026-10-05): six previously unused public
+  tasks, screened for issue-derivable acceptance tests and frozen before a
+  single run: 5/6 verified successes, all local-only, 0 false verification
+  passes. The sixth (prometheus) was fixed correctly but left UNVERIFIED:
+  the Go evidence check does not attribute data-driven test files
+  ([report](docs/benchmarks/second-independent-validation-2026-10.md)).
 * From the 2026-10-05 failure-driven engineering pass:
   * Completed tasks now distinguish `task_verified` (checks green and a
     test the change added or modified fails on the base commit and passes
