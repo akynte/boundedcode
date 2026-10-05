@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/akynte/boundedcode/internal/gitops"
+	"github.com/akynte/boundedcode/internal/sandbox"
 )
 
 func TestPatchFiles(t *testing.T) {
@@ -50,25 +51,24 @@ func TestApplyHiddenPatchResetsAgentEdits(t *testing.T) {
 	}
 }
 
-func TestDepMounts(t *testing.T) {
-	repo, wt := t.TempDir(), "/wt"
-	for _, d := range []string{"node_modules/x", "packages/p/node_modules", "a/b/c/d/node_modules", ".git/node_modules"} {
-		if err := os.MkdirAll(filepath.Join(repo, d), 0o755); err != nil {
-			t.Fatal(err)
-		}
+// TestAcceptanceGetsDependencies: acceptance checks get the materialized
+// repository's dependencies like verification does, including writable tool
+// caches (vitest writes node_modules/.vite: without the layer the vuejs
+// acceptance check failed before running a test).
+func TestAcceptanceGetsDependencies(t *testing.T) {
+	repo, wt := t.TempDir(), t.TempDir()
+	if err := os.MkdirAll(filepath.Join(repo, "node_modules", "x"), 0o755); err != nil {
+		t.Fatal(err)
 	}
-	var got []string
-	for _, m := range depMounts(repo, wt) {
-		if !m.ReadOnly {
-			t.Fatal("dependency mounts must be read-only")
-		}
-		got = append(got, m.Target)
+	var cs sandbox.Spec
+	if err := withDependencies(&cs, repo, wt); err != nil {
+		t.Fatal(err)
 	}
-	if strings.Join(got, ",") != "/wt/node_modules,/wt/packages/p/node_modules" {
-		t.Fatal(got)
+	if len(cs.Mounts) != 1 || !cs.Mounts[0].ReadOnly || cs.Mounts[0].Target != filepath.Join(wt, "node_modules") {
+		t.Fatalf("mounts = %+v", cs.Mounts)
 	}
-	if depMounts(repo, repo) != nil {
-		t.Fatal("no mounts when checking the repository itself")
+	if !strings.Contains(strings.Join(cs.Scratch, ","), filepath.Join(wt, "node_modules", ".vite")) {
+		t.Fatalf("no writable tool cache: %v", cs.Scratch)
 	}
 }
 

@@ -1,0 +1,69 @@
+{
+  "id": "suite-20261005T003347Z",
+  "model": "qwen3.6-35b-a3b",
+  "started": "2026-10-05T00:33:47.668164662Z",
+  "finished": "2026-10-05T00:58:01.387206288Z",
+  "results": [
+    {
+      "id": "vuejs__core-11899",
+      "category": "typescript",
+      "model": "qwen3.6-35b-a3b",
+      "success": false,
+      "task_status": "completed",
+      "self_verified": true,
+      "attempts": 1,
+      "local_tokens": 127806,
+      "generated_tokens": 34946,
+      "cached_prompt_tokens": 1478530,
+      "escalations": 0,
+      "local_only": false,
+      "condensations": 1,
+      "resumes": 0,
+      "wall_seconds": 1453.713414709,
+      "failed_checks": [
+        "core: sh -c node_modules/.bin/vitest run packages/compiler-sfc/__tests__/compileStyle.spec.ts --reporter=verbose: \u2026art node_modules/.pnpm/vitest@2.0.5_@types+node@20.16.5_jsdom@25.0.0_sass@1.78.0/node_modules/vitest/dist/chunks/cac.DGgmCKmU.js:1499:17\n \u276f CAC.run node_modules/.pnpm/vitest@2.0.5_@types+node@20.16.5_jsdom@25.0.0_sass@1.78.0/node_modules/vitest/dist/chunks/cac.DGgmCKmU.js:1479:3\n\n\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\nSerialized Error: { errno: -2, code: 'ENOENT', syscall: 'mkdir', path: '$HOME/.cache/boundedcode/bench-work/vuejs__core-11899-1791160427668190043/state/data/tasks/t20261005-545fc1/work/core/node_modules/.vite/vitest' }\n\n\n\n"
+      ],
+      "task_id": "t20261005-545fc1",
+      "state_dir": "$HOME/.cache/boundedcode/bench-work/vuejs__core-11899-1791160427668190043/state",
+      "intel": {
+        "context_packs": 1,
+        "pack_tokens": 3649,
+        "code_tokens": 2577,
+        "serena_calls": 3,
+        "serena_errors": 2,
+        "serena_ms": 6130.7300000000005,
+        "graph_calls": 5,
+        "graph_ms": 52.09,
+        "serena_symbols": 0,
+        "graph_symbols": 2,
+        "fallbacks": 2,
+        "agent_tool_calls": 46,
+        "agent_tools": {
+          "file_editor": 21,
+          "finish": 1,
+          "task_tracker": 1,
+          "terminal": 16,
+          "think": 7
+        }
+      }
+    }
+  ],
+  "summary": {
+    "tasks": 1,
+    "verified": 0,
+    "success_rate": 0,
+    "local_only_completion_rate": 0,
+    "frontier_escalation_rate": 0,
+    "verified_tasks_per_hour": 0,
+    "attempts_per_successful_task": 0,
+    "wall_seconds_per_task": 1453.713414709,
+    "local_tokens_per_task": 127806,
+    "self_verified_but_hidden_failed": 1
+  },
+  "acceptance_reevaluation": {
+    "reason": "The first acceptance check failed in the benchmark harness, not in the task: vitest could not create node_modules/.vite/vitest because the harness mounted node_modules read-only without the writable tool-cache layer (harness fixed: acceptance now uses sandbox.DependencyMounts). The agent was not rerun; the same final worktree was re-checked with the dataset's test patch re-applied.",
+    "first_evaluation": "invalid (harness error ENOENT mkdir node_modules/.vite/vitest; no test ran)",
+    "reevaluation": "FAILED: 25 passed, 1 failed: 'SFC scoped CSS > nesting selector with atrule and comment' (the dataset's fail-to-pass test)",
+    "evidence": "evidence/vuejs__core-11899-postfix-reacceptance.txt"
+  }
+}

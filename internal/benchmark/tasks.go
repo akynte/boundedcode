@@ -348,9 +348,13 @@ func (s *SuiteRunner) runOne(ctx context.Context, model string, spec TaskSpec) (
 		}
 		cs := checkSpec(ctx, spec, wt.Path, c.Run)
 		// Dependencies installed in the materialized repository (ignored by
-		// git, so absent from the worktree) are mounted read-only for the
-		// acceptance check only, as a dataset's evaluation image provides them.
-		cs.Mounts = append(cs.Mounts, depMounts(repos[c.Repo], wt.Path)...)
+		// git, so absent from the worktree) are provided as a dataset's
+		// evaluation image provides them.
+		if err := withDependencies(&cs, repos[c.Repo], wt.Path); err != nil {
+			res.Success = false
+			res.FailedChecks = append(res.FailedChecks, err.Error())
+			continue
+		}
 		cmd, err := s.Sandbox.Command(ctx, cs)
 		if err != nil {
 			res.Success = false
@@ -700,29 +704,17 @@ func patchFiles(patch string) []string {
 	return out
 }
 
-// depMounts maps installed dependency directories (node_modules, at most
-// three levels deep, for workspaces/monorepos) of the materialized repository
-// read-only onto the same relative paths in a worktree.
-func depMounts(repo, worktree string) []sandbox.Mount {
-	if repo == "" || repo == worktree {
-		return nil
+// withDependencies adds the materialized repository's installed
+// dependencies to an acceptance-check spec, exactly as BoundedCode's
+// verification gets them (read-only, with writable tool caches).
+func withDependencies(cs *sandbox.Spec, repo, worktree string) error {
+	deps, err := sandbox.DependencyMounts(repo, worktree)
+	if err != nil {
+		return fmt.Errorf("acceptance dependencies: %w", err)
 	}
-	var out []sandbox.Mount
-	_ = filepath.WalkDir(repo, func(p string, d fs.DirEntry, err error) error {
-		if err != nil || !d.IsDir() {
-			return nil //nolint:nilerr // unreadable entries are skipped
-		}
-		rel, _ := filepath.Rel(repo, p)
-		if d.Name() == ".git" || strings.Count(rel, string(filepath.Separator)) > 3 {
-			return filepath.SkipDir
-		}
-		if d.Name() == "node_modules" {
-			out = append(out, sandbox.Mount{Host: p, Target: filepath.Join(worktree, rel), ReadOnly: true})
-			return filepath.SkipDir
-		}
-		return nil
-	})
-	return out
+	cs.Mounts = append(cs.Mounts, deps.Mounts...)
+	cs.Scratch = append(cs.Scratch, deps.Scratch...)
+	return nil
 }
 
 func statusOf(t *task.Task) string {

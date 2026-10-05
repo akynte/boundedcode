@@ -1,0 +1,62 @@
+{
+  "id": "suite-20261005T000407Z",
+  "model": "qwen3.6-35b-a3b",
+  "started": "2026-10-05T00:04:07.333019283Z",
+  "finished": "2026-10-05T00:33:21.671818575Z",
+  "results": [
+    {
+      "id": "grpc__grpc-go-2744",
+      "category": "go",
+      "model": "qwen3.6-35b-a3b",
+      "success": false,
+      "task_status": "completed",
+      "self_verified": true,
+      "attempts": 1,
+      "local_tokens": 211364,
+      "generated_tokens": 35258,
+      "cached_prompt_tokens": 2166115,
+      "escalations": 0,
+      "local_only": false,
+      "condensations": 5,
+      "resumes": 0,
+      "wall_seconds": 1754.333031679,
+      "failed_checks": [
+        "grpc-go: sh -c go test -v ./credentials -run '^(TestAppendH2ToNextProtos|TestClientHandshakeReturnsAuthInfo|TestServerAndClientHandshake|TestServerHandshakeReturnsAuthInfo|TestTLSClone|TestTLSOverrideServerName)$': # google.golang.org/grpc/credentials [google.golang.org/grpc/credentials.test]\ncredentials/credentials_test.go:238:14: undefined: appendH2ToNextProtos\nFAIL\tgoogle.golang.org/grpc/credentials [build failed]\nFAIL\n"
+      ],
+      "task_id": "t20261005-091db0",
+      "state_dir": "$HOME/.cache/boundedcode/bench-work/grpc__grpc-go-2744-1791158647333046095/state",
+      "intel": {
+        "context_packs": 1,
+        "pack_tokens": 639,
+        "code_tokens": 0,
+        "serena_calls": 5,
+        "serena_errors": 0,
+        "serena_ms": 4933.886,
+        "graph_calls": 5,
+        "graph_ms": 48.132000000000005,
+        "serena_symbols": 0,
+        "graph_symbols": 0,
+        "fallbacks": 0,
+        "agent_tool_calls": 140,
+        "agent_tools": {
+          "file_editor": 16,
+          "finish": 1,
+          "terminal": 119,
+          "think": 4
+        }
+      }
+    }
+  ],
+  "summary": {
+    "tasks": 1,
+    "verified": 0,
+    "success_rate": 0,
+    "local_only_completion_rate": 0,
+    "frontier_escalation_rate": 0,
+    "verified_tasks_per_hour": 0,
+    "attempts_per_successful_task": 0,
+    "wall_seconds_per_task": 1754.333031679,
+    "local_tokens_per_task": 211364,
+    "self_verified_but_hidden_failed": 1
+  }
+}

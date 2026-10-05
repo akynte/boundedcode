@@ -107,7 +107,11 @@ func (s *SuiteRunner) RunBaseline(ctx context.Context, model string, spec TaskSp
 	res.Success = true
 	for _, c := range spec.Checks {
 		cs := checkSpec(ctx, spec, wt, c.Run)
-		cs.Mounts = append(cs.Mounts, depMounts(repo, wt)...)
+		if err := withDependencies(&cs, repo, wt); err != nil {
+			res.Success = false
+			res.FailedChecks = append(res.FailedChecks, err.Error())
+			continue
+		}
 		cmd, err := s.Sandbox.Command(ctx, cs)
 		if err != nil {
 			res.Success = false
