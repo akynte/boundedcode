@@ -264,7 +264,11 @@ Also:
 - verification presets for Go and JavaScript/TypeScript (others need
   `.boundedcode/verification.yaml`);
 - cross-service analysis does not cover gRPC, OpenAPI, protobuf or SQL
-  contracts.
+  contracts;
+- run `doctor` first: some run-time errors for missing dependencies (Docker
+  unreachable, codebase-memory-mcp missing) name the failure or point to a
+  log rather than giving an install hint
+  ([fresh-clone test](benchmarks/reports/publication-20261005/fresh-clone-test.md)).
 
 ## Reference hardware
 
