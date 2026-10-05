@@ -1,161 +1,253 @@
 # Second independent validation (2026-10-05)
 
-> Six previously unused public tasks (SWE-bench Multilingual / Multi-SWE-bench),
-> screened **before** the run for acceptance tests derivable from the issue,
-> frozen, and run **once each** on a frozen candidate build. Small sample:
-> read the result as "5 of 6", not as a rate. Earlier results stand as
-> published: **0/8 on the original frozen build, 1/8 after the defect
-> fixes**; the development corpus is development evidence only.
+> Six previously unused public tasks, screened **before** the run for
+> acceptance tests derivable from the issue, frozen, and run **once each** on
+> a frozen candidate build. This is a small practical validation sample, not
+> a statistically comprehensive benchmark: read the result as "5 of 6", not
+> as a rate. Earlier results stand as published: **0/8 on the original
+> frozen build, 1/8 after the defect fixes**; the development corpus is
+> development evidence only.
 
 Data: [`benchmarks/reports/second-validation-20261005/`](../../benchmarks/reports/second-validation-20261005/)
 (candidate manifest, [screening table](../../benchmarks/reports/second-validation-20261005/screening.md),
 curator analysis, frozen task specs with verification configs, environment, per-run JSON and
 logs, memory samples, `metrics.json`).
 
-## Result
+## Verdict
 
-**5 of 6 succeed (83 %), all local-only. 0 false verification passes.**
+**VALIDATED_FOR_PUBLIC_ALPHA.**
 
-| Task | Slot | Class | State | Hidden test | Attempts | Wall | Calls | Output tokens | Largest response | Frontier |
-|---|---|---|---|---|---|---|---|---|---|---|
-| gin-1805 | Go | LOCAL_ONLY_SUCCESS | task_verified | PASS | 1 | 867 s | 24 | 20.2 K | 4,672 | 0 |
-| caddy-6370 | Go + infrastructure | LOCAL_ONLY_SUCCESS | task_verified | PASS | 1 | 1,298 s | 21 | 34.6 K | 6,301 | 0 |
-| go-zero-1969 | Go | LOCAL_ONLY_SUCCESS | task_verified | PASS | 1 | 757 s | 46 | 14.7 K | 1,615 | 0 |
-| axios-5892 | JavaScript | LOCAL_ONLY_SUCCESS | task_verified | PASS | 1 | 733 s | 26 | 6.5 K | 827 | 0 |
-| vuejs-11870 | TypeScript | LOCAL_ONLY_SUCCESS | task_verified | PASS | 2¹ | 632 s | 29 | 9.0 K | 927 | 0 |
-| prometheus-10720 | Large repository | **FAILED** (strict) | tests_green, UNVERIFIED | PASS | 2 | 1,768 s | 69 | 36.4 K | 4,304 | 0 |
-
-Success = TASK_VERIFIED (a test the change adds fails on the base and passes
-with the change) **and** the hidden acceptance test passes. No task was
-BLOCKED_ENVIRONMENT, and no escalation was triggered. No human
-intervention: the environment-only verification configs were fixed before
-the run.
-
-¹ Vue's first attempt failed the repository's lint stage; the retry fixed it
-(1.5 min) and was verified.
-
-**Prometheus counts as FAILED although its fix is correct.** The agent:
-- added `day_of_year` to the parser and engine,
-- wrote data-driven cases in `promql/testdata/functions.test` (leap and
-  non-leap year ends), which fail on the base with "unknown function",
-- passed the hidden test.
-
-BoundedCode's evidence check for Go looks for `Test…` functions defined in
-the changed test files. A `.test` data file defines none, so the check
-reported "the changed tests also pass on the base" and asked once for
-another test. The second attempt produced the same kind of test, and the
-task ended UNVERIFIED, a candidate needing review. This is a
-**verification false negative** (BoundedCode gap, see below), not a model
-failure. The strict definition is kept as pre-registered.
-
-## Criteria
+- **Result:** 5/6 tasks completed successfully (TASK_VERIFIED plus a
+  passing hidden acceptance test), all five using only the local model.
+- **Verification:** 0 false verification passes.
+- **Runaway and memory:** no runaway generation and no memory pressure.
+- **The sixth task (prometheus)** was fixed correctly; its hidden test
+  passes. It ended UNVERIFIED because of a gap in BoundedCode's evidence
+  check, and counts as FAILED under the pre-registered definition.
 
 | Criterion | Target | Result |
 |---|---|---|
-| Pass rate | ≥ 75 % | 5/6 = 83 % ✔ |
+| Pass rate | ≥ 75 % | 5/6 = 83 % ✔ (6/6 hidden tests pass) |
 | Local majority | clear | 5/5 successes local-only ✔ |
-| False verification passes | 0 | 0 ✔ (every task_verified result passed its hidden test) |
-| Security regression | none | none ✔ (no boundary changed; sandbox network none throughout) |
-| Runaway / memory | none | none ✔ (largest response 6.3 K; longest task 29.5 min; BoundedCode ≤ 67 MiB, ≥ 33.1 GiB available) |
+| False verification passes | 0 | 0 ✔ |
+| Security regression | none | none ✔ |
+| Runaway / memory / state loss | none | none ✔ |
 
-**Verdict: VALIDATED_FOR_PUBLIC_ALPHA** on this sample. The sample is six
-tasks, each screened so that its hidden test follows from its issue. Tasks
-whose tests encode undisclosed choices were excluded by design (10 of 24
-candidates), and real requests have no such screen.
+## Methodology
 
-## Screening (frozen before the run, commit f63dde0)
+1. **Freeze the candidate build** before choosing tasks (build `5b3c54a`;
+   product code identical to `4b31742`). No product change was made
+   between the freeze and this report.
+2. **Pre-register the selection rule.** Six slots: Go (gin),
+   Go + infrastructure (caddy), Go RPC (go-zero/grpc-go), JavaScript (axios),
+   TypeScript (vuejs/core), large repository (prometheus). Candidates are
+   ranked by `sha256("boundedcode-second-validation-2026-10-05:" + id)`, and
+   the four best per slot are screened. Every instance used before is
+   excluded (gin-3227, caddy-6288, prometheus-13845, vuejs-11899,
+   axios-6539, grpc-go-2744, go-zero-2283, go-zero-990), as are gold patches
+   that change dependency manifests.
+3. **Screen (two gates).**
+   - **Environment:** acceptance fails on base and passes with the
+     reference patch in the offline sandbox.
+   - **Derivability:** a curator who saw the issue, base code, hidden test
+     and reference patch judged whether every behaviour the test requires
+     follows from the issue (YES/NO/AMBIGUOUS), reproducing the issue on
+     base and gold where practical. Only YES enters.
+4. **Select and freeze.** Per slot, the best-ranked candidate passing both
+   gates is selected. Each base gets an environment-only verification
+   config, confirmed to pass on the untouched base. Acceptance is
+   re-screened with the configs applied, then everything is committed
+   (`f63dde0`, 17:25:54) before the first run (17:26:04).
+5. **Run once each**, sequentially, on an otherwise idle machine. The agent
+   never sees hidden tests, reference patches or screening notes.
+6. **Score.**
+   - Success = TASK_VERIFIED **and** the hidden acceptance test passes.
+   - Classes: LOCAL_ONLY_SUCCESS, FRONTIER_ASSISTED_SUCCESS, FAILED,
+     BLOCKED_ENVIRONMENT.
 
-- **Candidates:** 24, the four best-ranked per slot by a pre-registered hash.
-- **Two gates:**
-  - environment: acceptance fails on base, passes with gold, offline
-  - derivability: curator analysis with reproduction
-- **Outcome:**
+## Candidate screening
 
-  | Verdict | Candidates |
-  |---|---|
-  | YES (derivable) | 12 |
-  | AMBIGUOUS | 5 |
-  | NO | 5 |
-  | Derivable but environment-invalid | 2 |
-- **Most common rejection:** the hidden test calls names that only the
-  reference patch introduces (4 candidates). Next most common: it pins
-  incidental choices.
-- **No acceptance command was modified.**
-- **Full table:**
-  [screening.md](../../benchmarks/reports/second-validation-20261005/screening.md).
-- **Freeze-record erratum:** `environment.json` says "frozen at 17:30".
-  The freeze commit is 17:25:54, and the run started at 17:26:04.
-
-## Per-task notes
-
-- **gin-1805:** a router-group static file system called middleware twice
-  on 404. The agent fixed `routergroup.go` and added
-  `TestLoggerStaticFS404SingleLogLine`, which fails on base.
-- **caddy-6370:** `Caddyfile.<ext>` without an adapter. The agent fixed
-  `cmd/main.go` and added `Test_isCaddyfile` cases (4 fail on base). The
-  quoted error message was the first retrieval seed.
-- **go-zero-1969:** `options` not enforced for `json.Number`. The fix in
-  `core/mapping/unmarshaler.go` passed the hidden `UnmarshalKey` test. This
-  was the curator's noted risk, and it did not materialise.
-- **axios-5892:** upper-case `Content-Encoding`. The fix in
-  `lib/adapters/http.js` plus a mocha test failing on base.
-- **vuejs-11870:** `renderList` over `shallowReactive` arrays.
-  - The task contract flagged a **material ambiguity that is not one**:
-    "nested properties or direct items". The issue is clear.
-  - Under the benchmark policy (`proceed`), it was recorded as
-    SPEC_AMBIGUOUS and the work continued.
-  - Under the default `ask` policy, this task would have stopped for a
-    needless question.
-- **prometheus-10720:** see above.
-
-## Mechanisms from the targeted pass, observed here
-
-| | Observation |
+| Verdict over 24 candidates | Count |
 |---|---|
-| Strategy governor | 0 stops. No attempt approached 40 K tokens without progress. |
-| Visible-output cap | Not reached (largest response 6,301). |
-| Task contract | Derived for 4 of 6. On caddy and prometheus the model returned no required items ("nothing required"), and the task ran without a contract. |
-| SPEC_AMBIGUOUS | 1 of 6 (vue). A false positive, as above. |
-| Retrieval seeds | caddy: diagnostic first, plus `filepath.Base` and `cmd/main.go`. vue: `shallowReactive`, `renderList`, with sample names demoted to last. The other four issues had no code-like seeds; the agent found the files itself. |
-| Context | Pack plus tool output: 1.6-3.7 % of the repository on the four large repositories; 7.2 % (axios) and 29 % (gin, a small repository). |
+| YES (derivable) | 12 |
+| AMBIGUOUS | 5 |
+| NO | 5 |
+| Derivable but environment-invalid (offline / never exits) | 2 |
 
-## Resources
+10 of 24 candidates were rejected because their acceptance tests were not
+issue-derivable:
+- **Names only the reference patch introduces (4):** `BindHeader`,
+  `DontTracingSpanName`, `WithIgnoreTimeout`, `Equal` methods.
+- **Incidental choices pinned (3):** whitespace semantics and an exact
+  error message; one specific race fix; one snapshot-cleanup policy.
+- **Internal function called directly (1).**
+- **Fixtures only the gold patch adds (1).**
+- **An acceptance command broken under Go 1.27 (1).**
 
-| Metric | Value |
+No acceptance command was modified. Full table with reasons:
+[screening.md](../../benchmarks/reports/second-validation-20261005/screening.md).
+
+## Frozen task set
+
+| Task | Repository @ base | Benchmark source | Category |
+|---|---|---|---|
+| gin-gonic__gin-1805 | gin-gonic/gin @ 70a0aba3 | SWE-bench Multilingual | Go |
+| caddyserver__caddy-6370 | caddyserver/caddy @ 198f4385 | SWE-bench Multilingual | Go + infrastructure |
+| zeromicro__go-zero-1969 | zeromicro/go-zero @ af05219b | Multi-SWE-bench | Go |
+| axios__axios-5892 | axios/axios @ ae003913 | SWE-bench Multilingual | JavaScript |
+| vuejs__core-11870 | vuejs/core @ 67d6596d | SWE-bench Multilingual | TypeScript |
+| prometheus__prometheus-10720 | prometheus/prometheus @ 89de30a0 | SWE-bench Multilingual | Large repository (1.8 M source tokens) |
+
+The verification configs are the default presets minus checks that fail on
+the untouched base offline:
+- tests needing the network, a browser or masked TLS keys;
+- files Go 1.27's gofmt reformats at base;
+- Prometheus commands that do not link under Go 1.27;
+- `--retries 2` for one axios body-upload test that resets under Node 24.
+
+Each exclusion is listed in its task spec.
+
+## Environment
+
+| Component | Detail |
 |---|---|
-| Wall-clock | median 812 s, total 6,055 s (1 h 41 min) |
-| Prompt-cache hit rate | 0.93-0.95 |
-| Memory: BoundedCode | ≤ 67 MiB |
-| Memory: llama-server | ≤ 29.3 GiB |
-| Memory: Docker VM | ≤ 10.2 GiB |
-| Memory: containers | ≤ 2.4 GiB |
-| Memory: minimum available | 33.1 GiB |
+| Host | i7-13620H (16 threads), 62.5 GiB RAM, RTX 4060 Laptop 8 GB, Debian 13 (Linux 7.1) |
+| Model | Qwen3.6-35B-A3B UD-Q4_K_M; llama.cpp v0.5.0 (7fe450e) |
+| Model settings | 131 K context, 35 MoE layers on CPU, q8_0 KV cache; temperature 0.6, top-p 0.95, top-k 20 |
+| Budgets | `reasoning_budget` 4096 per response; visible output 8192 per response; strategy budget 40 K tokens without progress, 50 K and 35 min per attempt |
+| Agent | OpenHands SDK 1.51.0 in Docker 29.8.0, network none, 8 GiB / 8 CPUs; Go 1.27.1, Node 24.21 in the sandbox |
+| Repository intelligence | codebase-memory-mcp 0.11.0; Serena v1.7.0 enabled |
+| Frontier | Codex CLI 0.156.1 (ChatGPT sign-in), normal Z1-Z4 policy, approvals pre-granted; no paid API keys |
+| Task policy | `task.contract: true`, `task.ambiguity: proceed` (benchmark; the default is `ask`) |
 
-## What this does and does not show
+Record: [`environment.json`](../../benchmarks/reports/second-validation-20261005/environment.json).
+The binary's embedded version string predates the history sanitization; it
+maps to `5b3c54a` (see `history-sanitization.md`).
+Erratum: `environment.json` says "frozen at 17:30"; the freeze commit is
+17:25:54.
 
-- **Shows:** on issue-derivable tasks across Go, JavaScript, TypeScript, an
-  infrastructure tool and a 1.8 M-token repository, the frozen build with a
-  local 35B-A3B model solves and **proves** most tasks in 10-30 minutes,
-  with no frontier calls. Its verification did not certify a wrong patch.
-- **Does not show:**
-  - performance on requests whose expected behaviour is not derivable from
-    the text (half of the screened candidates);
-  - stability across reruns (each task ran once);
-  - behaviour under the default `ask` ambiguity policy.
+## Per-task results
 
-## Known gaps found (not fixed during validation)
+| Task | Class | State | Hidden test | Attempts | Wall | Calls | Output tokens | Largest response | Strategy stops |
+|---|---|---|---|---|---|---|---|---|---|
+| gin-1805 | LOCAL_ONLY_SUCCESS | task_verified | PASS | 1 | 867 s | 24 | 20.2 K | 4,672 | 0 |
+| caddy-6370 | LOCAL_ONLY_SUCCESS | task_verified | PASS | 1 | 1,298 s | 21 | 34.6 K | 6,301 | 0 |
+| go-zero-1969 | LOCAL_ONLY_SUCCESS | task_verified | PASS | 1 | 757 s | 46 | 14.7 K | 1,615 | 0 |
+| axios-5892 | LOCAL_ONLY_SUCCESS | task_verified | PASS | 1 | 733 s | 26 | 6.5 K | 827 | 0 |
+| vuejs-11870 | LOCAL_ONLY_SUCCESS | task_verified | PASS | 2¹ | 632 s | 29 | 9.0 K | 927 | 0 |
+| prometheus-10720 | **FAILED** (strict) | tests_green, UNVERIFIED | PASS | 2 | 1,768 s | 69 | 36.4 K | 4,304 | 0 |
 
-1. **Data-driven tests are not attributed** by the Go evidence check
-   (`testdata/*.test` read by a `Test…` function elsewhere), which produces
-   false UNVERIFIED results. Fix candidate: when changed test files define
-   no tests, run the package's tests on the base export and on the change,
-   and compare the failing sets.
-2. **Contract quality:**
-   - 2 of 6 derivations returned nothing required;
-   - 1 false material ambiguity in this run;
-   - the development axios run named the wrong alternatives.
+¹ The first attempt failed the repository's lint stage; the retry fixed it
+in 1.5 min.
 
-   Under `ask`, a false positive costs a needless question.
-3. The development caddy run showed that a test which does not compile on
-   the base counts as behavioural evidence. This is weaker than a
-   behavioural failure; no false pass resulted in this validation.
+- **gin-1805:** router-group static file system called middleware twice on
+  404. Fix in `routergroup.go`; `TestLoggerStaticFS404SingleLogLine` fails
+  on base.
+- **caddy-6370:** `Caddyfile.<ext>` without an adapter. Fix in
+  `cmd/main.go`; 4 `Test_isCaddyfile` cases fail on base.
+- **go-zero-1969:** `options` not enforced for `json.Number`. Fix in
+  `core/mapping/unmarshaler.go`; 3 new tests fail on base. The curator's
+  noted risk (the hidden test goes through `UnmarshalKey`) did not
+  materialise.
+- **axios-5892:** upper-case `Content-Encoding` not decompressed. Fix in
+  `lib/adapters/http.js`; the mocha test fails on base.
+- **vuejs-11870:** `renderList` over `shallowReactive` arrays. Fix in
+  `renderList.ts`; the vitest case fails on base.
+- **prometheus-10720:** new `day_of_year()`. The agent added it to the
+  parser and engine and wrote cases in `promql/testdata/functions.test`
+  (Jan 1, leap and non-leap Dec 31); these fail on base with "unknown
+  function". See Failures.
+
+## Local vs frontier usage
+
+All five successes are local-only. No escalation was triggered on any task
+(0 frontier calls), so FRONTIER_ASSISTED_SUCCESS is 0.
+
+## Verification accuracy
+
+| | Count |
+|---|---|
+| task_verified and hidden PASS (true pass) | 5 |
+| task_verified and hidden FAIL (false pass) | **0** |
+| UNVERIFIED and hidden PASS (false negative) | 1 (prometheus) |
+| UNVERIFIED and hidden FAIL | 0 |
+
+Every verified result rested on a behavioural failure on the base. None
+relied on a test that merely fails to compile there.
+
+## Runaway-control results
+
+- **Governor:** no stops; no attempt came near 40 K tokens without
+  progress.
+- **Visible-output cap:** never reached (largest response 6,301).
+- **Thinking budget:** in effect on every response.
+- **Longest task:** 29.5 min.
+- **Unproductive generation:** none to stop. Successful tasks were not
+  slowed: the median task took 812 s, and total generation per task was
+  6.5-36 K tokens.
+
+## Ambiguity
+
+| | Result |
+|---|---|
+| Contract derived | 4 of 6. On caddy and prometheus the model's contract listed nothing required, and the task ran without one. |
+| SPEC_AMBIGUOUS | 1 of 6 (vue) |
+
+The vue flag was a **false positive**: "nested properties or direct items"
+for a clear request. Under `proceed` the task continued and passed. Under
+the default `ask`, it would have stopped for a needless question. No task
+was blocked.
+
+## Context efficiency
+
+| Task | Repository source tokens | Pack + tool output | Share |
+|---|---|---|---|
+| prometheus | 1,827,362 | 29.2 K | 1.6 % |
+| vuejs/core | 1,223,814 | 33.2 K | 2.7 % |
+| go-zero | 751,149 | 27.8 K | 3.7 % |
+| caddy | 701,528 | 18.3 K | 2.6 % |
+| axios | 274,912 | 19.7 K | 7.2 % |
+| gin | 120,111 | 35.0 K | 29.1 % |
+
+Retrieval seeds:
+- **caddy:** the quoted error message, then `filepath.Base` and
+  `cmd/main.go`.
+- **vue:** `shallowReactive` and `renderList`, with sample names last.
+- **The other four:** no code-like seeds; the agent located the code itself.
+
+Prompt-cache hit rate was 0.93-0.95.
+
+| Resource | Peak |
+|---|---|
+| BoundedCode | 67 MiB |
+| llama-server | 29.3 GiB |
+| Docker VM | 10.2 GiB |
+| Containers | 2.4 GiB |
+| Minimum available | 33.1 GiB |
+
+## Failures
+
+**prometheus-10720 (FAILED, verification false negative).** The Go evidence
+check counts `Test…` functions defined in the changed test files. The
+agent's test is a data file, `promql/testdata/functions.test`, read by
+`TestEvaluations` in another file, so the check found no test to run on the
+base. It reported "the changed tests also pass on the base commit" and
+asked once for another test. The second attempt added more cases to the
+same file with the same outcome, and the task ended UNVERIFIED, a
+candidate that needs review. The fix and the test are correct (the hidden
+test passes), so the cause is BoundedCode's evidence check, not the model.
+Fix candidate: when changed test files define no tests, run the package's
+tests on the base export and on the change, and compare the failing sets.
+
+## Limitations
+
+- **Six tasks, one run each.** Variance across reruns is unmeasured.
+- **Screened tasks only.** Screening kept only issue-derivable tests:
+  10 of 24 candidates were rejected, and real requests are not screened.
+- **Ambiguity policy.** The run used `proceed`. The default `ask` would
+  have blocked one clear task (vue) on a false ambiguity.
+- **Evidence-check gap.** The Go evidence check misses data-driven tests
+  (above). It also counts a test that does not compile on the base as
+  failing there, a weaker signal, seen in a development run but not here.
+- **One configuration.** One machine, one model; the frontier was enabled
+  but never triggered.

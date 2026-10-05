@@ -18,6 +18,9 @@ limited validation or unstable interfaces), **planned**.
 | Serena v1.7.0 symbol navigation (optional, MIT-pinned) | implemented | ADR-0008: per-worktree MCP instances, read-only, graph-for-breadth routing with per-symbol fallback; fake and real-Serena tests (Go, TS, worktree freshness, malicious repo config, multi-repo, crash, cancellation, resume); `bench intel` overlap study; Stage 2 edit experiment; CI pin guard. Optional, off by default: A/B 9/9 vs 9/9, efficiency trend only (`benchmarks/reports/*-ab-serena-summary.md`) |
 | Task ledger + context planner (resume packs) | implemented | run lease and crash recovery (`TestSIGKILLResume`, real SIGKILL), changed symbols, step progress, confined and redacted packs, lexical (ripgrep) stage |
 | Verification engine (task_verified vs tests_green via behavioural evidence, Go build-tag variants, Go/TS/Terraform-fmt/Helm presets, impact-selected Go packages, diff scope, protected paths, gitleaks) | implemented | config and presets read from the base commit (`TestAgentCannotWeakenVerification`); JS/TS stages use the checkout's installed `node_modules` (mounted read-only) and fail when a declared script has no installed dependencies; Terraform/Helm stages are optional and skipped when the tool is absent from the sandbox image |
+| Runaway control (reasoning budget, per-response output cap, progress-aware strategy budget) | implemented | `governor_test.go`; calibrated by replaying archived runs (`docs/benchmarks/targeted-engineering-pass-2026-10.md`); no live stop observed yet |
+| Task contract and ambiguity handling (`task.ambiguity: ask` blocks for `task run --clarify`; `proceed` records SPEC_AMBIGUOUS) | experimental | model-derived; in the second validation 2/6 derivations were empty and 1/6 flagged a false material ambiguity |
+| Ranked retrieval seeds (diagnostics first, prose names, config keys, samples last; common names demoted) | implemented | `seeds_test.go`; replay on the development issues |
 | Sandbox + policy (container, masks, read-only git, host git hardening) | implemented | adversarial tests incl. admin-dir tampering, planted symlinks, prompt-injected agent, policy bypasses; residual risks in `docs/design/sandbox.md` |
 | Frontier escalation Z1–Z4 (Codex subscription, manual) | implemented | live Codex run (Phase 7) fixed a task the local model failed; the contained provider is verified live (`TestCodexContainedLive`) |
 | Engineering benchmark harness (14 tasks, hidden checks) | implemented | every task fails on its base (`TestHiddenChecksFailOnBase`, 14/14 on 2026-10-04); the model evaluation used the original 11 |
@@ -38,3 +41,9 @@ A failure-driven engineering pass on 2026-10-05 used those failures as a
 development corpus (not a benchmark): 1/4 development tasks pass on the
 final build (prometheus, previously failing); see
 [the engineering report](../benchmarks/failure-driven-engineering-2026-10.md).
+A targeted pass (runaway control, ambiguity, retrieval seeds) followed, then a
+second, independent validation on 6 unseen tasks screened for
+issue-derivable acceptance tests: 5/6 verified successes, all local-only,
+0 false verification passes; see
+[the targeted pass](../benchmarks/targeted-engineering-pass-2026-10.md) and
+[the validation report](../benchmarks/second-independent-validation-2026-10.md).

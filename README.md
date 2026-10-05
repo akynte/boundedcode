@@ -58,29 +58,53 @@ indicative, not general claims.
 * Details: [infrastructure reports](benchmarks/reports/) and
   [model evaluation](docs/design/model-evaluation.md).
 
-## Small Real-World Validation
+## Real-world validation
 
-BoundedCode was evaluated on 8 real public engineering tasks selected
-before execution from established software-engineering benchmarks
-(SWE-bench Multilingual and Multi-SWE-bench: Go, JavaScript, TypeScript).
-This is a small validation sample, not a statistically comprehensive
-benchmark.
+Results are reported in order, failures included.
 
-The frozen build passed the hidden acceptance tests on 0/8 tasks. Four
-failures traced to BoundedCode defects, which were fixed; of the three
-affected tasks rerun, one passed. Final result: 1/8 tasks completed
-successfully, 1/8 using the local model without frontier assistance.
-Four failures were model reasoning or coding errors and three tasks have
-acceptance tests that depend on names only the reference solution defines.
+**1. Initial validation (2026-10-04).** 8 real public engineering tasks
+(SWE-bench Multilingual and Multi-SWE-bench: Go, JavaScript, TypeScript),
+selected before execution. The frozen build passed the hidden acceptance
+tests on 0/8. Four failures traced to BoundedCode defects, which were fixed;
+of the three affected tasks rerun, one passed: **1/8** overall, 1/8 local
+only. Three of the eight tasks have acceptance tests that depend on names
+only the reference solution defines
+([report](docs/benchmarks/small-real-world-validation-2026-10.md)).
 
-On the largest tested repository (Prometheus, ~2.6 M source tokens),
-BoundedCode provided about 6 K source tokens through context packs, and at
-most ~49 K tokens (1.9 %) of repository content reached the model in total.
+**2. Engineering fixes (development evidence, not benchmarks).** The failed
+tasks drove general fixes:
+- a behavioural-evidence verification gate,
+- an agent that can build and run tests offline,
+- bounded reasoning and visible output,
+- a progress-aware strategy budget,
+- a task contract that surfaces material ambiguity,
+- ranked retrieval seeds.
+
+On the development tasks this is optimistic by construction: 1/4 passed
+([failure-driven pass](docs/benchmarks/failure-driven-engineering-2026-10.md),
+[targeted pass](docs/benchmarks/targeted-engineering-pass-2026-10.md)).
+
+**3. Second, independent validation (2026-10-05).** In a fresh small
+validation on 6 previously unseen public engineering tasks whose hidden
+acceptance criteria were screened for consistency with the issue before
+execution, BoundedCode completed 5/6 successfully, with 5/6 completed using
+only the local model (Qwen3.6-35B-A3B, no frontier calls, 0 false
+verification passes, 10-30 min per task). The sixth was fixed correctly but
+left unverified by a gap in BoundedCode's evidence check
+([report](docs/benchmarks/second-independent-validation-2026-10.md)).
+
+This is a small practical validation sample, not a statistically
+comprehensive benchmark. Screening excluded 10 of 24 candidates whose
+hidden tests were not derivable from their issues; real requests are not
+screened.
+
+On the largest repositories tested, the model saw a small fraction of the
+source:
+- Prometheus at 1.8 M source tokens: 1.6 % in the second validation;
+- ~2.6 M in the first: ≤ 1.9 %.
+
 Resume after an interruption worked. On a two-task baseline, plain
 OpenHands with the same local model failed the same tasks, faster.
-
-See the [benchmark report](docs/benchmarks/small-real-world-validation-2026-10.md)
-for methodology and limitations.
 
 ## Quick start (development)
 
@@ -122,9 +146,19 @@ getting-started guide).
 * **Frontier escalation** works only through the Codex CLI with a ChatGPT
   subscription sign-in, or by pasting packets manually. API keys are
   refused ([ADR-0009](docs/architecture/adr/0009-frontier-escalation.md)).
-* **Local-only success rates** are measured only on this repository's
-  benchmark suite of 11 synthetic tasks. They say nothing yet about real
-  codebases.
+* **Real-world evidence is small.** One run each of 8 + 6 public tasks (see
+  above); stability across reruns and performance on requests whose
+  expected behaviour is not derivable from their text are unmeasured.
+* **Verification gaps.** Behavioural evidence for Go is a changed test that
+  fails on the base:
+  - data-driven test files (for example `testdata/*.test`) are not
+    attributed, so a correct change can end UNVERIFIED;
+  - a test that does not compile on the base counts as failing there;
+  - a test can only prove the reading of the request the agent chose.
+* **Ambiguity detection is model-derived** and imperfect: it has flagged a
+  clear request as ambiguous and misnamed real alternatives. With the
+  default `task.ambiguity: ask`, a false positive costs a clarification
+  question.
 
 ## Reference hardware
 

@@ -130,7 +130,10 @@ after it finishes.
 ## 6. Control loop (task run)
 
 ```text
-create task ──> create worktree ──> plan context pack (ledger + graph + git)
+create task ──> create worktree ──> task contract (local model)
+                                     | material ambiguity, policy ask ──> blocked until `task run --clarify`
+                                     v
+                         plan context pack (ledger + contract + graph + git)
       ^                                    |
       |                                    v
       |                       agent.Send(instruction + pack)
@@ -148,6 +151,19 @@ create task ──> create worktree ──> plan context pack (ledger + graph + 
 
 Budgets bound every loop (attempts, wall clock, local tokens, frontier
 escalations). Each agent turn is bounded by the remaining wall-clock budget.
+Within a turn, thinking is capped per response (`reasoning_budget`), visible
+output per response (`agent.max_output_tokens`), and a deterministic
+strategy governor stops an attempt that generates `agent.strategy.*` tokens
+without progress (first edit, new test file, an agent-run test going from
+failing to passing) or exceeds its token/time cap; the stopped strategy is
+recorded and the retry is told not to repeat it. Long output alone never
+triggers frontier escalation.
+
+A verification pass is `task_verified` only with behavioural evidence: a
+test the change adds or modifies fails on an export of the base commit and
+passes with the change. Otherwise the agent is asked once for such a test,
+and the task can end `tests_green` (UNVERIFIED), never as a verified merge
+candidate.
 Exhausting a budget parks the task in `blocked`; it never deletes work.
 
 Failure handling inside the loop:
@@ -178,8 +194,11 @@ with a token budget:
 6. impact of the change from the graph (the task worktree is indexed as its
    own project, because `detect_changes` only diffs the indexed checkout)
 7. cross-service contracts touching the task's repositories
-8. relevant source: lines named by failures, then symbols named in the task
-   (see 7.1)
+8. relevant source: lines named by failures, then retrieval seeds from the
+   request in rank order: quoted error messages (located by fixed-string
+   search), names in prose and linked files, config keys and flags, then
+   identifiers from code samples; placeholders and names matching many files
+   are demoted (see 7.1)
 9. relevant ADRs
 10. rules
 
