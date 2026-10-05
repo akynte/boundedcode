@@ -249,7 +249,13 @@ func verificationSection(results []verify.Result) string {
 				continue
 			}
 			seen[key] = true
-			fmt.Fprintf(&b, "### %s: %s failed (`%s`, exit %d)\n```\n%s\n```\n", r.Repository, f.Name, f.Command, f.ExitCode, strings.TrimSpace(f.Output))
+			// The failure lines first, then the output's tail; a long command
+			// (e.g. a skip list) is abbreviated so it does not crowd them out.
+			fmt.Fprintf(&b, "### %s: %s failed (`%s`, exit %d)\n", r.Repository, f.Name, oneLine(f.Command, 160), f.ExitCode)
+			if f.Digest != "" {
+				fmt.Fprintf(&b, "Failures:\n```\n%s\n```\nOutput tail:\n", f.Digest)
+			}
+			fmt.Fprintf(&b, "```\n%s\n```\n", strings.TrimSpace(tailRunes(f.Output, 2500)))
 		}
 	}
 	return b.String()
@@ -589,4 +595,16 @@ func formatLink(l xservice.Link) string {
 		return s
 	}
 	return fmt.Sprintf("[%s] %s: %s -> %s", l.Kind, l.Contract, side(l.From), side(l.To))
+}
+
+// tailRunes returns the last n bytes of s, cut at a line start.
+func tailRunes(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	s = s[len(s)-n:]
+	if i := strings.IndexByte(s, '\n'); i >= 0 && i < len(s)-1 {
+		s = s[i+1:]
+	}
+	return "…\n" + s
 }

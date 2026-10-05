@@ -74,6 +74,9 @@ type StageResult struct {
 	DurationMS int64  `json:"duration_ms"`
 	Command    string `json:"command"`
 	Output     string `json:"output,omitempty"` // tail, redacted
+	// Digest are the failure-identifying lines of the whole output
+	// (FailureDigest), for failed stages.
+	Digest string `json:"digest,omitempty"`
 }
 
 // Result is one verification run of one repository.
@@ -104,7 +107,7 @@ func (r Result) Failures() []StageResult {
 func (r Result) Signature() string {
 	var parts []string
 	for _, f := range r.Failures() {
-		parts = append(parts, f.Name+":"+firstErrorLine(f.Output))
+		parts = append(parts, f.Name+":"+f.Headline())
 	}
 	return strings.Join(parts, "|")
 }
@@ -517,6 +520,9 @@ func (e *Engine) runStageFull(ctx context.Context, t RepoTarget, st Stage, packa
 	default:
 		sr.Status = "error"
 	}
+	if sr.Status == "fail" || sr.Status == "error" {
+		sr.Digest = FailureDigest(full, 3000)
+	}
 	return sr, full
 }
 
@@ -659,6 +665,15 @@ func tail(s string, n int) string {
 		return "…" + s[len(s)-n:]
 	}
 	return s
+}
+
+// Headline is the first line that says why a failed stage failed: from the
+// digest when there is one, else the first informative output line.
+func (s StageResult) Headline() string {
+	if l := firstErrorLine(strings.TrimPrefix(s.Digest, "…\n")); l != "" {
+		return l
+	}
+	return firstErrorLine(s.Output)
 }
 
 func firstErrorLine(s string) string {

@@ -11,6 +11,7 @@ import (
 
 	"github.com/akynte/boundedcode/internal/repointel"
 	"github.com/akynte/boundedcode/internal/task"
+	"github.com/akynte/boundedcode/internal/verify"
 )
 
 // fakeGraph is a codebase-memory stand-in: symbols per project.
@@ -305,5 +306,20 @@ func TestLexicalSkippedWithoutRipgrep(t *testing.T) {
 	var st IntelStats
 	if out := requestSymbols(context.Background(), in, &st); out != "" || st.LexicalCalls != 0 {
 		t.Fatalf("%+v %q", st, out)
+	}
+}
+
+// TestVerificationSectionLeadsWithFailures: a long command (a repository's
+// skip list) is abbreviated and the failure digest comes before the tail.
+func TestVerificationSectionLeadsWithFailures(t *testing.T) {
+	cmd := "go test -count=1 -skip ^(" + strings.Repeat("TestSomethingLong|", 60) + ") ./..."
+	r := verify.Result{Repository: "caddy", Stages: []verify.StageResult{{Name: "go-test", Status: "fail", ExitCode: 1, Command: cmd,
+		Digest: "--- FAIL: TestCaddyfileAdaptToJSON (0.04s)", Output: strings.Repeat("{\"level\":\"info\"}\n", 400)}}}
+	s := verificationSection([]verify.Result{r})
+	if len(s) > 4000 || strings.Count(s, "TestSomethingLong") > 10 {
+		t.Fatalf("command not abbreviated (%d bytes)", len(s))
+	}
+	if i, j := strings.Index(s, "--- FAIL: TestCaddyfileAdaptToJSON"), strings.Index(s, "{\"level\""); i < 0 || j < i {
+		t.Fatalf("failure digest must come first:\n%s", s[:min(len(s), 600)])
 	}
 }

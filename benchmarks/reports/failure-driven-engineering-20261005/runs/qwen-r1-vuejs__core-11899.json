@@ -1,0 +1,64 @@
+{
+  "id": "suite-20261005T103125Z",
+  "model": "qwen3.6-35b-a3b",
+  "started": "2026-10-05T10:31:25.87256526Z",
+  "finished": "2026-10-05T11:13:15.380031776Z",
+  "results": [
+    {
+      "id": "vuejs__core-11899",
+      "category": "typescript",
+      "model": "qwen3.6-35b-a3b",
+      "success": false,
+      "task_status": "completed",
+      "self_verified": true,
+      "tests_green": true,
+      "attempts": 2,
+      "local_tokens": 233016,
+      "generated_tokens": 65122,
+      "cached_prompt_tokens": 2134350,
+      "escalations": 0,
+      "local_only": false,
+      "condensations": 2,
+      "resumes": 0,
+      "wall_seconds": 2509.502544076,
+      "failed_checks": [
+        "core: sh -c node_modules/.bin/vitest run packages/compiler-sfc/__tests__/compileStyle.spec.ts --reporter=verbose: … {\n  \u0026[data-v-test] {\n    background-color: green\n  }\n  .bar[data-v-test] { color: white\n  }\n  }\n  .foo[data-v-test] { color: red;\n  }\n  }\n\n ❯ packages/compiler-sfc/__tests__/compileStyle.spec.ts:63:7\n     61| }`,\n     62|       ),\n     63|     ).toMatch(\n       |       ^\n     64|       `h1 {\n     65| \u0026[data-v-test] {\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n Test Files  1 failed (1)\n      Tests  1 failed | 25 passed (26)\n   Start at  11:13:14\n   Duration  1.01s (transform 457ms, setup 9ms, collect 599ms, tests 155ms, environment 0ms, prepare 62ms)\n\n"
+      ],
+      "task_id": "t20261005-0db4a1",
+      "state_dir": "$HOME/.cache/boundedcode/bench-work/vuejs__core-11899-1791196285872587609/state",
+      "intel": {
+        "context_packs": 2,
+        "pack_tokens": 7325,
+        "code_tokens": 3496,
+        "serena_calls": 6,
+        "serena_errors": 4,
+        "serena_ms": 9302.27,
+        "graph_calls": 10,
+        "graph_ms": 111.438,
+        "serena_symbols": 0,
+        "graph_symbols": 4,
+        "fallbacks": 4,
+        "agent_tool_calls": 57,
+        "agent_tools": {
+          "file_editor": 24,
+          "finish": 2,
+          "task_tracker": 3,
+          "terminal": 21,
+          "think": 7
+        }
+      }
+    }
+  ],
+  "summary": {
+    "tasks": 1,
+    "verified": 0,
+    "success_rate": 0,
+    "local_only_completion_rate": 0,
+    "frontier_escalation_rate": 0,
+    "verified_tasks_per_hour": 0,
+    "attempts_per_successful_task": 0,
+    "wall_seconds_per_task": 2509.502544076,
+    "local_tokens_per_task": 233016,
+    "self_verified_but_hidden_failed": 1
+  }
+}

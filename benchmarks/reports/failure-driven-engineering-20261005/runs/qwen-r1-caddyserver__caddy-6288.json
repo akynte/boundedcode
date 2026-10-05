@@ -1,0 +1,64 @@
+{
+  "id": "suite-20261005T083735Z",
+  "model": "qwen3.6-35b-a3b",
+  "started": "2026-10-05T08:37:35.889138715Z",
+  "finished": "2026-10-05T10:08:37.999883806Z",
+  "results": [
+    {
+      "id": "caddyserver__caddy-6288",
+      "category": "devops-infra",
+      "model": "qwen3.6-35b-a3b",
+      "success": false,
+      "task_status": "active",
+      "self_verified": false,
+      "tests_green": false,
+      "attempts": 2,
+      "local_tokens": 568058,
+      "generated_tokens": 148944,
+      "cached_prompt_tokens": 6770003,
+      "escalations": 0,
+      "local_only": false,
+      "condensations": 9,
+      "resumes": 0,
+      "wall_seconds": 5462.105225962,
+      "failed_checks": [
+        "caddy: sh -c go test -v ./caddytest/integration -run \"TestCaddyfileAdapt*\": …: Caddyfile input is not formatted; run 'caddy fmt --overwrite' to fix inconsistencies\n{\"level\":\"warn\",\"ts\":1791194917.7164462,\"msg\":\"The 'trusted_ca_cert_file' field is deprecated. Use the 'trust_pool' field instead.\"}\n{\"level\":\"warn\",\"ts\":1791194917.7167645,\"msg\":\"The 'trusted_ca_cert_file' field is deprecated. Use the 'trust_pool' field instead.\"}\n{\"level\":\"warn\",\"ts\":1791194917.7172933,\"msg\":\"The 'trusted_ca_cert' field is deprecated. Use the 'trust_pool' field instead.\"}\n--- FAIL: TestCaddyfileAdaptToJSON (0.04s)\nFAIL\nFAIL\tgithub.com/caddyserver/caddy/v2/caddytest/integration\t0.051s\nFAIL\n"
+      ],
+      "task_id": "t20261005-7d07f5",
+      "state_dir": "$HOME/.cache/boundedcode/bench-work/caddyserver__caddy-6288-1791189455889163362/state",
+      "intel": {
+        "context_packs": 2,
+        "pack_tokens": 8527,
+        "code_tokens": 2390,
+        "serena_calls": 2,
+        "serena_errors": 0,
+        "serena_ms": 7696.604,
+        "graph_calls": 2,
+        "graph_ms": 20.037,
+        "serena_symbols": 0,
+        "graph_symbols": 0,
+        "fallbacks": 0,
+        "agent_tool_calls": 204,
+        "agent_tools": {
+          "file_editor": 79,
+          "finish": 1,
+          "task_tracker": 5,
+          "terminal": 110,
+          "think": 9
+        }
+      }
+    }
+  ],
+  "summary": {
+    "tasks": 1,
+    "verified": 0,
+    "success_rate": 0,
+    "local_only_completion_rate": 0,
+    "frontier_escalation_rate": 0,
+    "verified_tasks_per_hour": 0,
+    "attempts_per_successful_task": 0,
+    "wall_seconds_per_task": 5462.105225962,
+    "local_tokens_per_task": 568058,
+    "self_verified_but_hidden_failed": 0
+  }
+}

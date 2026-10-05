@@ -641,7 +641,7 @@ func (r *Runner) verifyAll(ctx context.Context, t *task.Task, wts []task.Worktre
 			passed = false
 			sigs = append(sigs, w.RepoName+":"+res.Signature())
 			for _, f := range res.Failures() {
-				summary = append(summary, fmt.Sprintf("%s/%s: %s", w.RepoName, f.Name, firstLine(f.Output)))
+				summary = append(summary, fmt.Sprintf("%s/%s: %s", w.RepoName, f.Name, f.Headline()))
 			}
 		}
 	}
