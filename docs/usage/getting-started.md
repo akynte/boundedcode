@@ -1,6 +1,6 @@
 # Getting Started
 
-> Pre-alpha. Commands may change.
+> Public alpha. Commands and configuration may change.
 
 ## 1. Prerequisites
 

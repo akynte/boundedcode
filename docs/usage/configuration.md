@@ -1,6 +1,6 @@
 # Configuration
 
-> Pre-alpha. Keys may change; `version` guards incompatible changes.
+> Public alpha. Keys may change; `version` guards incompatible changes.
 
 Configuration is layered, later layers winning:
 

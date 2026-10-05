@@ -14,3 +14,24 @@ __pycache__/
 /benchmarks/reports/raw/
 coverage.out
 SBOM.spdx.json
+
+# Runtime state and caches (BoundedCode keeps these under XDG dirs; never commit them)
+*.gguf.part
+*.log.tmp
+/state/
+/worktrees/
+/.cache/
+/tmp/
+*.sqlite
+*.db
+*.db-wal
+*.db-shm
+# Credentials and local config
+*.pem.local
+/config.local.yaml
+.codex/
+# IDE files
+.idea/
+.vscode/
+*.swp
+.DS_Store

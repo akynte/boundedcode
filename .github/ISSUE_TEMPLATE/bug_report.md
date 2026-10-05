@@ -4,10 +4,28 @@ about: Something does not work as documented
 labels: bug
 ---
 
-**What happened / what you expected**
+<!-- Security problems (sandbox escape, secret exposure): do NOT open an issue.
+     Use private vulnerability reporting, see SECURITY.md. -->
+
+**BoundedCode version** (`boundedcode version`):
+
+**OS and hardware** (CPU, GPU and VRAM, RAM):
+
+**Local model / profile** (and llama.cpp version):
+
+**Task type** (language, repository size, single/multi-repo):
 
 **Reproduction**
 
-**Environment** — output of `boundedcode doctor --json` (review it for paths you don't want to share)
+1.
+2.
 
-**Logs** — `boundedcode task events <id>` excerpt if relevant. Do not paste secrets or proprietary code.
+**Expected behavior**
+
+**Actual behavior**
+
+**Environment** — output of `boundedcode doctor --json`
+
+**Logs** — e.g. `boundedcode task events <id>` excerpt
+
+<!-- Review everything you paste: remove secrets, tokens, private paths and proprietary code. -->

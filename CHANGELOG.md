@@ -1,9 +1,59 @@
 # Changelog
 
-## Unreleased (pre-alpha)
+## v0.1.0-alpha.1 (2026-10-05): first public alpha
 
-Initial implementation. See `docs/development/status.md` for what is
-implemented, experimental and planned.
+Release notes: [docs/releases/v0.1.0-alpha.1.md](docs/releases/v0.1.0-alpha.1.md).
+
+### Added
+- Go control plane with a persistent task ledger and audit log (SQLite):
+  resume after a crash or reboot.
+- Git worktree isolation per task.
+- Local inference through a supervised llama.cpp server, with measured model
+  profiles.
+- Agent runtime: the OpenHands SDK in a network-less container, with model
+  calls tunnelled through the control plane.
+- Repository intelligence:
+  - codebase-memory-mcp for breadth;
+  - optional Serena v1.7.0 for LSP depth;
+  - cross-service contract analysis for HTTP, topics, env and Terraform.
+- Bounded context packs with ranked retrieval seeds.
+- Deterministic verification with behavioural evidence (`TASK_VERIFIED` vs
+  `tests_green`).
+- Runaway-generation control: thinking and visible-output caps, and a
+  progress-aware strategy budget.
+- Task contract with material-ambiguity handling (`task run --clarify`).
+- Optional frontier escalation: a Z1-Z4 policy via the Codex CLI with a
+  ChatGPT sign-in, or manual packets. API keys are refused.
+
+### Security
+- Container sandbox:
+  - no network;
+  - secret masking;
+  - protected paths;
+  - a read-only verification config taken from the base commit.
+- Hardened git worktree handling.
+- Symlink-safe host reads.
+- Deterministic command policy.
+- Frontier packet sanitization that fails closed.
+- See SECURITY.md and docs/design/sandbox.md.
+
+### Validation
+- Initial validation (2026-10-04): 0/8, then 1/8 after defect fixes.
+- Second independent validation (2026-10-05): 6 screened, previously unseen
+  tasks.
+  - 5/6 strict `TASK_VERIFIED` successes, all local-only.
+  - 6/6 hidden acceptance tests passed.
+  - 0 false verification passes.
+- Small samples, not statistically comprehensive benchmarks.
+
+### Known limitations
+- Small validation sample; one machine and one model.
+- Model-derived ambiguity detection has false positives.
+- Behavioural evidence misses data-driven test files consumed elsewhere.
+- Frontier escalation and the strategy governor were not exercised in the
+  second validation.
+
+### Development history before the alpha
 
 * Targeted engineering pass (2026-10-05):
   * Strategy governor: an attempt that keeps generating without progress

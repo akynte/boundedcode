@@ -23,7 +23,7 @@ score, or degree of autonomy.
 |---|---|
 | Reference machine | Lenovo LOQ 15IRH8: i7-13620H (10C/16T), RTX 4060 Laptop 8 GB (CC 8.9), 64 GB DDR5, NVMe, Debian 13 x86-64 |
 | Frontier budget | at most one ~USD 20/month subscription (initially ChatGPT Plus via Codex). No paid API credits are assumed. |
-| Workload target | 95 %+ of the workload runs locally and under 5 % goes to the frontier. This is *measured*, not assumed. |
+| Workload target | Design goal, not a demonstrated result: 95 %+ of the workload runs locally and under 5 % goes to the frontier, to be *measured* on real task history (`boundedcode stats`), not assumed. Current evidence is limited to small validation samples (see the README). |
 | Repository scale | Multi-million-token workspaces. The model sees a task-specific context pack of about 10K–30K tokens; the exact value is benchmark-driven. |
 
 Hard rules:

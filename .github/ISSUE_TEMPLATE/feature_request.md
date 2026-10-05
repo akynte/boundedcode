@@ -1,11 +1,13 @@
 ---
 name: Feature request
-about: Propose a capability
+about: Propose a change or new capability
 labels: enhancement
 ---
 
-**Problem** — what engineering workflow is blocked or slow?
+**Problem** — what are you trying to do, and what gets in the way?
 
-**Evidence** — benchmark, failing task or measurement if available
+**Use case** — repository/workflow where this matters:
 
-**Proposal**
+**Why existing functionality is insufficient**
+
+**Proposed behavior**

@@ -2,8 +2,8 @@
 
 ## Supported versions
 
-The project is pre-release. Only the latest commit on `main` receives fixes.
-Once releases exist, the latest minor release will be supported.
+BoundedCode is a public alpha. Security fixes go to `main` and the latest
+alpha release; older alpha releases are not patched.
 
 ## Reporting a vulnerability
 
@@ -33,7 +33,7 @@ What to expect:
 
 ## Security model
 
-boundedcode runs an LLM agent that executes commands and edits code. We
+BoundedCode runs an LLM agent that executes commands and edits code. We
 assume the model can be wrong or adversarially steered (for example by prompt
 injection in repository content). The design limits what a misbehaving agent
 can reach:
