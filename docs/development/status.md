@@ -30,3 +30,7 @@ limited validation or unstable interfaces), **planned**.
 An implementation audit against both specifications (the original project
 specification and the Serena integration) was done on 2026-10-04; see
 [audit-2026-10-04.md](audit-2026-10-04.md).
+
+A small real-world validation (8 public SWE-bench-style tasks) was run on
+2026-10-04: 0/8 on the frozen build, 1/8 after fixing five defects it found;
+see [the report](../benchmarks/small-real-world-validation-2026-10.md).

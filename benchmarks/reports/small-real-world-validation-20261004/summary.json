@@ -1,0 +1,58 @@
+{
+ "total_tasks": 8,
+ "original_frozen": {
+  "verified": 0,
+  "local_only_successes": 0,
+  "frontier_assisted_successes": 0,
+  "failures": 8,
+  "self_verified_but_failed": 4,
+  "local_model_calls": 818,
+  "frontier_calls_sent": 4,
+  "frontier_calls_blocked": 1,
+  "median_wall_clock_s_of_runs_that_started": 4953
+ },
+ "post_fix_reruns": {
+  "tasks": 3,
+  "accepted": 1,
+  "local_model_calls": 175,
+  "frontier_calls": 0
+ },
+ "final_accepted_outcomes": {
+  "verified_successes": 1,
+  "local_only_successes": 1,
+  "frontier_assisted_successes": 0,
+  "failures": 7,
+  "local_only_completion_rate": 0.125,
+  "median_wall_clock_s": 1932.5
+ },
+ "total_local_model_calls": 993,
+ "total_frontier_calls": {
+  "sent": 4,
+  "blocked_before_sending": 1
+ },
+ "median_repository_source_tokens": 743941.0,
+ "median_task_source_context_tokens_upper_bound": 46434.0,
+ "median_context_pack_source_tokens": 4395.5,
+ "largest_repository": {
+  "task": "prometheus__prometheus-13845",
+  "repository_source_tokens": 2572637,
+  "context_pack_source_tokens": 6214,
+  "source_context_tokens_upper_bound": 49371,
+  "ratio_upper_bound": 0.0192,
+  "ratio_context_pack": 0.00242
+ },
+ "tasks_requiring_human_intervention": {
+  "code_or_hint": 0,
+  "environment_only": [
+   "axios__axios-6539",
+   "caddyserver__caddy-6288",
+   "gin-gonic__gin-3227",
+   "grpc__grpc-go-2744",
+   "prometheus__prometheus-13845",
+   "vuejs__core-11899",
+   "zeromicro__go-zero-2283",
+   "zeromicro__go-zero-990"
+  ]
+ },
+ "resume_context_continuity": "PASS: prometheus__prometheus-13845 interrupted after 5 min, resumed by a newly built runner (same agent session, 1 resume, 4 condensations), continued to normal verification (self-verified; acceptance failed for a model reason)"
+}

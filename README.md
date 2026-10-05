@@ -58,6 +58,30 @@ indicative, not general claims.
 * Details: [infrastructure reports](benchmarks/reports/) and
   [model evaluation](docs/design/model-evaluation.md).
 
+## Small Real-World Validation
+
+BoundedCode was evaluated on 8 real public engineering tasks selected
+before execution from established software-engineering benchmarks
+(SWE-bench Multilingual and Multi-SWE-bench: Go, JavaScript, TypeScript).
+This is a small validation sample, not a statistically comprehensive
+benchmark.
+
+The frozen build passed the hidden acceptance tests on 0/8 tasks. Four
+failures traced to BoundedCode defects, which were fixed; of the three
+affected tasks rerun, one passed. Final result: 1/8 tasks completed
+successfully, 1/8 using the local model without frontier assistance.
+Four failures were model reasoning or coding errors and three tasks have
+acceptance tests that depend on names only the reference solution defines.
+
+On the largest tested repository (Prometheus, ~2.6 M source tokens),
+BoundedCode provided about 6 K source tokens through context packs, and at
+most ~49 K tokens (1.9 %) of repository content reached the model in total.
+Resume after an interruption worked. On a two-task baseline, plain
+OpenHands with the same local model failed the same tasks, faster.
+
+See the [benchmark report](docs/benchmarks/small-real-world-validation-2026-10.md)
+for methodology and limitations.
+
 ## Quick start (development)
 
 The full walkthrough (prerequisites with versions, model download, sandbox

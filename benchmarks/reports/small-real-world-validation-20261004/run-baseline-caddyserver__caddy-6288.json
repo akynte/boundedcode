@@ -1,0 +1,56 @@
+{
+  "id": "suite-20261005T010614Z",
+  "model": "qwen3.6-35b-a3b",
+  "started": "2026-10-05T01:06:14.458265322Z",
+  "finished": "2026-10-05T01:20:09.289224378Z",
+  "results": [
+    {
+      "id": "caddyserver__caddy-6288",
+      "category": "devops-infra",
+      "model": "qwen3.6-35b-a3b",
+      "success": false,
+      "task_status": "finished",
+      "self_verified": false,
+      "attempts": 1,
+      "local_tokens": 113717,
+      "generated_tokens": 19697,
+      "cached_prompt_tokens": 1670166,
+      "escalations": 0,
+      "local_only": false,
+      "condensations": 0,
+      "resumes": 0,
+      "wall_seconds": 834.825476713,
+      "failed_checks": [
+        "caddy: …: Caddyfile input is not formatted; run 'caddy fmt --overwrite' to fix inconsistencies\n{\"level\":\"warn\",\"ts\":1791163208.9648316,\"msg\":\"The 'trusted_ca_cert_file' field is deprecated. Use the 'trust_pool' field instead.\"}\n{\"level\":\"warn\",\"ts\":1791163208.9651918,\"msg\":\"The 'trusted_ca_cert_file' field is deprecated. Use the 'trust_pool' field instead.\"}\n{\"level\":\"warn\",\"ts\":1791163208.9656773,\"msg\":\"The 'trusted_ca_cert' field is deprecated. Use the 'trust_pool' field instead.\"}\n--- FAIL: TestCaddyfileAdaptToJSON (0.04s)\nFAIL\nFAIL\tgithub.com/caddyserver/caddy/v2/caddytest/integration\t0.050s\nFAIL\n"
+      ],
+      "task_id": "baseline-caddyserver--caddy-6288",
+      "state_dir": "$HOME/.cache/boundedcode/bench-work/baseline-caddyserver__caddy-6288-1791162374458312284/state",
+      "intel": {
+        "context_packs": 0,
+        "pack_tokens": 0,
+        "code_tokens": 0,
+        "serena_calls": 0,
+        "serena_errors": 0,
+        "serena_ms": 0,
+        "graph_calls": 0,
+        "graph_ms": 0,
+        "serena_symbols": 0,
+        "graph_symbols": 0,
+        "fallbacks": 0,
+        "agent_tool_calls": 0
+      }
+    }
+  ],
+  "summary": {
+    "tasks": 1,
+    "verified": 0,
+    "success_rate": 0,
+    "local_only_completion_rate": 0,
+    "frontier_escalation_rate": 0,
+    "verified_tasks_per_hour": 0,
+    "attempts_per_successful_task": 0,
+    "wall_seconds_per_task": 834.825476713,
+    "local_tokens_per_task": 113717,
+    "self_verified_but_hidden_failed": 0
+  }
+}
