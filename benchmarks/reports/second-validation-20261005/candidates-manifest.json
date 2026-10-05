@@ -1,0 +1,224 @@
+{
+  "name": "second-validation-20261005",
+  "purpose": "Second, independent small validation (target 6 tasks) of previously unused public tasks whose acceptance tests are screened for derivability from the issue before execution.",
+  "datasets": {
+    "swe-bench-multilingual": {
+      "hf": "SWE-bench/SWE-bench_Multilingual",
+      "revision": "846e647b9f33c0b51b739d005d13d85493c9af09",
+      "license": "MIT"
+    },
+    "multi-swe-bench": {
+      "hf": "ByteDance-Seed/Multi-SWE-bench",
+      "revision": "56ff018c04a38e27ada1e9d0a6d5839a51f88f0d",
+      "license": "CC0 (data adapted from the listed projects)",
+      "files": [
+        "go/zeromicro__go-zero_dataset.jsonl",
+        "go/grpc__grpc-go_dataset.jsonl"
+      ]
+    }
+  },
+  "selection_rule": [
+    "Fixed before any screening or run.",
+    "Slots: Go (gin), Go + DevOps/infrastructure (caddy), Go (grpc-go or go-zero), JavaScript (axios), TypeScript (vuejs/core), large repository (prometheus).",
+    "Candidates per slot ranked by sha256('boundedcode-second-validation-2026-10-05:' + instance_id); the four best-ranked are screened.",
+    "Excluded: every instance used in development or the first validation (gin-3227, caddy-6288, prometheus-13845, vuejs-11899, axios-6539, grpc-go-2744, go-zero-2283, go-zero-990) and gold patches changing dependency manifests.",
+    "Gate 1 (environment): acceptance fails on base and passes with the gold patch in the offline sandbox (Go 1.27, node 24).",
+    "Gate 2 (derivability): a curator who sees the issue, base code, acceptance test and gold patch answers whether a competent engineer seeing only the issue could derive every behaviour the acceptance test requires (YES/NO/AMBIGUOUS), reproducing the issue on base and gold where practical. Rejected on: gold does not fix the issue's reproduction; tests require unrelated behaviour, exact formatting not required by the issue, names/API shapes only the gold introduces, or one of several outcomes the issue allows; offline-unreproducible environment.",
+    "Per slot, the best-ranked candidate passing both gates is selected; a slot with none is left empty (no forcing).",
+    "The agent never sees hidden tests, gold patches or screening analysis; the screening record stays benchmark-internal."
+  ],
+  "candidates": {
+    "go-gin": [
+      "gin-gonic__gin-1957",
+      "gin-gonic__gin-1805",
+      "gin-gonic__gin-2121",
+      "gin-gonic__gin-2755"
+    ],
+    "go-caddy-infra": [
+      "caddyserver__caddy-6370",
+      "caddyserver__caddy-6350",
+      "caddyserver__caddy-6051",
+      "caddyserver__caddy-6345"
+    ],
+    "go-rpc": [
+      "zeromicro__go-zero-1969",
+      "zeromicro__go-zero-2363",
+      "zeromicro__go-zero-2032",
+      "grpc__grpc-go-3476"
+    ],
+    "js-axios": [
+      "axios__axios-5892",
+      "axios__axios-4731",
+      "axios__axios-4738",
+      "axios__axios-5085"
+    ],
+    "ts-vue": [
+      "vuejs__core-11870",
+      "vuejs__core-11915",
+      "vuejs__core-11739",
+      "vuejs__core-11589"
+    ],
+    "large-prometheus": [
+      "prometheus__prometheus-15142",
+      "prometheus__prometheus-10720",
+      "prometheus__prometheus-11859",
+      "prometheus__prometheus-10633"
+    ]
+  },
+  "categories": {
+    "go-gin": "go",
+    "go-caddy-infra": "devops-infra",
+    "go-rpc": "go",
+    "js-axios": "javascript",
+    "ts-vue": "typescript",
+    "large-prometheus": "large-repo"
+  },
+  "dependencies": {
+    "gin-gonic/gin": [
+      "go mod download && go list -deps -test ./... >/dev/null"
+    ],
+    "gohugoio/hugo": [
+      "go mod download && go list -deps -test ./... >/dev/null"
+    ],
+    "zeromicro/go-zero": [
+      "go mod download && go list -deps -test ./... >/dev/null"
+    ],
+    "prometheus/prometheus": [
+      "go mod download && go list -deps -test ./... >/dev/null"
+    ],
+    "caddyserver/caddy": [
+      "go mod download && go list -deps -test ./... >/dev/null"
+    ],
+    "axios/axios": [
+      "npm ci --ignore-scripts --no-audit --no-fund"
+    ],
+    "vuejs/core": [
+      "npx -y \"$(node -p 'require(\"./package.json\").packageManager.split(\"+\")[0]')\" install --frozen-lockfile --ignore-scripts"
+    ],
+    "grpc/grpc-go": [
+      "go mod download && go list -deps -test ./... >/dev/null"
+    ]
+  },
+  "tasks": [
+    {
+      "slot": "go-gin",
+      "instance_id": "gin-gonic__gin-1957",
+      "category": "go"
+    },
+    {
+      "slot": "go-gin",
+      "instance_id": "gin-gonic__gin-1805",
+      "category": "go"
+    },
+    {
+      "slot": "go-gin",
+      "instance_id": "gin-gonic__gin-2121",
+      "category": "go"
+    },
+    {
+      "slot": "go-gin",
+      "instance_id": "gin-gonic__gin-2755",
+      "category": "go"
+    },
+    {
+      "slot": "go-caddy-infra",
+      "instance_id": "caddyserver__caddy-6370",
+      "category": "devops-infra"
+    },
+    {
+      "slot": "go-caddy-infra",
+      "instance_id": "caddyserver__caddy-6350",
+      "category": "devops-infra"
+    },
+    {
+      "slot": "go-caddy-infra",
+      "instance_id": "caddyserver__caddy-6051",
+      "category": "devops-infra"
+    },
+    {
+      "slot": "go-caddy-infra",
+      "instance_id": "caddyserver__caddy-6345",
+      "category": "devops-infra"
+    },
+    {
+      "slot": "go-rpc",
+      "instance_id": "zeromicro__go-zero-1969",
+      "category": "go"
+    },
+    {
+      "slot": "go-rpc",
+      "instance_id": "zeromicro__go-zero-2363",
+      "category": "go"
+    },
+    {
+      "slot": "go-rpc",
+      "instance_id": "zeromicro__go-zero-2032",
+      "category": "go"
+    },
+    {
+      "slot": "go-rpc",
+      "instance_id": "grpc__grpc-go-3476",
+      "category": "go"
+    },
+    {
+      "slot": "js-axios",
+      "instance_id": "axios__axios-5892",
+      "category": "javascript"
+    },
+    {
+      "slot": "js-axios",
+      "instance_id": "axios__axios-4731",
+      "category": "javascript"
+    },
+    {
+      "slot": "js-axios",
+      "instance_id": "axios__axios-4738",
+      "category": "javascript"
+    },
+    {
+      "slot": "js-axios",
+      "instance_id": "axios__axios-5085",
+      "category": "javascript"
+    },
+    {
+      "slot": "ts-vue",
+      "instance_id": "vuejs__core-11870",
+      "category": "typescript"
+    },
+    {
+      "slot": "ts-vue",
+      "instance_id": "vuejs__core-11915",
+      "category": "typescript"
+    },
+    {
+      "slot": "ts-vue",
+      "instance_id": "vuejs__core-11739",
+      "category": "typescript"
+    },
+    {
+      "slot": "ts-vue",
+      "instance_id": "vuejs__core-11589",
+      "category": "typescript"
+    },
+    {
+      "slot": "large-prometheus",
+      "instance_id": "prometheus__prometheus-15142",
+      "category": "large-repo"
+    },
+    {
+      "slot": "large-prometheus",
+      "instance_id": "prometheus__prometheus-10720",
+      "category": "large-repo"
+    },
+    {
+      "slot": "large-prometheus",
+      "instance_id": "prometheus__prometheus-11859",
+      "category": "large-repo"
+    },
+    {
+      "slot": "large-prometheus",
+      "instance_id": "prometheus__prometheus-10633",
+      "category": "large-repo"
+    }
+  ]
+}
