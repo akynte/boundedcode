@@ -17,6 +17,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/akynte/boundedcode/internal/agent"
@@ -58,6 +59,9 @@ type Runner struct {
 	CtxSize    int
 	Log        *slog.Logger
 	Out        io.Writer
+	// ContractModel, when set, replaces the local-model call that derives
+	// the task contract (tests).
+	ContractModel func(ctx context.Context, request string) (string, error)
 	// CondenseEachRetry forces a context condensation before every retry
 	// (used by continuity tests and benchmarks).
 	CondenseEachRetry bool
@@ -83,6 +87,8 @@ const maxInfraRetries = 3
 // RunOptions modify one run.
 type RunOptions struct {
 	UserRequestedFrontier bool
+	// Clarification answers a task blocked as materially ambiguous.
+	Clarification string
 }
 
 func (r *Runner) say(format string, args ...any) {
@@ -205,10 +211,16 @@ func (r *Runner) Run(ctx context.Context, taskID string, opt RunOptions) (*task.
 	priorTokens, priorGen, priorCached := t.Budget.UsedLocalTokens, t.Budget.GeneratedTokens, t.Budget.CachedTokens
 	gw := r.NewGateway(t.ID, max(t.Budget.MaxLocalTokens-priorTokens, 1))
 
-	// Events from the runtime are audited; condensations are counted.
+	// Events from the runtime are audited; condensations are counted; the
+	// current attempt's governor sees them (see governor.go).
 	var evMu sync.Mutex
 	condensations := 0
+	var gov atomic.Pointer[governor]
+	generated := func() int { _, g, _ := gw.Stats(); return g }
 	onEvent := func(e agent.Event) {
+		if g := gov.Load(); g != nil {
+			g.observe(e, generated())
+		}
 		if e.Kind == "Condensation" {
 			evMu.Lock()
 			condensations++
@@ -240,7 +252,7 @@ func (r *Runner) Run(ctx context.Context, taskID string, opt RunOptions) (*task.
 	}
 	openReq := agent.OpenRequest{TaskID: t.ID, SessionID: t.AgentSessionID, Workspace: r.WorkDir(t.ID), GitCommonDirs: gitDirs, GitAdminDirs: adminDirs,
 		PersistenceDir: filepath.Join(r.Paths.TaskDir(t.ID), "runtime"), MaxIterations: r.Cfg.Agent.MaxIterations,
-		MaxInputTokens: r.CtxSize, MaxOutputTokens: 8192, CondenserMaxEvents: r.Cfg.Agent.CondenserMaxEvents,
+		MaxInputTokens: r.CtxSize, MaxOutputTokens: r.Cfg.Agent.MaxOutputTokens, CondenserMaxEvents: r.Cfg.Agent.CondenserMaxEvents,
 		CondenserMaxTokens: r.CtxSize * 7 / 10, Masks: masks, DependencyMounts: deps, DependencyScratch: depScratch, Toolchain: r.agentToolchain(t.ID), OnEvent: onEvent, Gateway: gw,
 		LLMTimeout: r.Cfg.Inference.RequestTimeout.D()}
 	sess, mode, err := r.openSession(ctx, t, openReq)
@@ -252,6 +264,7 @@ func (r *Runner) Run(ctx context.Context, taskID string, opt RunOptions) (*task.
 	consecutive := r.recentFailures(ctx, t.ID)
 	lastSig := ""
 	advice := r.pendingAdvice(ctx, t.ID)
+	strategyStopped := "" // set when the governor stops an attempt; consumed by the next pack
 	userFrontier := opt.UserRequestedFrontier
 	contractChecked := false
 	reviewedZ1 := r.hasEscalation(ctx, t.ID, frontier.Z1)
@@ -297,6 +310,23 @@ func (r *Runner) Run(ctx context.Context, taskID string, opt RunOptions) (*task.
 		}
 		return t, err
 	}
+	// Read the request before implementing it (see contract.go): a
+	// clarification from the user is recorded first, then the contract is
+	// derived (once) and a material ambiguity is raised per policy.
+	clarified := strings.TrimSpace(opt.Clarification) != ""
+	if clarified {
+		c := strings.TrimSpace(opt.Clarification)
+		t.Goal = strings.TrimSpace(contractRequest(t) + "\n\nClarification from the user: " + c)
+		t.Decide("user", "clarification: "+oneLineStr(c, 300))
+		_ = os.Remove(r.contractPath(t.ID)) // re-derive with the answer
+		r.Rec.Emit(ctx, t.ID, "task.clarified", map[string]any{"chars": len(c)})
+	}
+	contract := r.ensureContract(ctx, t)
+	if stop, questions := r.ambiguityGate(ctx, t, contract, clarified); stop {
+		r.say("task %s needs clarification before implementation:\n- %s\nanswer with: task run %s --clarify \"...\"", t.ID, questions, t.ID)
+		return t, r.block(t, save, "SPEC_AMBIGUOUS: the request is materially ambiguous; clarify with `task run "+t.ID+" --clarify \"...\"`:\n- "+questions)
+	}
+	contractText := contractPackText(contract, len(contract.MaterialOrNone()) > 0)
 	for {
 		if ctx.Err() != nil {
 			return interrupted("before attempt")
@@ -315,10 +345,14 @@ func (r *Runner) Run(ctx context.Context, taskID string, opt RunOptions) (*task.
 		results := r.latestVerification(ctx, t.ID, wts)
 		strategies, _ := r.Ledger.Strategies(ctx, t.ID)
 		contracts := r.contracts(ctx, t, wts)
+		if strategyStopped != "" {
+			advice = strings.TrimSpace(strategyStopped + "\n\n" + advice)
+			strategyStopped = ""
+		}
 		pack, err := contextplan.Build(ctx, contextplan.Inputs{Task: t, Worktrees: r.packWorktrees(ctx, t, wts), WorkDir: r.WorkDir(t.ID),
 			Strategies: strategies, Verification: results, Intel: r.Intel, Nav: r.Nav, Mode: mode,
 			BudgetTokens: r.Cfg.Budgets.ContextPackTokens, MaxAttempts: t.Budget.MaxAttempts, Advice: advice,
-			Contracts: contracts, ChangedFiles: t.ChangedFiles, Heads: heads(ctx, wts)})
+			Contracts: contracts, ChangedFiles: t.ChangedFiles, Heads: heads(ctx, wts), TaskContract: contractText})
 		if err != nil {
 			return t, err
 		}
@@ -331,9 +365,56 @@ func (r *Runner) Run(ctx context.Context, taskID string, opt RunOptions) (*task.
 			left := time.Duration((b.MaxWallClockS-b.UsedWallClockS)*float64(time.Second)) - time.Since(runStart)
 			sendCtx, cancelSend = context.WithTimeout(ctx, max(left, time.Second))
 		}
-		res, err := sess.Send(sendCtx, pack.Render())
+		// The governor bounds this attempt's strategy by its progress.
+		g := newGovernor(r.Cfg.Agent.Strategy, generated(), time.Now())
+		gov.Store(g)
+		turnCtx, stopTurn := context.WithCancelCause(sendCtx)
+		watchDone := make(chan struct{})
+		go func() {
+			tick := time.NewTicker(governorTick)
+			defer tick.Stop()
+			for {
+				select {
+				case <-watchDone:
+					return
+				case now := <-tick.C:
+					if stop, why := g.check(generated(), now); stop {
+						stopTurn(errNoProgress{why})
+						return
+					}
+				}
+			}
+		}()
+		res, err := sess.Send(turnCtx, pack.Render())
+		close(watchDone)
+		var np errNoProgress
+		noProgress := errors.As(context.Cause(turnCtx), &np) && ctx.Err() == nil
+		stopTurn(nil)
+		gov.Store(nil)
 		budgetHit := sendCtx.Err() != nil && ctx.Err() == nil
 		cancelSend()
+		if noProgress {
+			// Not a failure of the runtime: the strategy is over. Its work is
+			// checkpointed and verified as usual; the next attempt is told
+			// what this one did and to change approach. Long output alone
+			// does not escalate (Z2 still applies to verification failures).
+			summary := g.summary()
+			r.Rec.Emit(ctx, t.ID, "strategy.stopped", map[string]any{"attempt": t.AttemptCount, "reason": np.reason, "summary": summary})
+			r.say("strategy stopped: %s (%s)", np.reason, summary)
+			strategyStopped = "The previous attempt was stopped for lack of progress: " + np.reason + ". It did: " + summary + ".\n" +
+				"Do not repeat that approach. Re-read the task and the verification results, form a different hypothesis about the cause, " +
+				"write a small test that reproduces the problem first, and make the smallest change that makes it pass."
+			sess.Close()
+			if sess, mode, err = r.openSession(ctx, t, openReq); err != nil {
+				return t, err
+			}
+			// Compact the stopped strategy's history before the next attempt.
+			if err := sess.Condense(ctx); err != nil {
+				r.Log.Warn("condense after stopped strategy", "err", err)
+			}
+			err = nil
+			res = agent.Result{Status: "stopped", FinalMessage: "strategy stopped: " + np.reason}
+		}
 		if err != nil {
 			if ctx.Err() != nil {
 				_ = r.Ledger.ResolveStrategy(context.WithoutCancel(ctx), stratID, "rejected", "interrupted before completion")

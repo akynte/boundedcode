@@ -15,8 +15,11 @@ type Step func(workspace, message string) (string, error)
 
 // Runtime replays Steps in order across sessions (resumes continue the script).
 type Runtime struct {
-	mu       sync.Mutex
-	Steps    []Step
+	mu    sync.Mutex
+	Steps []Step
+	// Hangs marks steps (by index) whose turn, after the step ran, keeps
+	// going until its context ends, like an agent stuck in a loop.
+	Hangs    map[int]bool
 	next     int
 	Messages []string // every message received, for assertions
 	Opens    int
@@ -62,10 +65,16 @@ func (s *session) Send(ctx context.Context, message string) (agent.Result, error
 		s.rt.mu.Unlock()
 		return agent.Result{Status: "finished", FinalMessage: "no more scripted steps"}, nil
 	}
-	step := s.rt.Steps[s.rt.next]
+	idx := s.rt.next
+	step := s.rt.Steps[idx]
+	hang := s.rt.Hangs[idx]
 	s.rt.next++
 	s.rt.mu.Unlock()
 	final, err := step(s.ws, message)
+	if hang && err == nil {
+		<-ctx.Done()
+		return agent.Result{Status: "paused"}, ctx.Err()
+	}
 	if err != nil {
 		// A failing step is an agent outcome, not a transport error.
 		return agent.Result{Status: "error", Error: err.Error()}, nil //nolint:nilerr // see above

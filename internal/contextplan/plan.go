@@ -37,7 +37,9 @@ const (
 
 // Inputs are the authoritative sources.
 type Inputs struct {
-	Task         *task.Task
+	Task *task.Task
+	// TaskContract is the rendered task contract (orchestrator/contract.go).
+	TaskContract string
 	Worktrees    []task.Worktree
 	WorkDir      string // agent-visible root containing one directory per repo
 	Strategies   []task.Strategy
@@ -177,6 +179,9 @@ func taskSection(in Inputs) string {
 	fmt.Fprintf(&b, "Task %s (attempt %d of %d, phase %s)\n\nRequest:\n%s\n", t.ID, t.AttemptCount, in.MaxAttempts, t.Phase, t.OriginalRequest)
 	if t.Goal != "" && t.Goal != t.OriginalRequest {
 		fmt.Fprintf(&b, "\nGoal: %s\n", t.Goal)
+	}
+	if in.TaskContract != "" {
+		fmt.Fprintf(&b, "\nTask contract (derived from the request, which stays authoritative):\n%s\n", in.TaskContract)
 	}
 	if len(t.AcceptanceCriteria) > 0 {
 		b.WriteString("\nAcceptance criteria:\n")

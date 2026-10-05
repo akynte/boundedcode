@@ -32,11 +32,11 @@ type Evidence struct {
 
 var testFileRE = regexp.MustCompile(`(^|/)[^/]*(_test\.go|\.(test|spec)\.[cm]?[jt]sx?)$`)
 
-// isTestFile reports whether a workspace-relative path is test code or test
+// IsTestFile reports whether a workspace-relative path is test code or test
 // data: a conventional test file, or anything under a directory whose name
 // marks tests (test, tests, __tests__, spec, testdata, or a *test* directory
 // such as caddytest).
-func isTestFile(p string) bool {
+func IsTestFile(p string) bool {
 	if testFileRE.MatchString(p) {
 		return true
 	}
@@ -86,7 +86,7 @@ func (e *Engine) BehaviourEvidence(ctx context.Context, t RepoTarget) (Evidence,
 	}
 	var goTests []string
 	for _, f := range changed {
-		if isTestFile(f) {
+		if IsTestFile(f) {
 			ev.TestFiles = append(ev.TestFiles, f)
 		}
 	}

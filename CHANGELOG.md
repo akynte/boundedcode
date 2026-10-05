@@ -5,6 +5,25 @@
 Initial implementation. See `docs/development/status.md` for what is
 implemented, experimental and planned.
 
+* Targeted engineering pass (2026-10-05):
+  * Strategy governor: an attempt that keeps generating without progress
+    (no first edit, new test or failing-to-passing test within
+    `agent.strategy.no_progress_tokens`, or past the attempt's token and
+    time caps) is stopped, recorded and followed by a materially different
+    attempt. `agent.max_output_tokens` makes the per-response cap
+    configurable.
+  * Task contract: the request is read into required behaviour, explicitly
+    allowed alternatives, constraints and material ambiguities before
+    implementation. Material ambiguity blocks for clarification
+    (`task run --clarify`) or, with `task.ambiguity: proceed`, is recorded
+    as SPEC_AMBIGUOUS.
+  * Retrieval seeds are ranked: quoted error messages are searched
+    literally and located at their origin first; names discussed in prose
+    come before identifiers from code samples; placeholder names, URL
+    parts, @mentions and names matching a large share of the repository
+    are dropped or demoted; file links resolve to the file; lexical hits
+    prefer code over docs and build output, and skip source maps and
+    minified bundles.
 * From the 2026-10-05 failure-driven engineering pass:
   * Completed tasks now distinguish `task_verified` (checks green and a
     test the change added or modified fails on the base commit and passes

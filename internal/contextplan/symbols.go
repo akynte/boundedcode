@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -36,6 +37,12 @@ type IntelStats struct {
 	LexicalCalls   int     `json:"lexical_calls"`
 	LexicalMillis  float64 `json:"lexical_ms"`
 	LexicalSymbols int     `json:"lexical_symbols"` // symbols answered only by lexical search
+	// Seeds are the ranked retrieval seeds tried ("kind:text"), DiagnosticHits
+	// the error messages located in the code, Demoted the sample names
+	// skipped as too common or placeholders.
+	Seeds          []string `json:"seeds,omitempty"`
+	DiagnosticHits int      `json:"diagnostic_hits"`
+	Demoted        []string `json:"demoted,omitempty"`
 }
 
 // Limits keep symbol context compact: the point of LSP navigation is to send
@@ -67,13 +74,44 @@ func timed[T any](ms *float64, f func() (T, error)) (T, error) {
 // fails or finds nothing, the graph's snippet and callers are used, as before.
 // A name neither answers (or that has no index at all) falls back to a
 // bounded lexical search of the task worktrees.
+//
+// Seeds are tried in rank order (see seeds.go): a quoted error message is
+// searched literally first; sample-code names that match a large share of
+// the repository are skipped.
 func requestSymbols(ctx context.Context, in Inputs, st *IntelStats) string {
 	var b strings.Builder
-	shown := 0
-	for _, n := range identifiers(in.Task.OriginalRequest + "\n" + in.Task.Goal) {
+	shown, freqChecks := 0, 0
+	for _, seed := range Seeds(in.Task.OriginalRequest + "\n" + in.Task.Goal) {
 		if shown >= maxSymbolsShown {
 			break
 		}
+		if len(st.Seeds) < 12 {
+			st.Seeds = append(st.Seeds, seed.Kind+":"+trunc1(seed.Text, 80))
+		}
+		if seed.Kind == "diagnostic" {
+			if text, ok := diagnosticSymbol(ctx, in, seed.Text, st); ok {
+				b.WriteString(text)
+				st.DiagnosticHits++
+				shown++
+			}
+			continue
+		}
+		if seed.Kind == "sample" && freqChecks < frequencyCheckLimit && len(in.Worktrees) > 0 {
+			freqChecks++
+			if n := fileMatches(ctx, in.Worktrees[0].Path, seed.Text, maxSeedFileMatches); n > maxSeedFileMatches {
+				st.Demoted = append(st.Demoted, seed.Text)
+				continue
+			}
+		}
+		if looksLikePath(seed.Text) {
+			if text, ok := pathSymbol(ctx, in, seed.Text, st); ok {
+				b.WriteString(text)
+				st.LexicalSymbols++
+				shown++
+			}
+			continue
+		}
+		n := seed.Text
 		before := shown
 		for _, w := range in.Worktrees {
 			if shown >= maxSymbolsShown {
@@ -104,6 +142,16 @@ func requestSymbols(ctx context.Context, in Inputs, st *IntelStats) string {
 			}
 		}
 		if shown == before {
+			// Lexical fallback only for names specific enough to help: one
+			// that matches a large share of the repository gives scattered
+			// hits, not context.
+			if freqChecks < frequencyCheckLimit && len(in.Worktrees) > 0 {
+				freqChecks++
+				if fileMatches(ctx, in.Worktrees[0].Path, n, maxSeedFileMatches) > maxSeedFileMatches {
+					st.Demoted = append(st.Demoted, n)
+					continue
+				}
+			}
 			if text, ok := lexicalSymbol(ctx, in, n, st); ok {
 				b.WriteString(text)
 				st.LexicalSymbols++
@@ -112,6 +160,41 @@ func requestSymbols(ctx context.Context, in Inputs, st *IntelStats) string {
 		}
 	}
 	return b.String()
+}
+
+// diagnosticSymbol locates an error message in the task worktrees: a
+// fixed-string search (not whole-word) for its invariant text, which finds
+// the code that produces it.
+func diagnosticSymbol(ctx context.Context, in Inputs, msg string, st *IntelStats) (string, bool) {
+	rg, err := exec.LookPath(rgBinary)
+	if err != nil || len(in.Worktrees) == 0 {
+		return "", false
+	}
+	ctx, cancel := context.WithTimeout(ctx, lexicalTimeout)
+	defer cancel()
+	t0 := time.Now()
+	defer func() { st.LexicalMillis += float64(time.Since(t0).Microseconds()) / 1000 }()
+	var b strings.Builder
+	hits := 0
+	for _, w := range in.Worktrees {
+		st.LexicalCalls++
+		for _, h := range ripgrepMode(ctx, rg, w.Path, msg, maxMatchesPerName-hits, false) {
+			fmt.Fprintf(&b, "### %s: diagnostic %q raised at ./%s/%s:%d\n```\n%s```\n", w.RepoName, trunc1(msg, 100), w.RepoName, h.file, h.line,
+				readAround([]task.Worktree{w}, w.RepoName, h.file, h.line, lexicalRadius+3))
+			hits++
+		}
+		if hits >= maxMatchesPerName {
+			break
+		}
+	}
+	return b.String(), hits > 0
+}
+
+func trunc1(s string, n int) string {
+	if len(s) > n {
+		return s[:n] + "…"
+	}
+	return s
 }
 
 // rgBinary is the ripgrep executable; lexical search is skipped without it.
@@ -169,14 +252,27 @@ type lexicalHit struct {
 // ripgrep returns up to limit matches of pattern under root in path order,
 // excluding secret paths. Errors (including a timeout) yield what was found.
 func ripgrep(ctx context.Context, rg, root, pattern string, limit int) []lexicalHit {
-	cmd := exec.CommandContext(ctx, rg, "--json", "-n", "-w", "--fixed-strings", "--max-count", "3", "--max-columns", "200",
-		"--max-filesize", "1M", "--sort", "path", "-g", "!vendor", "-g", "!node_modules", "--", pattern, ".")
+	return ripgrepMode(ctx, rg, root, pattern, limit, true)
+}
+
+// ripgrepMode is ripgrep with or without whole-word matching.
+func ripgrepMode(ctx context.Context, rg, root, pattern string, limit int, word bool) []lexicalHit {
+	// Source maps and minified bundles repeat the source they were built
+	// from and only add noise.
+	args := []string{"--json", "-n", "--fixed-strings", "--max-count", "3", "--max-columns", "200",
+		"--max-filesize", "1M", "--sort", "path", "-g", "!vendor", "-g", "!node_modules", "-g", "!*.map", "-g", "!*.min.*"}
+	if word {
+		args = append(args, "-w")
+	}
+	cmd := exec.CommandContext(ctx, rg, append(args, "--", pattern, ".")...)
 	cmd.Dir = root
 	out, _ := cmd.Output() // exit 1 means no match
 	var hits []lexicalHit
 	sc := bufio.NewScanner(bytes.NewReader(out))
 	sc.Buffer(make([]byte, 64<<10), 4<<20)
-	for sc.Scan() && len(hits) < limit {
+	// Collect beyond the limit so that code can be preferred over
+	// documentation and build output before truncating.
+	for sc.Scan() && len(hits) < 3*limit {
 		var m struct {
 			Type string `json:"type"`
 			Data struct {
@@ -197,6 +293,11 @@ func ripgrep(ctx context.Context, rg, root, pattern string, limit int) []lexical
 			continue
 		}
 		hits = append(hits, lexicalHit{file: rel, line: m.Data.LineNumber})
+	}
+	// Code before documentation (changelogs, READMEs mention every name).
+	sort.SliceStable(hits, func(i, j int) bool { return !isDocFile(hits[i].file) && isDocFile(hits[j].file) })
+	if len(hits) > limit {
+		hits = hits[:max(limit, 0)]
 	}
 	return hits
 }
@@ -358,4 +459,54 @@ func clipLines(s string, n int) string {
 		return strings.Join(lines, "\n")
 	}
 	return strings.Join(lines[:n], "\n") + fmt.Sprintf("\n… (%d more lines)", len(lines)-n)
+}
+
+// isDocFile reports files that mention names without implementing them:
+// documentation and changelogs, and build output (dist/, build/, out/).
+func isDocFile(p string) bool {
+	switch strings.ToLower(filepath.Ext(p)) {
+	case ".md", ".markdown", ".rst", ".txt", ".adoc":
+		return true
+	}
+	for _, d := range strings.Split(filepath.ToSlash(filepath.Dir(p)), "/") {
+		if d == "dist" || d == "build" || d == "out" {
+			return true
+		}
+	}
+	return false
+}
+
+// looksLikePath reports a seed that names a file (dir/file.ext or file.ext).
+func looksLikePath(s string) bool {
+	return pathRE.MatchString(s) && pathRE.FindString(s) == s || fileNameRE.MatchString(s)
+}
+
+var fileNameRE = regexp.MustCompile(`^[\w-]+\.(go|ts|tsx|js|jsx|mjs|cjs|py|rs|java|vue|rb|c|h|cc|cpp|yaml|yml|json|toml|tf)$`)
+
+// pathSymbol shows the start of a file the request names, found by its path
+// suffix in the task worktrees (at most two matches).
+func pathSymbol(ctx context.Context, in Inputs, name string, st *IntelStats) (string, bool) {
+	rg, err := exec.LookPath(rgBinary)
+	if err != nil {
+		return "", false
+	}
+	var b strings.Builder
+	found := 0
+	for _, w := range in.Worktrees {
+		st.LexicalCalls++
+		cmd := exec.CommandContext(ctx, rg, "--files", "-g", "**/"+name, "-g", "!vendor", "-g", "!node_modules")
+		cmd.Dir = w.Path
+		out, _ := cmd.Output()
+		for _, f := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+			f = filepath.ToSlash(filepath.Clean(f))
+			if f == "." || f == "" || found >= 2 || policy.IsSecretPath(f) || !strings.HasSuffix("/"+f, "/"+name) {
+				continue
+			}
+			if snip := readAround([]task.Worktree{w}, w.RepoName, f, 1, 30); snip != "" {
+				fmt.Fprintf(&b, "### %s: file named in the request ./%s/%s\n```\n%s```\n", w.RepoName, w.RepoName, f, snip)
+				found++
+			}
+		}
+	}
+	return b.String(), found > 0
 }

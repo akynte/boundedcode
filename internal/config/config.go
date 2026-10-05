@@ -33,6 +33,18 @@ type Config struct {
 	Sandbox      SandboxConfig    `yaml:"sandbox"`
 	Budgets      Budgets          `yaml:"budgets"`
 	Escalation   EscalationConfig `yaml:"escalation"`
+	Task         TaskConfig       `yaml:"task"`
+}
+
+// TaskConfig configures how requests are read before implementation.
+type TaskConfig struct {
+	// Contract derives a compact task contract (required behaviour, allowed
+	// alternatives, material ambiguities) before the first attempt.
+	Contract bool `yaml:"contract"`
+	// Ambiguity: "ask" blocks a materially ambiguous task until the user
+	// clarifies it (task run --clarify); "proceed" records SPEC_AMBIGUOUS and
+	// has the agent state and demonstrate its reading (benchmarks).
+	Ambiguity string `yaml:"ambiguity"`
 }
 
 // InferenceConfig selects and configures the local inference runtime.
@@ -63,6 +75,26 @@ type AgentConfig struct {
 	MaxIterations int    `yaml:"max_iterations"`
 	// CondenserMaxEvents triggers OpenHands' summarizing condenser.
 	CondenserMaxEvents int `yaml:"condenser_max_events"`
+	// MaxOutputTokens caps one model response (thinking plus visible
+	// output; thinking alone is capped per model profile by
+	// server.reasoning_budget).
+	MaxOutputTokens int `yaml:"max_output_tokens"`
+	// Strategy bounds one attempt's approach by its progress.
+	Strategy StrategyBudget `yaml:"strategy"`
+}
+
+// StrategyBudget stops an attempt that keeps generating without progress
+// (see orchestrator/governor.go). Progress is the attempt's first edit, a new
+// test file, or an agent-run test going from failing to passing. Measured on
+// the 2026-10 validation runs: productive attempts generated at most ~49K
+// tokens; unproductive ones 72-109K over 40-64 minutes.
+type StrategyBudget struct {
+	// NoProgressTokens: generated tokens allowed since the last progress.
+	NoProgressTokens int `yaml:"no_progress_tokens"`
+	// MaxTokens: generated tokens allowed for the whole attempt.
+	MaxTokens int `yaml:"max_tokens"`
+	// MaxDuration: wall-clock allowed for the attempt's agent turn.
+	MaxDuration Duration `yaml:"max_duration"`
 }
 
 // RepoIntelConfig configures repository intelligence.
@@ -159,9 +191,11 @@ func Defaults() Config {
 			StartupTimeout: Duration(5 * time.Minute), RequestTimeout: Duration(10 * time.Minute),
 			IdleSleep: Duration(30 * time.Minute),
 		},
+		Task: TaskConfig{Contract: true, Ambiguity: "ask"},
 		Agent: AgentConfig{
 			Runtime: "openhands", Image: "boundedcode-openhands:local",
-			MaxIterations: 150, CondenserMaxEvents: 80,
+			MaxIterations: 150, CondenserMaxEvents: 80, MaxOutputTokens: 8192,
+			Strategy: StrategyBudget{NoProgressTokens: 60000, MaxTokens: 100000, MaxDuration: Duration(45 * time.Minute)},
 		},
 		RepoIntel: RepoIntelConfig{Provider: "codebase-memory-mcp", Binary: "codebase-memory-mcp", CrossService: true,
 			Serena: SerenaConfig{Enabled: false, Version: SerenaVersion, Transport: "stdio", MaxInstances: 2,
@@ -254,6 +288,16 @@ func (c Config) Validate() error {
 	}
 	if c.Agent.MaxIterations < 1 {
 		errs = append(errs, errors.New("agent.max_iterations: must be >= 1"))
+	}
+	if c.Task.Ambiguity != "ask" && c.Task.Ambiguity != "proceed" {
+		errs = append(errs, fmt.Errorf("task.ambiguity: %q is not ask|proceed", c.Task.Ambiguity))
+	}
+	if c.Agent.MaxOutputTokens < 512 {
+		errs = append(errs, errors.New("agent.max_output_tokens: must be >= 512"))
+	}
+	if st := c.Agent.Strategy; st.NoProgressTokens < 0 || st.MaxTokens < 0 || st.MaxDuration < 0 ||
+		st.MaxTokens > 0 && st.NoProgressTokens > st.MaxTokens {
+		errs = append(errs, errors.New("agent.strategy: budgets must be >= 0 (0 disables) and no_progress_tokens <= max_tokens"))
 	}
 	if c.RepoIntel.Provider != "codebase-memory-mcp" {
 		errs = append(errs, fmt.Errorf("repointel.provider: %q is not supported (codebase-memory-mcp)", c.RepoIntel.Provider))

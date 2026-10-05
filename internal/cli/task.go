@@ -241,6 +241,7 @@ func newTaskCmd(app *App) *cobra.Command {
 	addRunFlags(create, &rf)
 
 	var rf2 runFlags
+	var clarify string
 	runCmd := &cobra.Command{
 		Use:     "run TASK",
 		Aliases: []string{"resume"},
@@ -255,10 +256,11 @@ func newTaskCmd(app *App) *cobra.Command {
 				return err
 			}
 			defer cleanup()
-			return runAndReport(cmd.Context(), app, r, args[0], orchestrator.RunOptions{})
+			return runAndReport(cmd.Context(), app, r, args[0], orchestrator.RunOptions{Clarification: clarify})
 		},
 	}
 	addRunFlags(runCmd, &rf2)
+	runCmd.Flags().StringVar(&clarify, "clarify", "", "answer for a task blocked as materially ambiguous (SPEC_AMBIGUOUS)")
 
 	status := &cobra.Command{
 		Use: "status [TASK]", Short: "Show a task (or recent tasks)", Args: cobra.MaximumNArgs(1),

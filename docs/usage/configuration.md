@@ -52,6 +52,22 @@ strings (`90s`, `10m`, `4h`).
 | `image` | `boundedcode-openhands:local` | Sandbox image, built by `sandbox build`. |
 | `max_iterations` | `150` | Agent steps per attempt; must be >= 1. |
 | `condenser_max_events` | `80` | History length that triggers OpenHands' summarizing condenser. |
+| `max_output_tokens` | `8192` | Cap on one model response (thinking plus visible output). Thinking alone is capped per model profile by `server.reasoning_budget`. |
+| `strategy.no_progress_tokens` | `60000` | An attempt is stopped after generating this many tokens without progress (its first edit, a new test file, or an agent-run test going from failing to passing). `0` disables. |
+| `strategy.max_tokens` | `100000` | Hard cap on tokens generated in one attempt. |
+| `strategy.max_duration` | `45m` | Hard cap on one attempt's agent turn. |
+
+A stopped attempt is recorded (`strategy.stopped` event, rejected strategy
+with the reason), its work is checkpointed and verified as usual, the
+session is compacted, and the next attempt is told what was tried and to
+change approach. Stopping does not by itself escalate to the frontier.
+
+### `task`
+
+| Key | Default | Meaning |
+|---|---|---|
+| `contract` | `true` | Before the first attempt, derive a compact task contract from the request with the local model: what is required, alternatives the request explicitly allows, constraints, what is out of scope, open questions, and acceptance evidence. It is shown to the agent; the request stays authoritative. |
+| `ambiguity` | `ask` | What a *material* ambiguity does (plausible readings that change behaviour, an API, data, security, compatibility, tests or output). `ask`: the task blocks before implementation with the questions (SPEC_AMBIGUOUS); answer with `task run TASK --clarify "..."`. `proceed`: the ambiguity is recorded and the agent states and demonstrates the reading it chose (used by benchmarks). Explicitly allowed alternatives never block. |
 
 ### `repointel`
 

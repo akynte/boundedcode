@@ -1,0 +1,33 @@
+# Retrieval-seed replay (development check, deterministic, no model)
+Real issue texts of the development tasks against each repository's base source; lexical stage only (no graph/Serena), OLD = previous identifier order.
+
+== gin-gonic__gin-3227
+OLD seeds (first 8, in order): [RedirectFixedPath RedirectTrailingSlash trailingSlash NewRecorder NewRequest StatusCode]
+NEW seeds: [diagnostic:page not found name:RedirectFixedPath name:RedirectTrailingSlash name:gin.go name:trailingSlash sample:NewRecorder]
+NEW diagnostic hits: 1  demoted: []
+NEW files in context: [context_1.16_test.go context_1.17_test.go context_1.19_test.go context_test.go gin.go routes_test.go tree_test.go auth_test.go]
+
+== caddyserver__caddy-6288
+OLD seeds (first 8, in order): [expression]
+NEW seeds: [diagnostic:wrong argument count or unexpected line ending after name:expression]
+NEW diagnostic hits: 1  demoted: [expression]
+NEW files in context: [caddyconfig/caddyfile/dispenser.go]
+
+== prometheus__prometheus-13845
+OLD seeds (first 8, in order): [__name__ __address__ jDomantas TestRangeQuery DropMetricName Labels]
+NEW seeds: [name:__name__ name:__address__ name:DropMetricName name:Labels sample:TestRangeQuery]
+NEW diagnostic hits: 0  demoted: [__name__ __address__ Labels]
+NEW files in context: [model/labels/labels_test.go promql/engine_test.go cmd/promtool/tsdb.go model/labels/labels.go model/labels/labels_dedupelabels.go model/labels/labels_stringlabels.go]
+
+== vuejs__core-11899
+OLD seeds (first 8, in order): [lKcLp foo bar]
+NEW seeds: []
+NEW diagnostic hits: 0  demoted: []
+NEW files in context: []
+
+== axios__axios-6539
+OLD seeds (first 8, in order): [userId responseUrl UnhandledPromiseRejectionWarning TypeError fullPath buildFullPath supportedProtocols]
+NEW seeds: [sample:userId sample:responseUrl sample:UnhandledPromiseRejectionWarning sample:TypeError sample:fullPath sample:buildFullPath sample:supportedProtocols]
+NEW diagnostic hits: 0  demoted: []
+NEW files in context: [lib/adapters/fetch.js lib/adapters/http.js test/specs/core/buildFullPath.spec.js dist/node/axios.cjs lib/cancel/CancelToken.js test/specs/cancel/CancelToken.spec.js dist/axios.js package.json lib/core/AxiosHeaders.js test/manual/promise.js lib/core/Axios.js lib/core/buildFullPath.js lib/helpers/resolveConfig.js lib/helpers/formDataToStream.js lib/helpers/toFormData.js dist/browser/axios.cjs dist/esm/axios.js]
+
