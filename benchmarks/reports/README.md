@@ -9,3 +9,4 @@ runtime build, machine snapshot, options and run conditions.
 | `20261003T161953Z-infra-qwen3.6-35b-a3b` | Finalists re-measured on an idle machine with cold model loads (page cache evicted). These are the reference numbers. |
 | `*-tasks-*` | Engineering suite (hidden acceptance checks), see `benchmarks/tasks/`. |
 | `small-real-world-validation-20261004/` | 8-task validation on public SWE-bench Multilingual / Multi-SWE-bench tasks: manifest, screening, frozen and post-fix runs, two-task baseline, memory-pressure evidence. Report: [docs/benchmarks/small-real-world-validation-2026-10.md](../../docs/benchmarks/small-real-world-validation-2026-10.md). |
+| `failure-driven-engineering-20261005/` | Development-corpus retesting (not a benchmark) of the four valid validation failures plus axios: retrospectives, time profiles, per-run results. Report: [docs/benchmarks/failure-driven-engineering-2026-10.md](../../docs/benchmarks/failure-driven-engineering-2026-10.md). |

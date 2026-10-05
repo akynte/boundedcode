@@ -34,3 +34,7 @@ specification and the Serena integration) was done on 2026-10-04; see
 A small real-world validation (8 public SWE-bench-style tasks) was run on
 2026-10-04: 0/8 on the frozen build, 1/8 after fixing five defects it found;
 see [the report](../benchmarks/small-real-world-validation-2026-10.md).
+A failure-driven engineering pass on 2026-10-05 used those failures as a
+development corpus (not a benchmark): 1/4 development tasks pass on the
+final build (prometheus, previously failing); see
+[the engineering report](../benchmarks/failure-driven-engineering-2026-10.md).

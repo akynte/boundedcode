@@ -1,0 +1,63 @@
+{
+  "id": "suite-20261005T144131Z",
+  "model": "qwen3.6-35b-a3b",
+  "started": "2026-10-05T14:41:31.135861881Z",
+  "finished": "2026-10-05T15:15:59.786535051Z",
+  "results": [
+    {
+      "id": "axios__axios-6539",
+      "category": "javascript",
+      "model": "qwen3.6-35b-a3b",
+      "success": false,
+      "task_status": "completed",
+      "self_verified": true,
+      "tests_green": true,
+      "attempts": 2,
+      "local_tokens": 154478,
+      "generated_tokens": 21571,
+      "cached_prompt_tokens": 2467910,
+      "escalations": 0,
+      "local_only": false,
+      "condensations": 1,
+      "resumes": 0,
+      "wall_seconds": 2068.64606561,
+      "failed_checks": [
+        "axios: sh -c npx mocha -R tap test/unit/regression/SNYK-JS-AXIOS-7361793.js: …S-7361793.js:39:42)\n      at process.processImmediate (node:internal/timers:574:21)\n      at Axios.request (file://$HOME/.cache/boundedcode/bench-work/axios__axios-6539-1791211291135884145/state/data/tasks/t20261005-b2872b/work/axios/lib/core/Axios.js:45:41)\n      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n      at async Context.\u003canonymous\u003e (file://$HOME/.cache/boundedcode/bench-work/axios__axios-6539-1791211291135884145/state/data/tasks/t20261005-b2872b/work/axios/test/unit/regression/SNYK-JS-AXIOS-7361793.js:39:26)\n# tests 1\n# pass 0\n# fail 1\n1..1\n"
+      ],
+      "task_id": "t20261005-b2872b",
+      "state_dir": "$HOME/.cache/boundedcode/bench-work/axios__axios-6539-1791211291135884145/state",
+      "intel": {
+        "context_packs": 2,
+        "pack_tokens": 17919,
+        "code_tokens": 14394,
+        "serena_calls": 22,
+        "serena_errors": 2,
+        "serena_ms": 14864.849999999999,
+        "graph_calls": 8,
+        "graph_ms": 58.1,
+        "serena_symbols": 6,
+        "graph_symbols": 0,
+        "fallbacks": 0,
+        "agent_tool_calls": 57,
+        "agent_tools": {
+          "file_editor": 24,
+          "finish": 2,
+          "terminal": 27,
+          "think": 4
+        }
+      }
+    }
+  ],
+  "summary": {
+    "tasks": 1,
+    "verified": 0,
+    "success_rate": 0,
+    "local_only_completion_rate": 0,
+    "frontier_escalation_rate": 0,
+    "verified_tasks_per_hour": 0,
+    "attempts_per_successful_task": 0,
+    "wall_seconds_per_task": 2068.64606561,
+    "local_tokens_per_task": 154478,
+    "self_verified_but_hidden_failed": 1
+  }
+}

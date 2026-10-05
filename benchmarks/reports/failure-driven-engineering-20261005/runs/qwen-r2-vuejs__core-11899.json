@@ -1,0 +1,64 @@
+{
+  "id": "suite-20261005T140812Z",
+  "model": "qwen3.6-35b-a3b",
+  "started": "2026-10-05T14:08:12.483529674Z",
+  "finished": "2026-10-05T14:41:30.905523012Z",
+  "results": [
+    {
+      "id": "vuejs__core-11899",
+      "category": "typescript",
+      "model": "qwen3.6-35b-a3b",
+      "success": false,
+      "task_status": "completed",
+      "self_verified": true,
+      "tests_green": true,
+      "attempts": 1,
+      "local_tokens": 209279,
+      "generated_tokens": 49325,
+      "cached_prompt_tokens": 2698438,
+      "escalations": 0,
+      "local_only": false,
+      "condensations": 2,
+      "resumes": 0,
+      "wall_seconds": 1998.417422398,
+      "failed_checks": [
+        "core: sh -c node_modules/.bin/vitest run packages/compiler-sfc/__tests__/compileStyle.spec.ts --reporter=verbose: …te\n+ .bar[data-v-test] { color: white\n+ }\n+ \u0026[data-v-test] {\n+   background-color: green\n  }\n  }\n  .foo[data-v-test] { color: red;\n  }\n  }\n\n ❯ packages/compiler-sfc/__tests__/compileStyle.spec.ts:63:7\n     61| }`,\n     62|       ),\n     63|     ).toMatch(\n       |       ^\n     64|       `h1 {\n     65| \u0026[data-v-test] {\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n Test Files  1 failed (1)\n      Tests  1 failed | 25 passed (26)\n   Start at  14:41:29\n   Duration  944ms (transform 437ms, setup 9ms, collect 562ms, tests 148ms, environment 0ms, prepare 69ms)\n\n"
+      ],
+      "task_id": "t20261005-2d53ca",
+      "state_dir": "$HOME/.cache/boundedcode/bench-work/vuejs__core-11899-1791209292483549626/state",
+      "intel": {
+        "context_packs": 1,
+        "pack_tokens": 3649,
+        "code_tokens": 2577,
+        "serena_calls": 3,
+        "serena_errors": 2,
+        "serena_ms": 6140.603999999999,
+        "graph_calls": 5,
+        "graph_ms": 55.45099999999999,
+        "serena_symbols": 0,
+        "graph_symbols": 2,
+        "fallbacks": 2,
+        "agent_tool_calls": 77,
+        "agent_tools": {
+          "file_editor": 37,
+          "finish": 1,
+          "task_tracker": 2,
+          "terminal": 33,
+          "think": 4
+        }
+      }
+    }
+  ],
+  "summary": {
+    "tasks": 1,
+    "verified": 0,
+    "success_rate": 0,
+    "local_only_completion_rate": 0,
+    "frontier_escalation_rate": 0,
+    "verified_tasks_per_hour": 0,
+    "attempts_per_successful_task": 0,
+    "wall_seconds_per_task": 1998.417422398,
+    "local_tokens_per_task": 209279,
+    "self_verified_but_hidden_failed": 1
+  }
+}

@@ -1,0 +1,63 @@
+{
+  "id": "suite-20261005T120556Z",
+  "model": "qwen3.6-35b-a3b",
+  "started": "2026-10-05T12:05:56.814154582Z",
+  "finished": "2026-10-05T12:13:27.337465983Z",
+  "results": [
+    {
+      "id": "gin-gonic__gin-3227",
+      "category": "go",
+      "model": "qwen3.6-35b-a3b",
+      "success": false,
+      "task_status": "completed",
+      "self_verified": true,
+      "tests_green": true,
+      "attempts": 1,
+      "local_tokens": 42322,
+      "generated_tokens": 10535,
+      "cached_prompt_tokens": 521815,
+      "escalations": 0,
+      "local_only": false,
+      "condensations": 0,
+      "resumes": 0,
+      "wall_seconds": 450.518761586,
+      "failed_checks": [
+        "gin: sh -c go test -v . -run \"^TestRedirect\": === RUN   TestRedirectTrailingSlash\n    tree_test.go:703: want true, is false\n--- FAIL: TestRedirectTrailingSlash (0.00s)\nFAIL\nFAIL\tgithub.com/gin-gonic/gin\t0.004s\nFAIL\n"
+      ],
+      "task_id": "t20261005-c76f55",
+      "state_dir": "$HOME/.cache/boundedcode/bench-work/gin-gonic__gin-3227-1791201956814190866/state",
+      "intel": {
+        "context_packs": 1,
+        "pack_tokens": 3860,
+        "code_tokens": 3100,
+        "serena_calls": 9,
+        "serena_errors": 0,
+        "serena_ms": 5200.432000000002,
+        "graph_calls": 3,
+        "graph_ms": 25.674999999999997,
+        "serena_symbols": 3,
+        "graph_symbols": 0,
+        "fallbacks": 0,
+        "agent_tool_calls": 22,
+        "agent_tools": {
+          "file_editor": 8,
+          "finish": 1,
+          "terminal": 11,
+          "think": 2
+        }
+      }
+    }
+  ],
+  "summary": {
+    "tasks": 1,
+    "verified": 0,
+    "success_rate": 0,
+    "local_only_completion_rate": 0,
+    "frontier_escalation_rate": 0,
+    "verified_tasks_per_hour": 0,
+    "attempts_per_successful_task": 0,
+    "wall_seconds_per_task": 450.518761586,
+    "local_tokens_per_task": 42322,
+    "self_verified_but_hidden_failed": 1
+  }
+}
