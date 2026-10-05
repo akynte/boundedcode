@@ -25,12 +25,12 @@ func observation(text string) agent.Event {
 	return agent.Event{Kind: "ObservationEvent", Tool: "terminal", Raw: raw}
 }
 
-var budget = config.StrategyBudget{NoProgressTokens: 60000, MaxTokens: 100000, MaxDuration: config.Duration(45 * time.Minute)}
+var budget = config.Defaults().Agent.Strategy
 
 // TestGovernorStopsUnproductiveStrategy replays the shape of the caddy
 // failure (re-reading the same files, edits that never make a test pass)
-// without anything task-specific: it is stopped once 60K tokens pass
-// without progress, long before the hour it used to take.
+// without anything task-specific: it is stopped once the no-progress budget
+// is spent, long before the hour it used to take.
 func TestGovernorStopsUnproductiveStrategy(t *testing.T) {
 	now := time.Now()
 	g := newGovernor(budget, 0, now)
@@ -43,7 +43,7 @@ func TestGovernorStopsUnproductiveStrategy(t *testing.T) {
 		g.observe(action("terminal", "go test ./caddyfile/", ""), gen)
 		g.observe(observation("--- FAIL: TestX\n[The command completed with exit code 1.]"), gen)
 		if stop, why := g.check(gen, now.Add(time.Duration(i)*time.Minute)); stop {
-			if gen > 65000 || !strings.Contains(why, "since the last progress") {
+			if gen > budget.NoProgressTokens+5000 || !strings.Contains(why, "since the last progress") {
 				t.Fatalf("stopped late or for the wrong reason at %d tokens: %s", gen, why)
 			}
 			if s := g.summary(); !strings.Contains(s, "r/lexer.go (") || !strings.Contains(s, "first edit") {
@@ -62,8 +62,8 @@ func TestGovernorAllowsProductiveStrategy(t *testing.T) {
 	now := time.Now()
 	g := newGovernor(budget, 0, now)
 	gen := 0
-	for i := 0; i < 4; i++ { // 4 rounds of 20K tokens, each ending in progress
-		gen += 20000
+	for i := 0; i < 4; i++ { // 4 rounds of 12K tokens, each ending in progress
+		gen += 12000
 		g.observe(action("file_editor", "create", "/w/work/r/pkg/case"+string(rune('a'+i))+"_test.go"), gen)
 		g.observe(action("terminal", "go test ./pkg/", ""), gen)
 		g.observe(observation("FAIL\n[The command completed with exit code 1.]"), gen)
@@ -74,10 +74,10 @@ func TestGovernorAllowsProductiveStrategy(t *testing.T) {
 			t.Fatalf("productive strategy stopped at %d tokens: %s", gen, why)
 		}
 	}
-	if stop, why := g.check(100000, now.Add(30*time.Minute)); !stop || !strings.Contains(why, "attempt generated") {
+	if stop, why := g.check(budget.MaxTokens, now.Add(10*time.Minute)); !stop || !strings.Contains(why, "attempt generated") {
 		t.Fatalf("hard cap not applied: %v %s", stop, why)
 	}
-	if stop, why := newGovernor(budget, 0, now).check(0, now.Add(46*time.Minute)); !stop || !strings.Contains(why, "ran") {
+	if stop, why := newGovernor(budget, 0, now).check(0, now.Add(budget.MaxDuration.D()+time.Minute)); !stop || !strings.Contains(why, "ran") {
 		t.Fatalf("duration cap not applied: %v %s", stop, why)
 	}
 	if stop, _ := newGovernor(config.StrategyBudget{}, 0, now).check(1<<30, now.Add(100*time.Hour)); stop {

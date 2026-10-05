@@ -85,9 +85,11 @@ type AgentConfig struct {
 
 // StrategyBudget stops an attempt that keeps generating without progress
 // (see orchestrator/governor.go). Progress is the attempt's first edit, a new
-// test file, or an agent-run test going from failing to passing. Measured on
-// the 2026-10 validation runs: productive attempts generated at most ~49K
-// tokens; unproductive ones 72-109K over 40-64 minutes.
+// test file, or an agent-run test going from failing to passing. Calibrated
+// by replaying these rules over the 2026-10 runs: attempts of tasks that
+// passed went at most ~20K tokens without progress and ~30K in total;
+// unproductive attempts 34-56K without progress and 57-107K in total, over
+// 33-64 minutes.
 type StrategyBudget struct {
 	// NoProgressTokens: generated tokens allowed since the last progress.
 	NoProgressTokens int `yaml:"no_progress_tokens"`
@@ -195,7 +197,7 @@ func Defaults() Config {
 		Agent: AgentConfig{
 			Runtime: "openhands", Image: "boundedcode-openhands:local",
 			MaxIterations: 150, CondenserMaxEvents: 80, MaxOutputTokens: 8192,
-			Strategy: StrategyBudget{NoProgressTokens: 60000, MaxTokens: 100000, MaxDuration: Duration(45 * time.Minute)},
+			Strategy: StrategyBudget{NoProgressTokens: 40000, MaxTokens: 50000, MaxDuration: Duration(35 * time.Minute)},
 		},
 		RepoIntel: RepoIntelConfig{Provider: "codebase-memory-mcp", Binary: "codebase-memory-mcp", CrossService: true,
 			Serena: SerenaConfig{Enabled: false, Version: SerenaVersion, Transport: "stdio", MaxInstances: 2,

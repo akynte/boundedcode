@@ -53,9 +53,9 @@ strings (`90s`, `10m`, `4h`).
 | `max_iterations` | `150` | Agent steps per attempt; must be >= 1. |
 | `condenser_max_events` | `80` | History length that triggers OpenHands' summarizing condenser. |
 | `max_output_tokens` | `8192` | Cap on one model response (thinking plus visible output). Thinking alone is capped per model profile by `server.reasoning_budget`. |
-| `strategy.no_progress_tokens` | `60000` | An attempt is stopped after generating this many tokens without progress (its first edit, a new test file, or an agent-run test going from failing to passing). `0` disables. |
-| `strategy.max_tokens` | `100000` | Hard cap on tokens generated in one attempt. |
-| `strategy.max_duration` | `45m` | Hard cap on one attempt's agent turn. |
+| `strategy.no_progress_tokens` | `40000` | An attempt is stopped after generating this many tokens without progress (its first edit, a new test file, or an agent-run test going from failing to passing). `0` disables. |
+| `strategy.max_tokens` | `50000` | Hard cap on tokens generated in one attempt. |
+| `strategy.max_duration` | `35m` | Hard cap on one attempt's agent turn. |
 
 A stopped attempt is recorded (`strategy.stopped` event, rejected strategy
 with the reason), its work is checkpointed and verified as usual, the
