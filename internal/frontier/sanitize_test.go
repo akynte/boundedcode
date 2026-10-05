@@ -36,8 +36,8 @@ func TestSanitizeHostPathSources(t *testing.T) {
 		{"unmapped home path", "wrote /home/dev/scratch/test_write", "wrote $HOME/scratch/test_write"},
 		{"bare home", "HOME=/home/dev", "HOME=$HOME"},
 		{"tool output URL", "at file:///home/dev/proj/a.js:3:1", "at file://$HOME/proj/a.js:3:1"},
-		{"JSON-escaped", `{"path":"\/home\/ali\/src\/grpc-go\/x.go"}`, `{"path":"grpc-go\/x.go"}`},
-		{"URL-encoded", "GET /open?f=%2Fhome%2Fali%2Fnotes", "GET /open?f=$HOME%2Fnotes"},
+		{"JSON-escaped", `{"path":"\/home\/dev\/src\/grpc-go\/x.go"}`, `{"path":"grpc-go\/x.go"}`},
+		{"URL-encoded", "GET /open?f=%2Fhome%2Fdev%2Fnotes", "GET /open?f=$HOME%2Fnotes"},
 		{"other user untouched", "see /home/devon/x and /home/dev_backup/y", "see /home/devon/x and /home/dev_backup/y"},
 		{"repo-relative untouched", "rest/server.go:12 ./svc/x.go credentials/tls.go", "rest/server.go:12 ./svc/x.go credentials/tls.go"},
 	}
@@ -69,7 +69,7 @@ func TestSanitizeSymlinkedLocation(t *testing.T) {
 // TestCheckPacketFailsClosed: every spelling of the home directory is
 // refused, at path boundaries only, with the location in the error.
 func TestCheckPacketFailsClosed(t *testing.T) {
-	for _, bad := range []string{"x /home/dev/y", "x /home/dev", `"\/home\/ali\/y"`, "f=%2Fhome%2Fali%2Fy", "HOME=/home/dev\n"} {
+	for _, bad := range []string{"x /home/dev/y", "x /home/dev", `"\/home\/dev\/y"`, "f=%2Fhome%2Fdev%2Fy", "HOME=/home/dev\n"} {
 		err := CheckPacket(bad, "/home/dev")
 		if err == nil || !strings.Contains(err.Error(), "near") {
 			t.Errorf("%q not refused: %v", bad, err)
