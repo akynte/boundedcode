@@ -72,6 +72,19 @@ def main():
             m["verification_runs"] = c.execute("SELECT count(*) FROM verification_runs WHERE task_id=?", (tid,)).fetchone()[0]
             esc = c.execute("SELECT trigger, reason, status, packet_tokens, outcome FROM escalations WHERE task_id=? ORDER BY id", (tid,)).fetchall()
             m["frontier_calls"] = sum(1 for e in esc if e[2] in ("sent", "answered", "failed"))
+            ev = lambda k: [json.loads(d) for (d,) in c.execute("SELECT data FROM events WHERE task_id=? AND kind=?", (tid, k))]
+            m["strategies_stopped"] = [x.get("reason") for x in ev("strategy.stopped")]
+            m["spec_ambiguous"] = bool(ev("task.ambiguous"))
+            con = ev("task.contract")
+            m["contract"] = con[0] if con else None
+            packs = ev("context.pack")
+            if packs:
+                intel = packs[0].get("intel", {})
+                m["initial_seeds"] = intel.get("seeds", [])
+                m["diagnostic_hits"] = intel.get("diagnostic_hits", 0)
+                m["demoted_seeds"] = intel.get("demoted", [])
+            m["largest_generation"] = c.execute("SELECT coalesce(max(completion_tokens),0) FROM model_calls WHERE task_id=?", (tid,)).fetchone()[0]
+            m["verification_states"] = [x.get("verified") for x in ev("verify.evidence")]
             m["escalations"] = [{"trigger": e[0], "reason": e[1], "status": e[2], "packet_tokens": e[3], "outcome": e[4]} for e in esc]
         obs, by_tool, actions = observations(sd, tid)
         m.update({"tool_observation_tokens": obs, "tool_observation_tokens_by_tool": by_tool, "agent_tool_calls": actions})
