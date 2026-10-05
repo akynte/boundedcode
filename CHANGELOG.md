@@ -18,6 +18,9 @@ implemented, experimental and planned.
     A surviving host path used to block the escalation silently and leave
     no record; a refused packet is now kept locally and recorded as a
     `blocked` escalation, counted by `stats`.
+  * Verification no longer changes the candidate it judges: tracked files
+    rewritten and untracked files created by its stages (e.g. a build that
+    regenerates committed bundles) are undone afterwards and reported.
   * Cross-service scanning no longer runs out of memory: JavaScript
     constant bindings were expanded exponentially (vuejs/core reached
     ~58 GiB) and, in semicolon-free code, swallowed later statements. Both

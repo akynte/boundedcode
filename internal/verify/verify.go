@@ -304,11 +304,22 @@ func (e *Engine) Run(ctx context.Context, t RepoTarget, scope Scope) (Result, er
 		}
 	}
 	res.Packages = packages
-	for _, st := range cfg.Stages {
-		if st.Scope == "full" && scope != Full || st.Scope == "targeted" && scope != Targeted {
-			continue
+	before, snapErr := snapshotWorktree(ctx, t.Worktree)
+	if snapErr != nil {
+		res.Stages = append(res.Stages, sideEffectsStage(nil, fmt.Errorf("snapshot before verification: %w", snapErr)))
+	} else {
+		for _, st := range cfg.Stages {
+			if st.Scope == "full" && scope != Full || st.Scope == "targeted" && scope != Targeted {
+				continue
+			}
+			res.Stages = append(res.Stages, e.runStage(ctx, t, st, packages))
 		}
-		res.Stages = append(res.Stages, e.runStage(ctx, t, st, packages))
+		// Undo what the stages changed (see sideeffects.go).
+		undone, err := undoSideEffects(ctx, t.Worktree, before)
+		if err != nil || len(undone) > 0 {
+			res.Stages = append(res.Stages, sideEffectsStage(undone, err))
+			e.Rec.Emit(ctx, t.TaskID, "verify.side_effects", map[string]any{"repo": t.Name, "undone": len(undone), "error": errString(err)})
+		}
 	}
 	for _, s := range res.Stages {
 		if s.Status == "fail" || s.Status == "error" {
@@ -328,6 +339,13 @@ func (e *Engine) Run(ctx context.Context, t RepoTarget, scope Scope) (Result, er
 	e.Rec.Emit(ctx, t.TaskID, "verify.result", map[string]any{"repo": t.Name, "scope": scope, "passed": res.Passed,
 		"failures": names(res.Failures()), "ms": res.Duration.Milliseconds()})
 	return res, nil
+}
+
+func errString(err error) string {
+	if err == nil {
+		return ""
+	}
+	return err.Error()
 }
 
 func names(s []StageResult) []string {
