@@ -38,9 +38,9 @@ func TestFailureDigestSurvivesLogFlood(t *testing.T) {
 
 func TestFailureDigestOtherRunners(t *testing.T) {
 	cases := map[string]string{
-		"src/a.ts(68,25): error TS18048: 'atRule.nodes' is possibly 'undefined'.\n": "error TS18048",
+		"src/a.ts(68,25): error TS18048: 'atRule.nodes' is possibly 'undefined'.\n":                                 "error TS18048",
 		" FAIL  packages/x/__tests__/a.spec.ts > scoped CSS > nesting\nAssertionError: expected 'a' to match 'b'\n": "AssertionError",
-		"  1) issues 4999 should not fail\n     Error: getaddrinfo EAI_AGAIN\n": "1) issues 4999",
+		"  1) issues 4999 should not fail\n     Error: getaddrinfo EAI_AGAIN\n":                                     "1) issues 4999",
 	}
 	for out, want := range cases {
 		if d := FailureDigest(out, 3000); !strings.Contains(d, want) {
