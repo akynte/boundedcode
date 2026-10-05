@@ -121,9 +121,13 @@ func (r *Runtime) Open(ctx context.Context, req agent.OpenRequest) (agent.Sessio
 	if !r.Sandbox.Isolated() && len(masks) > 0 && r.Log != nil {
 		r.Log.Warn("sandbox is not isolated: secret path masks cannot be enforced", "masks", len(masks))
 	}
+	env := map[string]string{"OPENHANDS_SUPPRESS_BANNER": "1", "BC_ADAPTER_LOG": "INFO", "PYTHONUNBUFFERED": "1"}
+	if r.Sandbox.Isolated() {
+		mounts = append(mounts, toolchainMounts(req.Toolchain, env)...)
+	}
 	spec := sandbox.Spec{
 		Argv: r.Argv, Workdir: req.Workspace, Mounts: mounts, Scratch: scratch, Masks: masks, Interactive: true,
-		Env:  map[string]string{"OPENHANDS_SUPPRESS_BANNER": "1", "BC_ADAPTER_LOG": "INFO", "PYTHONUNBUFFERED": "1"},
+		Env:  env,
 		Name: "bc-" + req.TaskID,
 	}
 	remove := func() {}
@@ -438,4 +442,25 @@ func (r *redactWriter) Flush() {
 		_, _ = io.WriteString(r.w, telemetry.Redact(string(r.buf)))
 		r.buf = nil
 	}
+}
+
+// toolchainMounts gives the agent the offline Go environment verification
+// uses (read-only module cache, GOPROXY=off) and its own build cache. It
+// sets env and returns the mounts; missing host directories are skipped.
+func toolchainMounts(tc agent.Toolchain, env map[string]string) []sandbox.Mount {
+	var out []sandbox.Mount
+	env["GOTOOLCHAIN"], env["GOFLAGS"] = "local", "-buildvcs=false"
+	if tc.GoModCache != "" {
+		if st, err := os.Stat(tc.GoModCache); err == nil && st.IsDir() {
+			out = append(out, sandbox.Mount{Host: tc.GoModCache, Target: tc.GoModCache, ReadOnly: true})
+			env["GOMODCACHE"], env["GOPROXY"], env["GOFLAGS"] = tc.GoModCache, "off", "-buildvcs=false -mod=mod"
+		}
+	}
+	if tc.GoCache != "" {
+		if err := os.MkdirAll(tc.GoCache, 0o700); err == nil {
+			out = append(out, sandbox.Mount{Host: tc.GoCache, Target: tc.GoCache})
+			env["GOCACHE"] = tc.GoCache
+		}
+	}
+	return out
 }

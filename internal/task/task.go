@@ -55,7 +55,7 @@ type Task struct {
 	RemainingSteps      []string   `json:"remaining_steps"`
 	AttemptCount        int        `json:"attempt_count"`
 	Decisions           []Decision `json:"decisions"`
-	VerificationState   string     `json:"verification_state"` // none | failing | targeted_pass | full_pass
+	VerificationState   string     `json:"verification_state"` // none | failing | targeted_pass | tests_green | task_verified
 	ChangedRepositories []string   `json:"changed_repositories"`
 	ChangedFiles        []string   `json:"changed_files"`
 	ChangedSymbols      []string   `json:"changed_symbols"`
@@ -104,6 +104,14 @@ type Worktree struct {
 	Branch       string `json:"branch"`
 	BaseCommit   string `json:"base_commit"`
 }
+
+// Verification states of a completed task. tests_green: every configured
+// check passes; task_verified: additionally, a test the change added or
+// modified fails on the base and passes on the change.
+const (
+	VerificationTestsGreen   = "tests_green"
+	VerificationTaskVerified = "task_verified"
+)
 
 // Strategy is one approach tried in an attempt.
 type Strategy struct {

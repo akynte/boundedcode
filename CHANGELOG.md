@@ -5,6 +5,24 @@
 Initial implementation. See `docs/development/status.md` for what is
 implemented, experimental and planned.
 
+* From the 2026-10-05 failure-driven engineering pass:
+  * Completed tasks now distinguish `task_verified` (checks green and a
+    test the change added or modified fails on the base commit and passes
+    on the change) from `tests_green` (checks green, nothing demonstrates
+    the requested behaviour). Without evidence the agent is asked once for
+    a reproduction test; a task that still has none ends unverified, never
+    as a verified merge candidate. `stats` reports both.
+  * The agent sandbox gets verification's read-only Go module cache and
+    offline settings, so the agent can build and test what it is judged
+    by (it previously could not run a single test in repositories with
+    dependencies), with a separate build cache.
+  * Go files behind custom build tags that a change touches are compiled
+    under those tags (built-in `go-build-tags` stage).
+  * Model profiles can cap thinking per response (`reasoning_budget`);
+    the shipped profiles use 4096 tokens. Unbounded thinking ended in
+    8K-token runaways costing 31-51% of model time on several tasks.
+  * The context pack's change impact now follows the worktree's actual
+    changes after an interrupted attempt.
 * Fixes from the 2026-10-04 small real-world validation:
   * JavaScript/TypeScript verification now runs: the repository checkout's
     installed `node_modules` are mounted read-only into task worktrees (for

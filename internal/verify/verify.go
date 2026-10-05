@@ -49,6 +49,10 @@ type Stage struct {
 	Optional bool `yaml:"optional"`
 	// Requires lists files that must exist for the stage to apply (e.g. go.mod).
 	Requires []string `yaml:"requires"`
+	// Tests marks a stage that runs tests; behavioural evidence reruns such
+	// stages on the base commit with the change's tests (see delta.go).
+	// Without it, a stage whose name or command mentions "test" counts.
+	Tests bool `yaml:"tests"`
 }
 
 // Config is a repository's verification configuration
@@ -244,7 +248,7 @@ func presetFor(files map[string]bool) Config {
 			Stage{Name: "gofmt", Run: []string{"sh", "-c", `out=$(gofmt -l $(git ls-files '*.go' | grep -v '^vendor/') 2>&1); [ -z "$out" ] || { echo "files need gofmt:"; echo "$out"; exit 1; }`}, Requires: []string{"go.mod"}},
 			Stage{Name: "go-build", Run: []string{"go", "build", "./..."}, Requires: []string{"go.mod"}},
 			Stage{Name: "go-vet", Run: []string{"go", "vet", "{packages}"}, Requires: []string{"go.mod"}},
-			Stage{Name: "go-test", Run: []string{"go", "test", "-count=1", "{packages}"}, Requires: []string{"go.mod"}, Timeout: config.Duration(20 * time.Minute)},
+			Stage{Name: "go-test", Run: []string{"go", "test", "-count=1", "{packages}"}, Requires: []string{"go.mod"}, Timeout: config.Duration(20 * time.Minute), Tests: true},
 			Stage{Name: "golangci-lint", Run: []string{"golangci-lint", "run", "./..."}, Scope: "full", Optional: true, Requires: []string{"go.mod"}},
 		)
 	}
@@ -266,7 +270,7 @@ func presetFor(files map[string]bool) Config {
 		c.Stages = append(c.Stages,
 			Stage{Name: "tsc", Run: []string{"sh", "-c", tsc}, Optional: true, Requires: []string{"tsconfig.json"}},
 			Stage{Name: "npm-lint", Run: []string{"sh", "-c", npmScript("lint")}, Optional: true, Requires: []string{"package.json"}},
-			Stage{Name: "npm-test", Run: []string{"sh", "-c", npmScript("test")}, Optional: true, Requires: []string{"package.json"}, Timeout: config.Duration(20 * time.Minute)},
+			Stage{Name: "npm-test", Run: []string{"sh", "-c", npmScript("test")}, Optional: true, Requires: []string{"package.json"}, Timeout: config.Duration(20 * time.Minute), Tests: true},
 			Stage{Name: "npm-build", Run: []string{"sh", "-c", npmScript("build")}, Scope: "full", Optional: true, Requires: []string{"package.json"}},
 		)
 	}
@@ -296,6 +300,9 @@ func (e *Engine) Run(ctx context.Context, t RepoTarget, scope Scope) (Result, er
 	}
 	res.Stages = append(res.Stages, diffScope(changed, cfg))
 	res.Stages = append(res.Stages, e.secretScan(ctx, t, scope))
+	if st, ok := e.buildTagsStage(ctx, t, changed); ok {
+		res.Stages = append(res.Stages, st)
+	}
 
 	packages := []string{"./..."}
 	if scope == Targeted {
@@ -428,17 +435,25 @@ func (e *Engine) secretScan(ctx context.Context, t RepoTarget, scope Scope) Stag
 }
 
 func (e *Engine) runStage(ctx context.Context, t RepoTarget, st Stage, packages []string) StageResult {
+	sr, _ := e.runStageFull(ctx, t, st, packages)
+	return sr
+}
+
+// runStageFull is runStage that also returns the stage's whole (redacted)
+// output; StageResult keeps only its tail.
+func (e *Engine) runStageFull(ctx context.Context, t RepoTarget, st Stage, packages []string) (StageResult, string) {
 	sr := StageResult{Name: st.Name}
+	full := ""
 	for _, req := range st.Requires {
 		if _, err := os.Stat(filepath.Join(t.Worktree, req)); err != nil {
 			// A stage that applied at base cannot be switched off by deleting
 			// its required file.
 			if t.Base != "" && !blobMissing(ctx, t.Worktree, t.Base, req) {
 				sr.Status, sr.ExitCode, sr.Output = "fail", 1, req+" exists at the base commit but was removed by the change"
-				return sr
+				return sr, full
 			}
 			sr.Status, sr.Output = "skipped", "missing "+req
-			return sr
+			return sr, full
 		}
 	}
 	var argv []string
@@ -452,7 +467,7 @@ func (e *Engine) runStage(ctx context.Context, t RepoTarget, st Stage, packages 
 	sr.Command = strings.Join(argv, " ")
 	if err := policy.CheckCommand(argv); err != nil {
 		sr.Status, sr.Output = "error", err.Error()
-		return sr
+		return sr, full
 	}
 	timeout := st.Timeout.D()
 	if timeout == 0 {
@@ -463,12 +478,12 @@ func (e *Engine) runStage(ctx context.Context, t RepoTarget, st Stage, packages 
 	spec, err := e.spec(t, argv)
 	if err != nil {
 		sr.Status, sr.Output = "error", err.Error()
-		return sr
+		return sr, full
 	}
 	cmd, err := e.Sandbox.Command(sctx, spec)
 	if err != nil {
 		sr.Status, sr.Output = "error", err.Error()
-		return sr
+		return sr, full
 	}
 	var out bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &out
@@ -476,7 +491,8 @@ func (e *Engine) runStage(ctx context.Context, t RepoTarget, st Stage, packages 
 	start := time.Now()
 	err = cmd.Run()
 	sr.DurationMS = time.Since(start).Milliseconds()
-	sr.Output = tail(telemetry.Redact(out.String()), 6000)
+	full = telemetry.Redact(out.String())
+	sr.Output = tail(full, 6000)
 	var ee *exec.ExitError
 	switch {
 	case err == nil:
@@ -501,7 +517,7 @@ func (e *Engine) runStage(ctx context.Context, t RepoTarget, st Stage, packages 
 	default:
 		sr.Status = "error"
 	}
-	return sr
+	return sr, full
 }
 
 func (e *Engine) spec(t RepoTarget, argv []string) (sandbox.Spec, error) {

@@ -58,6 +58,12 @@ func BuildArgs(p model.Profile, modelPath, host string, port int) []string {
 	if s.Reasoning != "" {
 		args = append(args, "--reasoning", s.Reasoning)
 	}
+	if s.ReasoningBudget != 0 {
+		args = append(args, "--reasoning-budget", strconv.Itoa(s.ReasoningBudget))
+		if s.ReasoningBudgetMessage != "" {
+			args = append(args, "--reasoning-budget-message", s.ReasoningBudgetMessage)
+		}
+	}
 	// Sampling defaults are set server-side so every client (including the
 	// agent runtime) gets the profile's recommended values.
 	smp := p.Sampling

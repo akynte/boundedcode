@@ -105,7 +105,8 @@ type TaskResult struct {
 	Model           string   `json:"model"`
 	Success         bool     `json:"success"` // hidden acceptance checks passed
 	TaskStatus      string   `json:"task_status"`
-	SelfVerified    bool     `json:"self_verified"` // our verification gate passed
+	SelfVerified    bool     `json:"self_verified"` // task_verified: checks green and a test demonstrates the change
+	TestsGreen      bool     `json:"tests_green"`   // all configured checks passed (with or without evidence)
 	Attempts        int      `json:"attempts"`
 	LocalTokens     int      `json:"local_tokens"` // processed (uncached prompt + generated)
 	GeneratedTokens int      `json:"generated_tokens"`
@@ -301,7 +302,8 @@ func (s *SuiteRunner) runOne(ctx context.Context, model string, spec TaskSpec) (
 	}
 	if final != nil {
 		res.TaskStatus = string(final.Status)
-		res.SelfVerified = final.VerificationState == "full_pass"
+		res.SelfVerified = final.VerificationState == task.VerificationTaskVerified
+		res.TestsGreen = final.VerificationState == task.VerificationTestsGreen || res.SelfVerified
 		res.Attempts = final.AttemptCount
 		res.LocalTokens = final.Budget.UsedLocalTokens
 		res.GeneratedTokens, res.CachedTokens = final.Budget.GeneratedTokens, final.Budget.CachedTokens

@@ -32,6 +32,9 @@ server:
   threads: 8
   parallel: 1
   jinja: true
+  # Cap thinking per response; see model.ServerFlags.ReasoningBudget.
+  reasoning_budget: 4096
+  reasoning_budget_message: "\n\nI have reasoned enough. I will now act on my best plan.\n"
 sampling:
   temperature: 0.6
   top_p: 0.95

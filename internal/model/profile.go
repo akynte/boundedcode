@@ -64,6 +64,15 @@ type ServerFlags struct {
 	CacheReuse int    `yaml:"cache_reuse"`
 	// Reasoning maps to llama-server --reasoning (on|off|auto).
 	Reasoning string `yaml:"reasoning"`
+	// ReasoningBudget caps thinking tokens per response (llama-server
+	// --reasoning-budget): 0 leaves the server default, -1 is unrestricted.
+	// Unbounded thinking was measured to end in 8K-token runaways (repetition,
+	// tool calls trapped inside the thinking block) costing 31-51% of model
+	// time on several real tasks.
+	ReasoningBudget int `yaml:"reasoning_budget"`
+	// ReasoningBudgetMessage is injected before the end-of-thinking tag when
+	// the budget is spent, so the model moves on to act.
+	ReasoningBudgetMessage string `yaml:"reasoning_budget_message"`
 	// ExtraArgs are appended verbatim; prefer typed fields.
 	ExtraArgs []string `yaml:"extra_args"`
 }
@@ -94,6 +103,9 @@ func (p Profile) Validate() error {
 	case "", "on", "off", "auto":
 	default:
 		errs = append(errs, fmt.Errorf("server.flash_attn: %q is not on|off|auto", p.Server.FlashAttn))
+	}
+	if p.Server.ReasoningBudget < -1 {
+		errs = append(errs, fmt.Errorf("server.reasoning_budget: %d (want -1, 0 or a positive token count)", p.Server.ReasoningBudget))
 	}
 	switch p.Server.Reasoning {
 	case "", "on", "off", "auto":

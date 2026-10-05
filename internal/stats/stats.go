@@ -14,11 +14,14 @@ import (
 
 // Summary aggregates tasks created since a timestamp (RFC 3339; "" = all).
 type Summary struct {
-	Since              string         `json:"since,omitempty"`
-	Tasks              int            `json:"tasks"`
-	ByStatus           map[string]int `json:"by_status"`
-	Completed          int            `json:"completed"`
-	CompletedLocalOnly int            `json:"completed_local_only"`
+	Since     string         `json:"since,omitempty"`
+	Tasks     int            `json:"tasks"`
+	ByStatus  map[string]int `json:"by_status"`
+	Completed int            `json:"completed"`
+	// CompletedVerified completed with behavioural evidence (task_verified);
+	// the rest of Completed only had green checks (tests_green).
+	CompletedVerified  int `json:"completed_verified"`
+	CompletedLocalOnly int `json:"completed_local_only"`
 	// LocalOnlyRate is completed-without-any-frontier-answer / completed.
 	LocalOnlyRate float64 `json:"local_only_completion_rate"`
 	// EscalationRate is tasks with at least one escalation sent / tasks.
@@ -49,7 +52,7 @@ type Summary struct {
 // Compute aggregates the ledger.
 func Compute(ctx context.Context, db *sql.DB, since string) (Summary, error) {
 	s := Summary{Since: since, ByStatus: map[string]int{}}
-	rows, err := db.QueryContext(ctx, `SELECT t.id, t.status, t.attempt_count, t.budget,
+	rows, err := db.QueryContext(ctx, `SELECT t.id, t.status, t.verification_state, t.attempt_count, t.budget,
 		(SELECT COUNT(*) FROM escalations e WHERE e.task_id = t.id AND e.status IN ('sent','answered','answered_manual','failed')),
 		(SELECT COUNT(*) FROM escalations e WHERE e.task_id = t.id AND e.status IN ('answered','answered_manual')),
 		(SELECT COUNT(*) FROM escalations e WHERE e.task_id = t.id AND e.status = 'declined'),
@@ -62,9 +65,9 @@ func Compute(ctx context.Context, db *sql.DB, since string) (Summary, error) {
 	defer rows.Close()
 	escalated, attempts := 0, 0
 	for rows.Next() {
-		var id, status, budget string
+		var id, status, vstate, budget string
 		var att, sent, answered, declined, blocked, packet int
-		if err := rows.Scan(&id, &status, &att, &budget, &sent, &answered, &declined, &blocked, &packet); err != nil {
+		if err := rows.Scan(&id, &status, &vstate, &att, &budget, &sent, &answered, &declined, &blocked, &packet); err != nil {
 			return s, err
 		}
 		var b task.Budget
@@ -89,6 +92,9 @@ func Compute(ctx context.Context, db *sql.DB, since string) (Summary, error) {
 		s.FailedVerificationRuns += b.FailedVerifyRuns
 		if status == string(task.StatusCompleted) {
 			s.Completed++
+			if vstate == task.VerificationTaskVerified {
+				s.CompletedVerified++
+			}
 			attempts += att
 			if answered == 0 {
 				s.CompletedLocalOnly++

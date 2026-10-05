@@ -33,6 +33,30 @@ func (f *fakeFrontier) Ask(_ context.Context, packet, _ string) (string, error) 
 	return "Root cause: the settlement entry must be the negated amount so postings balance.", nil
 }
 
+// addReproTest writes a test that fails on the planted bug (unbalanced
+// posting) and passes once it is fixed: behavioural evidence for the fix.
+func addReproTest(ws string) error {
+	return os.WriteFile(filepath.Join(ws, "ledger-service/internal/consumer/repro_test.go"), []byte(`package consumer
+
+import (
+	"testing"
+
+	"example.com/ledger-service/internal/ledger"
+)
+
+func TestChargePostingBalances(t *testing.T) {
+	l := &ledger.Ledger{}
+	c := &Consumer{Ledger: l}
+	if err := c.HandlePaymentCharged(&ConsumerMessage{Topic: TopicPaymentCharged, Value: []byte(`+"`"+`{"payment_id":"p1","account_id":"a","amount_cents":500,"currency":"USD"}`+"`"+`)}); err != nil {
+		t.Fatal(err)
+	}
+	if l.Balance("a") != 500 || l.Balance(SettlementAccount) != -500 {
+		t.Fatalf("a=%d settlement=%d", l.Balance("a"), l.Balance(SettlementAccount))
+	}
+}
+`), 0o644)
+}
+
 func replaceIn(path, old, new string) error {
 	b, err := os.ReadFile(path)
 	if err != nil {
@@ -140,6 +164,9 @@ func TestRunFailEscalateCrashResumeAndComplete(t *testing.T) {
 		if !strings.Contains(msg, "resuming a task") || !strings.Contains(msg, "STRATEGIES ALREADY TRIED") {
 			return "", os.ErrInvalid // resume pack must be rebuilt from the ledger
 		}
+		if err := addReproTest(ws); err != nil {
+			return "", err
+		}
 		return "negated the settlement amount", replaceIn(filepath.Join(ws, consumerFile), "AmountCents: ev.AmountCents, Currency: ev.Currency},\n\t)", "AmountCents: -ev.AmountCents, Currency: ev.Currency},\n\t)")
 	}
 	rt2 := &scripted.Runtime{Steps: []scripted.Step{rightFix}}
@@ -151,7 +178,7 @@ func TestRunFailEscalateCrashResumeAndComplete(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Status != task.StatusCompleted || got.VerificationState != "full_pass" || got.Phase != task.PhaseReview {
+	if got.Status != task.StatusCompleted || got.VerificationState != task.VerificationTaskVerified || got.Phase != task.PhaseReview {
 		t.Fatalf("expected completed merge candidate, got status=%s phase=%s verify=%s; messages:\n%s", got.Status, got.Phase, got.VerificationState, strings.Join(rt2.Messages, "\n----\n"))
 	}
 	if rt2.Requests[0].Gateway == nil {
@@ -253,8 +280,11 @@ func TestContractCheck(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Status != task.StatusCompleted || len(rt.Messages) != 2 {
-		t.Fatalf("status=%s messages=%d\n%s", got.Status, len(rt.Messages), strings.Join(rt.Messages, "\n---\n"))
+	// A documentation change has no behavioural test: one evidence request,
+	// then an honest tests_green (unverified) result.
+	if got.Status != task.StatusCompleted || len(rt.Messages) != 3 || got.VerificationState != task.VerificationTestsGreen ||
+		!strings.Contains(rt.Messages[2], "nothing yet shows") {
+		t.Fatalf("status=%s verify=%s messages=%d\n%s", got.Status, got.VerificationState, len(rt.Messages), strings.Join(rt.Messages, "\n---\n"))
 	}
 	if !strings.Contains(rt.Messages[0], "CROSS-SERVICE CONTRACTS") || !strings.Contains(rt.Messages[0], "topic payments.charged") {
 		t.Fatalf("initial pack lacks contracts:\n%s", rt.Messages[0])

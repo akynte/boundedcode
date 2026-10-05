@@ -46,11 +46,24 @@ type OpenRequest struct {
 	DependencyMounts []DependencyMount
 	// DependencyScratch are writable tool-cache directories inside them.
 	DependencyScratch []string
+	// Toolchain gives the agent the same offline build environment as
+	// verification, so it can build and run the tests it is judged by.
+	Toolchain Toolchain
 	// OnEvent receives runtime events (may be nil). Called sequentially.
 	OnEvent func(Event)
 	// Gateway meters and forwards the session's model calls. The task runner
 	// supplies it so token budgets are enforced on the same counter.
 	Gateway *inference.Gateway
+}
+
+// Toolchain is the agent sandbox's build environment (host paths).
+type Toolchain struct {
+	// GoModCache is mounted read-only with GOPROXY=off, as for verification.
+	GoModCache string
+	// GoCache is the agent's own Go build cache (writable). It must not be
+	// verification's: Go caches test results, and an agent-written cache
+	// could otherwise turn a failing verification test into a cached "ok".
+	GoCache string
 }
 
 // DependencyMount maps an installed-dependency directory read-only to Target.

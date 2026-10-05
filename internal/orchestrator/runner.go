@@ -241,7 +241,7 @@ func (r *Runner) Run(ctx context.Context, taskID string, opt RunOptions) (*task.
 	openReq := agent.OpenRequest{TaskID: t.ID, SessionID: t.AgentSessionID, Workspace: r.WorkDir(t.ID), GitCommonDirs: gitDirs, GitAdminDirs: adminDirs,
 		PersistenceDir: filepath.Join(r.Paths.TaskDir(t.ID), "runtime"), MaxIterations: r.Cfg.Agent.MaxIterations,
 		MaxInputTokens: r.CtxSize, MaxOutputTokens: 8192, CondenserMaxEvents: r.Cfg.Agent.CondenserMaxEvents,
-		CondenserMaxTokens: r.CtxSize * 7 / 10, Masks: masks, DependencyMounts: deps, DependencyScratch: depScratch, OnEvent: onEvent, Gateway: gw,
+		CondenserMaxTokens: r.CtxSize * 7 / 10, Masks: masks, DependencyMounts: deps, DependencyScratch: depScratch, Toolchain: r.agentToolchain(t.ID), OnEvent: onEvent, Gateway: gw,
 		LLMTimeout: r.Cfg.Inference.RequestTimeout.D()}
 	sess, mode, err := r.openSession(ctx, t, openReq)
 	if err != nil {
@@ -485,13 +485,30 @@ func (r *Runner) Run(ctx context.Context, taskID string, opt RunOptions) (*task.
 					}
 				}
 			}
+			// Green checks are not proof that the requested behaviour exists:
+			// ask once for a test that demonstrates it (see verify/delta.go).
+			verified, why := r.behaviourEvidence(ctx, t, wts, changedRepos)
+			if !verified && roundsLeft && !r.hasEvent(ctx, t.ID, "verify.evidence_requested") {
+				r.Rec.Emit(ctx, t.ID, "verify.evidence_requested", map[string]any{"reason": why})
+				r.say("verification passed but %s; asking the agent for a test that demonstrates the change", why)
+				_ = r.Ledger.ResolveStrategy(ctx, stratID, "succeeded", "verification passed; behavioural evidence requested")
+				_ = r.updateStrategySummary(ctx, stratID, summary)
+				advice = evidenceRequest(why)
+				mode = contextplan.ModeRetry
+				continue
+			}
 			_ = r.Ledger.ResolveStrategy(ctx, stratID, "succeeded", "verification passed (targeted + full)")
 			_ = r.updateStrategySummary(ctx, stratID, summary)
-			t.VerificationState = "full_pass"
 			t.MarkStep("implement")
 			t.MarkStep("verify (full gate)")
 			t.Status, t.Phase, t.FinishedAt = task.StatusCompleted, task.PhaseReview, store.Now()
-			t.Decide("policy", "merge candidate: all verification passed on branch "+gitops.TaskBranch(t.ID))
+			if verified {
+				t.VerificationState = task.VerificationTaskVerified
+				t.Decide("policy", "merge candidate: all verification passed and a test demonstrates the change, on branch "+gitops.TaskBranch(t.ID))
+			} else {
+				t.VerificationState = task.VerificationTestsGreen
+				t.Decide("policy", "UNVERIFIED candidate: checks are green but "+why+"; review before merging branch "+gitops.TaskBranch(t.ID))
+			}
 			if err := save(); err != nil {
 				return t, err
 			}
@@ -499,7 +516,11 @@ func (r *Runner) Run(ctx context.Context, taskID string, opt RunOptions) (*task.
 			SetEscalationTaskOutcome(ctx, r.DB, t.ID, string(task.StatusCompleted))
 			r.Rec.Emit(ctx, t.ID, "task.completed", map[string]any{"attempts": t.AttemptCount, "tokens": t.Budget.UsedLocalTokens,
 				"escalations": t.Budget.UsedEscalations, "condensations": t.Budget.Condensations, "wall_s": round1(t.Budget.UsedWallClockS)})
-			r.say("task %s is a verified merge candidate on %s", t.ID, gitops.TaskBranch(t.ID))
+			if verified {
+				r.say("task %s is a verified merge candidate on %s", t.ID, gitops.TaskBranch(t.ID))
+			} else {
+				r.say("task %s: checks green but UNVERIFIED (%s); candidate on %s needs review", t.ID, why, gitops.TaskBranch(t.ID))
+			}
 			return t, nil
 		}
 
@@ -706,6 +727,56 @@ func secretMasks(workDir string, wts []task.Worktree) ([]string, error) {
 	return out, nil
 }
 
+// behaviourEvidence reports whether a test the change added or modified
+// fails on the base and passes on the candidate, in any changed repository.
+func (r *Runner) behaviourEvidence(ctx context.Context, t *task.Task, wts []task.Worktree, changedRepos []string) (bool, string) {
+	why := "no test demonstrates the change"
+	for _, w := range wts {
+		if !slices.Contains(changedRepos, w.RepoName) {
+			continue
+		}
+		ev, err := r.Verify.BehaviourEvidence(ctx, verify.RepoTarget{Name: w.RepoName, Worktree: w.Path, Base: w.BaseCommit, TaskID: t.ID, Source: w.RepoPath})
+		if err != nil {
+			r.Log.Warn("behavioural evidence", "repo", w.RepoName, "err", err)
+			why = "the behavioural check failed to run: " + trunc(err.Error(), 200)
+			continue
+		}
+		r.Rec.Emit(ctx, t.ID, "verify.evidence", map[string]any{"repo": w.RepoName, "verified": ev.Verified, "tests": ev.Tests,
+			"test_files": len(ev.TestFiles), "reason": ev.Reason})
+		if ev.Verified {
+			return true, ev.Reason
+		}
+		why = ev.Reason
+	}
+	return false, why
+}
+
+// evidenceRequest is the retry instruction when checks pass without
+// behavioural evidence.
+func evidenceRequest(why string) string {
+	return "Verification passed, but nothing yet shows that the requested behaviour works: " + why + ".\n" +
+		"Add a test that reproduces the problem or requirement described in the task, next to the existing tests of the code you changed. " +
+		"It must fail on the original code and pass with your change. Use the concrete inputs and expected results from the task where it gives them. " +
+		"Run it yourself, fix the code if it fails, and do not change expected values just to match the current output."
+}
+
+// hasEvent reports whether the task's audit log has an event of this kind.
+func (r *Runner) hasEvent(ctx context.Context, taskID, kind string) bool {
+	var n int
+	_ = r.DB.QueryRowContext(ctx, `SELECT COUNT(*) FROM events WHERE task_id = ? AND kind = ?`, taskID, kind).Scan(&n)
+	return n > 0
+}
+
+// agentToolchain is the agent's build environment: the module cache
+// verification uses, and a build cache of the agent's own in the task dir.
+func (r *Runner) agentToolchain(taskID string) agent.Toolchain {
+	tc := agent.Toolchain{GoCache: filepath.Join(r.Paths.TaskDir(taskID), "agent-gocache")}
+	if r.Verify != nil {
+		tc.GoModCache = r.Verify.GoModCache
+	}
+	return tc
+}
+
 // dependencyMounts returns the installed dependencies of each worktree's
 // repository checkout (see sandbox.DependencyMounts). The source path comes
 // from the ledger, not from the agent-writable worktree.
@@ -883,13 +954,22 @@ func (r *Runner) transportErrors(ctx context.Context, taskID string, since time.
 // its own project (fast mode, ~5 s on the fixtures) and the pack's impact,
 // graph snippets and callers describe the task's code, not the primary
 // checkout. Index failures fall back to the primary project.
+//
+// Whether a worktree has changes is read from git, not from the ledger's
+// ChangedFiles: those are recorded when an attempt finishes, so after an
+// interrupted attempt the worktree has changes the ledger does not list yet,
+// and the pack described the unchanged primary checkout ("changed_total: 0"
+// next to a real diff, found on a resumed Prometheus task).
 func (r *Runner) packWorktrees(ctx context.Context, t *task.Task, wts []task.Worktree) []task.Worktree {
 	out := append([]task.Worktree(nil), wts...)
-	if r.Intel == nil || len(t.ChangedFiles) == 0 {
+	if r.Intel == nil {
 		return out
 	}
 	for i, w := range out {
 		if w.IndexProject == "" {
+			continue
+		}
+		if files, err := gitops.ChangedFiles(ctx, w.Path, w.BaseCommit); err != nil || len(files) == 0 {
 			continue
 		}
 		start := time.Now()

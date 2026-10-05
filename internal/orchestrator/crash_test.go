@@ -155,6 +155,9 @@ func TestModelServerOutageDoesNotBurnAttempts(t *testing.T) {
 		return "", os.ErrDeadlineExceeded // the turn ends with an error
 	}
 	fix := func(ws, _ string) (string, error) {
+		if err := addReproTest(ws); err != nil {
+			return "", err
+		}
 		return "negated", replaceIn(filepath.Join(ws, consumerFile),
 			"AmountCents: ev.AmountCents, Currency: ev.Currency},\n\t)", "AmountCents: -ev.AmountCents, Currency: ev.Currency},\n\t)")
 	}

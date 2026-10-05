@@ -28,6 +28,19 @@ func TestBuildArgs(t *testing.T) {
 	}
 }
 
+func TestReasoningBudgetArgs(t *testing.T) {
+	p := model.Profile{Name: "m", File: "m.gguf"}
+	if j := strings.Join(BuildArgs(p, "/m", "127.0.0.1", 1), " "); strings.Contains(j, "--reasoning-budget") {
+		t.Fatalf("unset budget emitted: %q", j)
+	}
+	p.Server.ReasoningBudget, p.Server.ReasoningBudgetMessage = 4096, "Acting now."
+	args := BuildArgs(p, "/m", "127.0.0.1", 1)
+	i := slices.Index(args, "--reasoning-budget")
+	if i < 0 || args[i+1] != "4096" || !slices.Contains(args, "--reasoning-budget-message") || !slices.Contains(args, "Acting now.") {
+		t.Fatalf("budget args: %q", args)
+	}
+}
+
 func TestClassifyExit(t *testing.T) {
 	m := &Manager{StateDir: t.TempDir()}
 	if err := writeFile(m.logPath(), "load...\nggml_backend_cuda_buffer_type_alloc_buffer: allocating 9000 MiB on device 0: cudaMalloc failed: out of memory\n"); err != nil {

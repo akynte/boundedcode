@@ -65,8 +65,10 @@ func TestPromptInjectedAgentIsContained(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Status != task.StatusCompleted || got.AttemptCount != 2 {
-		t.Fatalf("status=%s attempts=%d", got.Status, got.AttemptCount)
+	// The fix adds no test: one more attempt asks for behavioural evidence,
+	// then the task ends unverified (tests_green).
+	if got.Status != task.StatusCompleted || got.AttemptCount != 3 || got.VerificationState != task.VerificationTestsGreen {
+		t.Fatalf("status=%s attempts=%d verify=%s", got.Status, got.AttemptCount, got.VerificationState)
 	}
 	strats, _ := r.Ledger.Strategies(ctx, tk.ID)
 	if strats[0].Outcome != "rejected" || !strings.Contains(strats[0].Reason, "protected path") {
