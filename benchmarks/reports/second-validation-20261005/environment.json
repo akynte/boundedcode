@@ -1,0 +1,79 @@
+{
+ "date": "2026-10-05",
+ "host": {
+  "cpu": "13th Gen Intel(R) Core(TM) i7-13620H",
+  "threads": 16,
+  "ram_gib": 62.5,
+  "gpu": "NVIDIA GeForce RTX 4060 Laptop GPU, 8188 MiB, 615.71.09",
+  "os": "Linux 7.1.13+deb13-amd64"
+ },
+ "model": {
+  "profile": "qwen3.6-35b-a3b",
+  "file": "Qwen3.6-35B-A3B-UD-Q4_K_M.gguf",
+  "source": "unsloth/Qwen3.6-35B-A3B-GGUF",
+  "quantization": "UD-Q4_K_M",
+  "ctx_size": 131072,
+  "n_cpu_moe": 35,
+  "kv_cache": "q8_0",
+  "sampling": {
+   "temperature": 0.6,
+   "top_p": 0.95,
+   "top_k": 20
+  },
+  "reasoning_budget": 4096
+ },
+ "llama_server": "version: 0.5.0-dev (build 1, commit 7fe450e)\nbuilt with GNU 14.2.0 for Linux x86_64",
+ "agent": {
+  "runtime": "openhands",
+  "sdk": "openhands-sdk 1.51.0",
+  "image": "boundedcode-openhands:local sha256:63220bfe6bf8788c45c72976c6a26dd5e05d948b59165eea487f46d0c4f4e5cb",
+  "max_iterations": 150,
+  "condenser_max_events": 80,
+  "max_output_tokens": 8192,
+  "strategy": {
+   "no_progress_tokens": 40000,
+   "max_tokens": 50000,
+   "max_duration": "35m"
+  }
+ },
+ "repointel": {
+  "codebase_memory_mcp": "codebase-memory-mcp 0.11.0",
+  "serena": "v1.7.0 (commit 949a27ef), enabled for this benchmark",
+  "cross_service": true
+ },
+ "frontier": {
+  "enabled": true,
+  "provider": "codex (ChatGPT subscription, contained)",
+  "codex_cli": "codex-cli 0.156.1",
+  "policy": "normal Z1-Z4 escalation policy; approvals pre-granted with --approve-frontier so policy-triggered calls run unattended; no paid API keys",
+  "max_escalations_per_task": 2
+ },
+ "sandbox": {
+  "kind": "docker",
+  "network": "none",
+  "memory": "8g",
+  "cpus": "8",
+  "engine": "29.8.0"
+ },
+ "toolchains_in_sandbox": {
+  "go": "go1.27.1",
+  "node": "v24.21.0"
+ },
+ "budgets": {
+  "max_attempts": 6,
+  "max_wall_clock": "4h",
+  "max_escalations": 2,
+  "task_timeout": "90m (harness)"
+ },
+ "config": "bench XDG_CONFIG_HOME copy of the user's config: frontier.enabled=true, repointel.serena.enabled=true, task.ambiguity=proceed; the user's own config is unchanged",
+ "candidate_build": {
+  "commit": "5b3c54a939de (product code identical to 4b31742)",
+  "binary_sha256": "9a469855143bf101aafe8a842df191b56ae4a3a49a232d06d5afb66076c05879",
+  "version": "boundedcode dev 5b3c54a939de"
+ },
+ "frozen_at": "2026-10-05T17:30 local, before any validation run; no product changes until the validation report",
+ "task": {
+  "contract": true,
+  "ambiguity": "proceed (benchmark: record SPEC_AMBIGUOUS and continue; real use defaults to ask)"
+ }
+}

@@ -1,0 +1,50 @@
+{
+ "name": "second-validation-20261005",
+ "frozen": true,
+ "tasks": {
+  "axios__axios-5892": {
+   "category": "javascript",
+   "spec_sha256": "488209864e8b88e1c62c36f0b9ed1786be24de6e181e0da9958c6dabe0ba3215",
+   "acceptance": "npx mocha test/unit/adapters/http.js -R tap -g 'compression'",
+   "slot": "js-axios"
+  },
+  "caddyserver__caddy-6370": {
+   "category": "devops-infra",
+   "spec_sha256": "8ce8f94903467d5f65db78ec312f2fa248fb3903b7ff195b28778bc784d28050",
+   "acceptance": "go test -v ./cmd",
+   "slot": "go-caddy-infra"
+  },
+  "gin-gonic__gin-1805": {
+   "category": "go",
+   "spec_sha256": "c000b2ea6ef108998b84d814ccdb4359d8960939f0af67ee8030d98158c41e62",
+   "acceptance": "go test -v . -run \"^Test.*Router\"",
+   "slot": "go-gin"
+  },
+  "prometheus__prometheus-10720": {
+   "category": "large-repo",
+   "spec_sha256": "68c1bef5c0a46f8a0d82aa18b1d30cc0980581912d08878379a8bfdae2f2f8c4",
+   "acceptance": "go test -v ./promql -run \"^TestEvaluations\"",
+   "slot": "large-prometheus"
+  },
+  "vuejs__core-11870": {
+   "category": "typescript",
+   "spec_sha256": "9bf59bf795b9d1f5ade8009dfe2ca16ddc5ad82f1f8575f522664755a91afcab",
+   "acceptance": "node_modules/.bin/vitest run packages/runtime-core/__tests__/helpers/renderList.spec.ts --reporter=verbose",
+   "slot": "ts-vue"
+  },
+  "zeromicro__go-zero-1969": {
+   "category": "go",
+   "spec_sha256": "5dee9758eeff91e3f5804bb4ccd4188ec28ad3ba87c9443527db4dd9268bf9f5",
+   "acceptance": "go test -v ./core/mapping -run '^(TestUnmarshalWithJsonNumberOptionsIncorrect)$'",
+   "slot": "go-rpc"
+  }
+ },
+ "run": "once each, sequentially, idle machine, candidate build, Qwen3.6-35B-A3B, normal frontier policy",
+ "success": "TASK_VERIFIED (behavioural evidence) and the hidden acceptance test passes",
+ "classes": [
+  "LOCAL_ONLY_SUCCESS",
+  "FRONTIER_ASSISTED_SUCCESS",
+  "FAILED",
+  "BLOCKED_ENVIRONMENT"
+ ]
+}

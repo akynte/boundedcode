@@ -1,0 +1,37 @@
+{
+ "id": "zeromicro__go-zero-1969",
+ "category": "go",
+ "source": "ByteDance-Seed/Multi-SWE-bench@56ff018c04a3:zeromicro__go-zero-1969",
+ "sources": {
+  "go-zero": "git:https://github.com/zeromicro/go-zero@af05219b70c5e18542ebb499b18a1dff6ffacc6d"
+ },
+ "repos": [
+  "go-zero"
+ ],
+ "request": "The validation of tag \"options\" is not working with int/uint type\n\nmy gozero version: v1.3.2 & v1.3.3\r\n\r\napi file:\r\n```\r\ntype (\r\n    Sex int  `json:\"sex,options=0|1\"`\r\n}\r\n```\r\nInput json:\r\n```\r\n{\r\n   \"sex\": 2\r\n}\r\n```\r\nExpected: validation is failed. \r\nActual: validation is passed.",
+ "hidden": [
+  {
+   "repo": "go-zero",
+   "patch": "diff --git a/core/mapping/unmarshaler_test.go b/core/mapping/unmarshaler_test.go\nindex da0424901ffe..521e574f5d68 100644\n--- a/core/mapping/unmarshaler_test.go\n+++ b/core/mapping/unmarshaler_test.go\n@@ -1170,6 +1170,20 @@ func TestUnmarshalWithIntOptionsIncorrect(t *testing.T) {\n \tassert.NotNil(t, UnmarshalKey(m, &in))\n }\n \n+func TestUnmarshalWithJsonNumberOptionsIncorrect(t *testing.T) {\n+\ttype inner struct {\n+\t\tValue     string `key:\"value,options=first|second\"`\n+\t\tIncorrect int    `key:\"incorrect,options=1|2\"`\n+\t}\n+\tm := map[string]interface{}{\n+\t\t\"value\":     \"first\",\n+\t\t\"incorrect\": json.Number(\"3\"),\n+\t}\n+\n+\tvar in inner\n+\tassert.NotNil(t, UnmarshalKey(m, &in))\n+}\n+\n func TestUnmarshalWithUintOptionsCorrect(t *testing.T) {\n \ttype inner struct {\n \t\tValue  string `key:\"value,options=first|second\"`\n"
+  }
+ ],
+ "checks": [
+  {
+   "repo": "go-zero",
+   "run": [
+    "sh",
+    "-c",
+    "go test -v ./core/mapping -run '^(TestUnmarshalWithJsonNumberOptionsIncorrect)$'"
+   ]
+  }
+ ],
+ "timeout": "90m",
+ "setup": [
+  {
+   "repo": "go-zero",
+   "file": ".boundedcode/verification.yaml",
+   "old": "",
+   "new": "# Repository verification config for this benchmark task, committed into the\n# task's base commit (ENVIRONMENT_ONLY setup). It is the default Go preset,\n# minus checks that already fail on the untouched base in the offline\n# sandbox with Go 1.27 (measured before any agent run, 2026-10-05):\n#   gofmt: 2 files Go 1.27's gofmt reformats at base are not checked\n#   go test: TestFigureOutListenOn, TestInternalIp (no network interfaces in the sandbox),\n#            TestParseWrapped{Get,Head}RequestWithJsonHeader (fail at base under Go 1.27)\nversion: 1\nstages:\n  - name: gofmt\n    run: [\"sh\", \"-c\", \"out=$(gofmt -l $(git ls-files '*.go' | grep -v '^vendor/' | grep -v -x -F -e core/rescue/recover.go -e tools/goctl/model/mongo/template/template.go ) 2>&1); [ -z \\\"$out\\\" ] || { echo \\\"files need gofmt:\\\"; echo \\\"$out\\\"; exit 1; }\"]\n    requires: [go.mod]\n  - name: go-build\n    run: [go, build, ./...]\n    requires: [go.mod]\n  - name: go-vet\n    run: [go, vet, \"{packages}\"]\n    requires: [go.mod]\n  - name: go-test\n    run: [go, test, -count=1, -skip, \"^(TestFigureOutListenOn|TestInternalIp|TestParseWrappedGetRequestWithJsonHeader|TestParseWrappedHeadRequestWithJsonHeader)$\", \"{packages}\"]\n    requires: [go.mod]\n    timeout: 20m\n  - name: golangci-lint\n    run: [golangci-lint, run, ./...]\n    scope: full\n    optional: true\n    requires: [go.mod]\n"
+  }
+ ]
+}

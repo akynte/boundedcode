@@ -1,0 +1,37 @@
+{
+ "id": "prometheus__prometheus-10720",
+ "category": "large-repo",
+ "source": "SWE-bench/SWE-bench_Multilingual@846e647b9f33:prometheus__prometheus-10720",
+ "sources": {
+  "prometheus": "git:https://github.com/prometheus/prometheus@89de30a0b754f4eb54fb543037683f3db6cda109"
+ },
+ "repos": [
+  "prometheus"
+ ],
+ "request": "PromQL function day_of_year\n<!--\r\n\r\n    Please do *NOT* ask support questions in Github issues.\r\n\r\n    If your issue is not a feature request or bug report use our\r\n    community support.\r\n\r\n    https://prometheus.io/community/\r\n\r\n    There is also commercial support available.\r\n\r\n    https://prometheus.io/support-training/\r\n\r\n-->\r\n## Proposal\r\n**Use case. Why is this important?**\r\n\r\nWe have day of month, day of week, but day_of_year would be handy as well, to complete our date functions.\r\n\n",
+ "hidden": [
+  {
+   "repo": "prometheus",
+   "patch": "diff --git a/promql/testdata/functions.test b/promql/testdata/functions.test\nindex b216c42c7bb..02e6a32190e 100644\n--- a/promql/testdata/functions.test\n+++ b/promql/testdata/functions.test\n@@ -704,6 +704,12 @@ eval instant at 0m day_of_month()\n eval instant at 0m day_of_month(vector(1136239445))\n   {} 2\n \n+eval instant at 0m day_of_year()\n+  {} 1\n+\n+eval instant at 0m day_of_year(vector(1136239445))\n+  {} 2\n+\n # Thursday.\n eval instant at 0m day_of_week()\n   {} 4\n@@ -739,6 +745,14 @@ eval instant at 0m month(vector(1456790399)) + day_of_month(vector(1456790399))\n eval instant at 0m month(vector(1456790400)) + day_of_month(vector(1456790400)) / 100\n   {} 3.01\n \n+# 2016-12-31 13:37:00 366th day in leap year.\n+eval instant at 0m day_of_year(vector(1483191420))\n+  {} 366\n+\n+# 2022-12-31 13:37:00 365th day in non-leap year.\n+eval instant at 0m day_of_year(vector(1672493820))\n+  {} 365\n+\n # February 1st 2016 in leap year.\n eval instant at 0m days_in_month(vector(1454284800))\n   {} 29\n"
+  }
+ ],
+ "checks": [
+  {
+   "repo": "prometheus",
+   "run": [
+    "sh",
+    "-c",
+    "go test -v ./promql -run \"^TestEvaluations\""
+   ]
+  }
+ ],
+ "timeout": "90m",
+ "setup": [
+  {
+   "repo": "prometheus",
+   "file": ".boundedcode/verification.yaml",
+   "old": "",
+   "new": "# Repository verification config for this benchmark task, committed into the\n# task's base commit (ENVIRONMENT_ONLY setup). It is the default Go preset,\n# minus checks that already fail on the untouched base in the offline\n# sandbox with Go 1.27 (measured before any agent run, 2026-10-05):\n#   gofmt: 12 files Go 1.27's gofmt reformats at base are not checked\n#   go build / test: cmd/prometheus and cmd/promtool do not link under Go 1.27\n#            (golang.org/x/net/internal/socket: invalid reference to syscall.recvmsg);\n#            config and discovery/dns tests fail at base; left out of build and test\n#   go vet: defers (time.Since not deferred), loopclosure, stdmethods (Seek signatures), unreachable (generated lexers) findings at base\n#   go test: scrape TestNewHTTPCACert, TestNewHTTPClientCert (expired test certificates),\n#            TestNewHTTPWithServerName, TestNewHTTPWithBadServerName (scrape/testdata/*.key hidden\n#            by BoundedCode's secret masking)\nversion: 1\nstages:\n  - name: gofmt\n    run: [\"sh\", \"-c\", \"out=$(gofmt -l $(git ls-files '*.go' | grep -v '^vendor/' | grep -v -x -F -e tsdb/db_test.go -e promql/test.go -e promql/functions.go -e promql/parser/ast.go -e tsdb/chunks/chunks.go -e discovery/targetgroup/targetgroup_test.go -e util/strutil/quote.go -e web/api/v1/api.go -e discovery/dns/dns.go -e model/textparse/openmetricsparse_test.go -e model/textparse/promparse_test.go -e documentation/examples/remote_storage/remote_storage_adapter/graphite/escape.go ) 2>&1); [ -z \\\"$out\\\" ] || { echo \\\"files need gofmt:\\\"; echo \\\"$out\\\"; exit 1; }\"]\n    requires: [go.mod]\n  - name: go-build\n    run: [\"sh\", \"-c\", \"go build $(go list -f '{{if .GoFiles}}{{.ImportPath}}{{end}}' ./... | grep -v -x -e github.com/prometheus/prometheus/cmd/prometheus -e github.com/prometheus/prometheus/cmd/promtool -e github.com/prometheus/prometheus/config -e github.com/prometheus/prometheus/discovery/dns)\"]\n    requires: [go.mod]\n  - name: go-vet\n    run: [\"sh\", \"-c\", \"go vet -defers=false -loopclosure=false -stdmethods=false -unreachable=false $(go list \\\"$@\\\" | grep -v -x -e github.com/prometheus/prometheus/cmd/prometheus -e github.com/prometheus/prometheus/cmd/promtool -e github.com/prometheus/prometheus/config -e github.com/prometheus/prometheus/discovery/dns)\", \"sh\", \"{packages}\"]\n    requires: [go.mod]\n  - name: go-test\n    run: [\"sh\", \"-c\", \"go test -count=1 -skip '^(TestNewHTTPCACert|TestNewHTTPClientCert|TestNewHTTPWithBadServerName|TestNewHTTPWithServerName)$' $(go list \\\"$@\\\" | grep -v -x -e github.com/prometheus/prometheus/cmd/prometheus -e github.com/prometheus/prometheus/cmd/promtool -e github.com/prometheus/prometheus/config -e github.com/prometheus/prometheus/discovery/dns)\", \"sh\", \"{packages}\"]\n    requires: [go.mod]\n    timeout: 20m\n  - name: golangci-lint\n    run: [golangci-lint, run, ./...]\n    scope: full\n    optional: true\n    requires: [go.mod]\n"
+  }
+ ]
+}
