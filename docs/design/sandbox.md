@@ -70,7 +70,9 @@ part of this boundary.
    chosen by the agent run inside the sandbox, so they are contained but
    unrestricted within it. The worktree's `package.json` is agent-writable,
    so its `test` script is too: as with editable test files, the stages
-   catch mistakes, not an adversarial agent (hidden acceptance checks do).
+   catch mistakes, not an adversarial agent. Only checks the agent cannot
+   edit catch that: human review of the merge candidate in normal use, or a
+   benchmark's hidden acceptance tests in validation runs.
 4. **Secret detection is pattern-based.** A secret stored under an
    innocuous name (for example `config/prod.yaml`) is not masked. gitleaks
    on the diff catches *new* secrets only. Mitigation: keep production
