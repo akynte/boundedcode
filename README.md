@@ -1,5 +1,13 @@
 # BoundedCode
 
+[![ci](https://github.com/akynte/boundedcode/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/akynte/boundedcode/actions/workflows/ci.yml)
+[![secret-scan](https://github.com/akynte/boundedcode/actions/workflows/secrets.yml/badge.svg?branch=main)](https://github.com/akynte/boundedcode/actions/workflows/secrets.yml)
+[![dco](https://github.com/akynte/boundedcode/actions/workflows/dco.yml/badge.svg?branch=main)](https://github.com/akynte/boundedcode/actions/workflows/dco.yml)
+[![release](https://img.shields.io/github/v/release/akynte/boundedcode?include_prereleases&sort=semver&label=release)](https://github.com/akynte/boundedcode/releases)
+[![status: public alpha](https://img.shields.io/badge/status-public%20alpha-orange)](docs/releases/v0.1.0-alpha.1.md)
+[![license](https://img.shields.io/github/license/akynte/boundedcode)](LICENSE)
+[![Go](https://img.shields.io/github/go-mod/go-version/akynte/boundedcode)](go.mod)
+
 **Bounded context. Bounded cost. Unbounded codebases.**
 
 BoundedCode is a local-first AI software-engineering platform for
