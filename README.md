@@ -44,7 +44,7 @@ Coding agents working on large codebases tend to fail in two ways:
 
 BoundedCode is built around the opposite defaults:
 
-| | |
+| Principle | What it means |
 |---|---|
 | **Bounded context** | The model sees a small task-specific pack (typically a few thousand tokens) drawn from repository intelligence, not the repository. |
 | **Local-first** | Inference runs on your machine through llama.cpp. A frontier model is an optional, policy-triggered exception. |
@@ -193,7 +193,7 @@ license.
 - **Tooling:** `boundedcode model` inspects the profiles;
   `boundedcode bench infra --apply` tunes one for your machine.
 
-| | |
+| Model profiles | Status |
 |---|---|
 | **Validated configuration** | Qwen3.6-35B-A3B, UD-Q4_K_M (Apache-2.0) on llama.cpp v0.5.0 |
 | **Other profiles** | Present, but not part of the validation |
@@ -296,7 +296,7 @@ example by prompt injection in repository content.
 
 **Tested configuration, not a minimum requirement:**
 
-| | |
+| Component | Tested configuration |
 |---|---|
 | Machine | Lenovo LOQ 15IRH8 laptop |
 | CPU | Intel Core i7-13620H |
