@@ -27,9 +27,10 @@ task state and optional frontier escalation.
 </div>
 
 > [!IMPORTANT]
-> **Public Alpha.** BoundedCode is usable and has been validated
-> experimentally on a small independent sample of real software-engineering
-> tasks. It has been tested on one machine with one model. Commands,
+> **Public Alpha.** BoundedCode is usable and has been validated on a small
+> held-out sample of real software-engineering tasks (tasks not used during
+> development and never shown to the agent). It has been tested on one
+> machine with one model. Commands,
 > configuration and APIs may change, and it is not production-ready. Issue
 > reports, compatibility reports and contributions are welcome.
 
@@ -46,9 +47,9 @@ BoundedCode is built around the opposite defaults:
 
 | Principle | What it means |
 |---|---|
-| **Bounded context** | The model sees a small task-specific pack (typically a few thousand tokens) drawn from repository intelligence, not the repository. |
-| **Local-first** | Inference runs on your machine through llama.cpp. A frontier model is an optional, policy-triggered exception. |
-| **Proof, not just green tests** | A task is `TASK_VERIFIED` only when a test it adds fails on the base commit and passes with the change. |
+| **Bounded context** | The model starts from a small task-specific pack drawn from repository intelligence and reads further code through tools as needed; the repository is never loaded as a whole. |
+| **Local-first** | Inference runs on your machine through llama.cpp. A frontier model is an optional, policy-triggered exception: enabled but not triggered in the second validation; in the first validation 4 frontier calls were sent and no task was accepted. |
+| **Evidence, not just green tests** | A task is `TASK_VERIFIED` only when a test it adds fails on the base commit and passes with the change (fail-before/pass-after evidence, not proof of correctness). |
 | **Durable tasks** | A persistent ledger lets long tasks resume after Ctrl-C, a crash or a reboot. |
 | **Contained agent** | The agent runs in a network-less container on its own git worktree. Nothing is pushed or merged for you. |
 
@@ -57,20 +58,37 @@ BoundedCode is built around the opposite defaults:
 | Stage | Result | Report |
 |---|---|---|
 | Initial validation: 8 real public tasks, frozen build | **0/8**, then **1/8** after the first defect fixes | [report](docs/benchmarks/small-real-world-validation-2026-10.md) |
-| Engineering: the failures used as a development corpus (not a benchmark) | fixes to verification, agent tooling, resource handling, retrieval and execution control | [failure-driven](docs/benchmarks/failure-driven-engineering-2026-10.md) · [targeted](docs/benchmarks/targeted-engineering-pass-2026-10.md) |
-| **Second independent validation:** 6 unseen, pre-screened tasks, run once | **5/6** strict `TASK_VERIFIED` · **6/6** hidden acceptance · **5/5** successes local-only · **0** false verification passes | [report](docs/benchmarks/second-independent-validation-2026-10.md) |
+| Engineering: the failures used as a development corpus (development evidence, not a validation) | fixes to verification, agent tooling, resource handling, retrieval and execution control | [failure-driven](docs/benchmarks/failure-driven-engineering-2026-10.md) · [targeted](docs/benchmarks/targeted-engineering-pass-2026-10.md) |
+| **Second validation (held out):** 6 tasks not used during development and never shown to the agent, screened for issue-derivable acceptance tests, run once | **5 of 6** strict `TASK_VERIFIED` and passing the datasets' hidden acceptance tests (hidden from the agent) · **6 of 6** hidden tests pass · all **5** successes local-only: no frontier calls (escalation enabled, not triggered) · **0** false verification passes among the 5 `TASK_VERIFIED` tasks | [report](docs/benchmarks/second-independent-validation-2026-10.md) |
 
-In a fresh small validation on 6 previously unseen public engineering tasks
-whose hidden acceptance criteria were screened for consistency with the issue
-before execution, BoundedCode completed 5/6 successfully, with 5/6 completed
-using only the local model.
+In a fresh small validation on 6 public engineering tasks not used during
+development and never shown to the agent, whose hidden acceptance criteria
+were screened for consistency with the issue before execution, 5 of the 6
+tasks succeeded, and all 5 successes used only the local model; no task made
+a frontier call.
 
-The tasks were selected before execution from SWE-bench Multilingual and
-Multi-SWE-bench. They cover Go, JavaScript, TypeScript, an infrastructure
-tool and a 1.8 M-token repository; on that repository the model saw 1.6 % of
-the source. Screening rejected 10 of 24 candidates whose hidden tests could
-not be derived from their issue. No frontier call was made, and there was no
-human code intervention.
+The tasks were selected before execution from the SWE-bench Multilingual and
+Multi-SWE-bench benchmark datasets. They cover Go, JavaScript, TypeScript, an
+infrastructure tool and a repository of 1.8 M estimated source tokens.
+Screening rejected 10 of 24 candidates whose hidden tests could not be
+derived from their issue. There was no human code intervention.
+
+Context use was roughly 18–35 K tokens per task across repositories of
+0.12–1.83 M estimated source tokens, so the share of the repository that
+entered context depends on repository size: at most about 1.6 % on the
+largest repository, 29.1 % on the smallest (gin). These figures include all
+tool output (files read, search and test output) and are therefore upper
+bounds; source tokens are estimated as bytes × 10/32.
+
+The 0 false verification passes covers the 5 `TASK_VERIFIED` tasks, on a task
+set screened for issue-derivable tests. In development runs with the same
+gate design, tasks were `TASK_VERIFIED` but failed hidden tests: 3 in the
+final failure-driven run, where the issue allowed another reading or the
+hidden test required details the issue did not state
+([§C](docs/benchmarks/failure-driven-engineering-2026-10.md#c-verification-why-false-passes-happened-what-prevents-them-now)),
+and 2 in the targeted pass's development checks, one on another valid reading
+and one whose only evidence was a test that does not compile on the base
+([verification honesty](docs/benchmarks/targeted-engineering-pass-2026-10.md#verification-honesty-in-the-development-checks)).
 
 <details>
 <summary><b>Why 5/6 and not 6/6?</b></summary>
@@ -81,14 +99,27 @@ The sixth task (Prometheus) was implemented correctly, and its hidden
 acceptance test passed. BoundedCode still classified it **UNVERIFIED**: its
 evidence checker did not associate the modified data-driven test file
 (`promql/testdata/functions.test`) with the Go test function that reads it.
-The official score stays **5/6**; hidden-acceptance correctness was **6/6**.
-A verifier that withholds "verified" when it cannot prove the change is
-behaving as intended.
+The official score stays **5 of 6**; 6 of 6 hidden acceptance tests passed.
+A verifier that withholds `TASK_VERIFIED` when it cannot show fail-before/
+pass-after evidence is behaving as intended.
 
 </details>
 
 > This is a small practical validation sample, not a statistically
-> comprehensive benchmark.
+> comprehensive evaluation.
+
+### Why the two validations are not an improvement curve
+
+The second set was screened for acceptance tests derivable from the issue;
+the first set was screened for environment validity only, and three of its
+tasks failed on identifiers that only the reference solution introduces. The
+first set also had a "difficult" slot (a multi-file reference patch); the
+second did not. The second validation ran with `task.ambiguity: proceed`, not
+the default `ask`. On the development tasks, the candidate build's checks
+before the freeze passed 0 of 2 (0 of 3 runs), per the
+[targeted engineering pass](docs/benchmarks/targeted-engineering-pass-2026-10.md#development-regression-result).
+Therefore 0/8 → 5/6 does not measure system improvement; each result stands
+on its own, with its own scope.
 
 ## How it works
 
@@ -216,8 +247,10 @@ risk or a high-risk review.
 - **Packets:** sanitized (host paths, secrets), and each one needs approval
   unless pre-approved.
 
-In the second validation, no escalation was triggered. See
-[ADR-0009](docs/architecture/adr/0009-frontier-escalation.md).
+Escalation was enabled but not triggered in the second validation. In the
+first validation, 4 frontier calls were sent and no task was accepted
+([report](docs/benchmarks/small-real-world-validation-2026-10.md#answers)).
+See [ADR-0009](docs/architecture/adr/0009-frontier-escalation.md).
 
 ## Verification
 
@@ -267,14 +300,20 @@ example by prompt injection in repository content.
    untested.
 3. **Ambiguity detection is imperfect.** The task contract is derived by the
    local model. It has flagged a clear request as ambiguous and misnamed real
-   alternatives. With the default `task.ambiguity: ask`, a false positive
-   costs a clarification question.
+   alternatives. The second validation ran with `task.ambiguity: proceed`,
+   not the default `ask`; under the default, one clear task (vue) would have
+   stopped on a false ambiguity flag.
 4. **Behavioural evidence misses some test layouts.** These include
    data-driven test files consumed by a test elsewhere.
-5. **Frontier escalation was enabled but not exercised** in the second
-   validation.
+5. **Frontier escalation is unproven.** It was enabled but not triggered in
+   the second validation; in the first, 4 frontier calls were sent and no
+   task was accepted.
 6. **The strategy governor** bounded runaway generation in development runs,
-   but did not trigger during the independent validation.
+   but did not trigger during the held-out validation.
+7. **No baseline advantage shown.** On the two-task baseline in the first
+   validation, BoundedCode did not improve the same local model's result and
+   was slower on those tasks; no baseline was run on the held-out set
+   ([baseline comparison](benchmarks/reports/small-real-world-validation-20261004/baseline-comparison.md)).
 
 <details>
 <summary>Smaller limitations</summary>
