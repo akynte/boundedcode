@@ -331,6 +331,15 @@ example by prompt injection in repository content.
 
 </details>
 
+## How this was built
+
+I designed the architecture, the threat model, the verification model and
+the evaluation protocol, and made the release and scope decisions.
+Implementation, test runs and first drafts of the reports were produced with
+heavy use of AI coding agents, under that design and review. The validation
+reports, errata and failures are published with their results unedited,
+including results that did not support a release.
+
 ## Reference hardware
 
 **Tested configuration, not a minimum requirement:**
