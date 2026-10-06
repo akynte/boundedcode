@@ -1,13 +1,13 @@
 # Targeted engineering pass (2026-10-05)
 
-> **Development evidence, not a benchmark.** The three changes below were
+> **Development evidence, not a validation.** The three changes below were
 > driven by the development corpus of the
 > [failure-driven pass](failure-driven-engineering-2026-10.md) and checked on
 > two of its tasks (caddy-6288, axios-6539) plus a deterministic retrieval
 > replay. Those tasks are not independent. Earlier results stand as
 > published: **0/8 on the original frozen build, 1/8 after the defect
-> fixes**, 1/4 on the development corpus. Independent evidence is the
-> [second validation](second-independent-validation-2026-10.md).
+> fixes**, 1/4 on the development corpus. Held-out evidence is the
+> [second validation on tasks not used in development](second-independent-validation-2026-10.md).
 
 Data: [`benchmarks/reports/targeted-engineering-20261005/`](../../benchmarks/reports/targeted-engineering-20261005/).
 Commits: 43f7cfd (changes), d5a09d3 (metrics), 4b31742 (governor calibration).
@@ -21,7 +21,7 @@ secret-handling or frontier-sanitization changes.
 | Change | Evidence it answers | Mechanism | Regression tests |
 |---|---|---|---|
 | A. Runaway generation control | Caddy: 72-109 K generated tokens per unproductive attempt over 40-64 min; 8 K-token visible-output turns | Separate budgets: reasoning (`reasoning_budget` 4096, llama-server), visible output per response (`agent.max_output_tokens` 8192), and a per-attempt **strategy budget** (`agent.strategy`). A deterministic governor tracks progress (first edit, a new test file, an agent-run test going from failing to passing) and stops an attempt that spends `no_progress_tokens` without progress, or exceeds `max_tokens` / `max_duration`. The stopped strategy is recorded (`strategy.stopped`) and the retry pack tells the agent not to repeat it. No escalation is triggered by long output alone. | 3 (`governor_test.go`) |
-| B. Requirement ambiguity | axios-6539: the issue allows two outcomes; runs picked different ones | One local-model call (thinking off) derives a task contract: required, acceptable alternatives, constraints, not required, unknown/ambiguous (material or not), acceptance evidence. A **material** ambiguity (≥ 2 readings that change behaviour, API, data, security, compatibility, tests or output) blocks the task for clarification (`task.ambiguity: ask`, the default; answered with `task run --clarify`) or, for benchmarks, is recorded as SPEC_AMBIGUOUS and the agent must state and demonstrate its reading (`proceed`). Explicit alternatives never block. The contract is shown in the context pack; the behavioural-evidence gate is unchanged. | 6 (`contract_test.go`, `task/contract_test.go`) |
+| B. Requirement ambiguity | axios-6539: the issue allows two outcomes; runs picked different ones | One local-model call (thinking off) derives a task contract: required, acceptable alternatives, constraints, not required, unknown/ambiguous (material or not), acceptance evidence. A **material** ambiguity (≥ 2 readings that change behaviour, API, data, security, compatibility, tests or output) blocks the task for clarification (`task.ambiguity: ask`, the default; answered with `task run --clarify`) or, for validation runs, is recorded as SPEC_AMBIGUOUS and the agent must state and demonstrate its reading (`proceed`). Explicit alternatives never block. The contract is shown in the context pack; the behavioural-evidence gate is unchanged. | 6 (`contract_test.go`, `task/contract_test.go`) |
 | C. Retrieval seed quality | Packs filled with `NewRecorder`, `foo`/`bar`, URL hashes; the quoted error message never searched | Seeds ranked: diagnostics (invariant text of quoted errors, fixed-string search) → names in prose / file paths / repository file links → config keys and flags → sample-code identifiers. Placeholders, URL parts and @mentions dropped; names matching > 25 files demoted; lexical hits prefer code over docs and build output; minified/map files excluded. | 6 (`seeds_test.go`) |
 
 `make check` (build, vet, golangci-lint, unit tests with race, license
@@ -117,3 +117,9 @@ written atomically, mode 0600, in the task directory. Seeds run `rg` with
 `--fixed-strings`, `--` before the pattern, and an argument vector (no
 shell), confined to the repository. The governor only cancels the agent's
 turn.
+
+## Revision note (2026-10-05)
+
+Wording only; no result changed.
+- "not a benchmark" is now "not a validation"; "Independent evidence is the second validation" is now "Held-out evidence is the second validation on tasks not used in development".
+- In the change table, "for benchmarks" is now "for validation runs".

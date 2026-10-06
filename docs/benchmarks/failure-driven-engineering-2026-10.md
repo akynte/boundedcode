@@ -1,11 +1,11 @@
 # Failure-driven engineering pass (2026-10-05)
 
-> **This is development-corpus retesting, not a benchmark.** The same four
+> **This is development-corpus retesting, not a validation.** The same four
 > failed tasks from the small real-world validation, plus axios as a
 > positive control, were analysed, used to drive general fixes, and rerun
 > with the same acceptance tests. Results on tasks used for development are
-> optimistic by construction and must not be read as independent evidence.
-> The original benchmark result stays as published: **0/8 on the frozen
+> optimistic by construction and must not be read as held-out evidence.
+> The original validation result stays as published: **0/8 on the frozen
 > build, 1/8 after the defect fixes** ([report](small-real-world-validation-2026-10.md)).
 
 Data: [`benchmarks/reports/failure-driven-engineering-20261005/`](../../benchmarks/reports/failure-driven-engineering-20261005/)
@@ -14,7 +14,7 @@ memory samples, history-sanitization plan).
 
 ## Results at a glance
 
-| | Original frozen benchmark (0217d96) | Post-defect benchmark | Development pass 1 (add3aab) | **Final development run (3c75f2e)** |
+| | Original frozen validation (0217d96) | Post-defect validation | Development pass 1 (add3aab) | **Final development run (3c75f2e)** |
 |---|---|---|---|---|
 | gin-3227 | FAIL | — | FAIL¹ | FAIL¹ |
 | caddy-6288 | FAIL | — | FAIL | FAIL |
@@ -56,7 +56,8 @@ test (`make check` and the container security suites pass):
 
 Reliability improved where the cause was BoundedCode's: **Prometheus went
 from FAIL (a no-op patch, self-verified) to PASS in both development passes**
-(1 attempt, ~23 min, local only, proven by its own regression test). It did
+(1 attempt, ~23 min, local-only: no frontier calls (no escalation was
+triggered), shown by its own fail-before/pass-after regression test). It did
 not improve enough overall: **1 of 4 development tasks pass**, below the
 ≥ 3/4 development target; of the other three, two are task-spec problems
 (gin, vue) and one is a genuine failure (caddy).
@@ -95,16 +96,17 @@ was sent back.
 but failed the hidden tests (gin, vue, axios). In each, the evidence test
 fails on base and passes with the change, so the gate worked as designed; the
 gap is between the issue text and the hidden test (gin, vue) or between two
-behaviours the issue allows (axios). No patch was verified that leaves the
+behaviours the issue allows (axios). No patch reached `task_verified` that leaves the
 issue's own stated problem in place, as far as checked (gin: reproduced;
 vue: checked for pass 1 only; axios: matches one stated expectation). The
 gate cannot detect a test that encodes the wrong one of several readings.
 
 ## D. Model comparison
 
-Not run. Laguna XS 2.1 and Qwen3-Coder-Next were dropped at the user's
-request; Qwen3.6-35B-A3B remains the default **by decision, not by
-comparison** (section 15 verdict A is therefore untested).
+Not run. The maintainer chose not to run the comparison with Laguna XS 2.1
+and Qwen3-Coder-Next; Qwen3.6-35B-A3B remains the default **by decision, not
+by comparison**. Whether another local model would do better on these tasks
+is therefore untested.
 
 ## E. Final task results (3c75f2e, Qwen3.6, no code changes between runs)
 
@@ -118,7 +120,7 @@ comparison** (section 15 verdict A is therefore untested).
 
 | Final metric | Value |
 |---|---|
-| Verified successes (hidden tests) | 1/5 (1/4 development tasks) |
+| Successes (hidden tests pass) | 1/5 (1/4 development tasks) |
 | Local-only successes / frontier-assisted | 1 / 0 |
 | False verification passes | 3 (gin, vue, axios; see C) |
 | Median wall-clock | 1,998 s |
@@ -152,7 +154,7 @@ Profiles: `profile-before.json`, `profile-after.json`.
 Not the bottleneck. Retrieval was COMPLETE-but-NOISY (prometheus) or
 PARTIAL-and-NOISY (gin, caddy, vue: seeds taken from identifiers in issue code
 blocks, such as `NewRecorder` or CSS class names); in every case the agent
-reached the right files itself within minutes. **Embeddings: A, still
+reached the right files itself within minutes. **Embeddings: still
 unnecessary.** A deterministic "where is this behaviour owned" query would
 not have helped gin (the issue pointed at the right file; the hidden test
 did not match the issue). Seed noise is a real but minor improvement target.
@@ -186,10 +188,10 @@ Frontier sanitization unchanged and fail-closed.
 
 ## K. Dominant original bottleneck
 
-**F: a combination.** Verification (B) and orchestration/environment (D)
-dominated the original failures: the agent could not run tests and the gate
+**A combination.** Verification and orchestration/environment dominated
+the original failures: the agent could not run tests and the gate
 could not fail on no-op patches; fixing those turned Prometheus into a pass
-with the same model. Local model capability (A) remains the limit on caddy
+with the same model. Local model capability remains the limit on caddy
 (runaway output, no reproduction test in 90 minutes). Two of the four
 "valid" tasks have hidden tests not derivable from their issues.
 
@@ -216,3 +218,13 @@ done and should screen tasks for issue-derivable acceptance tests.
 See `benchmarks/reports/failure-driven-engineering-20261005/history-sanitization.md`:
 unpushed commits contain absolute home paths in report files; a rewrite of
 the unpushed range is planned, not executed. Nothing has been pushed.
+
+## Revision note (2026-10-05)
+
+Wording only; no result changed.
+- "benchmark" replaced by "validation" where it described BoundedCode's own validations; "independent evidence" is now "held-out evidence".
+- §A: "local only" qualified as no frontier calls (no escalation was triggered); "proven by its own regression test" is now "shown by its own fail-before/pass-after regression test".
+- §C and §E: "verified" outcomes written as `task_verified` / "Successes (hidden tests pass)".
+- §D: "dropped at the user's request" is now "The maintainer chose not to run the comparison"; a reference to an internal checklist ("section 15 verdict A") was removed.
+- §G and §K: letter codes from an internal checklist ("Embeddings: A", "F: a combination", "(A)", "(B)", "(D)") removed; the findings are unchanged.
+- Erratum to "History": the history sanitization described there was executed on 2026-10-05 before the first push; see `benchmarks/reports/failure-driven-engineering-20261005/history-sanitization.md`.

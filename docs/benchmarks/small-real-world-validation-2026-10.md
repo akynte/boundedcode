@@ -1,7 +1,7 @@
 # Small real-world validation (2026-10)
 
 > **This is a small validation sample intended to demonstrate practical
-> operation, not a statistically comprehensive benchmark.** Eight tasks
+> operation, not a statistically comprehensive evaluation.** Eight tasks
 > cannot establish success rates, and nothing here supports claims of
 > state-of-the-art performance, superiority over other agents, a general
 > local completion rate, or equivalence to a paid frontier subscription.
@@ -12,12 +12,13 @@ Raw data, manifest, environment, screening, per-task JSON, logs and notes:
 ## Result in one paragraph
 
 On 8 public tasks fixed before any run, the frozen build (0217d96) passed the
-datasets' hidden acceptance tests on **0 of 8**. Four failures traced to
+datasets' hidden acceptance tests (hidden from the agent) on **0 of 8**. Four failures traced to
 BoundedCode defects (JavaScript verification never ran tests; secret masking
 hid a Go package; a frontier packet was silently blocked; the cross-service
 scanner exhausted 58 GiB of memory). After fixing them, the three affected
 tasks were rerun: **1 of 3 passed** (axios, local model only). Final outcome:
-**1 of 8 accepted, 1 of 8 local-only**. The remaining failures are model
+**1 of 8 accepted, 1 of 8 local-only: no frontier calls (escalation enabled,
+not triggered)**. The remaining failures are model
 reasoning/coding errors (4) and tasks whose acceptance tests reference
 identifiers only the reference solution introduces (3). Context reduction
 and resume worked as designed. On the two-task baseline, BoundedCode did not
@@ -36,13 +37,15 @@ improve the same local model's result.
   all decided before any agent run and recorded in the manifest: axios-5085
   (test needs internet) → axios-6539; caddy 4943/5995/6345/6115 (Go 1.27
   incompatibilities) → caddy-6288; all 7 Hugo instances (Go 1.27 `vet` panics)
-  → grpc-go-2744 (next Go repository in the brief's list). Terraform was
+  → grpc-go-2744 (the fallback Go slot recorded in the
+  [manifest](../../benchmarks/reports/small-real-world-validation-20261004/manifest.json)). Terraform was
   excluded (BUSL-1.1), Preact (browser tests).
 * **Acceptance:** the dataset's test patch is applied to the agent's final
   worktree (its files reset to base first) and the dataset's test command
   runs in the offline sandbox; exit status decides.
 * **Stack:** BoundedCode + OpenHands SDK 1.51.0 + Qwen3.6-35B-A3B UD-Q4_K_M on
-  llama.cpp (RTX 4060 8 GB laptop, 64 GB RAM) + codebase-memory-mcp 0.11.0 +
+  llama.cpp (RTX 4060 8 GB laptop, 64 GB RAM; MoE expert layers partly on
+  CPU, the model server holding ~20-27 GiB of RAM while serving) + codebase-memory-mcp 0.11.0 +
   Serena v1.7.0 + verification + Docker sandbox (no network) + frontier gate
   (Codex on a ChatGPT subscription, policy-triggered, pre-approved; no API
   keys). Details: `environment.json`.
@@ -94,11 +97,11 @@ failed.
 | Metric | Value |
 |---|---|
 | Total tasks | 8 |
-| Verified successes | **1** (axios-6539, post-fix) |
+| Successes (hidden acceptance tests pass) | **1** (axios-6539, post-fix) |
 | Local-only successes | 1 |
 | Frontier-assisted successes | 0 |
 | Failures | 7 |
-| Local-only completion rate | 12.5 % (1/8); frozen build: 0 % |
+| Local-only completions | 1 of 8; frozen build: 0 of 8 |
 | Total local model calls | 993 (818 frozen + 175 reruns) |
 | Total frontier calls | 4 sent (all frozen runs) + 1 blocked before sending |
 | Median wall-clock | 1,933 s per task (final runs); 4,953 s for frozen runs that started |
@@ -113,7 +116,7 @@ failed.
 
 1. **JavaScript verification never ran tests** (bcc17e1, 7bcc9c6): task
    worktrees had no `node_modules`; every JS stage was skipped and changes
-   were verified untested. Now the checkout's dependencies are mounted
+   passed verification without any test running. Now the checkout's dependencies are mounted
    read-only (writable tool caches on top), and a declared script with no
    installed dependencies fails instead of being skipped.
 2. **Secret masking hid source code** (e86a7aa, narrowed in b50ed59): grpc-go's
@@ -134,7 +137,7 @@ failed.
    change any result.)
 
 Also found: a defect in the benchmark harness itself (acceptance checks
-without the cache layer, 65f805a), and an operator error (deleting the work
+without the cache layer, 65f805a), and a mistake while running the validation (deleting the work
 directory under a running Docker Desktop VM) that cost one non-run attempt.
 
 ## Model and task failures
@@ -168,8 +171,10 @@ while serving. See `memory-pressure.md`.
 * **Q2. Most of this sample with only the local model?** No: 1 of 8.
 * **Q3. Large repository with a small fraction in context?** Yes, as a
   mechanism: on Prometheus (2.57 M source tokens) at most ~1.9 % of the
-  repository entered context (0.24 % via context packs), and the agent
-  produced a plausible, verified change. The change was still wrong.
+  repository entered context (0.24 % via context packs; the 1.9 % includes all
+  tool output and is an upper bound), and the agent produced a plausible
+  change that passed BoundedCode's verification at the time. The change was
+  still wrong.
 * **Q4. Does task state survive resume/context reset?** Yes. The Prometheus
   run was interrupted after 5 minutes; a newly built runner resumed the same
   task and agent session (1 resume, 4 condensations), continued and reached
@@ -199,3 +204,13 @@ public release or alpha that claims practical effectiveness.
 Go 1.27-only sandbox image that excluded otherwise-eligible instances, three
 tasks whose tests are coupled to reference-only identifiers, and
 environment-only verification configs written by the evaluator.
+
+## Revision note (2026-10-05)
+
+Wording only; no result changed.
+- "benchmark" replaced by "evaluation" where it described this validation.
+- First uses of "hidden acceptance tests" and "local-only" qualified.
+- "Local-only completion rate 12.5 % (1/8); frozen build: 0 %" is now "Local-only completions: 1 of 8; frozen build: 0 of 8"; "Verified successes" is now "Successes (hidden acceptance tests pass)".
+- grpc-go-2744 substitution: "the brief's list" is now the fallback slot recorded in the manifest (linked).
+- Stack line: MoE expert layers partly on CPU and the model server's RAM use (from the memory-pressure finding) added next to the hardware.
+- "operator error" is now "a mistake while running the validation"; "verified untested" and "verified change" (Q3) reworded to say what passed; Q3's 1.9 % marked as an upper bound.

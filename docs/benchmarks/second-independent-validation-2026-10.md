@@ -1,12 +1,29 @@
-# Second independent validation (2026-10-05)
+# Second validation on tasks not used in development (2026-10-05)
 
-> Six previously unused public tasks, screened **before** the run for
-> acceptance tests derivable from the issue, frozen, and run **once each** on
-> a frozen candidate build. This is a small practical validation sample, not
-> a statistically comprehensive benchmark: read the result as "5 of 6", not
-> as a rate. Earlier results stand as published: **0/8 on the original
-> frozen build, 1/8 after the defect fixes**; the development corpus is
-> development evidence only.
+> Six public tasks not used during development and never shown to the agent,
+> screened **before** the run for acceptance tests derivable from the issue,
+> frozen, and run **once each** on a frozen candidate build. This is a small
+> practical validation sample, not a statistically comprehensive evaluation:
+> read the result as "5 of 6", not as a rate. Earlier results stand as
+> published: **0/8 on the original frozen build, 1/8 after the defect
+> fixes**; the development corpus is development evidence only.
+
+This file keeps its original name (`second-independent-validation-2026-10.md`)
+so that existing links keep working.
+
+## Why the two validations are not an improvement curve
+
+This set was screened for acceptance tests derivable from the issue; the
+[first validation](small-real-world-validation-2026-10.md)'s set was screened
+for environment validity only, and three of its tasks failed on identifiers
+that only the reference solution introduces. The first set also had a
+"difficult" slot (a multi-file reference patch); this set did not. This
+validation ran with `task.ambiguity: proceed`, not the default `ask`. On the
+development tasks, the candidate build's checks before the freeze passed 0 of
+2 (0 of 3 runs), per the
+[targeted engineering pass](targeted-engineering-pass-2026-10.md#development-regression-result).
+Therefore 0/8 → 5/6 does not measure system improvement; each result stands
+on its own, with its own scope.
 
 Data: [`benchmarks/reports/second-validation-20261005/`](../../benchmarks/reports/second-validation-20261005/)
 (candidate manifest, [screening table](../../benchmarks/reports/second-validation-20261005/screening.md),
@@ -17,9 +34,20 @@ logs, memory samples, `metrics.json`).
 
 **VALIDATED_FOR_PUBLIC_ALPHA.**
 
-- **Result:** 5/6 tasks completed successfully (TASK_VERIFIED plus a
-  passing hidden acceptance test), all five using only the local model.
-- **Verification:** 0 false verification passes.
+- **Result:** 5 of 6 tasks completed successfully (TASK_VERIFIED plus
+  passing the datasets' hidden acceptance tests (hidden from the agent)).
+  All five were local-only: no frontier calls (escalation enabled, not
+  triggered).
+- **Verification:** 0 false verification passes among the 5 TASK_VERIFIED
+  tasks, on a task set screened for issue-derivable tests. In development
+  runs with the same gate design, tasks were TASK_VERIFIED but failed hidden
+  tests: 3 in the final failure-driven run, where the issue allowed another
+  reading or the hidden test required details the issue did not state
+  ([§C](failure-driven-engineering-2026-10.md#c-verification-why-false-passes-happened-what-prevents-them-now)),
+  and 2 in the targeted pass's development checks, one on another valid
+  reading and one whose only evidence was a test that does not compile on
+  the base
+  ([verification honesty](targeted-engineering-pass-2026-10.md#verification-honesty-in-the-development-checks)).
 - **Runaway and memory:** no runaway generation and no memory pressure.
 - **The sixth task (prometheus)** was fixed correctly; its hidden test
   passes. It ended UNVERIFIED because of a gap in BoundedCode's evidence
@@ -27,9 +55,9 @@ logs, memory samples, `metrics.json`).
 
 | Criterion | Target | Result |
 |---|---|---|
-| Pass rate | ≥ 75 % | 5/6 = 83 % ✔ (6/6 hidden tests pass) |
+| Pass rate | ≥ 75 % | 5/6 ✔ (6/6 hidden tests pass) |
 | Local majority | clear | 5/5 successes local-only ✔ |
-| False verification passes | 0 | 0 ✔ |
+| False verification passes | 0 | 0 ✔ (of 5 TASK_VERIFIED, screened set) |
 | Security regression | none | none ✔ |
 | Runaway / memory / state loss | none | none ✔ |
 
@@ -118,7 +146,7 @@ Each exclusion is listed in its task spec.
 | Agent | OpenHands SDK 1.51.0 in Docker 29.8.0, network none, 8 GiB / 8 CPUs; Go 1.27.1, Node 24.21 in the sandbox |
 | Repository intelligence | codebase-memory-mcp 0.11.0; Serena v1.7.0 enabled |
 | Frontier | Codex CLI 0.156.1 (ChatGPT sign-in), normal Z1-Z4 policy, approvals pre-granted; no paid API keys |
-| Task policy | `task.contract: true`, `task.ambiguity: proceed` (benchmark; the default is `ask`) |
+| Task policy | `task.contract: true`, `task.ambiguity: proceed` (validation runs; the default is `ask`) |
 
 Record: [`environment.json`](../../benchmarks/reports/second-validation-20261005/environment.json).
 The binary's embedded version string predates the history sanitization; it
@@ -172,8 +200,10 @@ All five successes are local-only. No escalation was triggered on any task
 | UNVERIFIED and hidden PASS (false negative) | 1 (prometheus) |
 | UNVERIFIED and hidden FAIL | 0 |
 
-Every verified result rested on a behavioural failure on the base. None
-relied on a test that merely fails to compile there.
+Every TASK_VERIFIED result rested on a behavioural failure on the base (a
+test that ran and failed there). None relied on a test that merely fails to
+compile there. This covers 5 tasks on a screened set; see the Verdict for the
+development runs where the same gate passed tasks that failed hidden tests.
 
 ## Runaway-control results
 
@@ -200,7 +230,13 @@ was blocked.
 
 ## Context efficiency
 
-| Task | Repository source tokens | Pack + tool output | Share |
+"Repository source tokens" are estimated as bytes × 10/32. "Pack + tool
+output" includes everything the agent's tools returned (files read, search
+and test output), so each share is an upper bound on how much of the
+repository entered context. Context use was roughly 18–35 K tokens per task;
+the share therefore depends mostly on repository size.
+
+| Task | Repository source tokens | Pack + tool output | Share (upper bound) |
 |---|---|---|---|
 | prometheus | 1,827,362 | 29.2 K | 1.6 % |
 | vuejs/core | 1,223,814 | 33.2 K | 2.7 % |
@@ -251,3 +287,13 @@ tests on the base export and on the change, and compare the failing sets.
   failing there, a weaker signal, seen in a development run but not here.
 - **One configuration.** One machine, one model; the frontier was enabled
   but never triggered.
+
+## Revision note (2026-10-05)
+
+Wording only; no result changed.
+- Title changed from "Second independent validation" to "Second validation on tasks not used in development"; "previously unused" is now "not used during development and never shown to the agent"; the filename is unchanged so links keep working.
+- Added "Why the two validations are not an improvement curve".
+- Verdict: "5/6" written as "5 of 6"; "local-only" qualified as no frontier calls (escalation enabled, not triggered); "0 false verification passes" scoped to the 5 TASK_VERIFIED tasks on a screened set, with the development counterexamples.
+- Criteria table: "5/6 = 83 %" is now "5/6"; the false-pass row notes "of 5 TASK_VERIFIED, screened set".
+- Context efficiency: shares labelled as upper bounds, with the token estimate (bytes × 10/32) and what the context figure includes.
+- "benchmark" kept only for the source datasets.
