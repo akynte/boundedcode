@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Documentation: terminology and claim qualifications aligned with published
+  evidence; no results changed.
+
 ## v0.1.0-alpha.1 (2026-10-05): first public alpha
 
 Release notes: [docs/releases/v0.1.0-alpha.1.md](docs/releases/v0.1.0-alpha.1.md).
@@ -23,7 +28,9 @@ Release notes: [docs/releases/v0.1.0-alpha.1.md](docs/releases/v0.1.0-alpha.1.md
   progress-aware strategy budget.
 - Task contract with material-ambiguity handling (`task run --clarify`).
 - Optional frontier escalation: a Z1-Z4 policy via the Codex CLI with a
-  ChatGPT sign-in, or manual packets. API keys are refused.
+  ChatGPT sign-in, or manual packets. API keys are refused. Enabled but not
+  triggered in the second validation; in the first, 4 frontier calls were
+  sent and no task was accepted.
 
 ### Security
 - Container sandbox:
@@ -39,12 +46,17 @@ Release notes: [docs/releases/v0.1.0-alpha.1.md](docs/releases/v0.1.0-alpha.1.md
 
 ### Validation
 - Initial validation (2026-10-04): 0/8, then 1/8 after defect fixes.
-- Second independent validation (2026-10-05): 6 screened, previously unseen
-  tasks.
-  - 5/6 strict `TASK_VERIFIED` successes, all local-only.
-  - 6/6 hidden acceptance tests passed.
-  - 0 false verification passes.
-- Small samples, not statistically comprehensive benchmarks.
+- Second validation (2026-10-05): 6 screened tasks not used during
+  development and never shown to the agent.
+  - 5 of 6 strict `TASK_VERIFIED` successes, all local-only: no frontier
+    calls (escalation enabled, not triggered).
+  - 6 of 6 of the datasets' hidden acceptance tests (hidden from the agent)
+    passed.
+  - 0 false verification passes among the 5 `TASK_VERIFIED` tasks on the
+    screened set.
+  - Not an improvement curve over the first validation: the two sets were
+    screened differently.
+- Small samples, not statistically comprehensive evaluations.
 
 ### Known limitations
 - Small validation sample; one machine and one model.
@@ -74,10 +86,11 @@ Release notes: [docs/releases/v0.1.0-alpha.1.md](docs/releases/v0.1.0-alpha.1.md
     are dropped or demoted; file links resolve to the file; lexical hits
     prefer code over docs and build output, and skip source maps and
     minified bundles.
-* Second independent validation (2026-10-05): six previously unused public
-  tasks, screened for issue-derivable acceptance tests and frozen before a
-  single run: 5/6 verified successes, all local-only, 0 false verification
-  passes. The sixth (prometheus) was fixed correctly but left UNVERIFIED:
+* Second validation (2026-10-05): six public tasks not used during
+  development and never shown to the agent, screened for issue-derivable
+  acceptance tests and frozen before a single run: 5 of 6 `TASK_VERIFIED`
+  successes, all local-only (no frontier calls), 0 false verification passes
+  among those 5. The sixth (prometheus) was fixed correctly but left UNVERIFIED:
   the Go evidence check does not attribute data-driven test files
   ([report](docs/benchmarks/second-independent-validation-2026-10.md)).
 * From the 2026-10-05 failure-driven engineering pass:

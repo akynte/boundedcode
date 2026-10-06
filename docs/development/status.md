@@ -38,12 +38,15 @@ A small real-world validation (8 public SWE-bench-style tasks) was run on
 2026-10-04: 0/8 on the frozen build, 1/8 after fixing five defects it found;
 see [the report](../benchmarks/small-real-world-validation-2026-10.md).
 A failure-driven engineering pass on 2026-10-05 used those failures as a
-development corpus (not a benchmark): 1/4 development tasks pass on the
+development corpus (development evidence, not a validation): 1/4 development tasks pass on the
 final build (prometheus, previously failing); see
 [the engineering report](../benchmarks/failure-driven-engineering-2026-10.md).
 A targeted pass (runaway control, ambiguity, retrieval seeds) followed, then a
-second, independent validation on 6 unseen tasks screened for
-issue-derivable acceptance tests: 5/6 verified successes, all local-only,
-0 false verification passes; see
+second validation on 6 tasks not used during development and never shown to
+the agent, screened for issue-derivable acceptance tests: 5 of 6
+`TASK_VERIFIED` and passing the datasets' hidden acceptance tests (hidden from
+the agent), all 5 local-only: no frontier calls (escalation enabled, not
+triggered), and 0 false verification passes among those 5 on the screened
+set (development runs with the same gate design did have such passes); see
 [the targeted pass](../benchmarks/targeted-engineering-pass-2026-10.md) and
 [the validation report](../benchmarks/second-independent-validation-2026-10.md).
