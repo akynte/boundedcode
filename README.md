@@ -151,6 +151,50 @@ flowchart LR
 | **Task ledger** | Persistent state and audit log; resume anywhere |
 | **Frontier gate** | Optional escalation when the policy triggers |
 
+### What BoundedCode implements vs. what it integrates
+
+BoundedCode is the control plane around existing tools. The model, the agent
+loop, code indexing and language servers come from upstream projects, used
+unmodified as separate processes or pinned dependencies (no forks, no
+vendored source).
+
+**Implemented in this repository** (Go, plus a small Python adapter):
+
+| Component | Where |
+|---|---|
+| Task orchestration: attempts, retries, budgets, resume after a crash | `internal/orchestrator`, `internal/task` |
+| Task ledger and audit log (SQLite) | `internal/store`, `internal/telemetry` |
+| Context planner and ranked retrieval seeds | `internal/contextplan` |
+| Strategy governor (runaway control) and task contract (ambiguity handling) | `internal/orchestrator`, `internal/task` |
+| Verification engine and behavioural-evidence gate | `internal/verify` |
+| Sandbox setup, secret masking, command and path policy | `internal/sandbox`, `internal/policy` |
+| Git worktree management and tamper checks | `internal/gitops` |
+| Cross-service contract analysis (HTTP, topics, env, Terraform) | `internal/xservice` |
+| Model gateway (metering, tunnelled agent calls) and llama.cpp supervision | `internal/inference` |
+| Frontier escalation policy, packet building and sanitization | `internal/frontier` |
+| Process management for codebase-memory-mcp and Serena | `internal/repointel` |
+| OpenHands adapter: JSON-RPC bridge to the agent SDK | `adapters/openhands/python` |
+| CLI, `doctor`, benchmark harness | `internal/cli`, `internal/benchmark` |
+
+**Integrated from upstream** (pinned; licenses in
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)):
+
+| Component | Role | How it is used |
+|---|---|---|
+| [llama.cpp](https://github.com/ggml-org/llama.cpp) v0.5.0 | Local inference | External `llama-server` process |
+| Local model (validated: Qwen3.6-35B-A3B) | Reasoning and editing | Weights downloaded by you; not redistributed |
+| [OpenHands Software Agent SDK](https://github.com/OpenHands/software-agent-sdk) 1.51.0 | Agent loop and tools | Python dependency of the adapter, inside the sandbox container |
+| [codebase-memory-mcp](https://github.com/DeusData/codebase-memory-mcp) v0.11.0 | Code graph, impact, search | External binary |
+| [Serena](https://github.com/oraios/serena) v1.7.0 (optional) | LSP-backed symbol navigation | External MCP processes, one per task worktree |
+| Language servers (`gopls`, `typescript-language-server`) | Used by Serena | Installed by you |
+| [gitleaks](https://github.com/gitleaks/gitleaks) v8.30.1 | Secret scanning of task diffs | External binary |
+| Docker (or Podman) | Container sandbox | Container engine |
+| [Codex CLI](https://github.com/openai/codex) (optional) | Frontier escalation | External `codex exec` process, run in its own container |
+| Go libraries: cobra, yaml, modernc.org/sqlite | CLI, config, embedded database | Go module dependencies |
+
+Version pins and update policy:
+[upstream components](docs/architecture/upstream-components.md).
+
 More detail:
 [system architecture](docs/architecture/system-architecture.md) ·
 [product spec](docs/product-spec.md) ·
