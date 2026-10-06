@@ -30,9 +30,9 @@ task state and optional frontier escalation.
 > **Public Alpha.** BoundedCode is usable and has been validated on a small
 > held-out sample of real software-engineering tasks (tasks not used during
 > development and never shown to the agent). It has been tested on one
-> machine with one model. Commands,
-> configuration and APIs may change, and it is not production-ready. Issue
-> reports, compatibility reports and contributions are welcome.
+> machine with one model. Commands, configuration and APIs may change, and it
+> is not production-ready. Issue reports, compatibility reports and
+> contributions are welcome.
 
 ## Why BoundedCode
 
@@ -47,7 +47,7 @@ BoundedCode is built around the opposite defaults:
 
 | Principle | What it means |
 |---|---|
-| **Bounded context** | The model starts from a small task-specific pack drawn from repository intelligence and reads further code through tools as needed; the repository is never loaded as a whole. |
+| **Bounded context** | The model starts from a small task-specific pack drawn from repository intelligence and reads further code through tools as needed, instead of receiving the whole repository. |
 | **Local-first** | Inference runs on your machine through llama.cpp. A frontier model is an optional, policy-triggered exception: enabled but not triggered in the second validation; in the first validation 4 frontier calls were sent and no task was accepted. |
 | **Evidence, not just green tests** | A task is `TASK_VERIFIED` only when a test it adds fails on the base commit and passes with the change (fail-before/pass-after evidence, not proof of correctness). |
 | **Durable tasks** | A persistent ledger lets long tasks resume after Ctrl-C, a crash or a reboot. |
@@ -95,8 +95,8 @@ and one whose only evidence was a test that does not compile on the base
 
 <br>
 
-The sixth task (Prometheus) was implemented correctly, and its hidden
-acceptance test passed. BoundedCode still classified it **UNVERIFIED**: its
+The sixth task (Prometheus) was implemented so that its hidden acceptance
+test passed. BoundedCode still classified it **UNVERIFIED**: its
 evidence checker did not associate the modified data-driven test file
 (`promql/testdata/functions.test`) with the Go test function that reads it.
 The official score stays **5 of 6**; 6 of 6 hidden acceptance tests passed.
@@ -134,7 +134,7 @@ flowchart LR
     A <-->|model calls tunnelled| M[llama.cpp<br/>local model]
     A --> W[Git worktree<br/>agent/task-id]
     W --> V{Verification<br/>behavioural evidence}
-    V -->|verified| R([Branch ready for review])
+    V -->|TASK_VERIFIED| R([Branch ready for review])
     V -->|failed| CP
     CP -.->|policy-triggered, optional| F[Frontier<br/>Codex CLI]
 ```
@@ -264,12 +264,14 @@ See [ADR-0009](docs/architecture/adr/0009-frontier-escalation.md).
   Without one, the task ends `tests_green` (UNVERIFIED) and is never presented
   as a verified merge candidate.
 - **Gate integrity:** the verification config is read from the base commit,
-  so the agent cannot weaken its own gate.
+  so the agent cannot change which stages run. It can still edit tests and
+  build scripts in its worktree; only review catches an adversarial change
+  there (see the sandbox's [residual risks](docs/design/sandbox.md#residual-risks-known-accepted-for-now)).
 
 This is not formal verification. Known limits:
 - data-driven test files read by a test elsewhere are not attributed;
 - a test that does not compile on the base counts as failing there;
-- a test can only prove the reading of a request that the agent chose.
+- a test can only demonstrate the reading of a request that the agent chose.
 
 ## Security
 
