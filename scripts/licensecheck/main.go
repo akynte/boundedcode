@@ -166,21 +166,34 @@ func hasPrefix(s string, prefixes []string) bool {
 	return false
 }
 
-// linkedModules lists non-main modules that provide packages linked into pkgs.
+// releaseTargets are the platforms release binaries are built for; each
+// links a slightly different set of modules (console and keychain access
+// differ per OS).
+var releaseTargets = []string{"linux/amd64", "linux/arm64", "darwin/amd64", "darwin/arm64", "windows/amd64", "windows/arm64"}
+
+// linkedModules lists non-main modules that provide packages linked into
+// pkgs on any release target.
 func linkedModules(pkgs string) ([]mod, error) {
-	cmd := exec.CommandContext(context.Background(), "go", "list", "-deps", "-f", "{{with .Module}}{{if not .Main}}{{.Path}} {{.Version}} {{.Dir}}{{end}}{{end}}", pkgs)
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	out, err := cmd.Output()
-	if err != nil {
-		return nil, fmt.Errorf("go list: %w: %s", err, stderr.String())
-	}
 	seen := map[string]mod{}
-	sc := bufio.NewScanner(bytes.NewReader(out))
-	for sc.Scan() {
-		f := strings.Fields(sc.Text())
-		if len(f) == 3 {
-			seen[f[0]] = mod{f[0], f[1], f[2]}
+	for _, t := range releaseTargets {
+		goos, goarch, _ := strings.Cut(t, "/")
+		cmd := exec.CommandContext(context.Background(), "go", "list", "-deps", "-f", "{{with .Module}}{{if not .Main}}{{.Path}} {{.Version}} {{.Dir}}{{end}}{{end}}", pkgs)
+		cmd.Env = append(os.Environ(), "GOOS="+goos, "GOARCH="+goarch, "CGO_ENABLED=0")
+		var stderr bytes.Buffer
+		cmd.Stderr = &stderr
+		out, err := cmd.Output()
+		if err != nil {
+			return nil, fmt.Errorf("go list (%s): %w: %s", t, err, stderr.String())
+		}
+		sc := bufio.NewScanner(bytes.NewReader(out))
+		for sc.Scan() {
+			f := strings.Fields(sc.Text())
+			if len(f) == 3 {
+				seen[f[0]] = mod{f[0], f[1], f[2]}
+			}
+		}
+		if err := sc.Err(); err != nil {
+			return nil, err
 		}
 	}
 	mods := make([]mod, 0, len(seen))
@@ -188,7 +201,7 @@ func linkedModules(pkgs string) ([]mod, error) {
 		mods = append(mods, m)
 	}
 	sort.Slice(mods, func(i, j int) bool { return mods[i].path < mods[j].path })
-	return mods, sc.Err()
+	return mods, nil
 }
 
 func isLicenseFile(name string) bool {

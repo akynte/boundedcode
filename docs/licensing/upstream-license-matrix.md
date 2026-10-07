@@ -98,6 +98,12 @@ The texts are in `LICENSES/go/`.
 | golang.org/x/sync | v0.23.0 | BSD-3-Clause |
 | github.com/zalando/go-keyring | v0.2.8 | MIT |
 | github.com/godbus/dbus/v5 | v5.2.2 | BSD-2-Clause |
+| github.com/danieljoos/wincred | v1.2.3 | MIT |
+| github.com/erikgeiser/coninput | v0.0.0-20211004153227-1c3628e74d0f | MIT |
+| github.com/inconshreveable/mousetrap | v1.1.0 | Apache-2.0 |
+| github.com/mattn/go-localereader | v0.0.2-0.20220822084749-2491eb6c1c75 | MIT |
+| github.com/ncruces/go-strftime | v1.0.0 | MIT |
+| golang.org/x/text | v0.27.0 | BSD-3-Clause |
 
 CI runs `go run ./scripts/licensecheck -check-notices
 THIRD_PARTY_NOTICES.md,docs/licensing/upstream-license-matrix.md`, which

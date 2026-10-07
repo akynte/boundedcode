@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+### Release packaging
+
+- `make dist` builds static binaries for linux, darwin and windows on amd64
+  and arm64 (`.exe` on Windows), each with its own SPDX SBOM, in one
+  `SHA256SUMS`.
+- The Go license check and `LICENSES/go` cover the modules of every release
+  target; six modules linked only on Windows or macOS are in the notices.
+  `github.com/mattn/go-localereader` is raised to the commit that adds its
+  LICENSE file (no code change).
+- CI vets and builds every release target, and builds, vets and runs the
+  tests on macOS and Windows runners (tests report only for now), and
+  parses `install.ps1`.
+
 ### Windows (experimental; compiled and unit-tested, not yet run on Windows)
 
 - Builds for Windows. Process trees are ended with `taskkill /T` (the

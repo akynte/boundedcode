@@ -22,23 +22,26 @@ irreversible.
    `CHANGELOG.md`.
 5. Build artifacts from the tagged commit, with a clean tree:
    ```bash
-   VERSION=vX.Y.Z make dist   # bin + SBOM + licenses archive + checksums
+   VERSION=vX.Y.Z make dist   # binaries + SBOMs + licenses archive + checksums
    ```
    The version comes from `git describe` when `VERSION` is unset; a
    `-dirty` suffix means the tree has uncommitted changes and must not be
    released. Contents of `dist/`:
-   * `boundedcode-linux-amd64`: static binary (CGO disabled)
-   * `SBOM.spdx.json`
+   * `boundedcode-{linux,darwin}-{amd64,arm64}` and
+     `boundedcode-windows-{amd64,arm64}.exe`: static binaries (CGO
+     disabled); `install.sh` and `install.ps1` download these names
+   * `SBOM-<os>-<arch>.spdx.json`: one SBOM per binary (the linked modules
+     differ per OS)
    * `boundedcode-VERSION-licenses.tar.gz`: `LICENSE`, `NOTICE`,
-     `THIRD_PARTY_NOTICES.md` and `LICENSES/` (Go modules and upstream
-     components), with neutral ownership and the commit time, so it is
-     reproducible
-   * `SHA256SUMS`: checksums of the three files above; the installer
-     verifies the binary against it
+     `THIRD_PARTY_NOTICES.md` and `LICENSES/` (Go modules of every release
+     target and upstream components), with neutral ownership and the
+     commit time, so it is reproducible
+   * `SHA256SUMS`: checksums of the files above; the installers verify the
+     binary against it
    * `LICENSE`, `NOTICE`, `THIRD_PARTY_NOTICES.md`, `LICENSES/` (unpacked
      copies, not uploaded)
 
-   Upload the binary, `SBOM.spdx.json`, the licenses archive and
+   Upload the six binaries, the six SBOMs, the licenses archive and
    `SHA256SUMS`, with `docs/releases/VERSION.md` as the notes (absolute
    links), as a pre-release while the version has a pre-release suffix.
 6. Secret-scan the full history: `gitleaks git --redact .`

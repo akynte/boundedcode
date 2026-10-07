@@ -43,14 +43,21 @@ licenses:
 sbom: build
 	$(GO) run ./scripts/sbom -version $(VERSION) -binary $(BIN) -o SBOM.spdx.json
 
-dist: licenses build
+# Release targets: one static binary each (CGO disabled), with its own SBOM.
+TARGETS := linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/arm64
+
+dist: licenses
 	rm -rf dist && mkdir -p dist
-	cp $(BIN) dist/boundedcode-linux-amd64
-	$(GO) run ./scripts/sbom -version $(VERSION) -binary $(BIN) -o dist/SBOM.spdx.json
+	set -e; for t in $(TARGETS); do \
+		os=$${t%/*}; arch=$${t#*/}; ext=""; [ "$$os" = windows ] && ext=.exe; \
+		bin=dist/boundedcode-$$os-$$arch$$ext; \
+		CGO_ENABLED=0 GOOS=$$os GOARCH=$$arch $(GO) build -trimpath -ldflags '$(LDFLAGS)' -o $$bin ./cmd/boundedcode; \
+		$(GO) run ./scripts/sbom -version $(VERSION) -goos $$os -goarch $$arch -binary $$bin -o dist/SBOM-$$os-$$arch.spdx.json; \
+	done
 	cp -r LICENSE NOTICE THIRD_PARTY_NOTICES.md LICENSES dist/
 	tar --sort=name --owner=0 --group=0 --numeric-owner --mtime=@$(SOURCE_DATE_EPOCH) \
 		-czf dist/$(LICENSES_TGZ) LICENSE NOTICE THIRD_PARTY_NOTICES.md LICENSES
-	cd dist && sha256sum boundedcode-linux-amd64 SBOM.spdx.json $(LICENSES_TGZ) > SHA256SUMS
+	cd dist && sha256sum boundedcode-linux-* boundedcode-darwin-* boundedcode-windows-* SBOM-*.spdx.json $(LICENSES_TGZ) > SHA256SUMS
 
 check: fmt vet test race lint licenses
 

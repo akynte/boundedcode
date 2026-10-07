@@ -108,9 +108,18 @@ func main() {
 	out := flag.String("o", "SBOM.spdx.json", "output file")
 	version := flag.String("version", "dev", "boundedcode version")
 	binary := flag.String("binary", "", "optional built binary to checksum")
+	goos := flag.String("goos", "", "target OS of the binary (default: this one)")
+	goarch := flag.String("goarch", "", "target architecture of the binary (default: this one)")
 	flag.Parse()
 	ctx := context.Background()
 	cmd := exec.CommandContext(ctx, "go", "list", "-deps", "-f", "{{with .Module}}{{if not .Main}}{{.Path}} {{.Version}} {{.Dir}}{{end}}{{end}}", "./cmd/...")
+	cmd.Env = os.Environ()
+	if *goos != "" {
+		cmd.Env = append(cmd.Env, "GOOS="+*goos, "CGO_ENABLED=0")
+	}
+	if *goarch != "" {
+		cmd.Env = append(cmd.Env, "GOARCH="+*goarch)
+	}
 	raw, err := cmd.Output()
 	if err != nil {
 		fatal(err)

@@ -38,6 +38,52 @@ jobs:
         run: |
           go run ./scripts/sbom -version ci -binary bin/boundedcode -o "$RUNNER_TEMP/SBOM.spdx.json"
           python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); assert d["spdxVersion"]=="SPDX-2.3" and len(d["packages"])>1' "$RUNNER_TEMP/SBOM.spdx.json"
+  cross-build:
+    # Every release target vets and builds (CGO disabled, as released).
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target: [linux/amd64, linux/arm64, darwin/amd64, darwin/arm64, windows/amd64, windows/arm64]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: vet and build ${{ matrix.target }}
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          export GOOS="${TARGET%/*}" GOARCH="${TARGET#*/}" CGO_ENABLED=0
+          go vet ./...
+          go build -o /dev/null ./cmd/boundedcode
+  native:
+    # Builds and tests on macOS and Windows hosts. The test step reports
+    # only (continue-on-error) until the suite is green there: macOS and
+    # Windows support is new and was developed on Linux.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: build
+        run: go build ./...
+      - name: vet
+        run: go vet ./...
+      - name: installer parses
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $errs = $null
+          [System.Management.Automation.Language.Parser]::ParseFile("$PWD/scripts/install.ps1", [ref]$null, [ref]$errs) | Out-Null
+          if ($errs) { $errs | ForEach-Object { Write-Error $_ }; exit 1 }
+      - name: test (report only)
+        continue-on-error: true
+        run: go test -short ./...
   lint:
     runs-on: ubuntu-latest
     steps:

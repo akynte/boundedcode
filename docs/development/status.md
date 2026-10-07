@@ -34,7 +34,7 @@ limited validation or unstable interfaces), **planned**.
 | macOS support | experimental | compiles and vets for darwin/arm64 and darwin/amd64; Go installers with pinned macOS assets (real archive unpacked on Linux); **not run on a Mac** |
 | Native Windows support | experimental | compiles and vets for windows/amd64; container path translation, relative worktree pointers, Windows packet sanitizing, ACLs; unit-tested from Linux, **not run on Windows**; Serena unsupported there |
 | Daemon, GUI | planned | |
-| Release packaging, SBOM | implemented | `make dist` (binary, SBOM, reproducible licenses archive, checksums), `scripts/sbom`; published as v0.1.0-alpha.1 (source) and v0.1.0-alpha.2 (with assets). Publishing needs maintainer approval. |
+| Release packaging, SBOM | implemented | `make dist` (binaries and SBOMs for linux, darwin and windows on amd64 and arm64, reproducible licenses archive, checksums), `scripts/sbom`; published as v0.1.0-alpha.1 (source) and v0.1.0-alpha.2 (with assets). Publishing needs maintainer approval. |
 | Local escalation tier (switch to a stronger local model before frontier) | planned | motivated by the 4/4 vs 1/4 result in ADR-0007 |
 
 An implementation audit against both specifications (the original project

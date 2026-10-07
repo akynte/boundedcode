@@ -168,6 +168,13 @@ PowerShell here).
 
 ### Phase 16: release
 
+**Done in code (2026-10-07).** `make dist` builds six binaries with an
+SBOM each; the license check and inventory cover every release target
+(six modules only Windows or macOS builds link were added to the notices;
+go-localereader was raised to the commit that adds its LICENSE, with no
+code change). CI vets and builds every target and builds, vets and tests
+on macOS and Windows runners (tests report only until green there).
+
 - Release matrix (linux amd64, darwin amd64/arm64, windows amd64); license
   inventory and SBOM per target (Windows and darwin pull extra Go modules);
   docs per platform.
