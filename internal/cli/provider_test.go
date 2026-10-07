@@ -3,13 +3,18 @@ package cli
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/akynte/boundedcode/internal/model"
 )
 
 // runCLI runs one command with stdin and returns its output.
@@ -131,5 +136,67 @@ func TestProviderCommands(t *testing.T) {
 		if k != "sk-ant-good-0123456789" && k != "sk-ant-bad-0123456789" {
 			t.Fatalf("unexpected key sent: %q", k)
 		}
+	}
+}
+
+// TestModelCommands: fetch (from a fake hub, sha256-verified), use, list
+// and remove, with a user profile so no real weights are involved.
+func TestModelCommands(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("BOUNDEDCODE_HOME", home)
+	data := []byte(strings.Repeat("tiny-gguf", 1000))
+	sum := sha256.Sum256(data)
+	hub := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/resolve/0123456789abcdef0123456789abcdef01234567/tiny.gguf") {
+			_, _ = w.Write(data)
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer hub.Close()
+	old := model.HuggingFaceURL
+	model.HuggingFaceURL = hub.URL
+	defer func() { model.HuggingFaceURL = old }()
+
+	if _, err := runCLI(t, "", "setup", "--only", "config"); err != nil {
+		t.Fatal(err)
+	}
+	prof := fmt.Sprintf("name: tiny\ndisplay_name: Tiny\nfile: tiny.gguf\nstatus: experimental\nsource:\n  repo: org/tiny\n  file: tiny.gguf\n"+
+		"  revision: 0123456789abcdef0123456789abcdef01234567\n  license: apache-2.0\n  size_bytes: %d\n  sha256: %s\n", len(data), hex.EncodeToString(sum[:]))
+	if err := os.MkdirAll(home+"/config/models", 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(home+"/config/models/tiny.yaml", []byte(prof), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out, err := runCLI(t, "", "model", "fetch", "tiny", "--yes")
+	if err != nil || !strings.Contains(out, "downloaded and verified") || !strings.Contains(out, "licensed apache-2.0") {
+		t.Fatalf("fetch: %v\n%s", err, out)
+	}
+	if got, _ := os.ReadFile(home + "/data/models/tiny.gguf"); string(got) != string(data) {
+		t.Fatal("weights not in the data models dir")
+	}
+	if out, err = runCLI(t, "", "model", "use", "tiny"); err != nil || !strings.Contains(out, "default model: tiny") {
+		t.Fatalf("use: %v\n%s", err, out)
+	}
+	out, _ = runCLI(t, "", "--json", "model", "list")
+	var rows []modelRow
+	if err := json.Unmarshal([]byte(out), &rows); err != nil {
+		t.Fatalf("%v: %s", err, out)
+	}
+	found := false
+	for _, r := range rows {
+		if r.Name == "tiny" {
+			found = r.Present && r.Default && r.Fit != "" && r.SizeBytes == int64(len(data))
+		}
+	}
+	if !found {
+		t.Fatalf("tiny row: %s", out)
+	}
+	if _, err = runCLI(t, "", "model", "fetch", "laguna-xs-2.1", "--yes"); err == nil || !strings.Contains(err.Error(), "under review") {
+		t.Fatalf("license-review profile fetched: %v", err)
+	}
+	if out, err = runCLI(t, "", "model", "remove", "tiny", "--yes"); err != nil || !strings.Contains(out, "deleted") {
+		t.Fatalf("remove: %v\n%s", err, out)
 	}
 }

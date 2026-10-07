@@ -3,6 +3,8 @@
 # review the model license there.
 name: qwen3.6-35b-a3b
 display_name: Qwen3.6-35B-A3B (UD-Q4_K_M GGUF)
+description: The default and the only validated model (8 GB GPU, 64 GB RAM, experts in system RAM); also suits a 24 GB+ GPU.
+status: validated
 file: Qwen3.6-35B-A3B-UD-Q4_K_M.gguf
 source:
   repo: unsloth/Qwen3.6-35B-A3B-GGUF
@@ -10,10 +12,16 @@ source:
   revision: a483e9e6cbd595906af30beda3187c2663a1118c
   base_model: Qwen/Qwen3.6-35B-A3B
   license: apache-2.0
+  license_url: https://huggingface.co/Qwen/Qwen3.6-35B-A3B
+  size_bytes: 22134528992
+  sha256: ac0e2c1189e055faa36eff361580e79c5bd6f8e76bffb4ce547f167d53e31a61
 architecture:
   moe: true
   total_params_b: 35
   active_params_b: 3
+  # 10 of 40 layers use full attention; about 1.33 GiB of q8_0 KV cache at
+  # 128K (estimate; consistent with the measured 1.1 GB VRAM headroom).
+  kv_mib: 1400
 # Server flags measured on the reference machine (RTX 4060 Laptop 8 GB, 64 GB
 # DDR5) with llama.cpp v0.5.0 -- see benchmarks/reports/20261003T152755Z-infra-*
 # (sweep) and 20261003T161953Z-infra-* (idle, cold-load finalists):

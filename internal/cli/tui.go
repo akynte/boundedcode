@@ -332,7 +332,8 @@ func (b *tuiBackend) Models(ctx context.Context) ([]tui.ModelRow, error) {
 	}
 	var out []tui.ModelRow
 	for _, r := range a.modelRows() {
-		out = append(out, tui.ModelRow{Name: r.Name, Display: a.Models[r.Name].DisplayName, File: r.File, License: r.License, Present: r.Present, Default: r.Default})
+		out = append(out, tui.ModelRow{Name: r.Name, Display: r.Display, File: r.File, License: r.License, Present: r.Present, Default: r.Default,
+			Description: r.Description, Status: r.Status, SizeBytes: r.SizeBytes, Fit: r.Fit, FitDetail: r.FitDetail, Recommended: r.Recommended})
 	}
 	return out, nil
 }

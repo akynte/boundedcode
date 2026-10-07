@@ -2,6 +2,28 @@
 
 ## Unreleased
 
+### Model choice for your hardware (experimental)
+
+- Hardware detection on Linux, macOS (Apple Silicon unified memory through
+  Metal) and Windows: RAM, CPU, NVIDIA GPUs and free disk space.
+- `bcode model recommend` rates every profile against the machine (fits the
+  GPU, MoE expert offload, GPU/RAM split, CPU only, or too large; a rule of
+  thumb from the file size and an estimated KV cache) and proposes one; the
+  validated default is kept whenever it runs on the GPU. `model list` shows
+  the size, status and fit of each; `doctor` rates the default model.
+- Five new experimental profiles, pinned by commit and sha256 (all
+  Apache-2.0, none gated): Qwen3.5-4B, Qwen3.5-9B, gpt-oss-20b, Devstral
+  Small 2 and Qwen3.8-27B. They leave GPU offload to llama.cpp's automatic
+  fitting (`--fit`, on by default in the pinned v0.5.0). Only Qwen3.6-35B-A3B
+  is validated.
+- `model fetch|use|remove|token` download (in Go: resumable, sha256-verified,
+  disk space checked, no python3 or bash needed), select and delete models;
+  `setup` uses the same downloader. Profiles may carry a license notice the
+  user sees before downloading; `model token set` stores a Hugging Face token
+  for gated repositories.
+- A user override written by `bench infra --apply` keeps the built-in
+  profile's revision, checksum and status for the same weights.
+
 ### Cloud model providers (experimental)
 
 - **New:** the agent can use a cloud model API instead of the local model:

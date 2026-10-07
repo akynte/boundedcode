@@ -20,6 +20,7 @@ import (
 	"github.com/akynte/boundedcode/internal/config"
 	"github.com/akynte/boundedcode/internal/inference"
 	"github.com/akynte/boundedcode/internal/inference/llamacpp"
+	"github.com/akynte/boundedcode/internal/model"
 	"github.com/akynte/boundedcode/internal/repointel/cbm"
 	"github.com/akynte/boundedcode/internal/sandbox"
 )
@@ -172,8 +173,12 @@ func setupSteps() []setupStep {
 				if err != nil {
 					return "Download the default model?"
 				}
-				return fmt.Sprintf("Download %s (%s, license %s) from huggingface.co/%s at a pinned revision into %s? This is a large download (tens of GB); review the license on its model page.",
-					p.Source.File, p.DisplayName, p.Source.License, p.Source.Repo, a.Config.ModelsDir)
+				msg := fmt.Sprintf("Download %s (%s) from huggingface.co/%s at a pinned revision into %s? %s",
+					p.DisplayName, formatGB(p.Source.SizeBytes), p.Source.Repo, a.modelsDir(), licenseNotice(p))
+				if f := model.FitFor(p, a.hardware(context.Background())); !f.Fast() {
+					msg += fmt.Sprintf(" Note: %s (%s); `%s model recommend` suggests a model for this machine.", f.Detail, f.Level, buildinfo.Command())
+				}
+				return msg
 			},
 			check: func(_ context.Context, a *App) (bool, string) {
 				if a.Config.Inference.IsCloud() {
@@ -186,7 +191,7 @@ func setupSteps() []setupStep {
 				if err != nil {
 					return false, err.Error()
 				}
-				path := p.ResolveFile(a.Config.ModelsDir)
+				path := p.ResolveFile(a.modelsDir())
 				fi, err := os.Stat(path)
 				if err != nil {
 					return false, p.Name + " not downloaded"
@@ -198,17 +203,15 @@ func setupSteps() []setupStep {
 				if err != nil {
 					return err
 				}
-				if p.Source.Revision == "" {
-					return fmt.Errorf("model profile %s has no pinned source revision; download %s manually into %s", p.Name, p.Source.File, a.Config.ModelsDir)
+				if p.Status == model.StatusReview {
+					return fmt.Errorf("%s's license is under review; choose another model with `%s model use`", p.Name, buildinfo.Command())
 				}
-				if _, err := exec.LookPath("python3"); err != nil {
-					return errors.New("python3 is needed to verify the download checksum")
+				path, err := a.fetchModel(ctx, p)
+				if err != nil {
+					return err
 				}
-				dir := a.Config.ModelsDir
-				if dir == "" {
-					dir = filepath.Join(a.Paths.Data, "models")
-				}
-				return a.runSetupScript(ctx, "fetch-model.sh", p.Source.Repo, p.Source.File, p.Source.Revision, dir)
+				a.printf("downloaded and verified: %s\n", path)
+				return nil
 			},
 		},
 		{

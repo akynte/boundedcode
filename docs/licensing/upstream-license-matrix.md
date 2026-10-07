@@ -28,8 +28,9 @@ live in [`LICENSES/`](../../LICENSES). Re-verify on every upgrade (see
 | Laguna XS 2.1 | `poolside/Laguna-XS-2.1` @ `c5f36269` | **OpenMDW-1.1** (not on the SPDX list, so `LicenseRef-OpenMDW-1.1`) | `8a0c5e23…62d88` | ⚠ **manual review**: a custom permissive model license with a patent-termination clause. Allowed for local benchmarking. Maintainer review is needed before it could become a documented default. |
 
 The profiles in `configs/models/` pin the GGUF files below by commit
-(`source.revision`). `scripts/fetch-model.sh` requires that revision and
-checks the download against the LFS sha256 the hub publishes for it. The
+(`source.revision`). `bcode model fetch` and `scripts/fetch-model.sh`
+require that revision and check the download against the LFS sha256 the hub
+publishes for it (recorded in the profile as `source.sha256`). The
 file hashes were also checked against local downloads on 2026-10-04.
 
 | Profile | GGUF repository @ revision | File | File sha256 (LFS) | License (card metadata) |

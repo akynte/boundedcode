@@ -99,6 +99,9 @@ live calls against the real APIs (needs keys).
 
 ### Phase 12: hardware detection and model catalog
 
+**Done (2026-10-07)**, except the TUI screens (Phase 13). The macOS and
+Windows probes compile but have not run on those systems.
+
 - `internal/hw` per OS: RAM, CPU, disk space, NVIDIA (nvidia-smi), Apple
   Silicon unified memory, other GPUs where the OS reports them.
 - Profiles gain size, sha256, quantization, minimum memory and per-backend

@@ -1,0 +1,32 @@
+# gpt-oss-20b: MoE, 21B total / 3.6B active, MXFP4. Uses OpenAI's harmony
+# format through the model's chat template (--jinja). Experimental: not yet
+# benchmarked by BoundedCode. The model card gives no sampling defaults, so
+# none are set. Weights are not redistributed.
+name: gpt-oss-20b
+display_name: gpt-oss-20b (MXFP4 GGUF)
+description: For a 12-16 GB GPU or a 32 GB machine; OpenAI's open-weight model.
+status: experimental
+file: gpt-oss-20b-MXFP4.gguf
+source:
+  repo: ggml-org/gpt-oss-20b-GGUF
+  file: gpt-oss-20b-MXFP4.gguf
+  revision: ef9b12f2ff56c69cf32153a02784e7a3c88bf524
+  base_model: openai/gpt-oss-20b
+  license: apache-2.0
+  license_url: https://huggingface.co/openai/gpt-oss-20b
+  # The model also ships a usage policy (USAGE_POLICY in the base repo).
+  license_notice: "Apache-2.0, with OpenAI's gpt-oss usage policy (comply with applicable law): https://huggingface.co/openai/gpt-oss-20b/blob/main/USAGE_POLICY"
+  size_bytes: 12109566624
+  sha256: 27cd6c432c7672cb812a92f611cf3ba7bbc35928262bb1e1253ff4ee6ae35901
+architecture:
+  moe: true
+  total_params_b: 21
+  active_params_b: 3.6
+  # 12 full-attention layers x 8 KV heads x 64 x 2 x 2 bytes = 24 KiB per
+  # token; x 65536 tokens = 1.5 GiB (estimate; sliding-window layers add a
+  # small fixed cache).
+  kv_mib: 1600
+server:
+  ctx_size: 65536
+  parallel: 1
+  jinja: true

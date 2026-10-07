@@ -4,6 +4,8 @@
 # UD-IQ3_XXS (~28.5 GB) — a 3-bit quant, which handicaps quality.
 name: qwen3-coder-next
 display_name: Qwen3-Coder-Next (UD-IQ3_XXS GGUF)
+description: Larger coding MoE in a 3-bit quant; the same 10/11 as the default in the model evaluation at about half the throughput.
+status: experimental
 file: Qwen3-Coder-Next-UD-IQ3_XXS.gguf
 source:
   repo: unsloth/Qwen3-Coder-Next-GGUF
@@ -11,6 +13,9 @@ source:
   revision: ce09c67b53bc8739eef83fe67b2f5d293c270632
   base_model: Qwen/Qwen3-Coder-Next
   license: apache-2.0
+  license_url: https://huggingface.co/Qwen/Qwen3-Coder-Next
+  size_bytes: 28482506752
+  sha256: 00a9bf4f9dcb6ef4fb78ef810e6b5dbd13cc604ceb0fa10f56c9ae2529c0ade4
 architecture:
   moe: true
   total_params_b: 80

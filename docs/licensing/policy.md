@@ -80,8 +80,9 @@ in this repository.**
 
 Model weights are never committed or redistributed. Profiles record the
 source repository, the commit (`source.revision`) and the license so users
-can review them before downloading. `scripts/fetch-model.sh` only downloads
-at an explicit commit and verifies the file against the hub's LFS sha256.
+can review them before downloading. `bcode model fetch` (and `scripts/fetch-model.sh`)
+only download at an explicit commit and verify the file against the sha256
+recorded in the profile (the hub's LFS sha256).
 
 ## SBOM
 

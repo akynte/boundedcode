@@ -54,19 +54,20 @@ Review the license on the model page first. The default profile
 `source.revision`:
 
 ```bash
-./scripts/fetch-model.sh unsloth/Qwen3.6-35B-A3B-GGUF Qwen3.6-35B-A3B-UD-Q4_K_M.gguf \
-    a483e9e6cbd595906af30beda3187c2663a1118c ~/models
+./bin/boundedcode model recommend            # the model that suits this machine
+./bin/boundedcode model fetch qwen3.6-35b-a3b
 ```
 
-The script refuses branch names such as `main` and checks the file against
-the sha256 the hub publishes for that commit. Without the last argument it
-writes to `~/.local/share/boundedcode/models`, which is also searched.
+The download is pinned to the profile's commit, resumes if interrupted, and
+is checked against the sha256 recorded in the profile. It goes to
+`models_dir`, or `~/.local/share/boundedcode/models` when that is unset.
+`scripts/fetch-model.sh` does the same from a shell.
 
 ## 3. Configure
 
 ```bash
 L=~/.local/share/boundedcode/runtimes/llama.cpp/v0.5.0/bin
-./bin/boundedcode init --models-dir ~/models --llama-server $L/llama-server --llama-bench $L/llama-bench \
+./bin/boundedcode init --llama-server $L/llama-server --llama-bench $L/llama-bench \
     --adapter-dir $PWD/adapters/openhands/python
 ./bin/boundedcode sandbox build --dir adapters/openhands
 ./bin/boundedcode doctor

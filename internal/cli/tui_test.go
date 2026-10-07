@@ -310,7 +310,7 @@ func TestSetupCheckAndConfigStep(t *testing.T) {
 }
 
 func TestEmbeddedSetupAssets(t *testing.T) {
-	for _, f := range []string{"scripts/install-deps.sh", "scripts/build-llama-cpp.sh", "scripts/fetch-model.sh"} {
+	for _, f := range []string{"scripts/install-deps.sh", "scripts/build-llama-cpp.sh"} {
 		if _, err := boundedcode.SetupScripts.ReadFile(f); err != nil {
 			t.Errorf("%s not embedded: %v", f, err)
 		}

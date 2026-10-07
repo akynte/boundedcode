@@ -4,11 +4,9 @@
 package hw
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"fmt"
-	"os"
 	"os/exec"
 	"runtime"
 	"strconv"
@@ -35,69 +33,72 @@ type GPU struct {
 // Snapshot is a point-in-time view of the machine.
 type Snapshot struct {
 	Time        time.Time `json:"time"`
+	OS          string    `json:"os"`
+	Arch        string    `json:"arch"`
 	CPUModel    string    `json:"cpu_model"`
 	LogicalCPUs int       `json:"logical_cpus"`
 	MemTotalMiB int       `json:"mem_total_mib"`
 	MemAvailMiB int       `json:"mem_available_mib"`
 	SwapUsedMiB int       `json:"swap_used_mib"`
 	GPUs        []GPU     `json:"gpus"`
-	Notes       []string  `json:"notes,omitempty"`
+	// Accelerator is what llama.cpp can offload to: NVIDIA (CUDA), Apple
+	// Silicon (Metal, unified memory) or none (CPU only).
+	Accelerator Accelerator `json:"accelerator"`
+	Notes       []string    `json:"notes,omitempty"`
+}
+
+// Accelerator kinds.
+const (
+	AccelNone   = "none"
+	AccelCUDA   = "cuda"
+	AccelMetal  = "metal"
+	AccelOthers = "other" // a GPU llama.cpp may use through Vulkan; not sized
+)
+
+// Accelerator is the offload target model choices are sized against.
+type Accelerator struct {
+	Kind string `json:"kind"`
+	Name string `json:"name,omitempty"`
+	// MemoryMiB is the memory the model can use on the accelerator: the
+	// largest NVIDIA GPU's VRAM, or for Apple Silicon the part of unified
+	// memory the GPU may wire (see metalBudget). 0 for none.
+	MemoryMiB int `json:"memory_mib"`
+	// Unified is true when accelerator memory is system RAM (Apple Silicon):
+	// MemoryMiB and MemTotalMiB are then the same memory, not additive.
+	Unified bool `json:"unified,omitempty"`
+	// Estimated marks a MemoryMiB that is a rule of thumb, not reported.
+	Estimated bool `json:"estimated,omitempty"`
 }
 
 // Probe collects a Snapshot.
 func Probe(ctx context.Context) Snapshot {
-	s := Snapshot{Time: time.Now().UTC(), LogicalCPUs: runtime.NumCPU(), CPUModel: cpuModel()}
-	if mi, err := readMeminfo(); err == nil {
-		s.MemTotalMiB = mi["MemTotal"] / 1024
-		s.MemAvailMiB = mi["MemAvailable"] / 1024
-		s.SwapUsedMiB = (mi["SwapTotal"] - mi["SwapFree"]) / 1024
-	} else {
-		s.Notes = append(s.Notes, "meminfo: "+err.Error())
-	}
+	s := Snapshot{Time: time.Now().UTC(), OS: runtime.GOOS, Arch: runtime.GOARCH, LogicalCPUs: runtime.NumCPU()}
+	probeHost(ctx, &s)
 	gpus, err := ProbeGPUs(ctx)
-	if err != nil {
+	if err != nil && s.Accelerator.Kind == "" {
 		s.Notes = append(s.Notes, "nvidia-smi: "+err.Error())
 	}
 	s.GPUs = gpus
+	if s.Accelerator.Kind == "" {
+		s.Accelerator = Accelerator{Kind: AccelNone}
+		for _, g := range gpus {
+			if g.MemTotalMiB > s.Accelerator.MemoryMiB {
+				s.Accelerator = Accelerator{Kind: AccelCUDA, Name: g.Name, MemoryMiB: g.MemTotalMiB}
+			}
+		}
+	}
 	return s
 }
 
-func cpuModel() string {
-	b, err := os.ReadFile("/proc/cpuinfo")
-	if err != nil {
-		return ""
+// metalBudget estimates how much unified memory the GPU may use on Apple
+// Silicon when the user has not set iogpu.wired_limit_mb: macOS wires up to
+// about two thirds of RAM for the GPU on smaller machines and more on larger
+// ones; two thirds is used as the conservative estimate.
+func metalBudget(totalMiB, wiredLimitMiB int) (int, bool) {
+	if wiredLimitMiB > 0 {
+		return min(wiredLimitMiB, totalMiB), false
 	}
-	for line := range strings.SplitSeq(string(b), "\n") {
-		if k, v, ok := strings.Cut(line, ":"); ok && strings.TrimSpace(k) == "model name" {
-			return strings.TrimSpace(v)
-		}
-	}
-	return ""
-}
-
-func readMeminfo() (map[string]int, error) {
-	f, err := os.Open("/proc/meminfo")
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-	out := map[string]int{}
-	sc := bufio.NewScanner(f)
-	for sc.Scan() {
-		k, v, ok := strings.Cut(sc.Text(), ":")
-		if !ok {
-			continue
-		}
-		fields := strings.Fields(v)
-		if len(fields) == 0 {
-			continue
-		}
-		n, err := strconv.Atoi(fields[0])
-		if err == nil {
-			out[k] = n // kB
-		}
-	}
-	return out, sc.Err()
+	return totalMiB * 2 / 3, true
 }
 
 const gpuQuery = "index,name,compute_cap,driver_version,memory.total,memory.used,utilization.gpu,temperature.gpu,power.draw,power.max_limit,clocks.sm,clocks_event_reasons.active"
@@ -138,20 +139,3 @@ func parseGPUs(out []byte) ([]GPU, error) {
 
 func atoi(s string) int     { n, _ := strconv.Atoi(s); return n }
 func atof(s string) float64 { n, _ := strconv.ParseFloat(s, 64); return n }
-
-// ProcessRSSMiB returns the resident set size of pid in MiB, or 0.
-func ProcessRSSMiB(pid int) int {
-	b, err := os.ReadFile(fmt.Sprintf("/proc/%d/status", pid))
-	if err != nil {
-		return 0
-	}
-	for line := range strings.SplitSeq(string(b), "\n") {
-		if strings.HasPrefix(line, "VmRSS:") {
-			f := strings.Fields(line)
-			if len(f) >= 2 {
-				return atoi(f[1]) / 1024
-			}
-		}
-	}
-	return 0
-}

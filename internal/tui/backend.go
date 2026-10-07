@@ -129,6 +129,12 @@ type Check struct {
 type ModelRow struct {
 	Name, Display, File, License string
 	Present, Default             bool
+	Description, Status          string
+	SizeBytes                    int64
+	// Fit is how the model fits this machine (model.Fit levels) and why;
+	// Recommended marks the model set-up proposes.
+	Fit, FitDetail string
+	Recommended    bool
 }
 
 // CreateTaskRequest are the inputs of `task create`.

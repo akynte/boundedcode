@@ -17,6 +17,7 @@ import (
 	"github.com/akynte/boundedcode/internal/buildinfo"
 	"github.com/akynte/boundedcode/internal/hw"
 	"github.com/akynte/boundedcode/internal/inference/llamacpp"
+	"github.com/akynte/boundedcode/internal/model"
 	"github.com/akynte/boundedcode/internal/repointel/cbm"
 	"github.com/akynte/boundedcode/internal/sandbox"
 )
@@ -79,15 +80,20 @@ func runDoctor(ctx context.Context, app *App) []check {
 		add(check{"state db", statusOK, s.Path(), ""})
 	}
 
-	snap := hw.Probe(ctx)
-	add(check{"cpu", statusOK, fmt.Sprintf("%s (%d threads)", snap.CPUModel, snap.LogicalCPUs), ""})
-	ram := check{"ram", statusOK, fmt.Sprintf("%d MiB total, %d MiB available", snap.MemTotalMiB, snap.MemAvailMiB), ""}
-	if snap.MemAvailMiB < 24*1024 {
-		ram.Status, ram.Hint = statusWarn, "MoE expert offload of a ~22 GB model needs roughly 24 GB free RAM"
+	snap := app.hardware(ctx)
+	add(check{"cpu", statusOK, fmt.Sprintf("%s (%d threads, %s/%s)", snap.CPUModel, snap.LogicalCPUs, snap.OS, snap.Arch), ""})
+	add(check{"ram", statusOK, fmt.Sprintf("%d MiB total, %d MiB available", snap.MemTotalMiB, snap.MemAvailMiB), ""})
+	switch snap.Accelerator.Kind {
+	case hw.AccelMetal:
+		add(check{"gpu", statusOK, describeHardware(snap), ""})
+	case hw.AccelNone:
+		if !app.Config.Inference.IsCloud() {
+			add(check{"gpu", statusWarn, "no supported GPU detected: local models run on the CPU (slow)",
+				"an NVIDIA GPU with its driver, Apple Silicon, or a cloud provider (`" + buildinfo.Command() + " provider use`)"})
+		}
 	}
-	add(ram)
-	if len(snap.GPUs) == 0 {
-		add(check{"gpu", statusWarn, "no NVIDIA GPU detected (CPU-only inference will be slow)", "install the NVIDIA driver"})
+	if !app.Config.Inference.IsCloud() {
+		add(modelFitCheck(app, snap))
 	}
 	for _, g := range snap.GPUs {
 		add(check{fmt.Sprintf("gpu%d", g.Index), statusOK,
@@ -180,7 +186,7 @@ func inferenceChecks(ctx context.Context, app *App) []check {
 	} else if p, err := app.Models.Get(cfg.DefaultModel); err != nil {
 		add(check{"default model", statusFail, err.Error(), ""})
 	} else {
-		path := p.ResolveFile(cfg.ModelsDir)
+		path := p.ResolveFile(app.modelsDir())
 		if fi, err := os.Stat(path); err != nil {
 			add(check{"default model", statusFail, path + " not found",
 				fmt.Sprintf("%s (downloads %s from huggingface.co/%s, license: %s)", setupHint("model"), p.Source.File, p.Source.Repo, p.Source.License)})
@@ -407,4 +413,25 @@ func frontierCheck(ctx context.Context, app *App) check {
 		return check{"frontier", statusWarn, "codex not logged in: " + line, "run `codex login` (ChatGPT sign-in)"}
 	}
 	return check{"frontier", statusOK, "codex: " + line, ""}
+}
+
+// modelFitCheck rates the default model against the machine.
+func modelFitCheck(app *App, snap hw.Snapshot) check {
+	p, err := app.Models.Get(app.Config.DefaultModel)
+	if err != nil {
+		return check{"model fit", statusFail, err.Error(), ""}
+	}
+	f := model.FitFor(p, snap)
+	c := check{"model fit", statusOK, fmt.Sprintf("%s: %s (%s)", p.Name, f.Detail, f.Level), ""}
+	if !f.Fast() {
+		c.Status = statusWarn
+		rec := model.Recommend(app.Models, app.Config.DefaultModel, snap)
+		c.Hint = "`" + buildinfo.Command() + " model recommend`"
+		if rec.Best.Profile != "" && rec.Best.Profile != p.Name {
+			c.Hint = fmt.Sprintf("this machine suits %s: `%s model use %s`", rec.Best.Profile, buildinfo.Command(), rec.Best.Profile)
+		} else if rec.Best.Profile == "" {
+			c.Hint = "no local model fits; use a cloud provider: `" + buildinfo.Command() + " provider use`"
+		}
+	}
+	return c
 }

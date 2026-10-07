@@ -248,12 +248,12 @@ make build                                  # ./bin/boundedcode
 ./scripts/install-deps.sh ~/.local/bin      # gitleaks + codebase-memory-mcp (checksum-pinned)
 ./scripts/build-llama-cpp.sh                # pinned llama.cpp v0.5.0 with CUDA
 
-# Download a model yourself (see "Models"), pinned to a commit and checksum-verified:
-./scripts/fetch-model.sh unsloth/Qwen3.6-35B-A3B-GGUF Qwen3.6-35B-A3B-UD-Q4_K_M.gguf \
-    a483e9e6cbd595906af30beda3187c2663a1118c ~/models
+# Download a model (see "Models"), pinned to a commit and sha256-verified:
+./bin/boundedcode model recommend               # the model that suits this machine
+./bin/boundedcode model fetch qwen3.6-35b-a3b   # into ~/.local/share/boundedcode/models
 
 L=~/.local/share/boundedcode/runtimes/llama.cpp/v0.5.0/bin
-./bin/boundedcode init --models-dir ~/models \
+./bin/boundedcode init \
     --llama-server $L/llama-server --llama-bench $L/llama-bench \
     --adapter-dir $PWD/adapters/openhands/python
 ./bin/boundedcode sandbox build --dir adapters/openhands   # agent sandbox image
@@ -295,9 +295,14 @@ license.
 - **Profiles:** each file in [`configs/models/`](configs/models) pins the
   upstream source and revision, the file, the license and the llama.cpp
   settings.
-- **Download:** `scripts/fetch-model.sh` checks the download against the
-  sha256 the hub publishes for that revision.
-- **Tooling:** `boundedcode model` inspects the profiles;
+- **Choice:** `bcode model recommend` rates every profile against this
+  machine's RAM and GPU (a rule of thumb, not a measurement) and proposes one;
+  `bcode model list` shows them all. Only the default is validated; the others
+  are marked experimental until they are benchmarked here.
+- **Download:** `bcode model fetch NAME` downloads at the pinned commit,
+  resumes interrupted downloads, and checks the file against the sha256 in its
+  profile.
+- **Tooling:** `bcode model use NAME` makes a model the default;
   `boundedcode bench infra --apply` tunes one for your machine.
 
 | Model profiles | Status |
@@ -410,7 +415,9 @@ example by prompt injection in repository content.
 1. **Small validation sample.** 8 + 6 public tasks, each run once. The second
    set was screened for issue-derivable tests; real requests are not.
 2. **One machine and one model.** Other GPUs, platforms and models are
-   untested.
+   untested. Model choice, cloud providers, macOS and Windows support are
+   being added (see the [plan](docs/development/multiplatform-plan.md)); none
+   of them has run on other hardware yet.
 3. **Ambiguity detection is imperfect.** The task contract is derived by the
    local model. It has flagged a clear request as ambiguous and misnamed real
    alternatives. The second validation ran with `task.ambiguity: proceed`,
@@ -422,17 +429,21 @@ example by prompt injection in repository content.
    its readings have a supporting quote there. This check, and the retry of
    a contract that names nothing required, have unit tests with scripted
    model replies only; they have not been run on real tasks.
-4. **Recent evidence-check changes are not yet validated.** Data-driven
+4. **New models and cloud providers are unmeasured.** Only Qwen3.6-35B-A3B
+   on the reference machine is validated. The other model profiles and the
+   cloud providers are experimental: their fit is a rule of thumb and their
+   quality on BoundedCode tasks is unknown.
+5. **Recent evidence-check changes are not yet validated.** Data-driven
    test files are now attributed to the Go package that reads them, and
    tests that only fail to compile on the base no longer count. Both changes are unreleased
    and covered by unit tests only; non-Go stages are compared per stage, not
    per test.
-5. **Frontier escalation is unproven.** It was enabled but not triggered in
+6. **Frontier escalation is unproven.** It was enabled but not triggered in
    the second validation; in the first, 4 frontier calls were sent and no
    task was accepted.
-6. **The strategy governor** bounded runaway generation in development runs,
+7. **The strategy governor** bounded runaway generation in development runs,
    but did not trigger during the held-out validation.
-7. **No baseline advantage shown.** On the two-task baseline in the first
+8. **No baseline advantage shown.** On the two-task baseline in the first
    validation, BoundedCode did not improve the same local model's result and
    was slower on those tasks; no baseline was run on the held-out set
    ([baseline comparison](benchmarks/reports/small-real-world-validation-20261004/baseline-comparison.md)).

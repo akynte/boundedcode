@@ -1,0 +1,36 @@
+# Qwen3.8-27B: dense 27B, hybrid attention (16 of 64 layers full attention).
+# Experimental: not yet benchmarked by BoundedCode. Weights are not
+# redistributed.
+name: qwen3.8-27b
+display_name: Qwen3.8-27B (UD-Q4_K_M GGUF)
+description: For a 24 GB+ GPU or a 32-64 GB Mac; vendor coding scores above the default (not measured here); dense, so slow when it does not fit the GPU.
+status: experimental
+file: Qwen3.8-27B-UD-Q4_K_M.gguf
+source:
+  repo: unsloth/Qwen3.8-27B-GGUF
+  file: Qwen3.8-27B-UD-Q4_K_M.gguf
+  revision: 4ca720788d1e01f1bff70c033e0d0028fd02e502
+  base_model: Qwen/Qwen3.8-27B
+  license: apache-2.0
+  license_url: https://huggingface.co/Qwen/Qwen3.8-27B
+  size_bytes: 16464440224
+  sha256: 322e194ff79741c7baa497c240f677f54b201b0efab44ca8e50f122b39123482
+architecture:
+  moe: false
+  total_params_b: 27
+  active_params_b: 27
+  # 16 full-attention layers x 4 KV heads x 256 x 2 x 2 bytes = 64 KiB per
+  # token; x 65536 tokens = 4 GiB (estimate).
+  kv_mib: 4100
+server:
+  ctx_size: 65536
+  parallel: 1
+  jinja: true
+  reasoning_budget: 4096
+  reasoning_budget_message: "\n\nI have reasoned enough. I will now act on my best plan.\n"
+# Model card, thinking mode.
+sampling:
+  temperature: 1.0
+  top_p: 0.95
+  top_k: 20
+  min_p: 0.0

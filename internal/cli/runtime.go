@@ -20,7 +20,7 @@ import (
 func (a *App) llamaManager() *llamacpp.Manager {
 	c := a.Config.Inference
 	return &llamacpp.Manager{
-		Binary: c.ServerBinary, Host: c.Host, Port: c.Port, ModelsDir: a.Config.ModelsDir,
+		Binary: c.ServerBinary, Host: c.Host, Port: c.Port, ModelsDir: a.modelsDir(),
 		StateDir: a.Paths.Runtime, StartupTimeout: c.StartupTimeout.D(), IdleSleep: c.IdleSleep.D(), Log: a.Log,
 	}
 }
@@ -138,7 +138,8 @@ func newRuntimeCmd(app *App) *cobra.Command {
 }
 
 func newModelCmd(app *App) *cobra.Command {
-	cmd := &cobra.Command{Use: "model", Short: "Inspect model profiles"}
+	cmd := &cobra.Command{Use: "model", Short: "Choose, download and inspect local models"}
+	cmd.AddCommand(newModelCatalogCmds(app)...)
 	cmd.AddCommand(&cobra.Command{
 		Use:   "list",
 		Short: "List model profiles and whether their weights are present",
@@ -149,11 +150,19 @@ func newModelCmd(app *App) *cobra.Command {
 			}
 			for _, r := range rows {
 				mark := " "
-				if r.Default {
+				switch {
+				case r.Default:
 					mark = "*"
+				case r.Recommended:
+					mark = "+"
 				}
-				app.printf("%s %-24s present=%-5v license=%-12s %s\n", mark, r.Name, r.Present, r.License, r.File)
+				present := "not downloaded"
+				if r.Present {
+					present = "downloaded"
+				}
+				app.printf("%s %-20s %-12s %-8s %-9s %-14s %s\n", mark, r.Name, r.Status, formatGB(r.SizeBytes), r.Fit, present, r.License)
 			}
+			app.printf("(* default, + recommended for this machine; `%s model recommend` explains)\n", buildinfo.Command())
 			return nil
 		},
 	})
@@ -167,7 +176,7 @@ func newModelCmd(app *App) *cobra.Command {
 				return err
 			}
 			c := app.Config.Inference
-			argv := app.llamaManager().ServerArgs(p, p.ResolveFile(app.Config.ModelsDir))
+			argv := app.llamaManager().ServerArgs(p, p.ResolveFile(app.modelsDir()))
 			if app.jsonOut {
 				return app.printJSON(map[string]any{"profile": p, "server_args": argv})
 			}
@@ -219,22 +228,42 @@ func (a *App) runtimeLog(n int) (string, []string, error) {
 	return p, lines, nil
 }
 
-// modelRow is a model profile and whether its weights are present.
+// modelRow is a model profile, whether its weights are present, and how it
+// fits this machine.
 type modelRow struct {
-	Name    string `json:"name"`
-	File    string `json:"file"`
-	Present bool   `json:"present"`
-	License string `json:"license"`
-	Default bool   `json:"default"`
+	Name        string `json:"name"`
+	Display     string `json:"display_name"`
+	Description string `json:"description,omitempty"`
+	Status      string `json:"status"`
+	File        string `json:"file"`
+	SizeBytes   int64  `json:"size_bytes,omitempty"`
+	Present     bool   `json:"present"`
+	License     string `json:"license"`
+	Default     bool   `json:"default"`
+	Fit         string `json:"fit"`
+	FitDetail   string `json:"fit_detail"`
+	Recommended bool   `json:"recommended"`
 }
 
 func (a *App) modelRows() []modelRow {
+	snap := a.hardware(context.Background())
+	rec := model.Recommend(a.Models, a.Config.DefaultModel, snap)
+	fits := map[string]model.Fit{}
+	for _, f := range rec.Fits {
+		fits[f.Profile] = f
+	}
 	var rows []modelRow
 	for _, n := range a.Models.Names() {
 		p := a.Models[n]
-		path := p.ResolveFile(a.Config.ModelsDir)
+		path := p.ResolveFile(a.modelsDir())
 		_, err := os.Stat(path)
-		rows = append(rows, modelRow{n, path, err == nil, p.Source.License, n == a.Config.DefaultModel})
+		status := p.Status
+		if status == "" {
+			status = model.StatusExperimental
+		}
+		rows = append(rows, modelRow{Name: n, Display: p.DisplayName, Description: p.Description, Status: status, File: path,
+			SizeBytes: p.Source.SizeBytes, Present: err == nil, License: p.Source.License, Default: n == a.Config.DefaultModel,
+			Fit: fits[n].Level, FitDetail: fits[n].Detail, Recommended: n == rec.Best.Profile})
 	}
 	return rows
 }

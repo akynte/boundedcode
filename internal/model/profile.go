@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -24,6 +25,12 @@ type Profile struct {
 	Architecture Architecture `yaml:"architecture"`
 	Server       ServerFlags  `yaml:"server"`
 	Sampling     Sampling     `yaml:"sampling"`
+	// Status is "validated" (measured by BoundedCode's validation),
+	// "experimental" (not yet benchmarked here) or "review" (its license is
+	// under review). Empty is treated as experimental.
+	Status string `yaml:"status"`
+	// Description is one line for model choices in set-up.
+	Description string `yaml:"description"`
 	// Origin is where the profile was loaded from (not serialized).
 	Origin string `yaml:"-"`
 }
@@ -36,6 +43,19 @@ type Source struct {
 	Revision  string `yaml:"revision"`
 	BaseModel string `yaml:"base_model"`
 	License   string `yaml:"license"`
+	// SizeBytes and SHA256 identify the file at Revision (from the Hugging
+	// Face API); downloads are verified against SHA256. 0/"" = unknown (the
+	// download then reads the hash from the API).
+	SizeBytes int64  `yaml:"size_bytes"`
+	SHA256    string `yaml:"sha256"`
+	// LicenseURL is where the license text is published.
+	LicenseURL string `yaml:"license_url"`
+	// LicenseNotice, when set, is shown before download and must be
+	// accepted (custom open-weight licenses: use restrictions, thresholds).
+	LicenseNotice string `yaml:"license_notice"`
+	// Gated repositories need a Hugging Face token whose account accepted
+	// the model's terms on its page.
+	Gated bool `yaml:"gated"`
 }
 
 // Architecture is coarse model metadata used for planning and reports.
@@ -43,6 +63,11 @@ type Architecture struct {
 	MoE           bool    `yaml:"moe"`
 	TotalParamsB  float64 `yaml:"total_params_b"`
 	ActiveParamsB float64 `yaml:"active_params_b"`
+	// KVMiB estimates the KV cache at the profile's ctx_size, for the
+	// memory fit (0 = 10% of the file size plus 512 MiB). Computed from the
+	// model's config (full-attention layers × KV heads × head size × 2 ×
+	// bytes per element × tokens); an estimate, not a measurement.
+	KVMiB int `yaml:"kv_mib"`
 }
 
 // ServerFlags are inference-server settings. Field names are runtime-neutral;
@@ -87,6 +112,18 @@ type Sampling struct {
 	RepeatPenalty   float64 `yaml:"repeat_penalty"`
 }
 
+// Profile statuses.
+const (
+	StatusValidated    = "validated"
+	StatusExperimental = "experimental"
+	StatusReview       = "review"
+)
+
+var (
+	sha256RE = regexp.MustCompile(`^[0-9a-f]{64}$`)
+	commitRE = regexp.MustCompile(`^[0-9a-f]{40}$`)
+)
+
 // Validate checks a profile.
 func (p Profile) Validate() error {
 	var errs []error
@@ -114,6 +151,17 @@ func (p Profile) Validate() error {
 	}
 	if p.Server.CtxSize < 0 || p.Server.NCPUMoE < 0 || p.Server.Parallel < 0 {
 		errs = append(errs, errors.New("server: negative sizes are invalid"))
+	}
+	switch p.Status {
+	case "", StatusValidated, StatusExperimental, StatusReview:
+	default:
+		errs = append(errs, fmt.Errorf("status: %q is not validated|experimental|review", p.Status))
+	}
+	if p.Source.SHA256 != "" && !sha256RE.MatchString(p.Source.SHA256) {
+		errs = append(errs, fmt.Errorf("source.sha256: %q is not a sha256 hex digest", p.Source.SHA256))
+	}
+	if p.Source.SizeBytes < 0 {
+		errs = append(errs, errors.New("source.size_bytes: negative"))
 	}
 	if p.Sampling.Temperature < 0 || p.Sampling.TopP < 0 || p.Sampling.TopP > 1 {
 		errs = append(errs, errors.New("sampling: temperature must be >= 0 and top_p in [0,1]"))
@@ -213,8 +261,52 @@ func (c Catalog) add(b []byte, origin string) error {
 		return fmt.Errorf("%s: %w", origin, err)
 	}
 	p.Origin = origin
+	if prev, ok := c[p.Name]; ok {
+		inheritCatalog(&p, prev)
+	}
 	c[p.Name] = p
 	return nil
+}
+
+// inheritCatalog fills a user override's missing catalog metadata from the
+// built-in profile it replaces, when both describe the same weights (same
+// repository and file). Overrides written by `bench infra --apply` carry
+// only tuned server settings; they must not lose the model's revision,
+// checksum, license notice or validation status. The override's own values
+// always win.
+func inheritCatalog(p *Profile, prev Profile) {
+	if p.Source.Repo != prev.Source.Repo || p.Source.File != prev.Source.File {
+		return
+	}
+	if p.Source.Revision != "" && prev.Source.Revision != "" && p.Source.Revision != prev.Source.Revision {
+		return // a different revision is different weights
+	}
+	src := &p.Source
+	if src.Revision == "" {
+		src.Revision = prev.Source.Revision
+	}
+	if src.SizeBytes == 0 {
+		src.SizeBytes = prev.Source.SizeBytes
+	}
+	if src.SHA256 == "" {
+		src.SHA256 = prev.Source.SHA256
+	}
+	if src.LicenseURL == "" {
+		src.LicenseURL = prev.Source.LicenseURL
+	}
+	if src.LicenseNotice == "" {
+		src.LicenseNotice = prev.Source.LicenseNotice
+	}
+	src.Gated = src.Gated || prev.Source.Gated
+	if p.Status == "" {
+		p.Status = prev.Status
+	}
+	if p.Description == "" {
+		p.Description = prev.Description
+	}
+	if p.Architecture.KVMiB == 0 {
+		p.Architecture.KVMiB = prev.Architecture.KVMiB
+	}
 }
 
 // Get returns the named profile.

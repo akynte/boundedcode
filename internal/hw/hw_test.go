@@ -23,3 +23,15 @@ func TestProbeDoesNotFail(t *testing.T) {
 		t.Fatal("no cpus")
 	}
 }
+
+func TestMetalBudget(t *testing.T) {
+	if mem, est := metalBudget(16384, 0); mem != 10922 || !est {
+		t.Fatalf("default budget = %d estimated=%v", mem, est)
+	}
+	if mem, est := metalBudget(16384, 12000); mem != 12000 || est {
+		t.Fatalf("user wired limit = %d estimated=%v", mem, est)
+	}
+	if mem, _ := metalBudget(16384, 99999); mem != 16384 {
+		t.Fatalf("limit above RAM = %d", mem)
+	}
+}

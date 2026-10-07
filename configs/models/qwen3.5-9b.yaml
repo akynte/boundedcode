@@ -1,0 +1,42 @@
+# Qwen3.5-9B: dense 9B, hybrid attention (8 of 32 layers full attention).
+# Experimental: not yet benchmarked by BoundedCode. Catalog research:
+# docs/design/model-catalog-research-2026-10.md. Weights are not
+# redistributed.
+name: qwen3.5-9b
+display_name: Qwen3.5-9B (Q4_K_M GGUF)
+description: For a 6-8 GB GPU or a 16 GB Mac; the same family as the default model.
+status: experimental
+file: Qwen3.5-9B-Q4_K_M.gguf
+source:
+  repo: unsloth/Qwen3.5-9B-GGUF
+  file: Qwen3.5-9B-Q4_K_M.gguf
+  revision: 3885219b6810b007914f3a7950a8d1b469d598a5
+  base_model: Qwen/Qwen3.5-9B
+  license: apache-2.0
+  license_url: https://huggingface.co/Qwen/Qwen3.5-9B
+  size_bytes: 5680522464
+  sha256: 03b74727a860a56338e042c4420bb3f04b2fec5734175f4cb9fa853daf52b7e8
+architecture:
+  moe: false
+  total_params_b: 9
+  active_params_b: 9
+  # 8 full-attention layers x 4 KV heads x 256 x 2 (K, V) x 2 bytes (f16)
+  # = 32 KiB per token; x 65536 tokens = 2 GiB (estimate).
+  kv_mib: 2100
+# Unset GPU layers, MoE offload, flash attention and cache types: llama.cpp
+# (--fit, on by default) sizes them for the machine. The model card advises
+# at least 128K context to preserve thinking; 64K keeps the KV cache within
+# an 8 GB machine.
+server:
+  ctx_size: 65536
+  parallel: 1
+  jinja: true
+  # Same family and template as the default model; see qwen3.6-35b-a3b.yaml.
+  reasoning_budget: 4096
+  reasoning_budget_message: "\n\nI have reasoned enough. I will now act on my best plan.\n"
+# Model card, thinking mode for precise coding tasks.
+sampling:
+  temperature: 0.6
+  top_p: 0.95
+  top_k: 20
+  min_p: 0.0

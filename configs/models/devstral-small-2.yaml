@@ -1,0 +1,34 @@
+# Devstral Small 2 (24B, dense): Mistral's agentic coding model. The model
+# card targets a 24 GB GPU or a 32 GB Mac and asks for llama.cpp with PR
+# #17945 (merged 2025-12-12, before the pinned v0.5.0). Experimental: not yet
+# benchmarked by BoundedCode. Weights are not redistributed.
+name: devstral-small-2
+display_name: Devstral Small 2 24B (Q4_K_M GGUF)
+description: Coding specialist for a 24 GB GPU or a 32 GB Mac; dense, so slow when it does not fit the GPU.
+status: experimental
+file: Devstral-Small-2-24B-Instruct-2512-Q4_K_M.gguf
+source:
+  repo: unsloth/Devstral-Small-2-24B-Instruct-2512-GGUF
+  file: Devstral-Small-2-24B-Instruct-2512-Q4_K_M.gguf
+  revision: 6e458b8add42681bfd023de5eab93637694aaf82
+  base_model: mistralai/Devstral-Small-2-24B-Instruct-2512
+  # The base model card: "licensed under the Apache 2.0 License" (the
+  # unsloth GGUF repository is tagged "other").
+  license: apache-2.0
+  license_url: https://huggingface.co/mistralai/Devstral-Small-2-24B-Instruct-2512
+  size_bytes: 14334446752
+  sha256: d14ba9edee1bb4c4996a726deb81e49ae81800a3216f0774634238c380aee496
+architecture:
+  moe: false
+  total_params_b: 24
+  active_params_b: 24
+  # 40 layers x 8 KV heads x 128 x 2 x 2 bytes = 160 KiB per token; x 32768
+  # tokens = 5 GiB (estimate). The heavy KV cache is why the context is 32K.
+  kv_mib: 5100
+server:
+  ctx_size: 32768
+  parallel: 1
+  jinja: true
+# Model card: "temperature": 0.15.
+sampling:
+  temperature: 0.15

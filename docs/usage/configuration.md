@@ -49,6 +49,19 @@ strings (`90s`, `10m`, `4h`).
 | `request_timeout` | `10m` | Bound on one completion; also detects stalls. |
 | `idle_sleep` | `30m` | The managed server unloads the model after this much inactivity and reloads it on the next request. `0s` disables; negative values are rejected. |
 
+### Local model choice
+
+`default_model` names the local model profile (built in, or a YAML file in
+`<config>/models/` that overrides one by name). `bcode model recommend` rates
+the profiles against this machine and proposes one; `bcode model use NAME`
+sets `default_model` (and selects the local provider), and `bcode model fetch
+NAME` downloads it into `models_dir` (default `~/.local/share/boundedcode/models`).
+Profiles record `status` (`validated`, `experimental`, or `review` for a
+license under review, which is never offered), the pinned `source.revision`,
+`source.size_bytes` and `source.sha256`, and an optional `source.license_notice`
+shown before download. A user profile that overrides a built-in one for the
+same file keeps the built-in revision, checksum and status.
+
 ### Model provider
 
 `bcode provider use NAME [--model ID] [...]` sets these keys, and
