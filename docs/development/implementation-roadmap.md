@@ -17,3 +17,4 @@ updated docs/ADRs, and small local commits. Progress is tracked in
 | 8 | Model evaluation | engineering suite on candidate models; default selected from measurements |
 | 9 | Cross-service intelligence | analyzers only for gaps proven by Phase 3/8 failures, each with fixtures, tests and a measured improvement |
 | 10 | OSS readiness | README, docs, benchmark report, install script, release process, DCO, license scan, secret scan, SBOM. **No publishing without maintainer approval.** |
+| 11–16 | Model choice, cloud providers, TUI set-up, macOS and native Windows | see [multiplatform-plan.md](multiplatform-plan.md) |
