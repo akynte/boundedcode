@@ -170,4 +170,8 @@ ALTER TABLE escalations ADD COLUMN diff_before TEXT NOT NULL DEFAULT '';
 ALTER TABLE escalations ADD COLUMN diff_after TEXT NOT NULL DEFAULT '';
 ALTER TABLE escalations ADD COLUMN task_outcome TEXT NOT NULL DEFAULT '';
 `,
+	// 4: model calls record their provider (local, or a cloud API).
+	`
+ALTER TABLE model_calls ADD COLUMN provider TEXT NOT NULL DEFAULT 'local';
+`,
 }

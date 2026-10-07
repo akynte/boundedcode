@@ -129,7 +129,7 @@ Switch views with `1`–`9` (with the chat input left via `esc`), the arrow keys
 | 4 | **Intel** | Code-graph search, trace, snippet, impact and architecture; cross-service links and endpoints; Serena symbol, refs and impls, optionally against a task worktree (`Root`). |
 | 5 | **Runtime** | Inference server state (serving, sleeping, stopped), endpoint, memory and context. Start with the selected model (`s`), stop (`S`). Inspect a model profile and its llama-server arguments (`m`). The server log tail is shown at the bottom. |
 | 6 | **Frontier** | Provider settings and the Codex login state; escalation summary and history. Open the escalation's task (`enter`) or store a manual answer (`a`). |
-| 7 | **Stats** | Local-first metrics (local-only rate, escalation rate, verified tasks per hour, tokens, frontier token share) for all time, 24 hours, 7 days or 30 days (`tab`/`→` cycles). |
+| 7 | **Stats** | Metrics (local-only rate, usage and estimated cost per provider, escalation rate, verified tasks per hour, tokens, frontier token share) for all time, 24 hours, 7 days or 30 days (`tab`/`→` cycles). |
 | 8 | **System** | Configuration paths and `doctor` checks with hints. Probe (`s`) or set up (`S`) Serena. Build the sandbox image (`b`). Initialize the configuration (`i`). |
 | 9 | **Console** | Run any command, including `bench infra`, `bench tasks` and `bench intel`, with tab completion and history. This view also lists every operation started from any view, with its output. Interrupt the selected operation with `x`. |
 

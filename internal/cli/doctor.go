@@ -157,6 +157,9 @@ func inferenceChecks(ctx context.Context, app *App) []check {
 	var out []check
 	add := func(c check) { out = append(out, c) }
 	cfg := app.Config
+	if cfg.Inference.IsCloud() {
+		return cloudChecks(ctx, app)
+	}
 	if cfg.Inference.Mode == "external" {
 		if err := app.checkExternalInference(ctx); err != nil {
 			add(check{"inference", statusWarn, "external server at " + cfg.Inference.ExternalURL + " is not reachable",
@@ -186,6 +189,30 @@ func inferenceChecks(ctx context.Context, app *App) []check {
 		}
 	}
 	return out
+}
+
+// cloudChecks reports the selected cloud provider: its API key (present,
+// and accepted by the provider) and the model's context.
+func cloudChecks(ctx context.Context, app *App) []check {
+	ic := app.Config.Inference
+	name := "provider " + ic.Provider
+	key, src, err := app.secretStore().Get(ic.Provider)
+	if err != nil {
+		_, err = app.cloudKey(ic.Provider) // the error that names the fixes
+		return []check{{name, statusFail, "no API key", err.Error()}}
+	}
+	out := []check{{name + " key", statusOK, "stored in the " + src, ""}}
+	up, err := upstreamFor(ic.Provider, ic.Cloud(), key, nil, 30*time.Second)
+	if err != nil {
+		return append(out, check{name, statusFail, err.Error(), ""})
+	}
+	pctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	size, err := cloudContext(pctx, ic.Provider, ic.Cloud(), up)
+	if err != nil {
+		return append(out, check{name, statusFail, err.Error(), ""})
+	}
+	return append(out, check{name, statusOK, fmt.Sprintf("model %s, working context %d tokens", ic.Cloud().Model, size), ""})
 }
 
 // engineCheck reports whether the container engine can run the sandbox:

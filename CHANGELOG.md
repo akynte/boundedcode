@@ -2,6 +2,31 @@
 
 ## Unreleased
 
+### Cloud model providers (experimental)
+
+- **New:** the agent can use a cloud model API instead of the local model:
+  OpenAI, Anthropic (through the official Go SDK), Google Gemini, or any
+  OpenAI-compatible service. `bcode provider use|key set|key delete|models|test|show`
+  configures it; the local model stays the default ([ADR-0010](docs/architecture/adr/0010-cloud-model-providers.md)).
+- API keys are stored in the OS credential store (or an owner-only file),
+  never in `config.yaml` or on command lines, are redacted by value, and are
+  used only by the host-side gateway: the agent sandbox keeps no network and
+  never sees a key. Vendor variables (`ANTHROPIC_API_KEY`, ...) are not read;
+  `BOUNDEDCODE_<PROVIDER>_API_KEY` is.
+- With a cloud provider, the agent's conversation, including repository
+  content, is sent to that provider.
+- Anthropic thinking blocks and Gemini thought signatures are kept on the host
+  and replayed verbatim; history condensation is handled with the Anthropic
+  `drop_block` binding control.
+- A rejected key blocks the task with the fix; rate limits and outages are
+  retried without burning attempts.
+- `stats` reports model-call usage per provider, and an estimated cost when
+  prices are configured; a task that used a cloud model no longer counts as
+  local-only.
+- New dependencies (MIT, BSD, Apache-2.0): `anthropic-sdk-go` and its
+  runtime, `go-keyring`, `godbus/dbus`. Database migration 4 adds the
+  provider to `model_calls`.
+
 ### Task contract
 
 - A material ambiguity is checked against the request text

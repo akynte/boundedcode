@@ -124,6 +124,9 @@ func setupSteps() []setupStep {
 			},
 			check: func(ctx context.Context, a *App) (bool, string) {
 				c := a.Config.Inference
+				if c.IsCloud() {
+					return true, "not needed: using " + a.providerLabel()
+				}
 				if c.Mode == "external" {
 					ok, _ := inference.NewClient(c.ExternalURL, 3*time.Second).Healthy(ctx)
 					if !ok {
@@ -173,6 +176,9 @@ func setupSteps() []setupStep {
 					p.Source.File, p.DisplayName, p.Source.License, p.Source.Repo, a.Config.ModelsDir)
 			},
 			check: func(_ context.Context, a *App) (bool, string) {
+				if a.Config.Inference.IsCloud() {
+					return true, "not needed: using " + a.providerLabel()
+				}
 				if a.Config.Inference.Mode == "external" {
 					return true, "served by the external server"
 				}

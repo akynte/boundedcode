@@ -270,7 +270,7 @@ func (r *Runtime) Open(ctx context.Context, req agent.OpenRequest) (agent.Sessio
 		EventCount     int    `json:"event_count"`
 	}
 	params := map[string]any{
-		"workspace": req.Workspace, "persistence_dir": req.PersistenceDir, "model": gw.Model,
+		"workspace": req.Workspace, "persistence_dir": req.PersistenceDir, "model": adapterModel(gw),
 		"conversation_id": req.SessionID, "max_iterations": nilIfZero(req.MaxIterations),
 		"max_input_tokens": nilIfZero(req.MaxInputTokens), "max_output_tokens": nilIfZero(req.MaxOutputTokens),
 		"condenser_max_events": nilIfZero(req.CondenserMaxEvents), "condenser_max_tokens": nilIfZero(req.CondenserMaxTokens),
@@ -533,4 +533,17 @@ func toolchainMounts(tc agent.Toolchain, env map[string]string) []sandbox.Mount 
 		}
 	}
 	return out
+}
+
+// cloudAlias is the model name the agent SDK sees for a cloud provider. The
+// gateway sends the real model upstream; a neutral name keeps the SDK from
+// switching on provider-specific request parameters by model name (it
+// would otherwise treat "claude-…" or "gemini-…" as a native model).
+const cloudAlias = "boundedcode-cloud"
+
+func adapterModel(gw *inference.Gateway) string {
+	if inference.IsCloud(gw.Provider()) {
+		return cloudAlias
+	}
+	return gw.Model
 }

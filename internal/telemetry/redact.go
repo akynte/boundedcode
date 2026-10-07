@@ -1,6 +1,10 @@
 package telemetry
 
-import "regexp"
+import (
+	"regexp"
+	"strings"
+	"sync"
+)
 
 // secretPatterns match common credential shapes. Redaction is best effort and
 // defence in depth: the primary control is never giving secrets to the agent.
@@ -16,8 +20,36 @@ var secretPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`(?i)((?:api[_-]?key|secret|password|passwd|token)\s*[:=]\s*["']?)[^\s"']{8,}`),
 }
 
+var (
+	knownMu sync.RWMutex
+	known   []string
+)
+
+// AddSecret registers a credential the process holds (a provider API key),
+// so Redact removes it wherever it appears, whatever its shape. Values
+// shorter than 8 characters are ignored (too likely to match plain text).
+func AddSecret(v string) {
+	v = strings.TrimSpace(v)
+	if len(v) < 8 {
+		return
+	}
+	knownMu.Lock()
+	defer knownMu.Unlock()
+	for _, k := range known {
+		if k == v {
+			return
+		}
+	}
+	known = append(known, v)
+}
+
 // Redact replaces likely secrets in s with a placeholder.
 func Redact(s string) string {
+	knownMu.RLock()
+	for _, k := range known {
+		s = strings.ReplaceAll(s, k, "[REDACTED]")
+	}
+	knownMu.RUnlock()
 	for _, re := range secretPatterns {
 		s = re.ReplaceAllStringFunc(s, func(m string) string {
 			sub := re.FindStringSubmatch(m)

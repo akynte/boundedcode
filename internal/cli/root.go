@@ -62,6 +62,7 @@ func newRoot(app *App) *cobra.Command {
 		newStatsCmd(app),
 		newTUICmd(app),
 		newSetupCmd(app),
+		newProviderCmd(app),
 	)
 	return root
 }

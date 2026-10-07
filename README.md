@@ -4,9 +4,10 @@
 
 **Bounded context. Bounded cost. Unbounded codebases.**
 
-A local-first AI software-engineering platform for long-running work on large
+An AI software-engineering platform for long-running work on large
 repositories, with bounded context, deterministic verification, persistent
-task state and optional frontier escalation.
+task state and optional frontier escalation. It runs a local model by default,
+or a cloud model API you choose.
 
 [![ci](https://github.com/akynte/boundedcode/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/akynte/boundedcode/actions/workflows/ci.yml)
 [![secret-scan](https://github.com/akynte/boundedcode/actions/workflows/secrets.yml/badge.svg?branch=main)](https://github.com/akynte/boundedcode/actions/workflows/secrets.yml)
@@ -48,7 +49,7 @@ BoundedCode is built around the opposite defaults:
 | Principle | What it means |
 |---|---|
 | **Bounded context** | The model starts from a small task-specific pack drawn from repository intelligence and reads further code through tools as needed, instead of receiving the whole repository. |
-| **Local-first** | Inference runs on your machine through llama.cpp. A frontier model is an optional, policy-triggered exception: enabled but not triggered in the second validation; in the first validation 4 frontier calls were sent and no task was accepted. |
+| **Local by default** | Inference runs on your machine through llama.cpp unless you choose a cloud model API (OpenAI, Anthropic, Gemini or an OpenAI-compatible service; unvalidated, see [Cloud models](#cloud-models)). A frontier model is an optional, policy-triggered exception: enabled but not triggered in the second validation; in the first validation 4 frontier calls were sent and no task was accepted. |
 | **Evidence, not just green tests** | A task is `TASK_VERIFIED` only when a test it adds fails on the base commit and passes with the change (fail-before/pass-after evidence, not proof of correctness). |
 | **Durable tasks** | A persistent ledger lets long tasks resume after Ctrl-C, a crash or a reboot. |
 | **Contained agent** | The agent runs in a network-less container on its own git worktree. Nothing is pushed or merged for you. |
@@ -304,6 +305,34 @@ license.
 | **Validated configuration** | Qwen3.6-35B-A3B, UD-Q4_K_M (Apache-2.0) on llama.cpp v0.5.0 |
 | **Other profiles** | Present, but not part of the validation |
 
+## Cloud models
+
+Instead of a local model, the agent can use a cloud model API:
+
+```bash
+bcode provider use anthropic --model claude-opus-5-5   # or openai, gemini, openai-compatible
+bcode provider key set anthropic                        # prompts without echo
+bcode provider test                                     # one short request
+```
+
+- **Keys** are stored in the OS credential store (Secret Service, macOS
+  Keychain, Windows Credential Manager), or an owner-only file where none
+  exists, never in the configuration file. Only the host-side gateway uses
+  them; the agent's sandbox has no network and never sees a key.
+- **Your code goes to the provider.** With a cloud provider, everything the
+  agent reads (context packs, file contents, command and test output) is sent
+  to that provider, under its data policy. Secrets are masked as with a local
+  model, but repository code is not. Use the local model for code that must
+  not leave the machine.
+- **Cost** is per token. `bcode stats` shows usage per provider, and an
+  estimate when you enter prices (`--input-price`, `--output-price`).
+- **Status:** experimental. The translations are tested against the providers'
+  documented request and response shapes with fake servers, not on real
+  tasks; the validation results above are for the local model only.
+
+See [ADR-0010](docs/architecture/adr/0010-cloud-model-providers.md) and the
+[configuration reference](docs/usage/configuration.md#model-provider).
+
 ## Frontier escalation (optional)
 
 BoundedCode runs **fully local without any frontier account**. Escalation is
@@ -318,7 +347,8 @@ risk or a high-risk review.
 
 - **Routes:** the Codex CLI with a ChatGPT subscription sign-in, or a manual
   mode that writes the packet to disk for you to answer.
-- **No API keys:** they are refused.
+- **No API keys for the frontier:** escalation uses only the Codex
+  subscription sign-in (the agent's cloud provider is a separate setting).
 - **Packets:** sanitized (host paths, secrets), and each one needs approval
   unless pre-approved.
 

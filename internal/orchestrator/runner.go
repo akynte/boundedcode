@@ -482,16 +482,45 @@ func (r *Runner) Run(ctx context.Context, taskID string, opt RunOptions) (*task.
 		r.say("agent stopped: status=%s events=%d stuck=%v", res.Status, res.EventsNew, res.Stuck)
 		if errors.Is(gwErr(gw, t), inference.ErrBudgetExhausted) {
 			_ = r.Ledger.ResolveStrategy(ctx, stratID, "rejected", "token budget exhausted")
-			return t, r.block(t, save, "local token budget exhausted")
+			return t, r.block(t, save, "token budget exhausted")
+		}
+		// A rejected API key cannot be fixed by retrying.
+		if n := r.callsWithStatus(ctx, t.ID, attemptStart, "http_401", "http_403"); n > 0 && res.Error != "" {
+			_ = r.Ledger.ResolveStrategy(ctx, stratID, "rejected", "infrastructure: API key rejected")
+			t.AttemptCount--
+			r.Rec.Emit(ctx, t.ID, "infra.failure", map[string]any{"auth_errors": n, "error": trunc(res.Error, 300)})
+			return t, r.block(t, save, "the "+r.Cfg.Inference.Provider+" API key was rejected: replace it in Settings or with `provider key set "+
+				r.Cfg.Inference.Provider+"`, then resume the task")
 		}
 		// A model server failure is infrastructure, not a failed strategy: it
-		// must not burn attempts or count toward Z2. Repair and retry.
-		if n := r.transportErrors(ctx, t.ID, attemptStart); n > 0 && res.Error != "" {
+		// must not burn attempts or count toward Z2. Repair and retry. For a
+		// cloud provider, rate limits and outages that outlasted the
+		// gateway's own retries count too; there is nothing to restart, so
+		// the runner waits and retries.
+		n := r.transportErrors(ctx, t.ID, attemptStart)
+		if r.Cfg.Inference.IsCloud() {
+			n += r.callsWithStatus(ctx, t.ID, attemptStart, "http_429", "http_500", "http_502", "http_503", "http_504", "http_529")
+		}
+		if n > 0 && res.Error != "" {
 			infraRetries++
 			_ = r.Ledger.ResolveStrategy(ctx, stratID, "rejected", "infrastructure: model server unavailable ("+trunc(res.Error, 160)+")")
 			t.AttemptCount-- // not a real attempt
 			r.Rec.Emit(ctx, t.ID, "infra.failure", map[string]any{"transport_errors": n, "retry": infraRetries, "error": trunc(res.Error, 300)})
-			r.say("model server failure (%d transport errors); repairing (%d/%d)", n, infraRetries, maxInfraRetries)
+			r.say("model server failure (%d failed calls); repairing (%d/%d)", n, infraRetries, maxInfraRetries)
+			if r.Cfg.Inference.IsCloud() {
+				if infraRetries > maxInfraRetries {
+					return t, r.block(t, save, "the "+r.Cfg.Inference.Provider+" API is unavailable or rate-limited; resume the task later")
+				}
+				select {
+				case <-ctx.Done():
+					return t, ctx.Err()
+				case <-time.After(cloudBackoff(infraRetries)):
+				}
+				if err := save(); err != nil {
+					return t, err
+				}
+				continue
+			}
 			if infraRetries > maxInfraRetries || r.EnsureModel == nil {
 				return t, r.block(t, save, "local model server unavailable")
 			}
@@ -1061,6 +1090,23 @@ func (r *Runner) keepLease(ctx context.Context, taskID, owner string, stop conte
 
 // transportErrors counts model calls of the task that failed to reach the
 // model server since t.
+// callsWithStatus counts the task's model calls with one of the statuses
+// since a time.
+func (r *Runner) callsWithStatus(ctx context.Context, taskID string, since time.Time, statuses ...string) int {
+	q := `SELECT COUNT(*) FROM model_calls WHERE task_id = ? AND created_at >= ? AND status IN (?` + strings.Repeat(",?", len(statuses)-1) + `)`
+	args := []any{taskID, since.UTC().Format(time.RFC3339Nano)}
+	for _, s := range statuses {
+		args = append(args, s)
+	}
+	var n int
+	_ = r.DB.QueryRowContext(ctx, q, args...).Scan(&n)
+	return n
+}
+
+// cloudBackoff is the wait before retrying an attempt that a cloud
+// provider's outage or rate limit stopped.
+var cloudBackoff = func(retry int) time.Duration { return time.Duration(retry) * 30 * time.Second }
+
 func (r *Runner) transportErrors(ctx context.Context, taskID string, since time.Time) int {
 	var n int
 	_ = r.DB.QueryRowContext(ctx, `SELECT COUNT(*) FROM model_calls WHERE task_id = ? AND status = 'transport_error' AND created_at >= ?`,

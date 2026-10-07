@@ -13,15 +13,19 @@ import (
 	"github.com/akynte/boundedcode/internal/store"
 )
 
-// Gateway forwards agent LLM requests to the inference server, meters them
+// Gateway forwards agent LLM requests to the model provider, meters them
 // into model_calls, and enforces a token budget. It is the only path from a
-// sandboxed agent to a model (ADR-0004).
+// sandboxed agent to a model (ADR-0004); for a cloud provider it is also the
+// only holder of the API key (ADR-0010).
 type Gateway struct {
-	Client *Client
-	Model  string // alias sent upstream regardless of what the agent asked for
-	DB     *sql.DB
-	TaskID string
-	Source string
+	// Upstream is the provider. Client is the legacy form: a local
+	// OpenAI-compatible server (used when Upstream is nil).
+	Upstream Upstream
+	Client   *Client
+	Model    string // model sent upstream regardless of what the agent asked for
+	DB       *sql.DB
+	TaskID   string
+	Source   string
 	// MaxTokens bounds prompt+completion tokens across the gateway's life
 	// (0 = unlimited).
 	MaxTokens int
@@ -40,7 +44,7 @@ func (g *Gateway) Stats() (processed, generated, cached int) {
 }
 
 // ErrBudgetExhausted is returned when the token budget is spent.
-var ErrBudgetExhausted = errors.New("local token budget exhausted")
+var ErrBudgetExhausted = errors.New("task token budget exhausted")
 
 // Used returns processed tokens (uncached prompt + completion) so far; this
 // is what the token budget limits, since cached prefix tokens cost almost no
@@ -66,33 +70,32 @@ func (g *Gateway) Forward(ctx context.Context, path string, body map[string]any)
 	body["model"] = g.Model
 	delete(body, "stream")
 	delete(body, "stream_options")
-	raw, err := json.Marshal(body)
-	if err != nil {
-		return 0, nil, err
-	}
 	start := time.Now()
-	resp, _, err := g.Client.Raw(ctx, "/v1/chat/completions", raw)
+	status, resp, err := g.upstream().Complete(ctx, body)
 	total := time.Since(start)
-	status := http.StatusOK
-	var he *HTTPError
-	switch {
-	case errors.As(err, &he):
-		status = he.Status
-	case err != nil:
+	if err != nil {
 		// Transport errors become a 502 for the agent, not a Go error.
 		g.record(ctx, 0, 0, 0, nil, total, "transport_error")
 		return http.StatusBadGateway, map[string]any{"error": map[string]any{"message": err.Error()}}, nil //nolint:nilerr // see above
 	}
 	var parsed struct {
-		Usage   Usage    `json:"usage"`
+		Usage struct {
+			Usage
+			Details *struct {
+				Cached int `json:"cached_tokens"`
+			} `json:"prompt_tokens_details"`
+		} `json:"usage"`
 		Timings *Timings `json:"timings"`
 	}
 	var out any
 	_ = json.Unmarshal(resp, &out)
 	_ = json.Unmarshal(resp, &parsed)
 	cached := 0
-	if parsed.Timings != nil {
+	switch {
+	case parsed.Timings != nil:
 		cached = parsed.Timings.CacheN
+	case parsed.Usage.Details != nil:
+		cached = parsed.Usage.Details.Cached
 	}
 	g.mu.Lock()
 	g.used += max(parsed.Usage.PromptTokens-cached, 0) + parsed.Usage.CompletionTokens
@@ -110,6 +113,16 @@ func (g *Gateway) Forward(ctx context.Context, path string, body map[string]any)
 	return status, out, nil
 }
 
+func (g *Gateway) upstream() Upstream {
+	if g.Upstream != nil {
+		return g.Upstream
+	}
+	return &OpenAIUpstream{Client: g.Client, Name: ProviderLocal}
+}
+
+// Provider names the gateway's provider.
+func (g *Gateway) Provider() string { return g.upstream().Provider() }
+
 func (g *Gateway) record(ctx context.Context, prompt, completion, cached int, t *Timings, total time.Duration, status string) {
 	if g.DB == nil {
 		return
@@ -118,7 +131,7 @@ func (g *Gateway) record(ctx context.Context, prompt, completion, cached int, t 
 	if t != nil {
 		pms, dms = t.PromptMS, t.PredictedMS
 	}
-	_, _ = g.DB.ExecContext(context.WithoutCancel(ctx), `INSERT INTO model_calls(task_id, source, model, prompt_tokens, completion_tokens, cached_tokens, prompt_ms, decode_ms, total_ms, status, created_at)
-		VALUES(?,?,?,?,?,?,?,?,?,?,?)`, g.TaskID, g.Source, g.Model, prompt, completion, cached, pms, dms,
+	_, _ = g.DB.ExecContext(context.WithoutCancel(ctx), `INSERT INTO model_calls(task_id, source, model, provider, prompt_tokens, completion_tokens, cached_tokens, prompt_ms, decode_ms, total_ms, status, created_at)
+		VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`, g.TaskID, g.Source, g.Model, g.Provider(), prompt, completion, cached, pms, dms,
 		float64(total)/float64(time.Millisecond), status, store.Now())
 }

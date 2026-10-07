@@ -83,6 +83,20 @@ The texts are in `LICENSES/go/`.
 | github.com/rivo/uniseg | v0.4.7 | MIT |
 | github.com/mattn/go-runewidth | v0.0.19 | MIT |
 | github.com/mattn/go-isatty | v0.0.24 | MIT |
+| github.com/anthropics/anthropic-sdk-go | v1.79.0 | MIT |
+| github.com/tidwall/gjson | v1.18.0 | MIT |
+| github.com/tidwall/sjson | v1.2.5 | MIT |
+| github.com/tidwall/match | v1.1.1 | MIT |
+| github.com/tidwall/pretty | v1.2.1 | MIT |
+| github.com/buger/jsonparser | v1.1.2 | MIT |
+| github.com/invopop/jsonschema | v0.14.0 | MIT |
+| github.com/bahlo/generic-list-go | v0.2.0 | BSD-3-Clause |
+| github.com/pb33f/ordered-map/v2 | v2.3.1 | Apache-2.0 |
+| github.com/standard-webhooks/standard-webhooks/libraries | v0.0.1 | MIT |
+| go.yaml.in/yaml/v4 | v4.0.0-rc.2 | MIT AND Apache-2.0 |
+| golang.org/x/sync | v0.23.0 | BSD-3-Clause |
+| github.com/zalando/go-keyring | v0.2.8 | MIT |
+| github.com/godbus/dbus/v5 | v5.2.2 | BSD-2-Clause |
 
 CI runs `go run ./scripts/licensecheck -check-notices
 THIRD_PARTY_NOTICES.md,docs/licensing/upstream-license-matrix.md`, which

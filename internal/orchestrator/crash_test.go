@@ -177,3 +177,68 @@ func TestModelServerOutageDoesNotBurnAttempts(t *testing.T) {
 		t.Fatalf("status=%s attempts=%d repairs=%d failed_verify=%d", got.Status, got.AttemptCount, repairs, got.Budget.FailedVerifyRuns)
 	}
 }
+
+// TestCloudFailures: with a cloud provider, a rate-limited or unavailable
+// API is retried without burning attempts (there is no server to restart),
+// and a rejected API key blocks the task with the fix instead of burning
+// attempts.
+func TestCloudFailures(t *testing.T) {
+	failing := func(s *store.Store, taskID *string, status string) scripted.Step {
+		return func(string, string) (string, error) {
+			_, err := s.DB.Exec(`INSERT INTO model_calls(task_id, source, model, provider, status, created_at) VALUES(?, 'agent', 'm', 'anthropic', ?, ?)`,
+				*taskID, status, store.Now())
+			if err != nil {
+				return "", err
+			}
+			return "", os.ErrDeadlineExceeded
+		}
+	}
+	fix := func(ws, _ string) (string, error) {
+		if err := addReproTest(ws); err != nil {
+			return "", err
+		}
+		return "negated", replaceIn(filepath.Join(ws, consumerFile),
+			"AmountCents: ev.AmountCents, Currency: ev.Currency},\n\t)", "AmountCents: -ev.AmountCents, Currency: ev.Currency},\n\t)")
+	}
+	defer func(f func(int) time.Duration) { cloudBackoff = f }(cloudBackoff)
+	cloudBackoff = func(int) time.Duration { return time.Millisecond }
+
+	t.Run("rate limited", func(t *testing.T) {
+		_, w, s, root := setup(t)
+		defer s.Close()
+		var taskID string
+		r := newRunner(s, root, &scripted.Runtime{Steps: []scripted.Step{failing(s, &taskID, "http_429"), fix}}, nil)
+		r.Cfg.Inference.Provider = "anthropic"
+		tk, err := r.Create(context.Background(), w, "Fix the unbalanced ledger posting", nil, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		taskID = tk.ID
+		got, err := r.Run(context.Background(), tk.ID, RunOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got.Status != task.StatusCompleted || got.AttemptCount != 1 {
+			t.Fatalf("status=%s attempts=%d", got.Status, got.AttemptCount)
+		}
+	})
+	t.Run("key rejected", func(t *testing.T) {
+		_, w, s, root := setup(t)
+		defer s.Close()
+		var taskID string
+		r := newRunner(s, root, &scripted.Runtime{Steps: []scripted.Step{failing(s, &taskID, "http_401"), fix}}, nil)
+		r.Cfg.Inference.Provider = "anthropic"
+		tk, err := r.Create(context.Background(), w, "Fix the unbalanced ledger posting", nil, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		taskID = tk.ID
+		got, _ := r.Run(context.Background(), tk.ID, RunOptions{})
+		if got == nil || got.Status != task.StatusBlocked || got.AttemptCount != 0 {
+			t.Fatalf("task = %+v", got)
+		}
+		if last := got.Decisions[len(got.Decisions)-1].Text; !strings.Contains(last, "API key was rejected") {
+			t.Fatalf("block reason = %q", last)
+		}
+	})
+}

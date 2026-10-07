@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -17,6 +18,8 @@ import (
 type Client struct {
 	BaseURL string
 	HTTP    *http.Client
+	// Header is added to every request (an API key for a cloud provider).
+	Header http.Header
 }
 
 // NewClient returns a client with the given per-request timeout.
@@ -114,6 +117,8 @@ func (c *Client) Chat(ctx context.Context, req ChatRequest) (*ChatResponse, erro
 type HTTPError struct {
 	Status int
 	Body   string
+	// RetryAfter is the server's Retry-After delay, if it sent one.
+	RetryAfter time.Duration
 }
 
 func (e *HTTPError) Error() string { return fmt.Sprintf("http %d: %s", e.Status, e.Body) }
@@ -125,6 +130,7 @@ func (c *Client) Raw(ctx context.Context, path string, body []byte) ([]byte, tim
 		return nil, 0, err
 	}
 	req.Header.Set("Content-Type", "application/json")
+	c.addHeaders(req)
 	start := time.Now()
 	resp, err := c.HTTP.Do(req)
 	if err != nil {
@@ -141,9 +147,31 @@ func (c *Client) Raw(ctx context.Context, path string, body []byte) ([]byte, tim
 		if len(msg) > 2000 {
 			msg = msg[:2000]
 		}
-		return b, wall, &HTTPError{Status: resp.StatusCode, Body: msg}
+		return b, wall, &HTTPError{Status: resp.StatusCode, Body: msg, RetryAfter: retryAfter(resp.Header.Get("Retry-After"))}
 	}
 	return b, wall, nil
+}
+
+func (c *Client) addHeaders(req *http.Request) {
+	for k, vs := range c.Header {
+		for _, v := range vs {
+			req.Header.Add(k, v)
+		}
+	}
+}
+
+// retryAfter parses a Retry-After header (seconds or an HTTP date).
+func retryAfter(v string) time.Duration {
+	if v == "" {
+		return 0
+	}
+	if n, err := strconv.Atoi(strings.TrimSpace(v)); err == nil && n >= 0 {
+		return time.Duration(n) * time.Second
+	}
+	if t, err := http.ParseTime(v); err == nil {
+		return max(time.Until(t), 0)
+	}
+	return 0
 }
 
 // Get fetches path and decodes JSON into v (v may be nil).
@@ -152,6 +180,7 @@ func (c *Client) Get(ctx context.Context, path string, v any) (int, error) {
 	if err != nil {
 		return 0, err
 	}
+	c.addHeaders(req)
 	resp, err := c.HTTP.Do(req)
 	if err != nil {
 		return 0, err

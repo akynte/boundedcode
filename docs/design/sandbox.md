@@ -108,3 +108,9 @@ part of this boundary.
    can make the agent write wrong code. The defence is deterministic
    verification plus human review of the merge candidate. Nothing merges
    automatically.
+11. **A cloud model provider receives repository content.** With
+   `inference.provider` set to a cloud API, the gateway sends the agent's
+   conversation (context packs, file contents, tool output) to that provider.
+   Secret masking and redaction apply as with a local model; repository code
+   does not stay on the machine. The provider's API key is held by the host
+   gateway only (ADR-0010).

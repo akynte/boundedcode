@@ -27,7 +27,7 @@ func (a *App) llamaManager() *llamacpp.Manager {
 
 // inferenceRuntime returns the configured runtime. External mode returns nil.
 func (a *App) inferenceRuntime() inference.Runtime {
-	if a.Config.Inference.Mode == "external" {
+	if a.Config.Inference.Mode == "external" || a.Config.Inference.IsCloud() {
 		return nil
 	}
 	return a.llamaManager()
@@ -181,6 +181,19 @@ func newModelCmd(app *App) *cobra.Command {
 
 // runtimeStatus reports the managed server, or probes the external one.
 func (a *App) runtimeStatus(ctx context.Context) (inference.Status, error) {
+	if a.Config.Inference.IsCloud() {
+		// No local server; the provider is reached per request.
+		ic := a.Config.Inference
+		ok, src := a.secretStore().Status(ic.Provider)
+		st := inference.Status{Running: ok, Healthy: ok, Endpoint: inference.Endpoint{BaseURL: ic.Provider, Model: ic.Cloud().Model},
+			Profile: ic.Cloud().Model, Detail: "cloud provider " + ic.Provider}
+		if ok {
+			st.Detail += " (key from the " + src + ")"
+		} else {
+			st.Detail += " (no API key)"
+		}
+		return st, nil
+	}
 	if rt := a.inferenceRuntime(); rt != nil {
 		return rt.Status(ctx)
 	}

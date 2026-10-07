@@ -178,7 +178,7 @@ func (v *systemView) view(m *Model, w, h int) string {
 		kv("State", 12, orDash(in.StateDB)),
 		kv("UI log", 12, orDash(in.LogFile)),
 		kv("Sandbox", 12, orDash(in.SandboxKind)+sFaint.Render("  image "+orDash(in.AgentImage))),
-		kv("Inference", 12, orDash(in.InferenceMode)+sFaint.Render("  default model "+orDash(in.DefaultModel))),
+		kv("Inference", 12, inferenceSummary(in)),
 		kv("Intel", 12, onOff(in.CrossService, "cross-service analysis")+sFaint.Render(" · ")+onOff(in.SerenaEnabled, "Serena LSP")),
 	}
 	if in.Err != "" {
@@ -267,4 +267,12 @@ func commitSuffix(c string) string {
 		return ""
 	}
 	return " (" + c + ")"
+}
+
+// inferenceSummary describes the model provider in the System view.
+func inferenceSummary(in Info) string {
+	if in.ProviderModel != "" {
+		return in.Provider + sFaint.Render("  model "+in.ProviderModel+" (cloud API)")
+	}
+	return orDash(in.InferenceMode) + sFaint.Render("  default model "+orDash(in.DefaultModel))
 }

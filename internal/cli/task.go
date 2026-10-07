@@ -21,6 +21,7 @@ import (
 	"github.com/akynte/boundedcode/internal/frontier"
 	"github.com/akynte/boundedcode/internal/gitops"
 	"github.com/akynte/boundedcode/internal/inference"
+	"github.com/akynte/boundedcode/internal/model"
 	"github.com/akynte/boundedcode/internal/orchestrator"
 	"github.com/akynte/boundedcode/internal/repointel/cbm"
 	"github.com/akynte/boundedcode/internal/sandbox"
@@ -76,9 +77,12 @@ func (a *App) buildRunner(ctx context.Context, f runFlags) (*orchestrator.Runner
 func (a *App) buildRunnerWith(ctx context.Context, f runFlags, db *sql.DB, paths config.Paths) (*orchestrator.Runner, func(), error) {
 	var err error
 	rec := telemetry.New(db, a.Log)
-	p, err := a.profile(f.model)
-	if err != nil {
-		return nil, nil, err
+	cloudMode := a.Config.Inference.IsCloud()
+	var p model.Profile
+	if !cloudMode {
+		if p, err = a.profile(f.model); err != nil {
+			return nil, nil, err
+		}
 	}
 	// Cheap dependency checks come before loading the model, so a missing
 	// engine or image is reported at once and with its fix.
@@ -98,7 +102,15 @@ func (a *App) buildRunnerWith(ctx context.Context, f runFlags, db *sql.DB, paths
 	timeout := a.Config.Inference.RequestTimeout.D()
 	// Inference endpoint.
 	var ep inference.Endpoint
-	if rt := a.inferenceRuntime(); rt != nil {
+	var cloud *cloudEndpoint
+	modelName, ctxSize := p.Name, p.Server.CtxSize
+	if cloudMode {
+		if cloud, err = a.prepareCloud(ctx, f.model); err != nil {
+			return nil, nil, err
+		}
+		modelName, ctxSize = cloud.model, cloud.ctxSize
+		a.printf("using %s model %s (working context %d tokens)\n", cloud.provider, cloud.model, cloud.ctxSize)
+	} else if rt := a.inferenceRuntime(); rt != nil {
 		a.printf("ensuring %s is serving %s…\n", rt.Name(), p.Name)
 		if ep, err = rt.Ensure(ctx, p); err != nil {
 			return nil, nil, err
@@ -110,8 +122,15 @@ func (a *App) buildRunnerWith(ctx context.Context, f runFlags, db *sql.DB, paths
 		}
 	}
 	newGW := func(taskID string, maxTokens int) *inference.Gateway {
-		return &inference.Gateway{Client: inference.NewClient(ep.BaseURL, timeout), Model: ep.Model, DB: db,
-			TaskID: taskID, Source: "agent", MaxTokens: maxTokens}
+		gw := &inference.Gateway{Model: ep.Model, DB: db, TaskID: taskID, Source: "agent", MaxTokens: maxTokens}
+		if cloud != nil {
+			// The key stays here, in the host-side gateway; the agent's
+			// sandbox only sees the stdio tunnel (ADR-0010).
+			gw.Model, gw.Upstream = cloud.model, cloud.upstream(paths.TaskDir(taskID))
+		} else {
+			gw.Client = inference.NewClient(ep.BaseURL, timeout)
+		}
+		return gw
 	}
 	var rt agent.Runtime
 	switch a.Config.Agent.Runtime {
@@ -153,7 +172,7 @@ func (a *App) buildRunnerWith(ctx context.Context, f runFlags, db *sql.DB, paths
 	r := &orchestrator.Runner{
 		DB: db, Ledger: task.Ledger{DB: db}, Rec: rec, Agent: rt,
 		Verify: &verify.Engine{Sandbox: sb, CacheDir: filepath.Join(paths.Cache, "build"), GoModCache: strings.TrimSpace(string(gomodcache)), DB: db, Rec: rec},
-		Cfg:    a.Config, Paths: paths, Model: p.Name, CtxSize: p.Server.CtxSize, Log: a.Log, Out: a.Err,
+		Cfg:    a.Config, Paths: paths, Model: modelName, CtxSize: ctxSize, Log: a.Log, Out: a.Err,
 		CondenseEachRetry: f.condenseRetry,
 		CrossService:      a.Config.RepoIntel.CrossService,
 	}
@@ -164,7 +183,7 @@ func (a *App) buildRunnerWith(ctx context.Context, f runFlags, db *sql.DB, paths
 		r.Intel = intel // likewise
 	}
 	r.WS = workspace.Store{DB: db}
-	if rt := a.inferenceRuntime(); rt != nil {
+	if rt := a.inferenceRuntime(); rt != nil && !cloudMode {
 		r.EnsureModel = func(ctx context.Context) error { _, err := rt.Ensure(ctx, p); return err }
 	}
 	// Gateway budget is per task; the runner passes the remaining allowance.
@@ -473,12 +492,20 @@ func (a *App) taskRunner(ctx context.Context, f runFlags, willRun bool) (*orches
 		return nil, nil, err
 	}
 	ws, _ := a.workspaces(ctx)
-	p, err := a.profile(f.model)
-	if err != nil {
-		return nil, nil, err
+	modelName := f.model
+	if a.Config.Inference.IsCloud() {
+		if modelName == "" {
+			modelName = a.Config.Inference.Cloud().Model
+		}
+	} else {
+		p, err := a.profile(f.model)
+		if err != nil {
+			return nil, nil, err
+		}
+		modelName = p.Name
 	}
 	return &orchestrator.Runner{DB: s.DB, Ledger: task.Ledger{DB: s.DB}, WS: ws, Rec: telemetry.New(s.DB, a.Log),
-		Agent: &openhands.Runtime{}, Cfg: a.Config, Paths: a.Paths, Model: p.Name, Log: a.Log, Out: a.Err}, func() {}, nil
+		Agent: &openhands.Runtime{}, Cfg: a.Config, Paths: a.Paths, Model: modelName, Log: a.Log, Out: a.Err}, func() {}, nil
 }
 
 func runAndReport(ctx context.Context, app *App, r *orchestrator.Runner, id string, opt orchestrator.RunOptions) error {

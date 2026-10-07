@@ -5,13 +5,16 @@ module and data directories use `boundedcode`.
 
 ## 1. Mission
 
-BoundedCode is a local-first control plane for AI-assisted software
-engineering on large, long-running, multi-repository projects. It runs on
-commodity hardware and keeps dependence on paid frontier subscriptions low.
+BoundedCode is a control plane for AI-assisted software engineering on
+large, long-running, multi-repository projects. It runs a local model on
+commodity hardware by default, or a cloud model API the user chooses
+(ADR-0010, 2026-10-07), and keeps dependence on paid frontier subscriptions
+low.
 
-> Local models handle the overwhelming majority of token volume. Frontier
-> models are used only where their marginal intelligence is worth consuming
-> scarce subscription quota.
+> With a local model, local models handle the overwhelming majority of token
+> volume. Frontier models are used only where their marginal intelligence is
+> worth consuming scarce subscription quota. A user may instead run the agent
+> on a cloud model API; that is their explicit, metered choice.
 
 The primary KPI is **verified engineering tasks completed per dollar per
 wall-clock hour**. It is not model size, context length, synthetic benchmark
@@ -29,7 +32,8 @@ score, or degree of autonomy.
 Hard rules:
 
 * No silent paid-API usage. An API key is only used if the user explicitly
-  configures one.
+  configures one (a cloud model provider, ADR-0010); keys never enter the
+  agent sandbox. The frontier route never uses an API key (ADR-0009).
 * No model weights in Git and no redistribution of model artifacts.
 * No destructive infrastructure operations (`terraform apply/destroy`,
   production `kubectl`).

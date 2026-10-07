@@ -178,6 +178,10 @@ func (b *tuiBackend) Info(ctx context.Context) tui.Info {
 	in.ConfigExists = statErr == nil
 	in.StateDB = a.Paths.StateDB()
 	in.DefaultModel = c.DefaultModel
+	in.Provider = c.Inference.Provider
+	if c.Inference.IsCloud() {
+		in.ProviderModel = c.Inference.Cloud().Model
+	}
 	in.InferenceMode, in.ExternalURL = c.Inference.Mode, c.Inference.ExternalURL
 	in.SandboxKind, in.AgentImage, in.AdapterDir = c.Sandbox.Kind, c.Agent.Image, c.Agent.AdapterDir
 	in.FrontierEnabled, in.FrontierProvider = c.Frontier.Enabled, c.Frontier.Provider
@@ -278,7 +282,7 @@ func (b *tuiBackend) Stats(ctx context.Context, since time.Duration) (stats.Summ
 	if since > 0 {
 		from = time.Now().UTC().Add(-since).Format(time.RFC3339Nano)
 	}
-	return stats.Compute(ctx, b.base.st.DB, from)
+	return b.base.computeStats(ctx, b.base.st.DB, from)
 }
 
 func convertChecks(cs []check) []tui.Check {

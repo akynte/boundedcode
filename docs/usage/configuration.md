@@ -37,7 +37,9 @@ strings (`90s`, `10m`, `4h`).
 
 | Key | Default | Notes |
 |---|---|---|
-| `mode` | `managed` | `managed` (boundedcode starts `llama-server`) or `external` (you run an OpenAI-compatible server). |
+| `provider` | `local` | `local` (llama.cpp, configured by the keys below) or a cloud API: `openai`, `anthropic`, `gemini`, `openai-compatible`. See [Model provider](#model-provider). |
+| `providers.<name>` | empty | Each cloud provider's settings (below); kept when you switch providers. |
+| `mode` | `managed` | Local provider only: `managed` (boundedcode starts `llama-server`) or `external` (you run an OpenAI-compatible server). |
 | `server_binary` | `llama-server` | Required in managed mode. |
 | `bench_binary` | `llama-bench` | Path to `llama-bench`, set by `init --llama-bench`. |
 | `external_url` | empty | Required in external mode. |
@@ -46,6 +48,44 @@ strings (`90s`, `10m`, `4h`).
 | `startup_timeout` | `5m` | Time allowed for the managed server to load the model. |
 | `request_timeout` | `10m` | Bound on one completion; also detects stalls. |
 | `idle_sleep` | `30m` | The managed server unloads the model after this much inactivity and reloads it on the next request. `0s` disables; negative values are rejected. |
+
+### Model provider
+
+`bcode provider use NAME [--model ID] [...]` sets these keys, and
+`bcode provider key set NAME` stores the API key (from the terminal without
+echo, or stdin). The key is kept in the OS credential store (Secret Service
+on Linux, the macOS Keychain, Windows Credential Manager), or in an
+owner-only `credentials.json` next to this file when no credential store is
+available, never in `config.yaml`. `BOUNDEDCODE_<PROVIDER>_API_KEY` (for
+example `BOUNDEDCODE_ANTHROPIC_API_KEY`) overrides the stored key, for
+servers and CI; vendor variables such as `ANTHROPIC_API_KEY` are not read.
+`BOUNDEDCODE_SECRETS=file` skips the credential store.
+
+```yaml
+inference:
+  provider: anthropic
+  providers:
+    anthropic:
+      model: claude-opus-5-5
+      effort: high
+    openai-compatible:
+      base_url: https://api.groq.com/openai/v1
+      model: MODEL-ID
+      context_window: 131072
+```
+
+| Key (`inference.providers.<name>.`) | Notes |
+|---|---|
+| `model` | The provider's model id. Required for the selected provider. `bcode provider models NAME` lists them. |
+| `base_url` | Endpoint override; required for `openai-compatible`. OpenAI-style URLs end in the API version (`https://api.openai.com/v1`). |
+| `context_window` | The model's input limit. `0` asks the provider: Anthropic and Gemini report it; OpenAI and compatible APIs do not, so set it for them. |
+| `context_limit` | Cap on the agent's working context before it condenses its history; `0` = 200000. Cloud tokens are billed on every turn. |
+| `effort` | `minimal`, `low`, `medium`, `high`, `xhigh` or `max`; mapped to Anthropic `output_config.effort`, Gemini `thinkingLevel` (up to `high`), OpenAI `reasoning_effort`. Empty = the model's default. |
+| `input_price`, `cached_input_price`, `output_price` | USD per million tokens, for the cost estimate in `bcode stats`. No prices are built in. |
+
+The token budget (`budgets.max_local_tokens`) applies to whichever provider
+runs the task. `--model` on `task create`/`task run` overrides the provider's
+model for one task.
 
 ### `agent`
 

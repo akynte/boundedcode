@@ -10,8 +10,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -47,9 +49,18 @@ type TaskConfig struct {
 	Ambiguity string `yaml:"ambiguity"`
 }
 
-// InferenceConfig selects and configures the local inference runtime.
+// InferenceConfig selects the model provider and configures the local
+// inference runtime.
 type InferenceConfig struct {
+	// Provider is "local" (llama.cpp, the default) or a cloud API:
+	// "openai", "anthropic", "gemini" or "openai-compatible". A cloud
+	// provider's API key is not stored here (see internal/secrets).
+	Provider string `yaml:"provider"`
+	// Providers holds each cloud provider's settings, so switching between
+	// providers keeps them.
+	Providers map[string]ProviderConfig `yaml:"providers,omitempty"`
 	// Mode is "managed" (we start llama-server) or "external" (user runs it).
+	// It applies to the local provider.
 	Mode           string   `yaml:"mode"`
 	ServerBinary   string   `yaml:"server_binary"`
 	BenchBinary    string   `yaml:"bench_binary"`
@@ -64,6 +75,45 @@ type InferenceConfig struct {
 	// next request, so an idle server does not hold RAM/VRAM. 0 disables.
 	IdleSleep Duration `yaml:"idle_sleep"`
 }
+
+// ProviderConfig configures one cloud provider.
+type ProviderConfig struct {
+	// Model is the provider's model id (e.g. "claude-opus-5-5").
+	Model string `yaml:"model"`
+	// BaseURL overrides the provider's endpoint; required for
+	// openai-compatible (for example https://api.groq.com/openai/v1).
+	BaseURL string `yaml:"base_url,omitempty"`
+	// ContextWindow is the model's input limit in tokens. 0 = ask the
+	// provider (Anthropic and Gemini report it); required for OpenAI and
+	// openai-compatible models, whose APIs do not.
+	ContextWindow int `yaml:"context_window,omitempty"`
+	// ContextLimit caps how much of the window the agent fills before it
+	// condenses its history: cloud tokens are billed, and a 1M-token window
+	// filled on every turn is expensive. 0 = 200000.
+	ContextLimit int `yaml:"context_limit,omitempty"`
+	// Effort is the provider's reasoning-effort setting (Anthropic
+	// output_config.effort, Gemini thinkingLevel, OpenAI reasoning_effort);
+	// "" = the model's default.
+	Effort string `yaml:"effort,omitempty"`
+	// InputPrice and OutputPrice are USD per million tokens, for cost
+	// estimates in stats (0 = not shown). CachedInputPrice applies to
+	// prompt tokens read from the provider's cache.
+	InputPrice       float64 `yaml:"input_price,omitempty"`
+	CachedInputPrice float64 `yaml:"cached_input_price,omitempty"`
+	OutputPrice      float64 `yaml:"output_price,omitempty"`
+}
+
+// DefaultContextLimit is ProviderConfig.ContextLimit's default.
+const DefaultContextLimit = 200000
+
+// CloudProviders are the provider names other than "local".
+var CloudProviders = []string{"openai", "anthropic", "gemini", "openai-compatible"}
+
+// IsCloud reports whether the selected provider is a cloud API.
+func (c InferenceConfig) IsCloud() bool { return c.Provider != "" && c.Provider != "local" }
+
+// Cloud returns the selected cloud provider's settings.
+func (c InferenceConfig) Cloud() ProviderConfig { return c.Providers[c.Provider] }
 
 // AgentConfig configures the agent runtime adapter.
 type AgentConfig struct {
@@ -188,7 +238,8 @@ func Defaults() Config {
 		Version:      CurrentVersion,
 		DefaultModel: "qwen3.6-35b-a3b",
 		Inference: InferenceConfig{
-			Mode: "managed", ServerBinary: "llama-server", BenchBinary: "llama-bench",
+			Provider: "local",
+			Mode:     "managed", ServerBinary: "llama-server", BenchBinary: "llama-bench",
 			Host: "127.0.0.1", Port: 8765,
 			StartupTimeout: Duration(5 * time.Minute), RequestTimeout: Duration(10 * time.Minute),
 			IdleSleep: Duration(30 * time.Minute),
@@ -280,6 +331,7 @@ func (c Config) Validate() error {
 	default:
 		errs = append(errs, fmt.Errorf("inference.mode: %q is not managed|external", c.Inference.Mode))
 	}
+	errs = append(errs, c.Inference.validateProvider()...)
 	if c.Inference.IdleSleep < 0 {
 		errs = append(errs, errors.New("inference.idle_sleep: must be >= 0 (0 disables)"))
 	}
@@ -473,4 +525,44 @@ func WriteFileAtomic(path string, data []byte, perm os.FileMode) error {
 		return err
 	}
 	return os.Rename(tmp, path)
+}
+
+func (c InferenceConfig) validateProvider() []error {
+	var errs []error
+	switch c.Provider {
+	case "local", "":
+	case "openai", "anthropic", "gemini", "openai-compatible":
+		p := c.Providers[c.Provider]
+		if p.Model == "" {
+			errs = append(errs, fmt.Errorf("inference.providers.%s.model: required when %s is the provider", c.Provider, c.Provider))
+		}
+		if c.Provider == "openai-compatible" && p.BaseURL == "" {
+			errs = append(errs, errors.New("inference.providers.openai-compatible.base_url: required"))
+		}
+	default:
+		errs = append(errs, fmt.Errorf("inference.provider: %q is not local|%s", c.Provider, strings.Join(CloudProviders, "|")))
+	}
+	for name, p := range c.Providers {
+		if !slices.Contains(CloudProviders, name) {
+			errs = append(errs, fmt.Errorf("inference.providers: unknown provider %q", name))
+			continue
+		}
+		if p.BaseURL != "" {
+			if u, err := url.Parse(p.BaseURL); err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" {
+				errs = append(errs, fmt.Errorf("inference.providers.%s.base_url: %q is not an http(s) URL", name, p.BaseURL))
+			}
+		}
+		if p.ContextWindow < 0 || p.ContextLimit < 0 {
+			errs = append(errs, fmt.Errorf("inference.providers.%s: context_window and context_limit must be >= 0", name))
+		}
+		if p.InputPrice < 0 || p.OutputPrice < 0 || p.CachedInputPrice < 0 {
+			errs = append(errs, fmt.Errorf("inference.providers.%s: prices must be >= 0", name))
+		}
+		switch p.Effort {
+		case "", "minimal", "low", "medium", "high", "xhigh", "max":
+		default:
+			errs = append(errs, fmt.Errorf("inference.providers.%s.effort: %q is not minimal|low|medium|high|xhigh|max", name, p.Effort))
+		}
+	}
+	return errs
 }

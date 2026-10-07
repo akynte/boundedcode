@@ -526,6 +526,9 @@ func productName(name string) string {
 }
 
 func (m *Model) modelName() string {
+	if m.info.ProviderModel != "" {
+		return m.info.Provider + " " + m.info.ProviderModel
+	}
 	if m.rt != nil && m.rt.Profile != "" {
 		return m.rt.Profile
 	}
@@ -538,6 +541,10 @@ func (m *Model) runtimeDot() string {
 		return sFaint.Render("○")
 	case m.rt == nil:
 		return sErr.Render("● error")
+	case m.info.ProviderModel != "" && m.rt.Healthy:
+		return sOK.Render("● cloud")
+	case m.info.ProviderModel != "":
+		return sErr.Render("● no API key")
 	case m.rt.Healthy && m.rt.Sleeping:
 		return sInfo.Render("● sleeping")
 	case m.rt.Healthy:

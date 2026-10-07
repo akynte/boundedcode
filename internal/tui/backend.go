@@ -68,6 +68,8 @@ type Info struct {
 	StateDB               string
 	LogFile               string
 	DefaultModel          string
+	Provider              string // local | openai | anthropic | gemini | openai-compatible
+	ProviderModel         string // the cloud provider's model ("" for local)
 	InferenceMode         string // managed | external
 	ExternalURL           string
 	SandboxKind           string
