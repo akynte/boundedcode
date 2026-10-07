@@ -101,7 +101,9 @@ evidence checker did not associate the modified data-driven test file
 (`promql/testdata/functions.test`) with the Go test function that reads it.
 The official score stays **5 of 6**; 6 of 6 hidden acceptance tests passed.
 A verifier that withholds `TASK_VERIFIED` when it cannot show fail-before/
-pass-after evidence is behaving as intended.
+pass-after evidence is behaving as intended. After this validation, the
+checker was changed to attribute changed test data to the Go package whose
+tests read it (unreleased; covered by unit tests, not yet re-validated).
 
 </details>
 
@@ -331,7 +333,7 @@ See [ADR-0009](docs/architecture/adr/0009-frontier-escalation.md).
 |---|---|
 | **builds** | It compiles and lints. |
 | **`tests_green`** | The repository's checks pass. Not enough on its own: in the initial validation, patches that changed nothing passed existing tests. |
-| **`TASK_VERIFIED`** | Checks pass **and** there is behavioural evidence: a test the change adds or modifies **fails on the base commit and passes with the change**. |
+| **`TASK_VERIFIED`** | Checks pass **and** there is behavioural evidence: a test the change adds or modifies (test code or test data) **fails on the base commit with the changed tests, does not fail there without them, and passes with the change**. |
 
 - **Missing evidence:** the agent is asked once for a reproduction test.
   Without one, the task ends `tests_green` (UNVERIFIED) and is never presented
@@ -341,9 +343,15 @@ See [ADR-0009](docs/architecture/adr/0009-frontier-escalation.md).
   build scripts in its worktree; only review catches an adversarial change
   there (see the sandbox's [residual risks](docs/design/sandbox.md#residual-risks-known-accepted-for-now)).
 
+A changed test that does not compile or load on the base (it calls code the
+change adds) shows that the API exists, not that it behaves as asked, so it is
+not evidence; nor is a stage that times out on the base.
+
 This is not formal verification. Known limits:
-- data-driven test files read by a test elsewhere are not attributed;
-- a test that does not compile on the base counts as failing there;
+- Go failures are compared per test function; other languages per stage
+  (the stage must fail with the changed tests and pass without them);
+- a change that only adds new API needs a test that also runs on the
+  original code, or it ends `tests_green`;
 - a test can only demonstrate the reading of a request that the agent chose.
 
 ## Security
@@ -377,9 +385,18 @@ example by prompt injection in repository content.
    local model. It has flagged a clear request as ambiguous and misnamed real
    alternatives. The second validation ran with `task.ambiguity: proceed`,
    not the default `ask`; under the default, one clear task (vue) would have
-   stopped on a false ambiguity flag.
-4. **Behavioural evidence misses some test layouts.** These include
-   data-driven test files consumed by a test elsewhere.
+   stopped on a false ambiguity flag. Since then, a material ambiguity is
+   checked against the request text before it can stop a task: a second
+   local-model call quotes the request, and the ambiguity is dropped when a
+   quote that settles it occurs in the request, or when fewer than two of
+   its readings have a supporting quote there. This check, and the retry of
+   a contract that names nothing required, have unit tests with scripted
+   model replies only; they have not been run on real tasks.
+4. **Recent evidence-check changes are not yet validated.** Data-driven
+   test files are now attributed to the Go package that reads them, and
+   tests that only fail to compile on the base no longer count. Both changes are unreleased
+   and covered by unit tests only; non-Go stages are compared per stage, not
+   per test.
 5. **Frontier escalation is unproven.** It was enabled but not triggered in
    the second validation; in the first, 4 frontier calls were sent and no
    task was accepted.
@@ -395,14 +412,13 @@ example by prompt injection in repository content.
 
 <br>
 
-- CLI only; there is no daemon or GUI.
+- Terminal only (the CLI and the full-screen `bcode` interface); there is
+  no daemon or GUI.
 - Verification presets cover Go and JavaScript/TypeScript. Other languages
-  need a `.boundedcode/verification.yaml`.
+  need a `.boundedcode/verification.yaml`
+  ([reference](docs/usage/configuration.md#repository-verification-boundedcodeverificationyaml)).
 - Cross-service analysis does not cover gRPC, OpenAPI, protobuf or SQL
   contracts.
-- Some run-time errors for missing dependencies (Docker unreachable,
-  codebase-memory-mcp missing) point to a log rather than giving an install
-  hint. `doctor` reports both clearly.
 
 </details>
 

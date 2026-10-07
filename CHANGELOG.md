@@ -2,6 +2,93 @@
 
 ## Unreleased
 
+### Task contract
+
+- A material ambiguity is checked against the request text
+  before `task.ambiguity: ask` can block on it. One more local-model call,
+  made only when there is a material ambiguity, quotes the request. The
+  ambiguity is dropped when a quote that settles it occurs in the request,
+  or when fewer than two of its readings have a supporting quote there. The
+  quotes are matched in code, ignoring case and whitespace, and a quote must
+  have at least 12 non-space characters. Each demotion is recorded as a task
+  decision and in a `task.ambiguity_grounded` event. If the check fails, the ambiguity
+  stays material (`task.grounding_failed`), as it does when an answer lacks a
+  quote slot per reading or is numbered differently from the questions; a
+  "settling" quote that is a reading's own support does not settle it. The result is kept in
+  `contract.json`, and older contract files still load. This addresses the
+  vue and axios false ambiguities of the second validation; it is covered by
+  unit tests with scripted replies and has not been run on real tasks.
+- An ambiguity that affects only the implementation is no
+  longer material.
+- Derivation: the prompt now says what `required` holds for a
+  bug report (the expected behaviour) and for a question or proposal (the
+  change it asks for). HTML comments are stripped from the request. A
+  contract with nothing required is retried once with a corrective
+  follow-up. `task.contract_failed` now includes the redacted raw reply,
+  truncated to 2000 characters.
+
+### Verification
+
+- Behavioural evidence attributes changed test data (for example
+  `promql/testdata/*.test`) to the Go package whose tests read it, and
+  compares Go test failures on the base with and without the changed tests,
+  so a failure the base already had no longer counts.
+- **Behaviour change:** a changed test that does not compile or load on the
+  base (it calls code the change adds), or a stage that times out there, is no
+  longer behavioural evidence. Such a task ends `tests_green` unless a test
+  that also runs on the original code shows the change.
+- Directories such as `latest/` or `contest/` are no longer taken for test
+  directories.
+- `docs/usage/configuration.md` documents `.boundedcode/verification.yaml`.
+
+### Missing or broken dependencies
+
+- Task runs (`task run`, `task create --run`, chat) check the container
+  engine and the sandbox image before starting. Docker or Podman not
+  installed, a daemon that is down or refuses the user, and a missing image
+  are now separate errors, each naming its fix (`setup --only sandbox`).
+  Before, these surfaced as `adapter exited before ready: exit status 125` or
+  `exec: "docker": executable file not found`.
+- An adapter that exits during startup is reported with the last lines of its
+  redacted log, not only the log's path.
+- Verification: a missing container engine is no longer reported as the
+  stage's tool missing (`go not installed`), and optional stages are no
+  longer skipped because of it. Engine failures (daemon down, image missing)
+  are verification errors with a fix instead of stage failures. Neither ever
+  passes the gate.
+- Missing model weights and a missing `llama-server` name `setup --only model`
+  and `setup --only inference`. In external inference mode, a task run fails
+  at once with the URL when the server does not answer, instead of blocking
+  later on "local model server unavailable".
+- **Behaviour change:** codebase-memory-mcp missing or at the wrong version: `index` fails with one
+  message naming `setup --only tools`; a task run warns once and continues
+  without graph context.
+- The full gate's missing-gitleaks error points to `setup --only tools`
+  instead of a script that needs a source checkout.
+- Frontier: a missing Codex CLI is reported as not installed, not as
+  "not logged in".
+- `doctor` tells an engine that is not installed from one whose daemon is
+  down, no longer reports the sandbox image as "not built" when it cannot
+  check, and points each missing dependency to its `setup --only` step.
+  `sandbox build` (and the terminal interface's build action) use the build
+  context embedded in the binary when no checkout is configured.
+- Hints name the program as you invoked it (`bcode` or `boundedcode`).
+- `setup --only` rejects an unknown step name instead of doing nothing and
+  reporting success. New `setup --only STEP --force` runs a step that already
+  looks complete (for example `--only inference` to rebuild llama.cpp after
+  installing the CUDA toolkit); it never rewrites the configuration.
+  `doctor`'s llama.cpp CUDA hints point to it.
+- Verification diagnoses a broken container engine once a minute at most, not
+  once per failing stage.
+
+### Release and install
+
+- `make dist` builds the licenses archive (reproducible: commit time, neutral
+  ownership) and includes it in `SHA256SUMS`.
+- The installer's uninstall hint uses the actual install directory and lists
+  every data directory and the sandbox image.
+- `--version` prints the version, like the `version` command.
+
 ## v0.1.0-alpha.2 (2026-10-06): `bcode`, chat and guided set-up
 
 Release notes: [docs/releases/v0.1.0-alpha.2.md](docs/releases/v0.1.0-alpha.2.md).

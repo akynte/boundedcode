@@ -70,8 +70,8 @@ change approach. Stopping does not by itself escalate to the frontier.
 
 | Key | Default | Meaning |
 |---|---|---|
-| `contract` | `true` | Before the first attempt, derive a compact task contract from the request with the local model: what is required, alternatives the request explicitly allows, constraints, what is out of scope, open questions, and acceptance evidence. It is shown to the agent; the request stays authoritative. |
-| `ambiguity` | `ask` | What a *material* ambiguity does (plausible readings that change behaviour, an API, data, security, compatibility, tests or output). `ask`: the task blocks before implementation with the questions (SPEC_AMBIGUOUS); answer with `task run TASK --clarify "..."`. `proceed`: the ambiguity is recorded and the agent states and demonstrates the reading it chose (used by benchmarks). Explicitly allowed alternatives never block. |
+| `contract` | `true` | Before the first attempt, derive a compact task contract from the request with the local model: what is required, alternatives the request explicitly allows, constraints, what is out of scope, open questions, and acceptance evidence. It is shown to the agent; the request stays authoritative. HTML comments (issue-template instructions) are removed from the request first, and a contract that names nothing required is asked for once more. |
+| `ambiguity` | `ask` | What a *material* ambiguity does (plausible readings that change behaviour, an API, data, security, compatibility, tests or output; implementation choices do not count). Before either policy applies, each material ambiguity is checked against the request text with one more local-model call: it is dropped, and the reason recorded as a task decision, when the request's own words settle it (for example an expected output) or when fewer than two of its readings are supported by a quote from the request. If that check fails, the ambiguity stays material. `ask`: the task blocks before implementation with the questions (SPEC_AMBIGUOUS); answer with `task run TASK --clarify "..."`. `proceed`: the ambiguity is recorded and the agent states and demonstrates the reading it chose (used by benchmarks). Explicitly allowed alternatives never block. |
 
 ### `repointel`
 
@@ -178,6 +178,44 @@ A key you leave out keeps its value from the user config. A list you set
 replaces the user's list; it is not merged with it. The file is decoded
 strictly, and the merged result goes through the same validation as
 `config.yaml`. Without the file, the workspace uses the user config as is.
+
+## Repository verification (`.boundedcode/verification.yaml`)
+
+Each repository can define its own verification stages. The file is read
+from the task's **base commit**, never from the worktree, so the agent cannot
+change how its own work is judged; a change to it takes effect for tasks that
+start after it is committed. Without the file, built-in presets are used for
+the languages found at the base commit: Go (`go.mod`), JavaScript and
+TypeScript (`package.json`, `tsconfig.json`), and the optional
+`terraform-fmt` and `helm-lint` checks. The file is decoded strictly: unknown
+keys are an error.
+
+```yaml
+version: 1
+max_changed_files: 200      # diff-scope bound; 0 means 200
+deny_paths: ["migrations/*"]    # extra patterns the change must not touch
+stages:
+  - name: go-test
+    run: [go, test, -count=1, "{packages}"]
+    scope: always           # always (default) | targeted | full
+    timeout: 20m            # default 10m
+    requires: [go.mod]      # the stage applies only if these files exist
+    tests: true             # runs tests (see behavioural evidence)
+    optional: false         # skip instead of fail when the tool is missing
+```
+
+| Key | Meaning |
+|---|---|
+| `name`, `run` | Required. `run` is an argument vector, not a shell line; use `[sh, -c, "..."]` for a script. Every command goes through the same command policy as the agent's commands. `{packages}` expands to the impact-selected Go packages (or `./...` in the full gate). |
+| `scope` | `targeted` stages run only while iterating, `full` stages only in the full gate before a task becomes a merge candidate, `always` in both. |
+| `requires` | Files that must exist for the stage to apply. A required file that exists at the base and is deleted by the change fails the stage, so a change cannot switch a stage off. A stage whose first required file is `go.mod` is treated as a Go stage by behavioural evidence. |
+| `tests` | Marks a stage that runs tests. Behavioural evidence reruns such stages on the base commit with and without the change's tests. Without the key, a stage whose name or command mentions "test" counts. |
+| `deny_paths` | Repository-relative patterns in Go `filepath.Match` syntax: `*` does not cross `/`, and there is no `**`. A changed file that matches fails the diff scope. |
+| `optional` | The stage is skipped, not failed, when its tool is not installed (exit code 127). |
+
+The `diff-scope` and `secret-scan` (gitleaks) stages always run in addition.
+Stages run in the sandbox without network access; dependencies come
+read-only from the repository checkout (for example its `node_modules`).
 
 ## Workspace repositories
 
