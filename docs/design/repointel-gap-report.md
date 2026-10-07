@@ -83,7 +83,7 @@ v0.11.0.
   3. Helm/Kustomize env ↔ application `EnvVar` linkage.
 * All three are upstream-shaped improvements to an MIT project. Contributing
   fixes upstream is preferable to a parallel analyzer. **No upstream issues
-  have been filed**, since that is external publication and needs the
-  maintainer's approval.
+  had been filed** at the time; the four confirmed defects were filed on
+  2026-10-04 (see [upstream-reports.md](upstream-reports.md)).
 * For context packs, the planner already gets exact symbols, call
   neighborhoods and same-repo impact cheaply (~12 ms per query).
