@@ -215,3 +215,35 @@ func TestChangedSymbols(t *testing.T) {
 		t.Errorf("untouched symbol reported: %v", got)
 	}
 }
+
+// TestRelativeGitdir: the relative .git pointer written for Windows
+// worktrees works with git and passes the integrity checks, and a relative
+// pointer that leaves the admin area is still refused.
+func TestRelativeGitdir(t *testing.T) {
+	repo := initRepo(t)
+	ctx := context.Background()
+	wt := filepath.Join(t.TempDir(), "wt")
+	if err := EnsureWorktree(ctx, repo, wt, "agent/t1", "HEAD"); err != nil {
+		t.Fatal(err)
+	}
+	if err := relativizeGitdir(wt); err != nil {
+		t.Fatal(err)
+	}
+	b, _ := os.ReadFile(filepath.Join(wt, ".git"))
+	if !strings.HasPrefix(string(b), "gitdir: ../") {
+		t.Fatalf(".git = %q", b)
+	}
+	if _, err := Run(ctx, wt, "status", "--porcelain"); err != nil {
+		t.Fatalf("git with a relative pointer: %v", err)
+	}
+	common := filepath.Join(repo, ".git")
+	if err := CheckTaskWorktree(wt, common, "agent/t1"); err != nil {
+		t.Fatalf("check: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(wt, ".git"), []byte("gitdir: ../../elsewhere\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := CheckWorktree(wt, common); err == nil {
+		t.Fatal("a relative pointer outside the admin dir was accepted")
+	}
+}

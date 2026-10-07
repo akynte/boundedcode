@@ -524,6 +524,11 @@ func WriteFileAtomic(path string, data []byte, perm os.FileMode) error {
 	if err := os.Chmod(tmp, perm); err != nil {
 		return err
 	}
+	if perm&0o077 == 0 {
+		if err := restrictToOwner(tmp, false); err != nil {
+			return err
+		}
+	}
 	return os.Rename(tmp, path)
 }
 

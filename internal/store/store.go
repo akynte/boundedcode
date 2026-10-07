@@ -31,7 +31,7 @@ func Open(ctx context.Context, path string) (*Store, error) {
 		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 			return nil, fmt.Errorf("create db dir: %w", err)
 		}
-		dsn = "file:" + path
+		dsn = "file:" + uriPath(path)
 	}
 	// WAL + busy timeout let a CLI and a long-running task process share the
 	// DB. Immediate transactions take the write lock up front, so concurrent
@@ -121,3 +121,15 @@ var ErrNotFound = errors.New("not found")
 
 // Now returns the canonical timestamp format used in the database.
 func Now() string { return time.Now().UTC().Format(time.RFC3339Nano) }
+
+// uriPath is a file path as the path of an SQLite URI filename: forward
+// slashes, a leading slash before a Windows drive (file:/C:/...), and
+// %, ? and # escaped so they are not read as URI syntax.
+func uriPath(p string) string {
+	p = filepath.ToSlash(p)
+	p = strings.NewReplacer("%", "%25", "?", "%3f", "#", "%23").Replace(p)
+	if len(p) >= 2 && p[1] == ':' {
+		p = "/" + p
+	}
+	return p
+}

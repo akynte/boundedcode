@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -48,6 +49,10 @@ func (a *App) serenaManager(paths config.Paths) *serena.Manager {
 // is disabled or unusable; tasks then use graph-only symbol context.
 func (a *App) serenaNavigator(ctx context.Context, paths config.Paths) (*serena.Navigator, func()) {
 	if !a.Config.RepoIntel.Serena.Enabled {
+		return nil, func() {}
+	}
+	if runtime.GOOS == "windows" {
+		fmt.Fprintf(a.Err, "serena: not supported on Windows yet (continuing without LSP navigation)\n")
 		return nil, func() {}
 	}
 	m := a.serenaManager(paths)
@@ -142,6 +147,9 @@ func newSerenaCmd(app *App) *cobra.Command {
 		Short: "Install the pinned, MIT-licensed Serena v" + serena.RequiredVersion + " (with permission) and its language servers",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx := cmd.Context()
+			if runtime.GOOS == "windows" {
+				return errors.New("the Serena integration is not supported on Windows yet; BoundedCode works without it (it is optional)")
+			}
 			uv, err := exec.LookPath("uv")
 			if err != nil {
 				return errors.New("uv not found: install it from https://docs.astral.sh/uv/ (it installs Serena from the locked environment)")

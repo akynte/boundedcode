@@ -269,8 +269,14 @@ func (r *Runtime) Open(ctx context.Context, req agent.OpenRequest) (agent.Sessio
 		Resumed        bool   `json:"resumed"`
 		EventCount     int    `json:"event_count"`
 	}
+	// The adapter runs in the sandbox: it sees paths where the sandbox
+	// mounts them (the same paths except on Windows hosts).
+	workspace, persistence := req.Workspace, req.PersistenceDir
+	if r.Sandbox.Isolated() {
+		workspace, persistence = sandbox.ContainerPath(workspace), sandbox.ContainerPath(persistence)
+	}
 	params := map[string]any{
-		"workspace": req.Workspace, "persistence_dir": req.PersistenceDir, "model": adapterModel(gw),
+		"workspace": workspace, "persistence_dir": persistence, "model": adapterModel(gw),
 		"conversation_id": req.SessionID, "max_iterations": nilIfZero(req.MaxIterations),
 		"max_input_tokens": nilIfZero(req.MaxInputTokens), "max_output_tokens": nilIfZero(req.MaxOutputTokens),
 		"condenser_max_events": nilIfZero(req.CondenserMaxEvents), "condenser_max_tokens": nilIfZero(req.CondenserMaxTokens),

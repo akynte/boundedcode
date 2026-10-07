@@ -122,3 +122,6 @@ func usageOf(tag string) Usage {
 	}
 	return u
 }
+
+// killProcessGroup kills the process group led by pid.
+func killProcessGroup(pid int) { _ = syscall.Kill(-pid, syscall.SIGKILL) }

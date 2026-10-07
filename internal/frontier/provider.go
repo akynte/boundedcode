@@ -10,8 +10,11 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
+
+	"github.com/akynte/boundedcode/internal/sandbox"
 )
 
 // Provider answers an escalation packet.
@@ -94,7 +97,14 @@ func (c *Codex) Ask(ctx context.Context, packet, dir string) (string, error) {
 	defer cancel()
 	var cmd *exec.Cmd
 	if c.Container != nil {
-		cmd, err = c.containerCmd(ctx, args, dir)
+		// Inside the container, dir is where the sandbox mounts it.
+		inArgs := slices.Clone(args)
+		for i, a := range inArgs {
+			if a == empty || a == out {
+				inArgs[i] = sandbox.ContainerPath(dir) + "/" + filepath.ToSlash(strings.TrimPrefix(a, dir+string(filepath.Separator)))
+			}
+		}
+		cmd, err = c.containerCmd(ctx, inArgs, dir)
 		if err != nil {
 			return "", err
 		}
@@ -176,9 +186,9 @@ func (c *Codex) containerCmd(ctx context.Context, args []string, dir string) (*e
 		"--tmpfs", "/home/agent:rw,exec,size=256m,mode=1777", "-e", "HOME=/home/agent",
 		"--mount", fmt.Sprintf("type=bind,source=%s,target=/usr/local/bin/codex-host,readonly", bin),
 		"--mount", fmt.Sprintf("type=bind,source=%s,target=/home/agent/.codex", codexHome),
-		"--mount", fmt.Sprintf("type=bind,source=%s,target=%s", dir, dir),
+		"--mount", fmt.Sprintf("type=bind,source=%s,target=%s", dir, sandbox.ContainerPath(dir)),
 		"-e", "CODEX_HOME=/home/agent/.codex",
-		"-w", dir,
+		"-w", sandbox.ContainerPath(dir),
 		cc.Image, "/usr/local/bin/codex-host"}
 	cmd := exec.CommandContext(ctx, cc.Engine, append(run, args...)...)
 	cmd.Cancel = func() error {

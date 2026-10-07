@@ -11,7 +11,6 @@ import (
 	"regexp"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/akynte/boundedcode/internal/jsonrpc"
@@ -243,7 +242,7 @@ func (s *session) kill() {
 // and outlived Serena.
 func (s *session) killGroup() {
 	if pid := s.pid(); pid > 0 {
-		_ = syscall.Kill(-pid, syscall.SIGKILL)
+		killProcessGroup(pid)
 	}
 	if s.tag != "" {
 		killTagged(s.tag)

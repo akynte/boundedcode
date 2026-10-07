@@ -8,6 +8,8 @@ import (
 
 	"github.com/akynte/boundedcode/internal/contextplan"
 	"github.com/akynte/boundedcode/internal/telemetry"
+
+	"github.com/akynte/boundedcode/internal/sandbox"
 )
 
 // PathMap maps host directories to the names a packet shows instead (e.g.
@@ -49,16 +51,19 @@ func BuildPacket(trigger Trigger, pack contextplan.Pack, question string, paths 
 // /home/devon, and repository-relative paths are untouched. JSON-escaped
 // (\/home\/u) and URL-encoded (%2Fhome%2Fu) spellings are handled too.
 func Sanitize(text string, paths PathMap, home string) string {
-	type rule struct{ from, to string }
+	type rule struct {
+		from, to string
+		fold     bool // Windows spellings: case-insensitive
+	}
 	var rules []rule
 	add := func(from, to string) {
-		from = strings.TrimRight(from, "/")
-		if from == "" || !strings.HasPrefix(from, "/") {
-			return
+		for _, sp := range spellings(from) {
+			rules = append(rules, rule{sp.text, to, sp.fold})
 		}
-		rules = append(rules, rule{from, to})
 		if real, err := filepath.EvalSymlinks(from); err == nil && real != from {
-			rules = append(rules, rule{real, to})
+			for _, sp := range spellings(real) {
+				rules = append(rules, rule{sp.text, to, sp.fold})
+			}
 		}
 	}
 	for from, to := range paths {
@@ -69,30 +74,58 @@ func Sanitize(text string, paths PathMap, home string) string {
 	}
 	sort.SliceStable(rules, func(i, j int) bool { return len(rules[i].from) > len(rules[j].from) })
 	for _, r := range rules {
-		for _, enc := range pathEncodings {
-			text = replaceAtBoundary(text, enc(r.from), enc(r.to))
-		}
+		text = replaceAtBoundary(text, r.from, r.to, r.fold)
 	}
 	return text
 }
 
-// pathEncodings are the spellings a path takes in tool output: plain,
-// JSON-escaped and URL-encoded.
-var pathEncodings = []func(string) string{
-	func(p string) string { return p },
-	func(p string) string { return strings.ReplaceAll(p, "/", `\/`) },
-	func(p string) string { return strings.ReplaceAll(p, "/", "%2F") },
+// spelling is one way a host path appears in tool output.
+type spelling struct {
+	text string
+	fold bool
+}
+
+// spellings are the forms a host path takes in tool output. A Unix path
+// appears plain, JSON-escaped (\/home\/u) and URL-encoded (%2Fhome%2Fu). A
+// Windows path also appears with either slash, JSON-escaped (C:\\Users),
+// and as the sandbox mounts it (/host/c/Users/...); Windows matches paths
+// without case, so these compare case-insensitively.
+func spellings(p string) []spelling {
+	p = strings.TrimRight(p, `/\`)
+	if p == "" {
+		return nil
+	}
+	if !windowsPath(p) {
+		if !strings.HasPrefix(p, "/") {
+			return nil
+		}
+		return []spelling{{p, false}, {strings.ReplaceAll(p, "/", `\/`), false}, {strings.ReplaceAll(p, "/", "%2F"), false}}
+	}
+	back := strings.ReplaceAll(p, "/", `\`)
+	slash := strings.ReplaceAll(p, `\`, "/")
+	inBox := sandbox.ContainerPathFor("windows", p)
+	out := []spelling{{back, true}, {slash, true}, {strings.ReplaceAll(back, `\`, `\\`), true}, {strings.ReplaceAll(slash, "/", "%2F"), true}}
+	for _, s := range []string{inBox, strings.ReplaceAll(inBox, "/", `\/`)} {
+		out = append(out, spelling{s, true})
+	}
+	return out
+}
+
+// windowsPath reports a drive-letter or UNC path.
+func windowsPath(p string) bool {
+	return len(p) >= 3 && p[1] == ':' && (p[2] == '\\' || p[2] == '/') &&
+		('a' <= p[0] && p[0] <= 'z' || 'A' <= p[0] && p[0] <= 'Z') || strings.HasPrefix(p, `\\`)
 }
 
 // replaceAtBoundary replaces from with to where from is a whole path prefix:
 // the next character is not one that continues a path component.
-func replaceAtBoundary(text, from, to string) string {
-	if from == "" || !strings.Contains(text, from) {
+func replaceAtBoundary(text, from, to string, fold bool) string {
+	if from == "" {
 		return text
 	}
 	var b strings.Builder
 	for {
-		i := strings.Index(text, from)
+		i := index(text, from, fold)
 		if i < 0 {
 			b.WriteString(text)
 			return b.String()
@@ -100,12 +133,20 @@ func replaceAtBoundary(text, from, to string) string {
 		end := i + len(from)
 		b.WriteString(text[:i])
 		if end < len(text) && continuesComponent(text[end]) {
-			b.WriteString(from)
+			b.WriteString(text[i:end])
 		} else {
 			b.WriteString(to)
 		}
 		text = text[end:]
 	}
+}
+
+// index is strings.Index, case-insensitive (ASCII) when fold is set.
+func index(s, sub string, fold bool) int {
+	if !fold {
+		return strings.Index(s, sub)
+	}
+	return strings.Index(strings.ToLower(s), strings.ToLower(sub))
 }
 
 func continuesComponent(c byte) bool {
@@ -117,19 +158,14 @@ func continuesComponent(c byte) bool {
 // any of the spellings Sanitize handles. It is the fail-closed gate after
 // sanitizing; the error names where the residue was found.
 func CheckPacket(packet, home string) error {
-	home = strings.TrimRight(home, "/")
-	if home == "" {
-		return nil
-	}
-	for _, enc := range pathEncodings {
-		h := enc(home)
+	for _, sp := range spellings(home) {
 		for off := 0; ; {
-			i := strings.Index(packet[off:], h)
+			i := index(packet[off:], sp.text, sp.fold)
 			if i < 0 {
 				break
 			}
 			i += off
-			end := i + len(h)
+			end := i + len(sp.text)
 			if end >= len(packet) || !continuesComponent(packet[end]) {
 				lo, hi := max(0, i-40), min(len(packet), end+60)
 				return fmt.Errorf("frontier packet still contains the host home directory %q (near %q); refusing to send", home, packet[lo:hi])

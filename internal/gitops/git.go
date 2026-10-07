@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 
 	"github.com/akynte/boundedcode/internal/pathutil"
@@ -30,9 +31,18 @@ var hardening = []string{
 	"-c", "uploadpack.packObjectsHook=",
 }
 
+// windowsFlags keep worktrees byte-identical to the repository (no CRLF
+// conversion: the sandbox's Linux tools read the files) and allow paths
+// beyond Windows' 260-character limit (deep node_modules trees).
+var windowsFlags = []string{"-c", "core.autocrlf=false", "-c", "core.longpaths=true"}
+
 // Run executes git in dir and returns trimmed stdout.
 func Run(ctx context.Context, dir string, args ...string) (string, error) {
-	cmd := exec.CommandContext(ctx, "git", append(append([]string{}, hardening...), args...)...)
+	flags := append([]string{}, hardening...)
+	if runtime.GOOS == "windows" {
+		flags = append(flags, windowsFlags...)
+	}
+	cmd := exec.CommandContext(ctx, "git", append(flags, args...)...)
 	cmd.Dir = dir
 	// Never prompt for credentials; never use the user's pager/editor.
 	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GIT_PAGER=cat", "GIT_EDITOR=true", "LC_ALL=C")
@@ -111,12 +121,38 @@ func EnsureWorktree(ctx context.Context, repo, path, branch, base string) error 
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
-	if _, err := Run(ctx, repo, "rev-parse", "--verify", "--quiet", "refs/heads/"+branch); err == nil {
+	var err error
+	if _, verr := Run(ctx, repo, "rev-parse", "--verify", "--quiet", "refs/heads/"+branch); verr == nil {
 		_, err = Run(ctx, repo, "worktree", "add", path, branch)
+	} else {
+		_, err = Run(ctx, repo, "worktree", "add", "-b", branch, path, base)
+	}
+	if err != nil || runtime.GOOS != "windows" {
 		return err
 	}
-	_, err := Run(ctx, repo, "worktree", "add", "-b", branch, path, base)
-	return err
+	return relativizeGitdir(path)
+}
+
+// relativizeGitdir rewrites a worktree's .git pointer as a relative path.
+// On Windows git writes an absolute C:/... path, which git inside the Linux
+// sandbox (where the worktree is mounted under /host/c/...) cannot follow;
+// a relative pointer works on both sides because the sandbox keeps the
+// directory structure. git has always accepted relative gitdir pointers.
+func relativizeGitdir(worktree string) error {
+	gitFile := filepath.Join(worktree, ".git")
+	b, err := os.ReadFile(gitFile)
+	if err != nil {
+		return err
+	}
+	ptr, ok := strings.CutPrefix(strings.TrimSpace(string(b)), "gitdir: ")
+	if !ok || !filepath.IsAbs(ptr) {
+		return nil
+	}
+	rel, err := filepath.Rel(worktree, filepath.Clean(ptr))
+	if err != nil || filepath.IsAbs(rel) {
+		return fmt.Errorf("worktree %s and its repository %s must be on the same drive (set BOUNDEDCODE_HOME on the repository's drive)", worktree, ptr)
+	}
+	return os.WriteFile(gitFile, []byte("gitdir: "+filepath.ToSlash(rel)+"\n"), 0o644)
 }
 
 // RemoveWorktree removes a task worktree. The branch is kept: work is never
@@ -254,6 +290,9 @@ func CheckWorktree(worktree, commonDir string) error {
 	if !ok {
 		return fmt.Errorf("worktree %s: .git is not a gitdir pointer", worktree)
 	}
+	if !filepath.IsAbs(ptr) {
+		ptr = filepath.Join(worktree, filepath.FromSlash(ptr)) // relative pointers (Windows worktrees)
+	}
 	ptr = filepath.Clean(ptr)
 	// Compare resolved paths, case-folded where the file system folds case:
 	// git may record /private/var/... for a /var/... common dir on macOS.
@@ -289,7 +328,11 @@ func CheckTaskWorktree(worktree, commonDir, branch string) error {
 		return err
 	}
 	b, _ := os.ReadFile(filepath.Join(worktree, ".git"))
-	admin := filepath.Clean(strings.TrimPrefix(strings.TrimSpace(string(b)), "gitdir: "))
+	admin := strings.TrimPrefix(strings.TrimSpace(string(b)), "gitdir: ")
+	if !filepath.IsAbs(admin) {
+		admin = filepath.Join(worktree, filepath.FromSlash(admin))
+	}
+	admin = filepath.Clean(admin)
 	head, err := os.ReadFile(filepath.Join(admin, "HEAD"))
 	if err != nil {
 		return fmt.Errorf("worktree %s: HEAD: %w", worktree, err)

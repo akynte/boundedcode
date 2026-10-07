@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime/debug"
+	"strings"
 )
 
 const (
@@ -26,7 +27,7 @@ const ShortName = "bcode"
 // the alias, otherwise Name. Messages that tell the user what to run use it,
 // so a hint can be copied as typed.
 func Command() string {
-	if filepath.Base(os.Args[0]) == ShortName {
+	if strings.TrimSuffix(strings.ToLower(filepath.Base(os.Args[0])), ".exe") == ShortName {
 		return ShortName
 	}
 	return Name

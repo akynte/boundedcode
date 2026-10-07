@@ -9,7 +9,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"testing"
 	"time"
 
@@ -203,7 +202,7 @@ func TestSendCancelKillsUnresponsiveAdapter(t *testing.T) {
 	if _, err := fmt.Sscan(string(b), &pid); err != nil {
 		t.Fatal(err)
 	}
-	if err := syscall.Kill(pid, 0); err == nil {
+	if processAlive(pid) {
 		t.Fatalf("adapter pid %d still alive", pid)
 	}
 }

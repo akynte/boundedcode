@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+### Windows (experimental; compiled and unit-tested, not yet run on Windows)
+
+- Builds for Windows. Process trees are ended with `taskkill /T` (the
+  llama.cpp server, codebase-memory-mcp, Serena); the llama.cpp server is
+  started detached in its own process group.
+- The sandbox mounts Windows paths at `/host/<drive>/...` in the Linux
+  container and translates working directories, environment values, adapter
+  parameters, `go list` output and the frontier container's paths; it runs
+  as uid 1000 where the host has no uid.
+- Worktrees get relative `.git` pointers (git inside the container cannot
+  follow `C:/...`), `core.autocrlf=false` and `core.longpaths=true`; the
+  integrity checks accept relative pointers and still refuse ones that leave
+  the admin area. The data folder and repositories must share a drive.
+- Frontier packets are sanitized of Windows paths in every spelling (either
+  slash, JSON-escaped, any case, and the sandbox's `/host/c/...` form).
+- Owner-only files and data folders get an owner-only access list (Windows
+  ignores Unix file modes). The SQLite path is passed as a proper URI.
+- `scripts/install.ps1` installs from a release (checksum-verified) and adds
+  the folder to the user's PATH. Serena is not supported on Windows yet.
+
 ### macOS (experimental; compiled and unit-tested, not yet run on a Mac)
 
 - Builds for macOS (arm64 and amd64). The llama.cpp manager checks and

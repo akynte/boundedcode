@@ -32,6 +32,7 @@ limited validation or unstable interfaces), **planned**.
 | Hardware detection and model choice (`model recommend|fetch|use|remove`) | experimental | `internal/hw` per OS (Linux probe checked on the reference machine; macOS and Windows compile only); fit rule and recommendation (`fit_test.go`, simulated machines); Go downloader (`download_test.go`, plus a ranged request against the real Hub). Five new profiles are **not benchmarked** |
 | Set-up wizard and model/provider settings in the interface | experimental | `internal/tui/setupwizard.go`; driven end to end against a fake backend (`TestWizardLocal`, `TestWizardCloud`, `TestWizardValidation`, `TestWizardFitsSmallTerminals`, `TestRuntimeModelActions`); not yet used by a real user |
 | macOS support | experimental | compiles and vets for darwin/arm64 and darwin/amd64; Go installers with pinned macOS assets (real archive unpacked on Linux); **not run on a Mac** |
+| Native Windows support | experimental | compiles and vets for windows/amd64; container path translation, relative worktree pointers, Windows packet sanitizing, ACLs; unit-tested from Linux, **not run on Windows**; Serena unsupported there |
 | Daemon, GUI | planned | |
 | Release packaging, SBOM | implemented | `make dist` (binary, SBOM, reproducible licenses archive, checksums), `scripts/sbom`; published as v0.1.0-alpha.1 (source) and v0.1.0-alpha.2 (with assets). Publishing needs maintainer approval. |
 | Local escalation tier (switch to a stronger local model before frontier) | planned | motivated by the 4/4 vs 1/4 result in ADR-0007 |

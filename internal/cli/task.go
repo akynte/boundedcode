@@ -48,7 +48,7 @@ func (a *App) sandbox(allowNone bool) (sandbox.Sandbox, error) {
 		return sandbox.None{}, nil
 	}
 	return &sandbox.Container{Engine: c.Engine, Image: a.Config.Agent.Image, Network: c.Network, Memory: c.Memory, CPUs: c.CPUs,
-		PIDs: 4096, UID: os.Getuid(), GID: os.Getgid()}, nil
+		PIDs: 4096, UID: sandboxUID(), GID: sandboxGID()}, nil
 }
 
 func (a *App) adapterArgv(sb sandbox.Sandbox) ([]string, error) {
@@ -196,7 +196,7 @@ func (a *App) buildRunnerWith(ctx context.Context, f runFlags, db *sql.DB, paths
 				if a.Config.Sandbox.Kind != "docker" {
 					return nil, nil, errors.New("frontier.contain requires a container engine (sandbox.kind: docker); set frontier.contain: false to run codex unconfined")
 				}
-				cx.Container = &frontier.CodexContainer{Engine: a.Config.Sandbox.Engine, Image: a.Config.Agent.Image, UID: os.Getuid(), GID: os.Getgid(),
+				cx.Container = &frontier.CodexContainer{Engine: a.Config.Sandbox.Engine, Image: a.Config.Agent.Image, UID: sandboxUID(), GID: sandboxGID(),
 					LinuxBinary: a.containerCodex()}
 			}
 			r.Frontier = cx
@@ -686,4 +686,22 @@ func indent(s, pfx string) string {
 		lines = append([]string{"…"}, lines[len(lines)-40:]...)
 	}
 	return pfx + strings.Join(lines, "\n"+pfx)
+}
+
+// sandboxUID and sandboxGID are the user the sandbox runs as: the invoking
+// user, so files written to the worktree keep their owner. Windows has no
+// uid (os.Getuid returns -1); Docker Desktop maps file ownership itself, so
+// a fixed unprivileged user is used there.
+func sandboxUID() int {
+	if u := os.Getuid(); u >= 0 {
+		return u
+	}
+	return 1000
+}
+
+func sandboxGID() int {
+	if g := os.Getgid(); g >= 0 {
+		return g
+	}
+	return 1000
 }

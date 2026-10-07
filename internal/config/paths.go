@@ -66,6 +66,11 @@ func (p Paths) Ensure() error {
 		if err := os.MkdirAll(d, 0o700); err != nil {
 			return fmt.Errorf("create %s: %w", d, err)
 		}
+		// Windows ignores the mode: give the directory an owner-only,
+		// inherited access list (credentials and task data live here).
+		if err := restrictToOwner(d, true); err != nil {
+			return fmt.Errorf("restrict %s to its owner: %w", d, err)
+		}
 	}
 	return nil
 }

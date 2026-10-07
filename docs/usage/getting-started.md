@@ -4,11 +4,24 @@
 
 ## Fast path
 
+Linux and macOS:
+
 ```bash
 curl -fsSL https://raw.githubusercontent.com/akynte/boundedcode/main/scripts/install.sh | bash
 cd ~/src/payment-service     # any git repository
 bcode
 ```
+
+Windows (PowerShell; needs Git for Windows and Docker Desktop):
+
+```powershell
+irm https://raw.githubusercontent.com/akynte/boundedcode/main/scripts/install.ps1 | iex
+cd $HOME\src\payment-service
+bcode
+```
+
+macOS and Windows support is new and **has not yet been run on those
+systems**; see [Platforms](#platforms) below.
 
 The installer puts `boundedcode` and `bcode` in `~/.local/bin`, from a
 checksum-verified release binary, or built with Go when the release has none.
@@ -19,6 +32,27 @@ the sandbox image. Run `bcode setup --check` to see the same list from the
 shell. Then describe a change in the chat; see
 [the terminal interface](tui.md). The rest of this page is the manual path,
 and the reference for what setup does.
+
+## Platforms
+
+| | Linux (x86-64, arm64) | macOS (Apple Silicon, Intel) | Windows (x64) |
+|---|---|---|---|
+| Status | validated on the reference machine (x86-64) | experimental, not yet run on a Mac | experimental, not yet run on Windows |
+| Local inference | llama.cpp built from source (CUDA), or the prebuilt release | prebuilt llama.cpp, Metal on Apple Silicon | prebuilt llama.cpp, CUDA 12.4 with an NVIDIA GPU, else CPU |
+| Sandbox | Docker or Podman | Docker Desktop or Podman machine | Docker Desktop (WSL 2 backend) |
+| Cloud providers | yes | yes | yes |
+| Serena (optional) | yes | yes (an interrupted run can leave language servers running) | not supported yet |
+
+**Windows notes.** The agent's sandbox is a Linux container; BoundedCode
+mounts your repositories at `/host/<drive>/...` inside it and translates
+paths both ways. Task worktrees use relative `.git` pointers, so the
+BoundedCode data folder and your repositories must be on the same drive (set
+`BOUNDEDCODE_HOME` on that drive if they are not). Worktrees are checked
+out without line-ending conversion (`core.autocrlf=false`) and with long
+paths enabled. Configuration, credentials and task data folders get an
+access list for your user only. JavaScript projects whose `node_modules` were
+installed on Windows need Linux dependencies for verification (the stage
+explains how).
 
 ## 1. Prerequisites
 

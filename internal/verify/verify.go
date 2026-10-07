@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -688,7 +689,12 @@ func (e *Engine) goImpactedPackages(ctx context.Context, t RepoTarget, changed [
 	if err != nil {
 		return nil, err
 	}
-	return impacted(string(out), worktree, goFiles), nil
+	// go list reports directories as the sandbox sees them.
+	root := worktree
+	if e.Sandbox.Isolated() {
+		root = sandbox.ContainerPath(worktree)
+	}
+	return impacted(string(out), root, goFiles), nil
 }
 
 // impacted computes the reverse-dependency closure from `go list` output.
@@ -708,6 +714,10 @@ func impacted(listing, worktree string, changedFiles []string) []string {
 	seed := map[string]bool{}
 	for _, cf := range changedFiles {
 		dir := filepath.Join(worktree, filepath.Dir(cf))
+		if strings.HasPrefix(worktree, "/") && filepath.Separator != '/' {
+			// A container path on a Windows host: slash-separated.
+			dir = path.Join(worktree, filepath.ToSlash(filepath.Dir(cf)))
+		}
 		for ip, p := range pkgs {
 			if p.dir == dir {
 				seed[ip] = true

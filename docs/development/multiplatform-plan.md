@@ -150,6 +150,12 @@ dependencies (the stage says so).
 
 ### Phase 15: native Windows
 
+**Done in code (2026-10-07); not run on Windows.** Compiles and vets for
+windows/amd64; the path translation, relative worktree pointers, Windows
+packet sanitizing and SQLite URIs are unit-tested from Linux. Serena is not
+supported on Windows (it is optional). `install.ps1` is untested (no
+PowerShell here).
+
 - Process management with Job Objects; Windows liveness; a host→container path
   translation layer for mounts, working directories, environment values and
   container output; worktrees with relative gitdir pointers;

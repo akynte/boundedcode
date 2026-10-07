@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"testing"
 )
@@ -65,5 +66,30 @@ func TestConcurrentFirstOpen(t *testing.T) {
 	var n int
 	if err := s.DB.QueryRow(`SELECT COUNT(*) FROM schema_migrations`).Scan(&n); err != nil || n != len(migrations) {
 		t.Fatalf("migrations recorded = %d (%v), want %d", n, err, len(migrations))
+	}
+}
+
+func TestURIPath(t *testing.T) {
+	for in, want := range map[string]string{
+		"/home/me/state.db":     "/home/me/state.db",
+		"/tmp/a?b#c%d/state.db": "/tmp/a%3fb%23c%25d/state.db",
+	} {
+		if got := uriPath(in); got != want {
+			t.Errorf("uriPath(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+// TestOpenOddPath: a database under a directory whose name has URI
+// characters opens and persists.
+func TestOpenOddPath(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "a?b#c%d", "state.db")
+	s, err := Open(context.Background(), p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.Close()
+	if _, err := os.Stat(p); err != nil {
+		t.Fatalf("database not at %s: %v", p, err)
 	}
 }

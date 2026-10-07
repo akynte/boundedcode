@@ -196,7 +196,7 @@ func (c *Container) Args(s Spec) ([]string, error) {
 		if forbiddenHostMount(m.Host) {
 			return nil, fmt.Errorf("sandbox: refusing to mount sensitive host path %s", m.Host)
 		}
-		spec := fmt.Sprintf("type=bind,source=%s,target=%s", m.Host, m.Target)
+		spec := fmt.Sprintf("type=bind,source=%s,target=%s", m.Host, ContainerPath(m.Target))
 		if m.ReadOnly {
 			spec += ",readonly"
 		}
@@ -206,29 +206,33 @@ func (c *Container) Args(s Spec) ([]string, error) {
 		if !filepath.IsAbs(p) {
 			return nil, fmt.Errorf("sandbox: scratch path must be absolute: %s", p)
 		}
-		args = append(args, "--mount", fmt.Sprintf("type=tmpfs,destination=%s,tmpfs-size=%d,tmpfs-mode=1777", p, scratchSize))
+		args = append(args, "--mount", fmt.Sprintf("type=tmpfs,destination=%s,tmpfs-size=%d,tmpfs-mode=1777", ContainerPath(p), scratchSize))
 	}
 	for _, p := range s.Masks {
-		// Mounts are identity-mapped, so the host path tells us the type.
+		// The host path tells us the type; the mask goes where the sandbox
+		// sees that path.
 		fi, err := os.Stat(p)
 		switch {
 		case err != nil:
 			continue // nothing to hide
 		case fi.IsDir():
-			args = append(args, "--mount", fmt.Sprintf("type=tmpfs,destination=%s,tmpfs-size=1k,tmpfs-mode=0500", p))
+			args = append(args, "--mount", fmt.Sprintf("type=tmpfs,destination=%s,tmpfs-size=1k,tmpfs-mode=0500", ContainerPath(p)))
 		default:
 			// tmpfs cannot cover a file: bind an empty read-only file instead.
 			empty, err := emptyFile()
 			if err != nil {
 				return nil, err
 			}
-			args = append(args, "--mount", fmt.Sprintf("type=bind,source=%s,target=%s,readonly", empty, p))
+			args = append(args, "--mount", fmt.Sprintf("type=bind,source=%s,target=%s,readonly", empty, ContainerPath(p)))
 		}
 	}
 	if s.Workdir != "" {
-		args = append(args, "-w", s.Workdir)
+		args = append(args, "-w", ContainerPath(s.Workdir))
 	}
 	for _, kv := range envList(s.Env) {
+		if k, v, ok := strings.Cut(kv, "="); ok && hostPathValue(v) {
+			kv = k + "=" + ContainerPath(v)
+		}
 		args = append(args, "-e", kv)
 	}
 	args = append(args, c.Image)

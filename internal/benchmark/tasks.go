@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"time"
@@ -450,12 +451,9 @@ func materialize(ctx context.Context, fixture string, sources map[string]string,
 		if err := os.MkdirAll(dst, 0o755); err != nil {
 			return nil, err
 		}
-		if out, err := exec.CommandContext(ctx, "cp", "-r", dir, target).CombinedOutput(); err != nil {
-			return nil, fmt.Errorf("cp: %s", out)
-		}
-		// Module cache files are read-only.
-		if out, err := exec.CommandContext(ctx, "chmod", "-R", "u+w", target).CombinedOutput(); err != nil {
-			return nil, fmt.Errorf("chmod: %s", out)
+		// Copied files are writable (module cache files are read-only).
+		if err := copyTree(ctx, dir, target); err != nil {
+			return nil, err
 		}
 		_ = os.Remove(filepath.Join(target, ".bc-source-ready"))
 		repos[name] = target
@@ -468,8 +466,8 @@ func materialize(ctx context.Context, fixture string, sources map[string]string,
 		if err := os.MkdirAll(dst, 0o755); err != nil {
 			return nil, err
 		}
-		if out, err := exec.CommandContext(ctx, "cp", "-r", filepath.Join(fixture, e.Name()), target).CombinedOutput(); err != nil {
-			return nil, fmt.Errorf("cp: %s", out)
+		if err := copyTree(ctx, filepath.Join(fixture, e.Name()), target); err != nil {
+			return nil, err
 		}
 		repos[e.Name()] = target
 	}
@@ -724,4 +722,25 @@ func statusOf(t *task.Task) string {
 		return "none"
 	}
 	return string(t.Status)
+}
+
+// copyTree copies a directory tree. os.CopyFS makes the copies writable and
+// keeps execute bits; a tree with symlinks (which it does not copy) falls
+// back to cp -r on Unix.
+func copyTree(ctx context.Context, src, dst string) error {
+	err := os.CopyFS(dst, os.DirFS(src))
+	if err == nil {
+		return nil
+	}
+	if runtime.GOOS == "windows" {
+		return fmt.Errorf("copy %s: %w", src, err)
+	}
+	_ = os.RemoveAll(dst)
+	if out, cerr := exec.CommandContext(ctx, "cp", "-r", src, dst).CombinedOutput(); cerr != nil {
+		return fmt.Errorf("cp: %s", out)
+	}
+	if out, cerr := exec.CommandContext(ctx, "chmod", "-R", "u+w", dst).CombinedOutput(); cerr != nil {
+		return fmt.Errorf("chmod: %s", out)
+	}
+	return nil
 }

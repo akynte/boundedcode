@@ -9,7 +9,6 @@ import (
 	"runtime"
 	"slices"
 	"strings"
-	"syscall"
 	"testing"
 	"time"
 
@@ -329,7 +328,7 @@ func TestCrashRecovery(t *testing.T) {
 	ctx := context.Background()
 	one(t)(nav.FindSymbol(ctx, repo, "CreatePayment", repointel.FindOptions{}))
 	pid := m.Instances()[0].PID
-	_ = syscall.Kill(-pid, syscall.SIGKILL)
+	killProcessGroup(pid)
 	time.Sleep(300 * time.Millisecond)
 	if err := m.Health(ctx, repo); err == nil {
 		t.Fatal("health check passed on a killed instance")
