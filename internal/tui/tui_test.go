@@ -36,6 +36,45 @@ type fakeBackend struct {
 	status   map[string]task.Status
 	gitInits []string
 	nextID   int
+	// Set-up wizard data and what it stored.
+	hw        HardwareInfo
+	providers []ProviderRow
+	pmodels   []ProviderModel
+	keys      map[string]string
+	testErr   error
+}
+
+func (f *fakeBackend) Hardware(context.Context) HardwareInfo { return f.hw }
+func (f *fakeBackend) Providers(context.Context) []ProviderRow {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.providers
+}
+func (f *fakeBackend) ProviderModels(_ context.Context, provider, _ string) ([]ProviderModel, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.keys[provider] == "" {
+		return nil, fmt.Errorf("no API key for %s", provider)
+	}
+	return f.pmodels, nil
+}
+func (f *fakeBackend) SetProviderKey(_ context.Context, provider, key string) (string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.keys == nil {
+		f.keys = map[string]string{}
+	}
+	f.keys[provider] = key
+	return "OS credential store", nil
+}
+func (f *fakeBackend) DeleteProviderKey(_ context.Context, provider string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	delete(f.keys, provider)
+	return nil
+}
+func (f *fakeBackend) TestProvider(context.Context) (string, error) {
+	return "anthropic claude-x answered in 1s", f.testErr
 }
 
 func now(d time.Duration) string { return time.Now().UTC().Add(-d).Format(time.RFC3339Nano) }
@@ -157,7 +196,10 @@ func (f *fakeBackend) RuntimeLog(context.Context, int) (string, []string, error)
 }
 
 func (f *fakeBackend) Models(context.Context) ([]ModelRow, error) {
-	return []ModelRow{{Name: "qwen3.6", File: "/models/q.gguf", License: "Apache-2.0", Present: true, Default: true}, {Name: "laguna", File: "/models/l.gguf", License: "MIT"}}, nil
+	return []ModelRow{{Name: "qwen3.6", File: "/models/q.gguf", License: "Apache-2.0", Present: true, Default: true, Status: "validated",
+		SizeBytes: 22134528992, Fit: "offload", FitDetail: "needs about 23 GB", Recommended: true},
+		{Name: "small", File: "/models/s.gguf", License: "Apache-2.0", Status: "experimental", SizeBytes: 2740937888, Fit: "gpu"},
+		{Name: "laguna", File: "/models/l.gguf", License: "MIT", Status: "review"}}, nil
 }
 
 func (f *fakeBackend) CreateTask(_ context.Context, req CreateTaskRequest) (string, error) {
@@ -719,7 +761,7 @@ func (hn *harness) execs() []string {
 
 func TestChatMessageCreatesAndRunsTask(t *testing.T) {
 	hn := newChatHarness(t, 140, 40, nil)
-	hn.mustSee("local-first coding agent", "/src/orders ⎇ main", "Describe a change")
+	hn.mustSee("coding agent", "/src/orders ⎇ main", "Describe a change")
 	hn.say("add retries to the client")
 	if len(hn.be.created) != 1 || hn.be.created[0].Workspace != "payments" || hn.be.created[0].FromTask != "" {
 		t.Fatalf("created = %+v", hn.be.created)
@@ -795,9 +837,7 @@ func TestChatRequiresSetupAndRunsIt(t *testing.T) {
 		t.Fatal("task created before setup")
 	}
 	hn.say("/setup")
-	if got := strings.Join(hn.be.lastExec(), " "); got != "setup" {
-		t.Fatalf("exec = %q", got)
-	}
+	hn.mustSee("Where should the agent's model run?")
 }
 
 func TestChatOutsideGitOffersInit(t *testing.T) {
@@ -836,4 +876,146 @@ func TestChatSlashCommands(t *testing.T) {
 	hn.mustSee("Talk to BoundedCode", "/git-init")
 	hn.say("/nope")
 	hn.mustSee("Unknown command /nope")
+}
+
+func wizardBackend() *fakeBackend {
+	be := defaultBackend()
+	be.hw = HardwareInfo{Summary: "linux/amd64, 64 GB RAM, RTX 4060 (8 GB, CUDA)", Recommended: "qwen3.6"}
+	be.providers = []ProviderRow{{Name: "local", Model: "qwen3.6", Selected: true}, {Name: "openai"}, {Name: "anthropic"}, {Name: "gemini"}, {Name: "openai-compatible"}}
+	be.pmodels = []ProviderModel{{ID: "claude-x", Display: "Claude X", ContextWindow: 1000000}, {ID: "claude-y", Display: "Claude Y"}}
+	return be
+}
+
+// TestWizardLocal: /setup → local → the suggested model → confirm → `model
+// use` → confirm → `setup --yes`.
+func TestWizardLocal(t *testing.T) {
+	be := wizardBackend()
+	hn := newChatHarness(t, 120, 40, be)
+	hn.say("/setup")
+	hn.mustSee("Where should the agent's model run?", "This machine: linux/amd64", "Suggested here:", "qwen3.6.")
+	hn.keys("ctrl+s")
+	hn.mustSee("Local model", "validated", "GPU + RAM", "suggested", "fits the GPU")
+	if strings.Contains(hn.screen(), "laguna") {
+		t.Fatal("a profile under license review is offered")
+	}
+	hn.keys("ctrl+s")
+	hn.mustSee("Set up the local model")
+	hn.keys("y")
+	if got := strings.Join(be.lastExec(), " "); !strings.HasPrefix(got, "model use ") {
+		t.Fatalf("exec = %q", got)
+	}
+	hn.mustSee("Install what is missing?")
+	hn.keys("y")
+	if got := strings.Join(be.lastExec(), " "); got != "setup --yes" {
+		t.Fatalf("exec = %q", got)
+	}
+}
+
+// TestWizardCloud: cloud → Anthropic → key (masked, never in an Exec) →
+// the provider's models → `provider use` → test → `setup --yes`.
+func TestWizardCloud(t *testing.T) {
+	be := wizardBackend()
+	hn := newChatHarness(t, 120, 40, be)
+	hn.say("/setup")
+	hn.keys("down", "ctrl+s") // "A cloud model API"
+	hn.mustSee("Cloud provider", "Anthropic", "billed per token")
+	hn.keys("down") // openai → anthropic
+	hn.keys("tab", "tab")
+	hn.typeText("sk-ant-secret-value-123456")
+	if strings.Contains(hn.screen(), "sk-ant-secret") {
+		t.Fatal("API key shown on screen")
+	}
+	hn.keys("ctrl+s")
+	if be.keys["anthropic"] != "sk-ant-secret-value-123456" {
+		t.Fatalf("stored keys = %v", be.keys)
+	}
+	hn.mustSee("Cloud model", "claude-x", "context 1000000 tokens")
+	hn.keys("ctrl+s")
+	exec := strings.Join(be.lastExec(), " ")
+	if exec != "provider use anthropic --model claude-x" {
+		t.Fatalf("exec = %q", exec)
+	}
+	hn.mustSee("Install what is missing?")
+	hn.keys("y")
+	if got := strings.Join(be.lastExec(), " "); got != "setup --yes" {
+		t.Fatalf("exec = %q", got)
+	}
+	for _, e := range be.execs {
+		if strings.Contains(strings.Join(e, " "), "secret") {
+			t.Fatalf("key passed to a command: %v", e)
+		}
+	}
+}
+
+// TestWizardValidation: an OpenAI-compatible service needs its URL, and
+// models of providers that do not report a context window need one.
+func TestWizardValidation(t *testing.T) {
+	be := wizardBackend()
+	hn := newChatHarness(t, 120, 40, be)
+	hn.say("/setup")
+	hn.keys("down", "ctrl+s")
+	hn.keys("down", "down", "down") // openai-compatible
+	hn.keys("tab", "tab")
+	hn.typeText("key-0123456789")
+	hn.keys("ctrl+s")
+	hn.mustSee("needs its API URL")
+	hn.keys("shift+tab")
+	hn.typeText("https://api.example.com/v1")
+	hn.keys("ctrl+s")
+	hn.mustSee("Cloud model")
+	hn.keys("down") // claude-y: no reported context window
+	hn.keys("ctrl+s")
+	hn.mustSee("enter the model's context window")
+	hn.keys("tab", "tab")
+	hn.typeText("131072")
+	hn.keys("ctrl+s")
+	if got := strings.Join(be.lastExec(), " "); got != "provider use openai-compatible --model claude-y --base-url https://api.example.com/v1 --context-window 131072" {
+		t.Fatalf("exec = %q", got)
+	}
+}
+
+// TestWizardFitsSmallTerminals renders every wizard step at the smallest
+// supported common size (screen() checks the frame's exact size).
+func TestWizardFitsSmallTerminals(t *testing.T) {
+	for _, size := range [][2]int{{80, 24}, {200, 60}} {
+		be := wizardBackend()
+		hn := newChatHarness(t, size[0], size[1], be)
+		hn.say("/setup")
+		hn.screen()
+		hn.keys("ctrl+s")
+		hn.screen() // local models
+		hn.keys("esc")
+		hn.say("/setup")
+		hn.keys("down", "ctrl+s")
+		hn.screen() // providers
+		hn.keys("down", "tab", "tab")
+		hn.typeText("k-0123456789")
+		hn.keys("ctrl+s")
+		hn.screen() // cloud models
+	}
+}
+
+// TestRuntimeModelActions: use, download (after confirmation) and delete
+// the selected model from the Runtime view.
+func TestRuntimeModelActions(t *testing.T) {
+	be := wizardBackend()
+	hn := newChatHarness(t, 140, 40, be)
+	hn.gotoView("Runtime")
+	hn.keys("down") // "small": not downloaded
+	hn.keys("u")
+	if got := strings.Join(be.lastExec(), " "); got != "model use small" {
+		t.Fatalf("exec = %q", got)
+	}
+	hn.keys("d")
+	hn.mustSee("Download model", "small")
+	hn.keys("y")
+	if got := strings.Join(be.lastExec(), " "); got != "model fetch small --yes" {
+		t.Fatalf("exec = %q", got)
+	}
+	hn.keys("up", "x") // qwen3.6: downloaded
+	hn.mustSee("Delete model weights?")
+	hn.keys("y")
+	if got := strings.Join(be.lastExec(), " "); got != "model remove qwen3.6 --yes" {
+		t.Fatalf("exec = %q", got)
+	}
 }

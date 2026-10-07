@@ -73,7 +73,7 @@ var slashCmds = []slashCmd{
 	{"/status", "", "show the current task's status and budget"},
 	{"/model", "NAME", "use another model profile for the next runs"},
 	{"/index", "", "re-index this repository"},
-	{"/setup", "", "install and configure what is missing"},
+	{"/setup", "", "choose the model or provider and install what is missing"},
 	{"/git-init", "", "make this folder a git repository"},
 	{"/clear", "", "clear the transcript"},
 	{"/quit", "", "quit"},
@@ -644,7 +644,8 @@ func (v *chatView) slash(m *Model, text string) tea.Cmd {
 		}
 		return v.index(m)
 	case "/setup":
-		return v.runSetup(m)
+		v.note("Choose where the model runs; set-up then installs what is missing (you are asked first).")
+		return m.startWizard()
 	case "/git-init":
 		if v.project != nil && v.project.Root != "" {
 			v.note("This folder is already in a git repository: " + v.project.Root)
@@ -665,18 +666,6 @@ func (v *chatView) slash(m *Model, text string) tea.Cmd {
 		v.fail("Unknown command " + name + " (type /help).")
 	}
 	return nil
-}
-
-func (v *chatView) runSetup(m *Model) tea.Cmd {
-	v.note("Running setup. You are asked before each download or build; output is in the activity panel (J).")
-	return m.startJob("setup", "", []string{"setup"}, func(m *Model, err error) tea.Cmd {
-		if err != nil {
-			v.fail("Setup did not finish: " + err.Error() + " (fix the step and type /setup again)")
-		} else {
-			v.note("Setup complete. Describe a change to start.")
-		}
-		return nil
-	})
 }
 
 // maybeIndex indexes a repository registered for the first time once the
@@ -853,7 +842,7 @@ func (v *chatView) transcript(m *Model, w int) []string {
 
 func (v *chatView) welcome(m *Model, w int) []string {
 	out := []string{
-		sAccentB.Render("◆ "+productName(m.info.Name)) + sFaint.Render(" "+m.info.Version+" · local-first coding agent"),
+		sAccentB.Render("◆ "+productName(m.info.Name)) + sFaint.Render(" "+m.info.Version+" · coding agent"),
 	}
 	switch p := v.project; {
 	case p == nil:
@@ -883,7 +872,7 @@ func (v *chatView) welcome(m *Model, w int) []string {
 				}
 				out = append(out, "    "+icon+" "+sText.Render(fit(s.Title, 48))+sFaint.Render(trunc(s.Detail, max(10, w-58))))
 			}
-			out = append(out, sMuted.Render("  Type ")+sKey.Render("/setup")+sMuted.Render(" to install what is missing; you are asked before every download or build."))
+			out = append(out, sMuted.Render("  Type ")+sKey.Render("/setup")+sMuted.Render(" to choose a local model or a cloud provider and install what is missing; you are asked first."))
 		} else if len(v.entries) == 0 {
 			out = append(out, "")
 			for _, l := range strings.Split(wrap("Describe a change to make, e.g. \"add input validation to the signup handler, with tests\"", w-4), "\n") {

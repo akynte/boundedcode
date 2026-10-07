@@ -63,6 +63,9 @@ func newRuntimeCmd(app *App) *cobra.Command {
 		Short: "Start (or reuse) the inference server for a model profile",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			rt := app.inferenceRuntime()
+			if app.Config.Inference.IsCloud() {
+				return fmt.Errorf("the provider is %s (a cloud API): there is no local server to start; `%s provider use local` switches back", app.Config.Inference.Provider, buildinfo.Command())
+			}
 			if rt == nil {
 				return fmt.Errorf("inference.mode is external (%s); nothing to start", app.Config.Inference.ExternalURL)
 			}

@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/textarea"
@@ -24,7 +25,14 @@ const (
 	fToggle
 	fChoice
 	fMulti
+	fList
 )
+
+// listItem is one option of a vertical list field.
+type listItem struct {
+	value, title, desc string
+	badges             []string // short tags shown after the title
+}
 
 type field struct {
 	key, label, help string
@@ -37,6 +45,7 @@ type field struct {
 	choice           int
 	checked          []bool
 	mcur             int
+	items            []listItem
 }
 
 func textField(key, label, value, placeholder string) *field {
@@ -81,6 +90,27 @@ func choiceField(key, label string, options []string, selected string) *field {
 	return f
 }
 
+// secretField is a single-line input that shows • instead of the text
+// (API keys). The value never appears on screen.
+func secretField(key, label, placeholder string) *field {
+	f := textField(key, label, "", placeholder)
+	f.input.EchoMode = textinput.EchoPassword
+	f.input.EchoCharacter = '•'
+	return f
+}
+
+// listField is a vertical single choice whose options carry a description;
+// selected is the initially chosen value.
+func listField(key, label string, items []listItem, selected string) *field {
+	f := &field{key: key, label: label, kind: fList, items: items}
+	for i, it := range items {
+		if it.value == selected {
+			f.mcur = i
+		}
+	}
+	return f
+}
+
 func multiField(key, label string, options []string, checked bool) *field {
 	f := &field{key: key, label: label, kind: fMulti, options: options, checked: make([]bool, len(options))}
 	for i := range f.checked {
@@ -97,7 +127,7 @@ func (f *field) textValue() string        { return strings.TrimSpace(f.input.Val
 func (f *field) areaValue() string        { return strings.TrimSpace(f.area.Value()) }
 func (f *field) selected() string         { return f.options[f.choice] }
 func (f *field) multiline() bool          { return f.kind == fArea }
-func (f *field) wantsArrows() bool        { return f.kind == fArea || f.kind == fMulti }
+func (f *field) wantsArrows() bool        { return f.kind == fArea || f.kind == fMulti || f.kind == fList }
 func (f *field) empty() bool              { return f.value() == "" }
 func (f *field) setWidth(w int) {
 	switch f.kind {
@@ -137,6 +167,10 @@ func (f *field) value() string {
 		}
 	case fMulti:
 		return strings.Join(f.selection(), ",")
+	case fList:
+		if f.mcur < len(f.items) {
+			return f.items[f.mcur].value
+		}
 	}
 	return ""
 }
@@ -264,7 +298,7 @@ func (f *form) handle(msg tea.Msg) (bool, tea.Cmd) {
 			if !cur.wantsArrows() {
 				return false, f.move(-1)
 			}
-			if cur.kind == fMulti {
+			if cur.kind == fMulti || cur.kind == fList {
 				if cur.mcur == 0 {
 					return false, f.move(-1)
 				}
@@ -275,8 +309,12 @@ func (f *form) handle(msg tea.Msg) (bool, tea.Cmd) {
 			if !cur.wantsArrows() {
 				return false, f.move(1)
 			}
-			if cur.kind == fMulti {
-				if cur.mcur >= len(cur.options)-1 {
+			if cur.kind == fMulti || cur.kind == fList {
+				n := len(cur.options)
+				if cur.kind == fList {
+					n = len(cur.items)
+				}
+				if cur.mcur >= n-1 {
 					return false, f.move(1)
 				}
 				cur.mcur++
@@ -391,6 +429,9 @@ func (f *form) view(w, h int) string {
 				}
 				b.WriteString("\n" + line)
 			}
+		case fList:
+			b.WriteString(mark + ls.Render(label))
+			b.WriteString(listView(fl, focused, fw, max(3, (h-14)/2)))
 		case fText:
 			b.WriteString(mark + ls.Render(label) + "\n  ")
 			b.WriteString(underline(fl.input.View(), fw, focused))
@@ -409,6 +450,56 @@ func (f *form) view(w, h int) string {
 	b.WriteString(badge(" "+f.submitLabel+" ", cAccent) + "  " + sKey.Render("ctrl+s") + sMuted.Render(" submit  ") +
 		sKey.Render("tab") + sMuted.Render(" next  ") + sKey.Render("esc") + sMuted.Render(" cancel"))
 	return sModal.Width(fw + 6).Render(b.String())
+}
+
+// listView renders a list field's options, scrolled to keep the cursor in
+// a window of at most rows options (each takes two lines).
+func listView(fl *field, focused bool, w, rows int) string {
+	var b strings.Builder
+	if len(fl.items) == 0 {
+		return "\n  " + sFaint.Render("(none)")
+	}
+	start := 0
+	if fl.mcur >= rows {
+		start = fl.mcur - rows + 1
+	}
+	end := min(len(fl.items), start+rows)
+	if start > 0 {
+		b.WriteString("\n  " + sFaint.Render(fmt.Sprintf("↑ %d more", start)))
+	}
+	for i := start; i < end; i++ {
+		it := fl.items[i]
+		radio := sFaint.Render("○")
+		title := sText.Render(it.title)
+		if i == fl.mcur {
+			radio = sAccent.Render("●")
+			if focused {
+				title = sSel.Render(it.title)
+			} else {
+				title = sBold.Render(it.title)
+			}
+		}
+		line := "  " + radio + " " + title
+		for _, bd := range it.badges {
+			line += " " + sFaint.Render("["+bd+"]")
+		}
+		b.WriteString("\n" + trunc(line, w+4))
+		if it.desc != "" {
+			// At most two lines, so long lists still fit the dialog.
+			lines := strings.Split(wrap(it.desc, w-2), "\n")
+			if len(lines) > 2 {
+				lines = lines[:2]
+				lines[1] = trunc(lines[1]+" …", w-2)
+			}
+			for _, l := range lines {
+				b.WriteString("\n    " + sMuted.Render(l))
+			}
+		}
+	}
+	if end < len(fl.items) {
+		b.WriteString("\n  " + sFaint.Render(fmt.Sprintf("↓ %d more", len(fl.items)-end)))
+	}
+	return b.String()
 }
 
 func underline(s string, w int, focused bool) string {

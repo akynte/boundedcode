@@ -17,7 +17,7 @@ var statsWindows = []struct {
 	d     time.Duration
 }{{"all time", 0}, {"24 hours", 24 * time.Hour}, {"7 days", 7 * 24 * time.Hour}, {"30 days", 30 * 24 * time.Hour}}
 
-// statsView shows local-first metrics.
+// statsView shows the success metrics.
 type statsView struct {
 	win    int
 	sum    *stats.Summary

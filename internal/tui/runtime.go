@@ -115,7 +115,45 @@ func (v *runtimeView) action(m *Model, key string) tea.Cmd {
 		return tea.Batch(m.toast("done", toastOK), v.load(m), m.loadRuntime())
 	}
 	switch key {
+	case "p":
+		return m.startWizard()
+	case "u":
+		if p := v.selected(); p != nil {
+			name := p.Name
+			return m.startJob("use model "+name, "", []string{"model", "use", name}, func(m *Model, err error) tea.Cmd {
+				m.refreshInfo()
+				return reload(m, err)
+			})
+		}
+	case "d":
+		if p := v.selected(); p != nil {
+			if p.Status == "review" {
+				return m.toast(p.Name+": license under review; not offered for download", toastInfo)
+			}
+			if p.Present {
+				return m.toast(p.Name+" is already downloaded", toastInfo)
+			}
+			name := p.Name
+			body := fmt.Sprintf("Download %s (%.1f GB, license %s) at its pinned revision and check its sha256? It goes to the models folder.", name, float64(p.SizeBytes)/1e9, p.License)
+			if p.FitDetail != "" {
+				body += " On this machine: " + p.FitDetail + "."
+			}
+			return m.ask("Download model", body, false, func() tea.Cmd {
+				return m.startJob("download "+name, "", []string{"model", "fetch", name, "--yes"}, reload)
+			})
+		}
+	case "x":
+		if p := v.selected(); p != nil && p.Present {
+			name := p.Name
+			return m.ask("Delete model weights?", "Delete the downloaded weights of "+name+" ("+p.File+")? Download them again with d.", true,
+				func() tea.Cmd {
+					return m.startJob("delete "+name, "", []string{"model", "remove", name, "--yes"}, reload)
+				})
+		}
 	case "s", "enter":
+		if m.info.ProviderModel != "" {
+			return m.toast("using the cloud provider "+m.info.Provider+": there is no local server (p to change)", toastInfo)
+		}
 		if m.info.InferenceMode == "external" {
 			return m.toast("inference.mode is external; nothing to start", toastInfo)
 		}
@@ -246,7 +284,7 @@ func (v *runtimeView) view(m *Model, w, h int) string {
 }
 
 func (v *runtimeView) hints(m *Model) []hint {
-	return []hint{{"s", "start selected"}, {"S", "stop"}, {"m", "profile details"}, {"tab", "models/log"}}
+	return []hint{{"s", "start selected"}, {"u", "use"}, {"d", "download"}, {"x", "delete"}, {"p", "model & provider"}, {"S", "stop"}, {"m", "details"}, {"tab", "models/log"}}
 }
 
 func (v *runtimeView) commands(m *Model) []command {

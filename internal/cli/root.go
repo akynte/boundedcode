@@ -33,7 +33,7 @@ func newRoot(app *App) *cobra.Command {
 	var verbose bool
 	root := &cobra.Command{
 		Use:           buildinfo.Command(),
-		Short:         buildinfo.ProductName + ": local-first control plane for AI-assisted software engineering",
+		Short:         buildinfo.ProductName + ": control plane for AI-assisted software engineering, with a local model or a cloud API",
 		Version:       buildinfo.Version + " " + buildinfo.Commit(),
 		SilenceUsage:  true,
 		SilenceErrors: true,

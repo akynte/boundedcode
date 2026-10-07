@@ -66,6 +66,23 @@ func (v *systemView) update(m *Model, msg tea.Msg) tea.Cmd {
 
 func (v *systemView) action(m *Model, key string) tea.Cmd {
 	switch key {
+	case "m":
+		return m.startWizard()
+	case "K":
+		if m.info.ProviderModel == "" {
+			return m.toast("the local provider has no API key", toastInfo)
+		}
+		prov := m.info.Provider
+		return m.ask("Remove the "+prov+" API key?", "The stored key is deleted from the credential store. Tasks cannot use "+prov+" until a key is added again (m).", true,
+			func() tea.Cmd {
+				be, ctx := m.be, m.ctx
+				return func() tea.Msg {
+					if err := be.DeleteProviderKey(ctx, prov); err != nil {
+						return showTextMsg{err: err}
+					}
+					return showTextMsg{title: "API key removed", text: "The " + prov + " key was removed."}
+				}
+			})
 	case "r", "R":
 		if !v.busy {
 			return v.doctor(m)
@@ -248,12 +265,14 @@ func checkLines(cs []Check, w int) []string {
 }
 
 func (v *systemView) hints(m *Model) []hint {
-	return []hint{{"r", "rerun doctor"}, {"s", "probe Serena"}, {"S", "set up Serena"}, {"b", "build sandbox"}, {"i", "initialize"}}
+	return []hint{{"m", "model & provider"}, {"r", "rerun doctor"}, {"s", "probe Serena"}, {"S", "set up Serena"}, {"b", "build sandbox"}, {"i", "initialize"}}
 }
 
 func (v *systemView) commands(m *Model) []command {
 	k := func(key string) func(m *Model) tea.Cmd { return func(m *Model) tea.Cmd { return v.action(m, key) } }
 	return []command{
+		{title: "Model and provider…", group: "System", key: "m", run: k("m")},
+		{title: "Remove the cloud provider's API key…", group: "System", key: "K", run: k("K")},
 		{title: "Run doctor", group: "System", key: "r", run: k("r")},
 		{title: "Probe Serena (MCP start, language servers)", group: "System", key: "s", run: k("s")},
 		{title: "Set up Serena…", group: "System", key: "S", run: k("S")},

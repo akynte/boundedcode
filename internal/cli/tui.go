@@ -17,9 +17,11 @@ import (
 	"golang.org/x/term"
 
 	"github.com/akynte/boundedcode/internal/buildinfo"
+	"github.com/akynte/boundedcode/internal/config"
 	"github.com/akynte/boundedcode/internal/frontier"
 	"github.com/akynte/boundedcode/internal/gitops"
 	"github.com/akynte/boundedcode/internal/inference"
+	"github.com/akynte/boundedcode/internal/model"
 	"github.com/akynte/boundedcode/internal/stats"
 	"github.com/akynte/boundedcode/internal/task"
 	"github.com/akynte/boundedcode/internal/telemetry"
@@ -438,4 +440,86 @@ func (b *tuiBackend) Setup(ctx context.Context) []tui.SetupStep {
 		out = append(out, tui.SetupStep{Name: s.Name, Title: s.Title, Detail: s.Detail, OK: s.OK})
 	}
 	return out
+}
+
+func (b *tuiBackend) Hardware(ctx context.Context) tui.HardwareInfo {
+	a, err := b.fork(io.Discard)
+	if err != nil {
+		return tui.HardwareInfo{Summary: err.Error()}
+	}
+	snap := a.hardware(ctx)
+	rec := model.Recommend(a.Models, a.Config.DefaultModel, snap)
+	return tui.HardwareInfo{Summary: describeHardware(snap), Recommended: rec.Best.Profile, Reason: rec.Reason}
+}
+
+func (b *tuiBackend) Providers(context.Context) []tui.ProviderRow {
+	a, err := b.fork(io.Discard)
+	if err != nil {
+		return nil
+	}
+	var out []tui.ProviderRow
+	for _, r := range a.providerRows() {
+		out = append(out, tui.ProviderRow{Name: r.Name, Model: r.Model, BaseURL: r.BaseURL, Selected: r.Selected, KeySource: r.KeySource})
+	}
+	return out
+}
+
+func (b *tuiBackend) ProviderModels(ctx context.Context, provider, baseURL string) ([]tui.ProviderModel, error) {
+	a, err := b.fork(io.Discard)
+	if err != nil {
+		return nil, err
+	}
+	if baseURL != "" {
+		if a.Config.Inference.Providers == nil {
+			a.Config.Inference.Providers = map[string]config.ProviderConfig{}
+		}
+		p := a.Config.Inference.Providers[provider]
+		p.BaseURL = strings.TrimRight(baseURL, "/")
+		a.Config.Inference.Providers[provider] = p
+	}
+	list, err := a.providerModels(ctx, provider)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]tui.ProviderModel, 0, len(list))
+	for _, m := range list {
+		out = append(out, tui.ProviderModel{ID: m.ID, Display: m.DisplayName, ContextWindow: m.ContextWindow})
+	}
+	return out, nil
+}
+
+func (b *tuiBackend) SetProviderKey(_ context.Context, provider, key string) (string, error) {
+	a, err := b.fork(io.Discard)
+	if err != nil {
+		return "", err
+	}
+	name, err := normalizeProvider(provider)
+	if err != nil {
+		return "", err
+	}
+	src, err := a.secretStore().Set(name, key)
+	if err != nil {
+		return "", err
+	}
+	return describeSource(src, a), nil
+}
+
+func (b *tuiBackend) DeleteProviderKey(_ context.Context, provider string) error {
+	a, err := b.fork(io.Discard)
+	if err != nil {
+		return err
+	}
+	return a.secretStore().Delete(provider)
+}
+
+func (b *tuiBackend) TestProvider(ctx context.Context) (string, error) {
+	a, err := b.fork(io.Discard)
+	if err != nil {
+		return "", err
+	}
+	res, err := a.testProvider(ctx)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%s %s answered in %s (%d prompt + %d output tokens)", res.Provider, res.Model, res.Latency, res.Prompt, res.Output), nil
 }

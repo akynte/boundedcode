@@ -55,6 +55,45 @@ type Backend interface {
 	// SetPrompter installs the function that asks the user a yes/no
 	// question; it blocks until answered or ctx ends.
 	SetPrompter(p Prompter)
+	// Hardware describes this machine and the local model it suits.
+	Hardware(ctx context.Context) HardwareInfo
+	// Providers lists the model providers, the selected one, and which
+	// have a stored API key.
+	Providers(ctx context.Context) []ProviderRow
+	// ProviderModels lists a cloud provider's models with its stored key
+	// (baseURL overrides the configured endpoint; "" keeps it).
+	ProviderModels(ctx context.Context, provider, baseURL string) ([]ProviderModel, error)
+	// SetProviderKey stores an API key in the credential store and returns
+	// where it went. Keys go through this call, never through Exec, so they
+	// are not echoed in job output or written to the interface log.
+	SetProviderKey(ctx context.Context, provider, key string) (string, error)
+	// DeleteProviderKey removes a stored API key.
+	DeleteProviderKey(ctx context.Context, provider string) error
+	// TestProvider sends one short request through the selected provider and
+	// returns a one-line result.
+	TestProvider(ctx context.Context) (string, error)
+}
+
+// HardwareInfo is this machine's hardware and the local model it suits.
+type HardwareInfo struct {
+	Summary     string // one line: OS, CPU, RAM, GPU
+	Recommended string // model profile; "" when none fits
+	Reason      string
+}
+
+// ProviderRow is one model provider.
+type ProviderRow struct {
+	Name, Model, BaseURL string
+	Selected             bool
+	// KeySource is where the API key is stored ("" = none; always "" for
+	// local).
+	KeySource string
+}
+
+// ProviderModel is one model a cloud provider offers.
+type ProviderModel struct {
+	ID, Display   string
+	ContextWindow int // 0 = the provider does not report it
 }
 
 // Prompter asks the user to confirm. It is called from background goroutines.

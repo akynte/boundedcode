@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### Set-up wizard in the interface (experimental)
+
+- `/setup` (and `m` in System, `p` in Runtime, or the palette) opens a
+  wizard: local model or cloud API; a model list rated against this machine
+  with the suggestion preselected; or a provider, a masked API-key field
+  (stored by the backend, never passed to a command or logged), the
+  provider's live model list, a connection test; then one confirmation to
+  install what is missing (`setup --yes`).
+- Runtime view: use (`u`), download (`d`) and delete (`x`) model weights.
+  System view: remove the provider's API key (`K`).
+- Forms gain masked inputs and vertical option lists with descriptions.
+
 ### Model choice for your hardware (experimental)
 
 - Hardware detection on Linux, macOS (Apple Silicon unified memory through

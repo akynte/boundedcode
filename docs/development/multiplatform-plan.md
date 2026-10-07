@@ -118,6 +118,8 @@ Windows probes compile but have not run on those systems.
 
 ### Phase 13: TUI set-up wizard and settings
 
+**Done (2026-10-07).**
+
 - First-run wizard: hardware summary → local or cloud → local: model list with
   fit badges, license notice, download progress → cloud: provider, masked key
   entry, model, connection test → tools and sandbox → done.
