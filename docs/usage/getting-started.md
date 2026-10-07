@@ -2,6 +2,24 @@
 
 > Public alpha. Commands and configuration may change.
 
+## Fast path
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/akynte/boundedcode/main/scripts/install.sh | bash
+cd ~/src/payment-service     # any git repository
+bcode
+```
+
+The installer puts `boundedcode` and `bcode` in `~/.local/bin`, from a
+checksum-verified release binary, or built with Go when the release has none.
+On the first run, `bcode` shows what is missing and `/setup` installs it,
+asking before every download or build. It covers what sections 2 and 3 do by
+hand: the configuration, the pinned tools, llama.cpp, the model weights and
+the sandbox image. Run `bcode setup --check` to see the same list from the
+shell. Then describe a change in the chat; see
+[the terminal interface](tui.md). The rest of this page is the manual path,
+and the reference for what setup does.
+
 ## 1. Prerequisites
 
 Versions marked "tested" are what the reference machine (Debian 13) runs;
@@ -10,7 +28,7 @@ older ones may work but are not checked.
 | Need | Version | Why | Check |
 |---|---|---|---|
 | Linux x86-64, NVIDIA GPU (8 GB+), 32–64 GB RAM | | local inference with MoE expert offload | `boundedcode doctor` |
-| Go | 1.27.1+ (`go.mod`) | build the CLI | `go version` |
+| Go | 1.27.1+ (`go.mod`) | build the CLI (not needed with a release binary) | `go version` |
 | Docker (or Podman) | tested: Docker 29.8; Podman is configurable but not tested on the reference machine | agent sandbox, contained Codex | `docker version` |
 | CUDA toolkit | tested: 13.4 (`nvcc` in `/usr/local/cuda/bin`) | only to build llama.cpp with CUDA | `nvcc --version` |
 | uv | 0.12.18 (the version the sandbox image and CI use) | adapter development without containers, Serena setup | `uv --version` |
@@ -84,7 +102,16 @@ on an idle machine:
 
 The result is a branch `agent/<id>` in each repository, verified by the
 deterministic pipeline. Nothing is pushed or merged automatically. Review it
-like any pull request.
+like any pull request, or bring it into your checkout:
+
+```bash
+./bin/boundedcode task apply <id>            # staged, for you to review and commit
+./bin/boundedcode task apply <id> --commit   # committed on your current branch
+./bin/boundedcode task create "Also log each retry" --from <id> --run   # follow-up on its branch
+```
+
+The same is available in the chat (`bcode`), where each message becomes a
+task.
 
 ## 6. Frontier escalation (optional)
 

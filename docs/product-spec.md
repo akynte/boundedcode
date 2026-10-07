@@ -68,7 +68,9 @@ Hard rules:
 * The Serena application from v2 on (GPL-3.0-or-later). The optional
   integration is pinned to the MIT-licensed v1.7.0 and runs as a separate
   process (ADR-0008); moving past it needs a legal and architectural review.
-* A GUI before the core is stable.
+* A GUI before the core is stable. The terminal interface (`bcode`, experimental)
+  is not a GUI in this sense: it is a client of the CLI's operations and adds
+  no behaviour of its own.
 * A zoo of hot-swapped large local models.
 
 ## 4. Functional requirements

@@ -2,6 +2,39 @@
 
 ## Unreleased
 
+## v0.1.0-alpha.2 (2026-10-06): `bcode`, chat and guided set-up
+
+Release notes: [docs/releases/v0.1.0-alpha.2.md](docs/releases/v0.1.0-alpha.2.md).
+
+### Added
+- `bcode`: one-command install (`scripts/install.sh`), installing `boundedcode`
+  and the short name `bcode`. Running either with no arguments opens the
+  terminal interface in a chat for the current git repository. The repository
+  is registered and indexed on first use. Each message becomes a task, answers
+  a task that is waiting, or starts a follow-up from the previous task's
+  branch.
+- `setup`: checks and, with permission, installs every prerequisite (tools,
+  llama.cpp, model weights, sandbox image). It uses pinned installers and a
+  sandbox build context embedded in the binary, so no source checkout is
+  needed.
+- `task apply`: brings a completed task's changes into your checkout, staged
+  or committed (`--commit`). It refuses a checkout with uncommitted changes.
+- `task create --from TASK`: follow-up tasks start from the previous task's
+  branch.
+- Terminal interface (`boundedcode tui`): a full-screen client for every CLI
+  capability. It has a live task activity timeline, diffs, verification
+  stages, workspaces and indexing, repository intelligence, runtime and model
+  profiles, frontier escalations, stats, `doctor` and Serena set-up, and a
+  console for any command, including benchmarks. Actions run the CLI commands
+  in-process, and approvals appear as dialogs. See
+  [docs/usage/tui.md](docs/usage/tui.md).
+- The audit log's `agent.event` records now include a short, redacted summary
+  of each agent action and its stated reason (`action`, `thought`, at most
+  300 characters each), and an `is_error` flag on failed tool results.
+
+### Changed
+- `boundedcode` (or `bcode`) with no arguments in a terminal opens the
+  terminal interface; without a terminal it prints help as before.
 - Documentation: terminology and claim qualifications aligned with published
   evidence; no results changed.
 

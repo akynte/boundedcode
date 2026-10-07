@@ -11,8 +11,12 @@ Configuration is layered, later layers winning:
 
 The config directory is `$XDG_CONFIG_HOME/boundedcode` (usually
 `~/.config/boundedcode`), or `$BOUNDEDCODE_HOME/config` when
-`BOUNDEDCODE_HOME` is set. `boundedcode init` writes a `config.yaml` with
-every key; a missing file means all defaults.
+`BOUNDEDCODE_HOME` is set. `boundedcode init` (or the first step of
+`boundedcode setup`) writes a `config.yaml` with every key; a missing file
+means all defaults. `setup` also edits `inference.server_binary` and
+`bench_binary` after it builds llama.cpp. Tools that `setup` installs go to
+`<data dir>/bin` (usually `~/.local/share/boundedcode/bin`), which BoundedCode
+puts first on its own `PATH`.
 
 Every file is decoded strictly: an unknown key is an error, so a typo fails
 loudly instead of being ignored. After decoding, the whole configuration is

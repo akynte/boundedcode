@@ -10,7 +10,8 @@ Keep these markers accurate when code changes.
                                 |
                                 v
                  +------------------------------+
-                 |  boundedcode CLI (Go)        |
+                 |  bcode / boundedcode (Go)    |
+                 |  CLI · TUI with chat [exp]   |
                  +--------------+---------------+
                                 |
                                 v
@@ -42,11 +43,27 @@ Keep these markers accurate when code changes.
                                  local GGUF model
 ```
 
+### Interactive interface **[exp]**
+
+`bcode` with no arguments opens `internal/tui`, a client of the control plane
+with no logic of its own:
+
+* the **chat** maps each message to a task operation for the repository in the
+  current directory: `task create` (from `HEAD`, or with `--from` to start from
+  the previous task's branch), `task run --clarify` for a task waiting on an
+  answer, and `task apply` to bring a result into the checkout;
+* the **views** read the ledger, audit log and status, and run the remaining
+  commands;
+* **`setup`** checks and installs prerequisites with pinned installers and a
+  sandbox build context embedded in the binary (`assets.go`), so an installed
+  binary needs no source checkout.
+
 ## 2. Process model
 
 | Process | Owner | Lifetime |
 |---|---|---|
 | `boundedcode` CLI | user | per command; long-running for `task run` |
+| `bcode` / `boundedcode tui` **[exp]** | user | interactive session. The chat and the views run the same CLI commands in-process (`internal/tui` → `cli.tuiBackend.Exec`), so policy, sandboxing and audit are unchanged; approvals that the CLI asks on stdin appear as dialogs. A task it runs holds the usual lease, so a parallel `task run` is refused |
 | `llama-server` | supervised by `inference/llamacpp` or user-supplied | long-lived; reused across tasks. A managed server unloads the model after `inference.idle_sleep` (default 30 min; measured: RSS 19.3 GiB → 0.8 GiB, VRAM 7.1 → 0.2 GiB) and reloads it on the next request (1.7 s with a warm page cache); `runtime stop` ends it |
 | OpenHands adapter | spawned per task session by `agent/openhands` | per session; may crash or restart without losing the task |
 | `codebase-memory-mcp` | `repointel/cbm` keeps one persistent MCP stdio session per command or task (ADR-0006), with a private cache dir and UI/watchers disabled; own process group with a parent-death signal; calls are time-bounded and a dead or hung session falls back to the CLI | per command/task |

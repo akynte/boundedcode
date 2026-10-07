@@ -9,6 +9,8 @@ limited validation or unstable interfaces), **planned**.
 | Typed config + model profiles | implemented | strict YAML, validation tests |
 | SQLite state + redacted audit log | implemented | `internal/store`, `internal/telemetry` |
 | `doctor`, `init` | implemented | |
+| `bcode` chat, `setup`, one-command install | experimental | The chat maps messages to new, clarified and follow-up tasks, with queueing and interrupt (model tests). `setup` steps (backend tests, plus a pty first run with declined downloads). `task apply` and follow-ups from a branch (backend tests with real git). The installer was tested on its build-from-source path; no release binary is published yet |
+| Terminal interface (`tui`) | experimental | `internal/tui`. It covers every CLI command: structured views read the ledger and audit log, and actions run the CLI commands in-process, so policy and audit are unchanged. Model-level tests drive keys and forms against a fake backend at 80×24 to 200×60. Backend tests drive the real CLI (init, workspace, create, cancel, cleanup). The real binary was smoke-tested in a pty |
 | llama.cpp supervision (start/reuse/stop, health, OOM classification, external server, idle sleep) | implemented | `internal/inference/llamacpp`; idle sleep measured 2026-10-04 (RSS 19.3 → 0.8 GiB, VRAM 7.1 → 0.2 GiB, wake 1.7 s) |
 | Infrastructure benchmark (feasibility search, prompt/decode, cache reuse, thermals) | implemented | `bench infra`; reports in `benchmarks/reports/` |
 | OpenHands adapter (JSON-RPC/stdio, LLM tunnel, resume, condense, protocol v1 handshake) | implemented | real SDK through the adapter, scripted LLM, host and container tests; malformed/partial/crash/deadline/fuzz tests on the protocol |

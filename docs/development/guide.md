@@ -5,7 +5,9 @@
 | Path | Contents |
 |---|---|
 | `cmd/boundedcode` | entry point |
-| `internal/cli` | cobra commands (thin) |
+| `internal/cli` | cobra commands (thin), `setup`, and the terminal UI backend (`tui.go`) |
+| `internal/tui` | terminal interface and chat (Bubble Tea); a client of the CLI with no logic of its own |
+| `assets.go` | setup scripts and the sandbox build context embedded in the binary |
 | `internal/orchestrator` | task run loop and escalation |
 | `internal/task` | canonical ledger |
 | `internal/contextplan` | context packs |
@@ -18,6 +20,14 @@
 | `internal/benchmark` | infrastructure and engineering benchmarks |
 | `adapters/openhands` | Python adapter and sandbox Dockerfile |
 | `benchmarks/fixtures`, `benchmarks/tasks`, `benchmarks/reports` | fixtures, task specs, results |
+
+Build and install the local tree as `boundedcode` and `bcode` with
+`make install` (`~/.local/bin`; set `PREFIX_BIN` for elsewhere). The UI's logs
+go to `<state dir>/tui.log`. UI tests drive the model directly with a fake
+backend (`internal/tui/tui_test.go`); the backend tests run the real CLI
+against a temporary `BOUNDEDCODE_HOME` (`internal/cli/tui_test.go`). When a
+setup script or a file in `adapters/openhands` changes, the embedded copy
+changes with it. Check `go list -f '{{.EmbedFiles}}' .` when adding files.
 
 ## Tests
 

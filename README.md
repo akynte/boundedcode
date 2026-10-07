@@ -12,7 +12,7 @@ task state and optional frontier escalation.
 [![secret-scan](https://github.com/akynte/boundedcode/actions/workflows/secrets.yml/badge.svg?branch=main)](https://github.com/akynte/boundedcode/actions/workflows/secrets.yml)
 [![dco](https://github.com/akynte/boundedcode/actions/workflows/dco.yml/badge.svg?branch=main)](https://github.com/akynte/boundedcode/actions/workflows/dco.yml)
 [![release](https://img.shields.io/github/v/release/akynte/boundedcode?include_prereleases&sort=semver&label=release)](https://github.com/akynte/boundedcode/releases)
-[![status: public alpha](https://img.shields.io/badge/status-public%20alpha-orange)](docs/releases/v0.1.0-alpha.1.md)
+[![status: public alpha](https://img.shields.io/badge/status-public%20alpha-orange)](docs/releases/v0.1.0-alpha.2.md)
 [![license](https://img.shields.io/github/license/akynte/boundedcode)](LICENSE)
 [![Go](https://img.shields.io/github/go-mod/go-version/akynte/boundedcode)](go.mod)
 
@@ -125,7 +125,7 @@ on its own, with its own scope.
 
 ```mermaid
 flowchart LR
-    U([Task request]) --> CP[BoundedCode<br/>Go control plane]
+    U([Task request<br/>bcode chat or CLI]) --> CP[BoundedCode<br/>Go control plane]
     CP <--> L[(Task ledger<br/>SQLite)]
     CP --> P[Context planner]
     P --- CM[codebase-memory-mcp<br/>repository breadth]
@@ -141,6 +141,7 @@ flowchart LR
 
 | Layer | Role |
 |---|---|
+| **`bcode` chat / CLI** | Interactive chat and views (experimental) or plain commands, over the same operations |
 | **Go control plane** | Orchestrates tasks, budgets, retries and escalation policy |
 | **codebase-memory-mcp** | Repository breadth: code graph, impact, search |
 | **Serena / LSP** (optional) | Semantic depth: definitions, references, implementations |
@@ -173,6 +174,7 @@ vendored source).
 | Model gateway (metering, tunnelled agent calls) and llama.cpp supervision | `internal/inference` |
 | Frontier escalation policy, packet building and sanitization | `internal/frontier` |
 | Process management for codebase-memory-mcp and Serena | `internal/repointel` |
+| Terminal interface and chat; guided set-up; applying results to a checkout | `internal/tui`, `internal/cli` |
 | OpenHands adapter: JSON-RPC bridge to the agent SDK | `adapters/openhands/python` |
 | CLI, `doctor`, benchmark harness | `internal/cli`, `internal/benchmark` |
 
@@ -202,6 +204,28 @@ More detail:
 [ADRs](docs/architecture/adr/)
 
 ## Quick start
+
+### Install and run (one command)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/akynte/boundedcode/main/scripts/install.sh | bash
+cd ~/src/my-service     # any git repository
+bcode
+```
+
+The installer puts `boundedcode` and its short name `bcode` in `~/.local/bin`.
+It uses a checksum-verified release binary when the release ships one, and
+otherwise builds from source with Go. `bcode` opens a chat for the repository
+you are in. On the first run it checks the prerequisites and offers to install
+what is missing: tools, llama.cpp, the model weights and the Docker sandbox.
+It asks before every download or build. After that, describe a change and it
+runs as a task. See [the terminal interface](docs/usage/tui.md).
+
+You still need Linux x86-64, git and Docker, plus an NVIDIA GPU with the
+CUDA toolkit for fast local inference. `bcode setup --check` shows what is
+missing from the shell.
+
+### Manual install
 
 **Prerequisites:**
 - Linux x86-64
@@ -244,6 +268,11 @@ Run your first task:
 ./bin/boundedcode task diff <id>        # review the agent/<id> branch like a pull request
 ./bin/boundedcode task resume <id>      # after Ctrl-C, a crash or a reboot
 ```
+
+Prefer a full-screen interface? `./bin/boundedcode tui` covers all of the above
+and the rest of the CLI: live task activity, diffs, verification, workspaces,
+repository intelligence, the runtime, frontier escalations, stats and
+`doctor`. See [docs/usage/tui.md](docs/usage/tui.md).
 
 > [!TIP]
 > Already running an OpenAI-compatible server? Use
