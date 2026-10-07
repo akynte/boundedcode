@@ -60,9 +60,10 @@ type Runner struct {
 	CtxSize    int
 	Log        *slog.Logger
 	Out        io.Writer
-	// ContractModel, when set, replaces the local-model call that derives
-	// the task contract (tests).
-	ContractModel func(ctx context.Context, request string) (string, error)
+	// ContractModel, when set, replaces the local-model calls that read the
+	// request before implementation (tests): the contract derivation, its
+	// corrective retry and the ambiguity grounding check (call.Purpose).
+	ContractModel func(ctx context.Context, call ContractCall) (string, error)
 	// CondenseEachRetry forces a context condensation before every retry
 	// (used by continuity tests and benchmarks).
 	CondenseEachRetry bool
