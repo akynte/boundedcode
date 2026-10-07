@@ -20,18 +20,27 @@ irreversible.
    only from those reports.
 4. Update `docs/development/status.md` and the release notes in
    `CHANGELOG.md`.
-5. Build artifacts:
+5. Build artifacts from the tagged commit, with a clean tree:
    ```bash
-   VERSION=v0.1.0 make dist   # bin + checksums + SBOM + license files
+   VERSION=vX.Y.Z make dist   # bin + SBOM + licenses archive + checksums
    ```
-   Contents of `dist/`:
-   * `boundedcode-linux-amd64`
-   * `SHA256SUMS`
+   The version comes from `git describe` when `VERSION` is unset; a
+   `-dirty` suffix means the tree has uncommitted changes and must not be
+   released. Contents of `dist/`:
+   * `boundedcode-linux-amd64`: static binary (CGO disabled)
    * `SBOM.spdx.json`
-   * `LICENSE`
-   * `NOTICE`
-   * `THIRD_PARTY_NOTICES.md`
-   * `LICENSES/`
+   * `boundedcode-VERSION-licenses.tar.gz`: `LICENSE`, `NOTICE`,
+     `THIRD_PARTY_NOTICES.md` and `LICENSES/` (Go modules and upstream
+     components), with neutral ownership and the commit time, so it is
+     reproducible
+   * `SHA256SUMS`: checksums of the three files above; the installer
+     verifies the binary against it
+   * `LICENSE`, `NOTICE`, `THIRD_PARTY_NOTICES.md`, `LICENSES/` (unpacked
+     copies, not uploaded)
+
+   Upload the binary, `SBOM.spdx.json`, the licenses archive and
+   `SHA256SUMS`, with `docs/releases/VERSION.md` as the notes (absolute
+   links), as a pre-release while the version has a pre-release suffix.
 6. Secret-scan the full history: `gitleaks git --redact .`
 7. Check DCO sign-off on every commit, including the root commit:
    `scripts/check-dco.sh --root HEAD`

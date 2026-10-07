@@ -89,7 +89,10 @@ cat <<'EOF'
 
   The first run checks what is missing (inference server, model, tools,
   Docker sandbox) and sets it up with your permission. `bcode setup --check`
-  shows the same from the shell. Uninstall: rm ~/.local/bin/{boundedcode,bcode}
-  (and ~/.config/boundedcode, ~/.local/share/boundedcode for all data).
+  shows the same from the shell.
 
 EOF
+printf '  Uninstall: rm %s/{boundedcode,bcode}\n' "$BIN_DIR"
+printf '  All data: ~/.config, ~/.local/share, ~/.local/state and ~/.cache under\n'
+printf '  boundedcode/ (or their XDG_* overrides), and the sandbox image\n'
+printf '  (docker rmi boundedcode-openhands:local).\n\n'
