@@ -17,6 +17,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/akynte/boundedcode/internal/buildinfo"
 	"github.com/akynte/boundedcode/internal/repointel"
 )
 
@@ -31,7 +32,7 @@ var versionRE = regexp.MustCompile(`\b(\d+\.\d+\.\d+)\b`)
 func CheckVersion(ctx context.Context, binary string) (got string, err error) {
 	path, err := exec.LookPath(binary)
 	if err != nil {
-		return "", fmt.Errorf("codebase-memory-mcp not found (%s): %w", binary, err)
+		return "", fmt.Errorf("codebase-memory-mcp is not installed: %w", err)
 	}
 	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
@@ -46,9 +47,19 @@ func CheckVersion(ctx context.Context, binary string) (got string, err error) {
 		return "", fmt.Errorf("%s --version: unrecognized output %q", path, lastN(strings.TrimSpace(string(out)), 200))
 	}
 	if m[1] != RequiredVersion {
-		return m[1], fmt.Errorf("codebase-memory-mcp %s at %s is not the supported %s (install the pinned release with scripts/install-deps.sh)", m[1], path, RequiredVersion)
+		return m[1], fmt.Errorf("codebase-memory-mcp %s at %s is not the supported %s", m[1], path, RequiredVersion)
 	}
 	return m[1], nil
+}
+
+// Preflight is CheckVersion as one actionable message: the problem and the
+// setup step that installs the pinned release. Commands check once, up
+// front, instead of failing on every call.
+func Preflight(ctx context.Context, binary string) error {
+	if _, err := CheckVersion(ctx, binary); err != nil {
+		return fmt.Errorf("%w; run `%s setup --only tools`", err, buildinfo.Command())
+	}
+	return nil
 }
 
 // Client invokes the codebase-memory-mcp binary.

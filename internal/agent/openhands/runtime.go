@@ -13,10 +13,12 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/akynte/boundedcode/internal/agent"
+	"github.com/akynte/boundedcode/internal/buildinfo"
 	"github.com/akynte/boundedcode/internal/inference"
 	"github.com/akynte/boundedcode/internal/jsonrpc"
 	"github.com/akynte/boundedcode/internal/sandbox"
@@ -156,6 +158,11 @@ func (r *Runtime) Open(ctx context.Context, req agent.OpenRequest) (agent.Sessio
 		return nil, err
 	}
 	fmt.Fprintf(logf, "\n=== %s adapter start (sandbox=%s) ===\n", time.Now().UTC().Format(time.RFC3339), r.Sandbox.Name())
+	// This run's output starts here; earlier runs of the task precede it.
+	var runStart int64
+	if fi, err := logf.Stat(); err == nil {
+		runStart = fi.Size()
+	}
 	stderr := &redactWriter{w: logf}
 	cmd.Stderr = stderr
 	stdin, err := cmd.StdinPipe()
@@ -174,6 +181,11 @@ func (r *Runtime) Open(ctx context.Context, req agent.OpenRequest) (agent.Sessio
 	if err := cmd.Start(); err != nil {
 		cancel()
 		logf.Close()
+		if c, ok := r.Sandbox.(sandbox.Checker); ok && errors.Is(err, exec.ErrNotFound) {
+			if cerr := c.Check(ctx); cerr != nil {
+				return nil, &startupError{msg: "start adapter: " + cerr.Error(), err: err}
+			}
+		}
 		return nil, fmt.Errorf("start adapter: %w", err)
 	}
 	grace := r.InterruptGrace
@@ -237,8 +249,8 @@ func (r *Runtime) Open(ctx context.Context, req agent.OpenRequest) (agent.Sessio
 	select {
 	case <-ready:
 	case <-s.exited:
-		_ = s.Close()
-		return nil, fmt.Errorf("adapter exited before ready: %w (see %s)", s.waitErr, logf.Name())
+		_ = s.Close() // flushes the log
+		return nil, r.exitedBeforeReady(ctx, s.waitErr, logPath, runStart)
 	case <-time.After(timeout):
 		_ = s.Close()
 		return nil, fmt.Errorf("adapter not ready after %s (see %s)", timeout, logf.Name())
@@ -272,9 +284,67 @@ func (r *Runtime) Open(ctx context.Context, req agent.OpenRequest) (agent.Sessio
 	return s, nil
 }
 
+// startupTailLines is how much of the adapter log a startup failure quotes.
+const startupTailLines = 10
+
+// exitedBeforeReady explains an adapter that exited during startup: the
+// sandbox's own diagnosis when its engine is not ready, and the last lines
+// of this run's (already redacted) log, so the cause is in the error rather
+// than only in the file.
+func (r *Runtime) exitedBeforeReady(ctx context.Context, waitErr error, logPath string, runStart int64) error {
+	var b strings.Builder
+	fmt.Fprintf(&b, "adapter exited before ready: %v", waitErr)
+	if c, ok := r.Sandbox.(sandbox.Checker); ok {
+		if err := c.Check(ctx); err != nil {
+			fmt.Fprintf(&b, "; %v", err)
+		}
+	}
+	fmt.Fprintf(&b, " (see %s)", logPath)
+	if lines := logTail(logPath, runStart, startupTailLines); len(lines) > 0 {
+		b.WriteString("\nlast adapter output:\n  " + strings.Join(lines, "\n  "))
+	}
+	return &startupError{msg: b.String(), err: waitErr}
+}
+
+// startupError is a startup failure whose message already quotes err.
+type startupError struct {
+	msg string
+	err error
+}
+
+func (e *startupError) Error() string { return e.msg }
+func (e *startupError) Unwrap() error { return e.err }
+
+// logTail returns the last n non-empty lines written to path from offset on.
+func logTail(path string, offset int64, n int) []string {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil
+	}
+	defer f.Close()
+	const maxRead = 64 << 10
+	if fi, err := f.Stat(); err == nil && fi.Size()-offset > maxRead {
+		offset = fi.Size() - maxRead
+	}
+	if _, err := f.Seek(offset, io.SeekStart); err != nil {
+		return nil
+	}
+	b, err := io.ReadAll(io.LimitReader(f, maxRead))
+	if err != nil {
+		return nil
+	}
+	var lines []string
+	for l := range strings.SplitSeq(string(b), "\n") {
+		if l = strings.TrimRight(l, "\r\t "); strings.TrimSpace(l) != "" {
+			lines = append(lines, l)
+		}
+	}
+	return lines[max(0, len(lines)-n):]
+}
+
 // checkProtocol refuses an adapter that speaks another protocol version.
 func checkProtocol(v *int) error {
-	const fix = "rebuild the sandbox image with `boundedcode sandbox build` (host mode: update the adapter checkout and `uv sync`)"
+	fix := "rebuild the sandbox image with `" + buildinfo.Command() + " sandbox build` (host mode: update the adapter checkout and `uv sync`)"
 	switch {
 	case v == nil:
 		return fmt.Errorf("adapter reported no protocol version, control plane expects v%d; %s", ProtocolVersion, fix)

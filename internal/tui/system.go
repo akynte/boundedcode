@@ -94,9 +94,14 @@ func (v *systemView) action(m *Model, key string) tea.Cmd {
 		dir := defaultSandboxDir(m.info.AdapterDir)
 		return m.openForm(newForm("Build the sandbox image",
 			"Builds "+orDash(m.info.AgentImage)+" locally with the container engine. The image is never pushed.",
-			"Build", []*field{textField("dir", "Directory with the sandbox Dockerfile", dir, "adapters/openhands").mustFill()},
+			"Build", []*field{textField("dir", "Directory with the sandbox Dockerfile", dir, "empty: the copy built into this program").
+				withHelp("Only needed to build from a source checkout (adapters/openhands).")},
 			func(f formValues) (tea.Cmd, error) {
-				return m.startJob("sandbox build", "", []string{"sandbox", "build", "--dir", expandHome(f.str("dir"))}, func(m *Model, err error) tea.Cmd {
+				args := []string{"sandbox", "build"}
+				if d := f.str("dir"); d != "" {
+					args = append(args, "--dir", expandHome(d))
+				}
+				return m.startJob("sandbox build", "", args, func(m *Model, err error) tea.Cmd {
 					if err != nil {
 						return m.errToast(err)
 					}

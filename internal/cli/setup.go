@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -15,10 +16,12 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/akynte/boundedcode"
+	"github.com/akynte/boundedcode/internal/buildinfo"
 	"github.com/akynte/boundedcode/internal/config"
 	"github.com/akynte/boundedcode/internal/inference"
 	"github.com/akynte/boundedcode/internal/inference/llamacpp"
 	"github.com/akynte/boundedcode/internal/repointel/cbm"
+	"github.com/akynte/boundedcode/internal/sandbox"
 )
 
 // setupStep is one prerequisite: check reports whether it is satisfied and
@@ -38,6 +41,13 @@ type setupState struct {
 	Title  string `json:"title"`
 	OK     bool   `json:"ok"`
 	Detail string `json:"detail"`
+}
+
+// setupHint tells the user to run one setup step, naming the program as
+// they invoked it (e.g. "run `bcode setup --only tools`"), with any extra
+// flags.
+func setupHint(step string, flags ...string) string {
+	return "run `" + strings.Join(append([]string{buildinfo.Command(), "setup", "--only", step}, flags...), " ") + "`"
 }
 
 // toolsDir holds tools installed by setup; it is put on PATH at start-up.
@@ -206,38 +216,43 @@ func setupSteps() []setupStep {
 				if c.Kind != "docker" {
 					return true, "sandbox.kind is " + c.Kind + " (unsandboxed)"
 				}
-				if _, err := exec.LookPath(c.Engine); err != nil {
-					return false, c.Engine + " not installed"
-				}
-				ictx, cancel := context.WithTimeout(ctx, 15*time.Second)
-				defer cancel()
-				if err := exec.CommandContext(ictx, c.Engine, "image", "inspect", a.Config.Agent.Image).Run(); err != nil {
-					if err := exec.CommandContext(ictx, c.Engine, "info").Run(); err != nil {
-						return false, c.Engine + " is installed but not usable (is the daemon running and are you in the docker group?)"
-					}
-					return false, a.Config.Agent.Image + " not built"
+				var ee *sandbox.EngineError
+				if err := sandbox.CheckEngine(ctx, c.Engine, a.Config.Agent.Image); errors.As(err, &ee) {
+					return false, ee.Problem()
+				} else if err != nil {
+					return false, err.Error()
 				}
 				return true, a.Config.Agent.Image
 			},
 			run: func(ctx context.Context, a *App) error {
-				c := a.Config.Sandbox
-				if _, err := exec.LookPath(c.Engine); err != nil {
-					return fmt.Errorf("%s is not installed: install Docker (https://docs.docker.com/engine/install/) and run setup again", c.Engine)
-				}
-				dir, err := os.MkdirTemp("", "bc-sandbox-")
-				if err != nil {
-					return err
-				}
-				defer os.RemoveAll(dir)
-				if err := extract(boundedcode.SandboxContext, dir); err != nil {
-					return err
-				}
-				cmd := exec.CommandContext(ctx, c.Engine, "build", "-t", a.Config.Agent.Image, filepath.Join(dir, "adapters", "openhands"))
-				cmd.Stdout, cmd.Stderr = a.Out, a.Out
-				return cmd.Run()
+				return a.buildSandboxImage(ctx, "", a.Out)
 			},
 		},
 	}
+}
+
+// buildSandboxImage builds the agent sandbox image from dir, or from the
+// build context embedded in the binary when dir is empty (no checkout
+// needed).
+func (a *App) buildSandboxImage(ctx context.Context, dir string, out io.Writer) error {
+	// The image is what is built here; the engine itself must work.
+	if err := sandbox.CheckEngine(ctx, a.Config.Sandbox.Engine, ""); err != nil {
+		return err
+	}
+	if dir == "" {
+		tmp, err := os.MkdirTemp("", "bc-sandbox-")
+		if err != nil {
+			return err
+		}
+		defer os.RemoveAll(tmp)
+		if err := extract(boundedcode.SandboxContext, tmp); err != nil {
+			return err
+		}
+		dir = filepath.Join(tmp, "adapters", "openhands")
+	}
+	cmd := exec.CommandContext(ctx, a.Config.Sandbox.Engine, "build", "-t", a.Config.Agent.Image, dir)
+	cmd.Stdout, cmd.Stderr = out, out
+	return cmd.Run()
 }
 
 // checkSetup reports every step.
@@ -323,7 +338,7 @@ func extract(fsys fs.FS, dir string) error {
 }
 
 func newSetupCmd(app *App) *cobra.Command {
-	var yes, check bool
+	var yes, check, force bool
 	var only []string
 	cmd := &cobra.Command{
 		Use:   "setup",
@@ -331,13 +346,30 @@ func newSetupCmd(app *App) *cobra.Command {
 		Long: `Checks and, with your permission, satisfies each prerequisite in order:
 configuration, repository tools, the llama.cpp inference server, the default
 model weights and the agent sandbox image. Steps already satisfied are
-skipped, so setup can be re-run at any time. Everything is pinned and
-checksum-verified, and installed under your user directories.`,
+skipped, so setup can be re-run at any time; --force with --only runs the
+named steps again (for example --only inference to rebuild llama.cpp after
+installing the CUDA toolkit). Everything is pinned and checksum-verified, and
+installed under your user directories.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx := cmd.Context()
 			if err := app.Paths.Ensure(); err != nil {
 				return err
+			}
+			names := make([]string, 0, len(setupSteps()))
+			for _, s := range setupSteps() {
+				names = append(names, s.Name)
+			}
+			for _, o := range only {
+				if !slices.Contains(names, o) {
+					return fmt.Errorf("unknown setup step %q (steps: %s)", o, strings.Join(names, ","))
+				}
+			}
+			if force && len(only) == 0 {
+				return errors.New("--force needs --only: name the steps to run again")
+			}
+			if force && slices.Contains(only, "config") {
+				return errors.New("--force does not rewrite the configuration; edit it, or remove it and run setup")
 			}
 			if check {
 				st := app.checkSetup(ctx)
@@ -359,9 +391,12 @@ checksum-verified, and installed under your user directories.`,
 					continue
 				}
 				ok, detail := s.check(ctx, app)
-				if ok {
+				if ok && !force {
 					app.printf("✔ %s: %s\n", s.Title, detail)
 					continue
+				}
+				if ok {
+					detail += " (running again: --force)"
 				}
 				app.printf("• %s: %s\n", s.Title, detail)
 				if s.Ask != nil && !yes && !confirm(app, s.Ask(app)+" [y/N] ") {
@@ -398,5 +433,6 @@ checksum-verified, and installed under your user directories.`,
 	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "do not ask before downloads and builds")
 	cmd.Flags().BoolVar(&check, "check", false, "only report what is missing")
 	cmd.Flags().StringSliceVar(&only, "only", nil, "run only these steps: config,tools,inference,model,sandbox")
+	cmd.Flags().BoolVar(&force, "force", false, "with --only: run the named steps even if they look complete (not config)")
 	return cmd
 }

@@ -3,7 +3,6 @@ package cli
 import (
 	"context"
 	"os"
-	"path/filepath"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
@@ -20,9 +19,6 @@ func Execute(ctx context.Context, args []string) int {
 		args = []string{"tui"}
 	}
 	root := newRoot(app)
-	if name := filepath.Base(os.Args[0]); name == "bcode" {
-		root.Use = name
-	}
 	root.SetArgs(args)
 	err := root.ExecuteContext(ctx)
 	app.close()
@@ -36,8 +32,9 @@ func Execute(ctx context.Context, args []string) int {
 func newRoot(app *App) *cobra.Command {
 	var verbose bool
 	root := &cobra.Command{
-		Use:           buildinfo.Name,
+		Use:           buildinfo.Command(),
 		Short:         buildinfo.ProductName + ": local-first control plane for AI-assisted software engineering",
+		Version:       buildinfo.Version + " " + buildinfo.Commit(),
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {

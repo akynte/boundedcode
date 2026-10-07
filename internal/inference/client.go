@@ -169,6 +169,16 @@ func (c *Client) Get(ctx context.Context, path string, v any) (int, error) {
 	return resp.StatusCode, nil
 }
 
+// Reachable reports whether an HTTP server answers at the client's base URL.
+// Any HTTP response counts: an external OpenAI-compatible server need not
+// implement /health, but a refused or timed-out connection fails.
+func (c *Client) Reachable(ctx context.Context) error {
+	if code, err := c.Get(ctx, "/health", nil); err != nil && code == 0 {
+		return err
+	}
+	return nil
+}
+
 // Healthy reports whether GET /health returns 200. llama-server returns 503
 // while the model is loading.
 func (c *Client) Healthy(ctx context.Context) (bool, error) {

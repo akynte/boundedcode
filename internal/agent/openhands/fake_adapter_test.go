@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"syscall"
@@ -26,6 +27,8 @@ import (
 //	stubborn   protocol v1; session.send ignores session.interrupt
 //	v0         ready without protocol_version
 //	v99        ready with protocol_version 99
+//	crash      exits before ready after 12 lines of stderr and a secret
+//	crash1     exits before ready after one line of stderr
 func TestMain(m *testing.M) {
 	if mode := os.Getenv("BC_FAKE_ADAPTER"); mode != "" {
 		fakeAdapter(mode)
@@ -36,6 +39,19 @@ func TestMain(m *testing.M) {
 
 func fakeAdapter(mode string) {
 	fmt.Fprintln(os.Stderr, "fake adapter starting; api_key=sk-proj-abcdefghijklmnopqrstuvwxyz0123")
+	switch mode {
+	case "crash":
+		for i := 1; i <= 12; i++ {
+			fmt.Fprintf(os.Stderr, "startup line %d\n", i)
+		}
+		// A fake key, assembled so secret scanners do not flag the source.
+		fmt.Fprintln(os.Stderr, "LLM_API_KEY="+"sk-proj-"+"zyxwvutsrqponmlkjihgfedcba9876")
+		fmt.Fprintln(os.Stderr, "fatal: boom")
+		os.Exit(3)
+	case "crash1":
+		fmt.Fprintln(os.Stderr, "fatal: boom")
+		os.Exit(3)
+	}
 	if pf := os.Getenv("BC_FAKE_ADAPTER_PIDFILE"); pf != "" {
 		_ = os.WriteFile(pf, fmt.Appendf(nil, "%d", os.Getpid()), 0o600)
 	}
@@ -189,5 +205,56 @@ func TestSendCancelKillsUnresponsiveAdapter(t *testing.T) {
 	}
 	if err := syscall.Kill(pid, 0); err == nil {
 		t.Fatalf("adapter pid %d still alive", pid)
+	}
+}
+
+// TestExitedBeforeReadyQuotesLog: an adapter that dies during startup is
+// reported with the tail of this run's redacted log, not only its path.
+func TestExitedBeforeReadyQuotesLog(t *testing.T) {
+	rt, req := fakeRuntime(t, "crash")
+	_, err := rt.Open(t.Context(), req)
+	logPath := AdapterLogPath(req)
+	if err == nil {
+		t.Fatal("Open succeeded")
+	}
+	msg := err.Error()
+	for _, want := range []string{"adapter exited before ready: exit status 3", logPath, "last adapter output:", "startup line 5", "startup line 12", "fatal: boom"} {
+		if !strings.Contains(msg, want) {
+			t.Errorf("error lacks %q:\n%s", want, msg)
+		}
+	}
+	for _, unwanted := range []string{"startup line 4\n", "sk-proj-zyx", "=== "} {
+		if strings.Contains(msg, unwanted) {
+			t.Errorf("error contains %q:\n%s", unwanted, msg)
+		}
+	}
+	var ee *exec.ExitError
+	if !errors.As(err, &ee) || ee.ExitCode() != 3 {
+		t.Errorf("exit error not wrapped: %v", err)
+	}
+
+	// A second run quotes only its own output.
+	t.Setenv("BC_FAKE_ADAPTER", "crash1")
+	_, err = rt.Open(t.Context(), req)
+	if err == nil || strings.Contains(err.Error(), "startup line") || !strings.Contains(err.Error(), "fatal: boom") {
+		t.Fatalf("second run: %v", err)
+	}
+}
+
+// checkedSandbox is a host sandbox whose engine check fails, like a
+// container engine whose daemon is down.
+type checkedSandbox struct {
+	sandbox.None
+	err error
+}
+
+func (c checkedSandbox) Check(context.Context) error { return c.err }
+
+func TestExitedBeforeReadyDiagnosesSandbox(t *testing.T) {
+	rt, req := fakeRuntime(t, "crash1")
+	rt.Sandbox = checkedSandbox{err: errors.New("docker is installed but not usable")}
+	_, err := rt.Open(t.Context(), req)
+	if err == nil || !strings.Contains(err.Error(), "docker is installed but not usable") || !strings.Contains(err.Error(), "fatal: boom") {
+		t.Fatalf("err = %v", err)
 	}
 }

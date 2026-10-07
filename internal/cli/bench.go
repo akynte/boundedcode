@@ -14,6 +14,7 @@ import (
 	"go.yaml.in/yaml/v3"
 
 	"github.com/akynte/boundedcode/internal/benchmark"
+	"github.com/akynte/boundedcode/internal/buildinfo"
 	"github.com/akynte/boundedcode/internal/config"
 	"github.com/akynte/boundedcode/internal/orchestrator"
 	"github.com/akynte/boundedcode/internal/repointel/cbm"
@@ -293,7 +294,7 @@ func newBenchIntelCmd(app *App) *cobra.Command {
 				},
 			}
 			if err := study.Serena("").Verify(ctx); err != nil {
-				return fmt.Errorf("serena: %w (run `boundedcode serena setup`)", err)
+				return fmt.Errorf("serena: %w (run `"+buildinfo.Command()+" serena setup`)", err)
 			}
 			var reps []*benchmark.IntelReport
 			for _, s := range specs {

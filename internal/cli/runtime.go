@@ -10,6 +10,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/akynte/boundedcode/internal/buildinfo"
 	"github.com/akynte/boundedcode/internal/inference"
 	"github.com/akynte/boundedcode/internal/inference/llamacpp"
 	"github.com/akynte/boundedcode/internal/model"
@@ -30,6 +31,21 @@ func (a *App) inferenceRuntime() inference.Runtime {
 		return nil
 	}
 	return a.llamaManager()
+}
+
+// externalProbeTimeout bounds the reachability check of an external server.
+const externalProbeTimeout = 5 * time.Second
+
+// checkExternalInference fails fast when the external inference server does
+// not answer, instead of a task blocking later on transport errors.
+func (a *App) checkExternalInference(ctx context.Context) error {
+	url := a.Config.Inference.ExternalURL
+	if err := inference.NewClient(url, externalProbeTimeout).Reachable(ctx); err != nil {
+		return fmt.Errorf("external inference server %s is not reachable: %w; start it, or correct inference.external_url in %s "+
+			"(to have %s run llama.cpp instead, set inference.mode: managed and run `%s setup --only inference`)",
+			url, err, a.configFile(), buildinfo.ProductName, buildinfo.Command())
+	}
+	return nil
 }
 
 func (a *App) profile(name string) (model.Profile, error) {

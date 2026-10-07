@@ -228,6 +228,10 @@ func newIndexCmd(app *App) *cobra.Command {
 					return fmt.Errorf("repository %q is not an enabled repository of %s (see `workspace show`)", a, w.Name)
 				}
 			}
+			// Checked once, so a missing tool is one message, not one per repository.
+			if err := cbm.Preflight(ctx, app.Config.RepoIntel.Binary); err != nil {
+				return err
+			}
 			rec, _ := app.Recorder(ctx)
 			st, _ := app.Store(ctx)
 			intel := app.intel()
@@ -292,6 +296,9 @@ func newIntelCmd(app *App) *cobra.Command {
 			ws, _ := app.workspaces(ctx)
 			repos, err := ws.Repos(ctx, w.ID)
 			if err != nil {
+				return err
+			}
+			if err := cbm.Preflight(ctx, app.Config.RepoIntel.Binary); err != nil {
 				return err
 			}
 			n := 0

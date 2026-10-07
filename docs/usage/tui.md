@@ -92,7 +92,12 @@ already done:
 
 Every step that downloads or builds asks first, and declining leaves it for
 later. `bcode setup --check` reports the state; `bcode setup --yes` runs
-everything without asking.
+everything without asking. `--only` names steps (`config`, `tools`,
+`inference`, `model`, `sandbox`), and `--only STEP --force` runs a step that
+already looks complete, for example `bcode setup --only inference --force`
+to rebuild llama.cpp with CUDA after installing the CUDA toolkit. `--force`
+never rewrites the configuration. Error messages for a missing dependency
+name the step that installs it.
 
 ## How it works
 

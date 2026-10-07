@@ -2,7 +2,11 @@
 // version. See docs/development/renaming.md.
 package buildinfo
 
-import "runtime/debug"
+import (
+	"os"
+	"path/filepath"
+	"runtime/debug"
+)
 
 const (
 	// ProductName is the human-facing project name.
@@ -14,6 +18,19 @@ const (
 	// DataDirName is the directory name used under XDG base directories.
 	DataDirName = "boundedcode"
 )
+
+// ShortName is the short alias the installers link to Name.
+const ShortName = "bcode"
+
+// Command is the name the CLI was invoked as: ShortName when run through
+// the alias, otherwise Name. Messages that tell the user what to run use it,
+// so a hint can be copied as typed.
+func Command() string {
+	if filepath.Base(os.Args[0]) == ShortName {
+		return ShortName
+	}
+	return Name
+}
 
 // Version is set at link time with -ldflags "-X .../buildinfo.Version=v0.1.0".
 var Version = "dev"

@@ -59,7 +59,13 @@ func (c *Codex) LoginStatus(ctx context.Context) (string, error) {
 // Ask implements Provider.
 func (c *Codex) Ask(ctx context.Context, packet, dir string) (string, error) {
 	st, err := c.LoginStatus(ctx)
-	if err != nil {
+	switch {
+	case errors.Is(err, exec.ErrNotFound):
+		return "", fmt.Errorf("codex CLI is not installed (%w): install it (https://github.com/openai/codex), run `codex login`, "+
+			"or set frontier.provider: manual", err)
+	case err != nil && st == "":
+		return "", fmt.Errorf("codex login status: %w: run `codex login`", err)
+	case err != nil:
 		return "", fmt.Errorf("codex not logged in (%s): run `codex login`", st)
 	}
 	if strings.Contains(strings.ToLower(st), "api key") {

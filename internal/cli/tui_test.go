@@ -293,6 +293,20 @@ func TestSetupCheckAndConfigStep(t *testing.T) {
 	if err == nil || !strings.Contains(buf.String(), "skipped") {
 		t.Fatalf("declined model step: %v\n%s", err, buf.String())
 	}
+	// A misspelt step is an error, not a silent no-op; --force needs named
+	// steps and never rewrites the configuration.
+	for args, want := range map[string]string{
+		"setup --only tool":            `unknown setup step "tool"`,
+		"setup --force":                "--force needs --only",
+		"setup --only config --force":  "does not rewrite the configuration",
+		"setup --only sandbox,x --yes": `unknown setup step "x"`,
+	} {
+		buf.Reset()
+		err := be.Exec(ctx, strings.Fields(args), &buf)
+		if err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("%s: err = %v, want %q", args, err, want)
+		}
+	}
 }
 
 func TestEmbeddedSetupAssets(t *testing.T) {

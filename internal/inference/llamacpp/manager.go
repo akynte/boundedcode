@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"log/slog"
 	"net"
 	"os"
@@ -17,6 +18,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/akynte/boundedcode/internal/buildinfo"
 	"github.com/akynte/boundedcode/internal/config"
 	"github.com/akynte/boundedcode/internal/hw"
 	"github.com/akynte/boundedcode/internal/inference"
@@ -111,6 +113,9 @@ func (m *Manager) Ensure(ctx context.Context, p model.Profile) (inference.Endpoi
 	ep := inference.Endpoint{BaseURL: m.baseURL(), Model: p.Name}
 	modelPath := p.ResolveFile(m.ModelsDir)
 	if _, err := os.Stat(modelPath); err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return ep, fmt.Errorf("model file for %s: %w (run `%s setup --only model` to download the default model)", p.Name, err, buildinfo.Command())
+		}
 		return ep, fmt.Errorf("model file for %s: %w", p.Name, err)
 	}
 	args := m.ServerArgs(p, modelPath)
@@ -162,7 +167,7 @@ func (m *Manager) start(ctx context.Context, p model.Profile, args []string, has
 	}
 	bin, err := exec.LookPath(m.Binary)
 	if err != nil {
-		return 0, fmt.Errorf("llama-server binary: %w", err)
+		return 0, fmt.Errorf("llama-server binary: %w (run `%s setup --only inference` to build it, or set inference.mode: external to use a server you run)", err, buildinfo.Command())
 	}
 	if _, err := os.Stat(m.logPath()); err == nil {
 		_ = os.Rename(m.logPath(), m.logPath()+".1")

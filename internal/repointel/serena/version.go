@@ -21,6 +21,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/akynte/boundedcode/internal/buildinfo"
 )
 
 // Pinned release. Changing any of these requires the license review in
@@ -163,7 +165,7 @@ func Check(inst Installation) error {
 		return &UnsupportedError{Detected: inst.CLIVersion, Reason: why}
 	case inst.PackageVersion == "":
 		return &UnsupportedError{Detected: inst.CLIVersion, Reason: "cannot read the " + PackageName +
-			" package metadata next to " + inst.Executable + " (install it with `boundedcode serena setup`)"}
+			" package metadata next to " + inst.Executable + " (install it with `" + buildinfo.Command() + " serena setup`)"}
 	case inst.PackageVersion != RequiredVersion:
 		return &UnsupportedError{Detected: inst.PackageVersion, Reason: "package metadata disagrees with `serena --version` (" +
 			inst.CLIVersion + "); " + why}

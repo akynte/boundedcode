@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -13,9 +14,11 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/akynte/boundedcode/internal/buildinfo"
 	"github.com/akynte/boundedcode/internal/hw"
 	"github.com/akynte/boundedcode/internal/inference/llamacpp"
 	"github.com/akynte/boundedcode/internal/repointel/cbm"
+	"github.com/akynte/boundedcode/internal/sandbox"
 )
 
 // checkStatus is the outcome of one doctor check.
@@ -66,7 +69,7 @@ func runDoctor(ctx context.Context, app *App) []check {
 	add := func(c check) { out = append(out, c) }
 
 	if _, err := os.Stat(app.configFile()); err != nil {
-		add(check{"config", statusWarn, "no config file; using defaults", "run `init`"})
+		add(check{"config", statusWarn, "no config file; using defaults", setupHint("config")})
 	} else {
 		add(check{"config", statusOK, app.configFile(), ""})
 	}
@@ -92,36 +95,19 @@ func runDoctor(ctx context.Context, app *App) []check {
 	}
 
 	cfg := app.Config
-	if cfg.Inference.Mode == "external" {
-		add(check{"inference", statusOK, "external server at " + cfg.Inference.ExternalURL, ""})
-	} else {
-		if v, err := llamacpp.Version(ctx, cfg.Inference.ServerBinary); err != nil {
-			add(check{"llama-server", statusFail, err.Error(), "build llama.cpp with CUDA (scripts/build-llama-cpp.sh) or pass `init --llama-server PATH`"})
-		} else {
-			add(check{"llama-server", statusOK, v + " (" + cfg.Inference.ServerBinary + ")", ""})
-			add(llamaCUDACheck(ctx, cfg.Inference.ServerBinary))
-		}
-	}
-	if p, err := app.Models.Get(cfg.DefaultModel); err != nil {
-		add(check{"default model", statusFail, err.Error(), ""})
-	} else {
-		path := p.ResolveFile(cfg.ModelsDir)
-		if fi, err := os.Stat(path); err != nil {
-			add(check{"default model", statusFail, path + " not found",
-				fmt.Sprintf("download %s from huggingface.co/%s (license: %s)", p.Source.File, p.Source.Repo, p.Source.License)})
-		} else {
-			add(check{"default model", statusOK, fmt.Sprintf("%s (%.1f GiB)", path, float64(fi.Size())/(1<<30)), ""})
-		}
+	for _, c := range inferenceChecks(ctx, app) {
+		add(c)
 	}
 
 	add(gitCheck(ctx))
 	add(versionCheck(ctx, "go", "go", []string{"version"}, false, "needed to build and verify Go repositories outside containers"))
 	add(versionCheck(ctx, "python3", "python3", []string{"--version"}, false, "the OpenHands adapter needs Python >= 3.12 (uv can provide it)"))
 	add(adapterCheck(app))
+	// engineErr is why the container engine cannot run the sandbox (nil:
+	// it can); the image is only checked against a working engine.
+	var engineErr error
 	if cfg.Sandbox.Kind == "docker" {
-		c := versionCheck(ctx, "container engine", cfg.Sandbox.Engine, []string{"version", "--format", "{{.Server.Version}}"}, true,
-			"install Docker or Podman, or set sandbox.kind: none for development only")
-		add(c)
+		add(engineCheck(ctx, cfg.Sandbox.Engine, &engineErr))
 	} else {
 		add(check{"container engine", statusWarn, "sandbox.kind is none: agent tools run unsandboxed", "use docker for autonomous tasks"})
 	}
@@ -133,17 +119,11 @@ func runDoctor(ctx context.Context, app *App) []check {
 	for _, c := range languageServerChecks(cfg.RepoIntel.Serena.Enabled) {
 		add(c)
 	}
-	add(versionCheck(ctx, "gitleaks", "gitleaks", []string{"version"}, false, "secret scanning stage is skipped without it"))
+	add(versionCheck(ctx, "gitleaks", "gitleaks", []string{"version"}, false,
+		"the secret scan is skipped while iterating and the full gate fails without it; "+setupHint("tools")))
 	add(versionCheck(ctx, "ripgrep", "rg", []string{"--version"}, false, "used for exact lexical retrieval"))
 	if cfg.Sandbox.Kind == "docker" {
-		ictx, cancel := context.WithTimeout(ctx, 15*time.Second)
-		out, err := exec.CommandContext(ictx, cfg.Sandbox.Engine, "image", "inspect", "--format", "{{.Id}}", cfg.Agent.Image).Output()
-		cancel()
-		if err != nil {
-			add(check{"sandbox image", statusWarn, cfg.Agent.Image + " not built", "run `boundedcode sandbox build --dir adapters/openhands`"})
-		} else {
-			add(check{"sandbox image", statusOK, cfg.Agent.Image + " " + strings.TrimSpace(string(out))[:19], ""})
-		}
+		add(imageCheck(ctx, cfg.Sandbox.Engine, cfg.Agent.Image, engineErr))
 	}
 	add(frontierCheck(ctx, app))
 	return out
@@ -171,9 +151,88 @@ func gitCheck(ctx context.Context) check {
 	return c
 }
 
+// inferenceChecks reports the inference server and the default model's
+// weights (served by the server itself in external mode).
+func inferenceChecks(ctx context.Context, app *App) []check {
+	var out []check
+	add := func(c check) { out = append(out, c) }
+	cfg := app.Config
+	if cfg.Inference.Mode == "external" {
+		if err := app.checkExternalInference(ctx); err != nil {
+			add(check{"inference", statusWarn, "external server at " + cfg.Inference.ExternalURL + " is not reachable",
+				"start it, or correct inference.external_url in " + app.configFile()})
+		} else {
+			add(check{"inference", statusOK, "external server at " + cfg.Inference.ExternalURL, ""})
+		}
+	} else {
+		if v, err := llamacpp.Version(ctx, cfg.Inference.ServerBinary); err != nil {
+			add(check{"llama-server", statusFail, err.Error(), setupHint("inference") + " (or pass `init --llama-server PATH`, or use inference.mode: external)"})
+		} else {
+			add(check{"llama-server", statusOK, v + " (" + cfg.Inference.ServerBinary + ")", ""})
+			add(llamaCUDACheck(ctx, cfg.Inference.ServerBinary))
+		}
+	}
+	if cfg.Inference.Mode == "external" {
+		add(check{"default model", statusOK, "served by the external server", ""})
+	} else if p, err := app.Models.Get(cfg.DefaultModel); err != nil {
+		add(check{"default model", statusFail, err.Error(), ""})
+	} else {
+		path := p.ResolveFile(cfg.ModelsDir)
+		if fi, err := os.Stat(path); err != nil {
+			add(check{"default model", statusFail, path + " not found",
+				fmt.Sprintf("%s (downloads %s from huggingface.co/%s, license: %s)", setupHint("model"), p.Source.File, p.Source.Repo, p.Source.License)})
+		} else {
+			add(check{"default model", statusOK, fmt.Sprintf("%s (%.1f GiB)", path, float64(fi.Size())/(1<<30)), ""})
+		}
+	}
+	return out
+}
+
+// engineCheck reports whether the container engine can run the sandbox:
+// not installed and installed-but-unusable (daemon down, no permission) are
+// different problems with different fixes. *engineErr is set when it cannot.
+func engineCheck(ctx context.Context, engine string, engineErr *error) check {
+	const name = "container engine"
+	var ee *sandbox.EngineError
+	if err := sandbox.CheckEngine(ctx, engine, ""); errors.As(err, &ee) {
+		*engineErr = err
+		return check{name, statusFail, ee.Problem(), ee.Hint() + " (or set sandbox.kind: none for development only)"}
+	} else if err != nil {
+		*engineErr = err
+		return check{name, statusFail, err.Error(), ""}
+	}
+	return versionCheck(ctx, name, engine, []string{"version", "--format", "{{.Server.Version}}"}, true, "")
+}
+
+// imageCheck reports whether the sandbox image is built. With an unusable
+// engine it cannot tell, and says so rather than "not built".
+func imageCheck(ctx context.Context, engine, image string, engineErr error) check {
+	const name = "sandbox image"
+	if engineErr != nil {
+		return check{name, statusWarn, image + " not checked: the container engine is not usable", "fix the container engine first"}
+	}
+	// CheckEngine has its own probe timeout and tells a missing image from
+	// an engine that stopped answering.
+	if err := sandbox.CheckEngine(ctx, engine, image); err != nil {
+		var ee *sandbox.EngineError
+		if errors.As(err, &ee) {
+			return check{name, statusWarn, ee.Problem(), ee.Hint()}
+		}
+		return check{name, statusWarn, image + ": " + err.Error(), ""}
+	}
+	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, engine, "image", "inspect", "--format", "{{.Id}}", image).Output()
+	if err != nil {
+		return check{name, statusWarn, image + ": " + err.Error(), ""}
+	}
+	id := strings.TrimSpace(string(out))
+	return check{name, statusOK, image + " " + id[:min(len(id), 19)], ""}
+}
+
 // cbmCheck compares the installed codebase-memory-mcp with the pin.
 func cbmCheck(ctx context.Context, binary string) check {
-	const hint = "install the pinned release with scripts/install-deps.sh (https://github.com/DeusData/codebase-memory-mcp/releases)"
+	hint := setupHint("tools") + " (installs the pinned release)"
 	got, err := cbm.CheckVersion(ctx, binary)
 	switch {
 	case err == nil:
@@ -200,7 +259,7 @@ func llamaCUDACheck(ctx context.Context, binary string) check {
 	b, err := cmd.CombinedOutput()
 	if err != nil {
 		return check{"llama.cpp CUDA", statusWarn, fmt.Sprintf("--list-devices: %v %s", err, firstMeaningfulLine(string(b))),
-			"llama.cpp may be too old for --list-devices; rebuild with scripts/build-llama-cpp.sh"}
+			"llama.cpp may be too old for --list-devices; rebuild it: " + setupHint("inference", "--force")}
 	}
 	var devs []string
 	for l := range strings.SplitSeq(string(b), "\n") {
@@ -209,7 +268,7 @@ func llamaCUDACheck(ctx context.Context, binary string) check {
 		}
 	}
 	if len(devs) == 0 {
-		return check{"llama.cpp CUDA", statusWarn, "no CUDA device listed (CPU-only build or driver problem)", "build llama.cpp with CUDA (scripts/build-llama-cpp.sh)"}
+		return check{"llama.cpp CUDA", statusWarn, "no CUDA device listed (CPU-only build or driver problem)", "install the NVIDIA driver and CUDA toolkit (nvcc), then rebuild llama.cpp: " + setupHint("inference", "--force")}
 	}
 	return check{"llama.cpp CUDA", statusOK, strings.Join(devs, "; "), ""}
 }
@@ -261,7 +320,7 @@ func languageServerChecks(serenaEnabled bool) []check {
 	var out []check
 	for _, ls := range []struct{ name, bin, hint string }{
 		{"gopls", "gopls", "go install golang.org/x/tools/gopls@latest"},
-		{"typescript LSP", "typescript-language-server", "`boundedcode serena setup` installs its own copy"},
+		{"typescript LSP", "typescript-language-server", "`" + buildinfo.Command() + " serena setup` installs its own copy"},
 	} {
 		if p, err := exec.LookPath(ls.bin); err == nil {
 			out = append(out, check{ls.name, statusOK, p, ""})

@@ -80,6 +80,22 @@ func (a *App) buildRunnerWith(ctx context.Context, f runFlags, db *sql.DB, paths
 	if err != nil {
 		return nil, nil, err
 	}
+	// Cheap dependency checks come before loading the model, so a missing
+	// engine or image is reported at once and with its fix.
+	sb, err := a.sandbox(f.unsafeNoSandbox)
+	if err != nil {
+		return nil, nil, err
+	}
+	if c, ok := sb.(sandbox.Checker); ok {
+		if err := c.Check(ctx); err != nil {
+			return nil, nil, err
+		}
+	}
+	argv, err := a.adapterArgv(sb)
+	if err != nil {
+		return nil, nil, err
+	}
+	timeout := a.Config.Inference.RequestTimeout.D()
 	// Inference endpoint.
 	var ep inference.Endpoint
 	if rt := a.inferenceRuntime(); rt != nil {
@@ -89,16 +105,10 @@ func (a *App) buildRunnerWith(ctx context.Context, f runFlags, db *sql.DB, paths
 		}
 	} else {
 		ep = inference.Endpoint{BaseURL: a.Config.Inference.ExternalURL, Model: p.Name}
+		if err := a.checkExternalInference(ctx); err != nil {
+			return nil, nil, err
+		}
 	}
-	sb, err := a.sandbox(f.unsafeNoSandbox)
-	if err != nil {
-		return nil, nil, err
-	}
-	argv, err := a.adapterArgv(sb)
-	if err != nil {
-		return nil, nil, err
-	}
-	timeout := a.Config.Inference.RequestTimeout.D()
 	newGW := func(taskID string, maxTokens int) *inference.Gateway {
 		return &inference.Gateway{Client: inference.NewClient(ep.BaseURL, timeout), Model: ep.Model, DB: db,
 			TaskID: taskID, Source: "agent", MaxTokens: maxTokens}
@@ -111,11 +121,19 @@ func (a *App) buildRunnerWith(ctx context.Context, f runFlags, db *sql.DB, paths
 	default:
 		return nil, nil, fmt.Errorf("agent runtime %q cannot run tasks from the CLI", a.Config.Agent.Runtime)
 	}
-	intel := &cbm.Client{Binary: a.Config.RepoIntel.Binary, CacheDir: filepath.Join(paths.Cache, "codebase-memory")}
-	cleanup := func() { _ = intel.Close() }
-	if err := intel.Open(ctx); err != nil {
-		a.Log.Warn("repository intelligence unavailable; continuing without graph context", "err", err)
-		cleanup = func() {}
+	// Repository intelligence is optional for a run: one warning names the
+	// problem and its fix, and the run continues without graph context.
+	var intel *cbm.Client
+	cleanup := func() {}
+	if err := cbm.Preflight(ctx, a.Config.RepoIntel.Binary); err != nil {
+		fmt.Fprintf(a.Err, "warning: %v (continuing without graph context)\n", err)
+	} else {
+		intel = &cbm.Client{Binary: a.Config.RepoIntel.Binary, CacheDir: filepath.Join(paths.Cache, "codebase-memory")}
+		cleanup = func() { _ = intel.Close() }
+		if err := intel.Open(ctx); err != nil {
+			a.Log.Warn("persistent repository-intelligence session unavailable; using the one-shot CLI", "err", err)
+			cleanup = func() {}
+		}
 	}
 	switch f.serena {
 	case "on":
@@ -133,7 +151,7 @@ func (a *App) buildRunnerWith(ctx context.Context, f runFlags, db *sql.DB, paths
 	}
 	gomodcache, _ := exec.CommandContext(ctx, "go", "env", "GOMODCACHE").Output()
 	r := &orchestrator.Runner{
-		DB: db, Ledger: task.Ledger{DB: db}, Rec: rec, Agent: rt, Intel: intel,
+		DB: db, Ledger: task.Ledger{DB: db}, Rec: rec, Agent: rt,
 		Verify: &verify.Engine{Sandbox: sb, CacheDir: filepath.Join(paths.Cache, "build"), GoModCache: strings.TrimSpace(string(gomodcache)), DB: db, Rec: rec},
 		Cfg:    a.Config, Paths: paths, Model: p.Name, CtxSize: p.Server.CtxSize, Log: a.Log, Out: a.Err,
 		CondenseEachRetry: f.condenseRetry,
@@ -141,6 +159,9 @@ func (a *App) buildRunnerWith(ctx context.Context, f runFlags, db *sql.DB, paths
 	}
 	if nav != nil {
 		r.Nav = nav // assigned only when usable: a nil *Navigator is a non-nil interface
+	}
+	if intel != nil {
+		r.Intel = intel // likewise
 	}
 	r.WS = workspace.Store{DB: db}
 	if rt := a.inferenceRuntime(); rt != nil {
@@ -604,18 +625,14 @@ func newSandboxCmd(app *App) *cobra.Command {
 	build := &cobra.Command{
 		Use: "build", Short: "Build the sandbox image locally (never pushed)",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if dir == "" {
-				if app.Config.Agent.AdapterDir == "" {
-					return errors.New("pass --dir adapters/openhands (or set agent.adapter_dir)")
-				}
+			if dir == "" && app.Config.Agent.AdapterDir != "" {
 				dir = filepath.Dir(app.Config.Agent.AdapterDir)
 			}
-			c := exec.CommandContext(cmd.Context(), app.Config.Sandbox.Engine, "build", "-t", app.Config.Agent.Image, dir)
-			c.Stdout, c.Stderr = app.Err, app.Err
-			return c.Run()
+			// Without a checkout the build context embedded in the binary is used.
+			return app.buildSandboxImage(cmd.Context(), dir, app.Err)
 		},
 	}
-	build.Flags().StringVar(&dir, "dir", "", "directory containing the sandbox Dockerfile (adapters/openhands)")
+	build.Flags().StringVar(&dir, "dir", "", "directory containing the sandbox Dockerfile (default: agent.adapter_dir's parent, else the copy built into this binary)")
 	cmd.AddCommand(build)
 	return cmd
 }

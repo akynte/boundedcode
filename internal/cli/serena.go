@@ -15,6 +15,7 @@ import (
 	"golang.org/x/term"
 
 	"github.com/akynte/boundedcode/configs"
+	"github.com/akynte/boundedcode/internal/buildinfo"
 	"github.com/akynte/boundedcode/internal/config"
 	"github.com/akynte/boundedcode/internal/repointel"
 	"github.com/akynte/boundedcode/internal/repointel/serena"
@@ -52,7 +53,7 @@ func (a *App) serenaNavigator(ctx context.Context, paths config.Paths) (*serena.
 	m := a.serenaManager(paths)
 	if err := m.Verify(ctx); err != nil {
 		a.Log.Warn("serena enabled but unusable; continuing without LSP navigation", "err", err)
-		fmt.Fprintf(a.Err, "serena: %v (continuing without it; see `%s serena status`)\n", err, "boundedcode")
+		fmt.Fprintf(a.Err, "serena: %v (continuing without it; see `%s serena status`)\n", err, buildinfo.Command())
 		return nil, func() {}
 	}
 	return &serena.Navigator{M: m}, func() { _ = m.Close() }
@@ -74,14 +75,14 @@ func serenaChecks(ctx context.Context, app *App, probe bool) []check {
 	inst, err := serena.Detect(ctx, exe)
 	if errors.Is(err, serena.ErrNotInstalled) {
 		return []check{{"serena", optional, fmt.Sprintf("not installed (%s); %s in config", exe, state),
-			"optional LSP symbol navigation: `boundedcode serena setup`"}}
+			"optional LSP symbol navigation: `" + buildinfo.Command() + " serena setup`"}}
 	}
 	if err != nil {
-		return []check{{"serena", statusWarn, err.Error(), "reinstall with `boundedcode serena setup --reinstall`"}}
+		return []check{{"serena", statusWarn, err.Error(), "reinstall with `" + buildinfo.Command() + " serena setup --reinstall`"}}
 	}
 	if err := serena.Check(inst); err != nil {
 		return []check{{"serena", statusWarn, fmt.Sprintf("detected %s at %s: not supported", firstNonEmpty(inst.PackageVersion, inst.CLIVersion), inst.Executable),
-			err.Error() + ". Your installation is left unchanged; `boundedcode serena setup` installs the pinned v" + serena.RequiredVersion + " separately"}}
+			err.Error() + ". Your installation is left unchanged; `" + buildinfo.Command() + " serena setup` installs the pinned v" + serena.RequiredVersion + " separately"}}
 	}
 	out := []check{{"serena", statusOK, fmt.Sprintf("v%s (license %s, LICENSE sha256 verified; commit %.8s), %s (%s)",
 		inst.PackageVersion, serena.ExpectedLicense, serena.PinnedCommit, state, inst.Executable), ""}}
@@ -99,7 +100,7 @@ func serenaChecks(ctx context.Context, app *App, probe bool) []check {
 		t0 := time.Now()
 		if err := serena.ProbeLanguage(ctx, m, lang, false); err != nil {
 			out = append(out, check{name, statusWarn, "MCP start or language server failed: " + trunc(err.Error(), 300),
-				"run `boundedcode serena setup` (installs language servers); logs in " + m.LogDir})
+				"run `" + buildinfo.Command() + " serena setup` (installs language servers); logs in " + m.LogDir})
 			continue
 		}
 		out = append(out, check{name, statusOK, fmt.Sprintf("MCP start and symbol lookup ok (%.1fs)", time.Since(t0).Seconds()), ""})

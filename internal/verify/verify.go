@@ -16,8 +16,10 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/akynte/boundedcode/internal/buildinfo"
 	"github.com/akynte/boundedcode/internal/config"
 	"github.com/akynte/boundedcode/internal/gitops"
 	"github.com/akynte/boundedcode/internal/policy"
@@ -123,6 +125,36 @@ type Engine struct {
 	Rec        *telemetry.Recorder
 	// Gitleaks is the secret scanner binary ("" = gitleaks on PATH).
 	Gitleaks string
+
+	// engineCheck caches the sandbox's diagnosis of a failed stage start
+	// (engineCheckTTL), so a daemon that hangs costs one probe, not one per
+	// stage.
+	engineMu      sync.Mutex
+	engineChecked time.Time
+	engineErr     error
+}
+
+// engineCheckTTL is how long a sandbox diagnosis is reused.
+const engineCheckTTL = time.Minute
+
+// checkSandbox diagnoses the sandbox (nil: ready, or not diagnosable),
+// reusing a recent result.
+func (e *Engine) checkSandbox(ctx context.Context) error {
+	c, ok := e.Sandbox.(sandbox.Checker)
+	if !ok {
+		return nil
+	}
+	e.engineMu.Lock()
+	defer e.engineMu.Unlock()
+	if !e.engineChecked.IsZero() && time.Since(e.engineChecked) < engineCheckTTL {
+		return e.engineErr
+	}
+	err := c.Check(ctx)
+	if ctx.Err() != nil {
+		return err // cancelled: do not cache
+	}
+	e.engineChecked, e.engineErr = time.Now(), err
+	return err
 }
 
 // RepoTarget identifies what to verify.
@@ -408,7 +440,7 @@ func (e *Engine) secretScan(ctx context.Context, t RepoTarget, scope Scope) Stag
 	if err != nil {
 		sr.Status, sr.Output = "skipped", "gitleaks not installed"
 		if scope == Full {
-			sr.Status, sr.Output = "error", "gitleaks not installed: the full gate requires a secret scan (scripts/install-deps.sh installs it)"
+			sr.Status, sr.Output = "error", "gitleaks not installed: the full gate requires a secret scan (run `"+buildinfo.Command()+" setup --only tools` to install it)"
 		}
 		return sr
 	}
@@ -500,6 +532,10 @@ func (e *Engine) runStageFull(ctx context.Context, t RepoTarget, st Stage, packa
 	switch {
 	case err == nil:
 		sr.Status = "pass"
+	case errors.Is(err, exec.ErrNotFound) && e.Sandbox.Isolated():
+		// The container engine itself is missing: an environment error,
+		// never the stage's tool, and never skipped.
+		sr.Status, sr.Output = "error", e.engineMissing(ctx, err)
 	case errors.Is(err, exec.ErrNotFound):
 		// Host execution (sandbox none) of a tool that is not installed.
 		if st.Optional {
@@ -509,6 +545,16 @@ func (e *Engine) runStageFull(ctx context.Context, t RepoTarget, st Stage, packa
 		}
 	case sctx.Err() != nil:
 		sr.Status, sr.Output = "fail", "timeout after "+timeout.String()+"\n"+sr.Output
+	case errors.As(err, &ee) && ee.ExitCode() == 125 && e.Sandbox.Isolated():
+		sr.ExitCode = ee.ExitCode()
+		// The engine could not start the stage (daemon down, image missing):
+		// an environment error, not the change's fault. Either way the
+		// stage does not pass.
+		if msg, ok := e.engineFailure(ctx, err, full); ok {
+			sr.Status, sr.Output = "error", msg+"\n"+sr.Output
+		} else {
+			sr.Status = "fail"
+		}
 	case errors.As(err, &ee):
 		sr.ExitCode = ee.ExitCode()
 		// 127 = command not found (in the sandbox, docker reports 127 too).
@@ -524,6 +570,32 @@ func (e *Engine) runStageFull(ctx context.Context, t RepoTarget, st Stage, packa
 		sr.Digest = FailureDigest(full, 3000)
 	}
 	return sr, full
+}
+
+// engineFailure explains a stage that exited 125 in a container sandbox
+// when the engine, not the stage, failed: the engine is not ready, or its
+// own error is what the stage printed. A stage's own exit 125 stays a
+// failure (ok false).
+func (e *Engine) engineFailure(ctx context.Context, runErr error, output string) (string, bool) {
+	if _, ok := e.Sandbox.(sandbox.Checker); !ok {
+		return "", false
+	}
+	if err := e.checkSandbox(ctx); err != nil {
+		return "sandbox unavailable: " + err.Error(), true
+	}
+	if sandbox.EngineFailure(e.Sandbox.Name(), 125, output) {
+		return "container engine " + e.Sandbox.Name() + " could not run the stage: " + runErr.Error(), true
+	}
+	return "", false
+}
+
+// engineMissing explains a container sandbox whose engine binary is not
+// installed, with its fix when the engine can be diagnosed.
+func (e *Engine) engineMissing(ctx context.Context, runErr error) string {
+	if err := e.checkSandbox(ctx); err != nil {
+		return "sandbox unavailable: " + err.Error()
+	}
+	return "sandbox " + e.Sandbox.Name() + " could not run the stage: " + runErr.Error()
 }
 
 func (e *Engine) spec(t RepoTarget, argv []string) (sandbox.Spec, error) {
