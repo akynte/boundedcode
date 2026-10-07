@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -57,6 +58,9 @@ func (e *EngineError) Hint() string {
 	case errors.Is(e.Kind, ErrEngineMissing):
 		return "install Docker (https://docs.docker.com/engine/install/) or Podman, then run " + setup
 	case errors.Is(e.Kind, ErrEngineUnreachable):
+		if runtime.GOOS == "darwin" || runtime.GOOS == "windows" {
+			return "start Docker Desktop (or, with Podman, `podman machine start`), then run " + setup
+		}
 		if filepath.Base(e.Engine) == "docker" {
 			return "start it (e.g. `sudo systemctl start docker`) and add your user to the docker group (`sudo usermod -aG docker $USER`, then log in again)"
 		}

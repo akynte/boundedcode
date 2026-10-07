@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -282,7 +283,7 @@ func cbmCheck(ctx context.Context, binary string) check {
 func llamaCUDACheck(ctx context.Context, binary string) check {
 	bin, err := exec.LookPath(binary)
 	if err != nil {
-		return check{"llama.cpp CUDA", statusWarn, err.Error(), ""}
+		return check{"llama.cpp GPU", statusWarn, err.Error(), ""}
 	}
 	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
@@ -291,19 +292,24 @@ func llamaCUDACheck(ctx context.Context, binary string) check {
 	cmd.Env = append(os.Environ(), "LD_LIBRARY_PATH="+strings.Trim(filepath.Dir(bin)+string(os.PathListSeparator)+os.Getenv("LD_LIBRARY_PATH"), string(os.PathListSeparator)))
 	b, err := cmd.CombinedOutput()
 	if err != nil {
-		return check{"llama.cpp CUDA", statusWarn, fmt.Sprintf("--list-devices: %v %s", err, firstMeaningfulLine(string(b))),
+		return check{"llama.cpp GPU", statusWarn, fmt.Sprintf("--list-devices: %v %s", err, firstMeaningfulLine(string(b))),
 			"llama.cpp may be too old for --list-devices; rebuild it: " + setupHint("inference", "--force")}
 	}
 	var devs []string
 	for l := range strings.SplitSeq(string(b), "\n") {
-		if l = strings.TrimSpace(l); strings.HasPrefix(l, "CUDA") {
+		// GPU devices: CUDA0, MTL0 (Metal), Vulkan0.
+		if l = strings.TrimSpace(l); strings.HasPrefix(l, "CUDA") || strings.HasPrefix(l, "MTL") || strings.HasPrefix(l, "Vulkan") {
 			devs = append(devs, l)
 		}
 	}
 	if len(devs) == 0 {
-		return check{"llama.cpp CUDA", statusWarn, "no CUDA device listed (CPU-only build or driver problem)", "install the NVIDIA driver and CUDA toolkit (nvcc), then rebuild llama.cpp: " + setupHint("inference", "--force")}
+		hint := "install the NVIDIA driver and CUDA toolkit (nvcc), then rebuild llama.cpp: " + setupHint("inference", "--force")
+		if runtime.GOOS == "darwin" {
+			hint = "Metal needs an Apple Silicon Mac; on an Intel Mac llama.cpp runs on the CPU"
+		}
+		return check{"llama.cpp GPU", statusWarn, "no GPU device listed (CPU-only build or driver problem)", hint}
 	}
-	return check{"llama.cpp CUDA", statusOK, strings.Join(devs, "; "), ""}
+	return check{"llama.cpp GPU", statusOK, strings.Join(devs, "; "), ""}
 }
 
 var openhandsPinRE = regexp.MustCompile(`"openhands-sdk==([^"]+)"`)

@@ -98,20 +98,29 @@ what is already done:
 
 1. **Configuration:** written automatically with default paths.
 2. **Repository tools:** pinned, checksum-verified codebase-memory-mcp and
-   gitleaks, installed into `~/.local/share/boundedcode/bin`.
-3. **Inference server:** the pinned llama.cpp built from source, with CUDA
-   when it is available. This needs git, cmake and a C++ compiler. To use a
-   server you already run, set `inference.mode: external` instead.
+   gitleaks for this OS and CPU, installed into
+   `~/.local/share/boundedcode/bin`.
+3. **Inference server:** the pinned llama.cpp. On Linux with git, cmake and a
+   C++ compiler it is built from source (with CUDA when an NVIDIA GPU is
+   present), which is the validated build; otherwise, and on macOS and
+   Windows, the official prebuilt release of the same commit is downloaded
+   and checked against its pinned sha256 (Metal on Apple Silicon, CUDA 12.4
+   on Windows with an NVIDIA GPU, else CPU). To use a server you already
+   run, set `inference.mode: external` instead. Not needed with a cloud
+   provider.
 4. **Model weights:** the default profile's GGUF at a pinned revision,
    checksum-verified. This is a large download; review the model license
    first.
 5. **Sandbox image:** built locally with Docker from a build context embedded
    in the binary. It is never pushed.
+6. **Frontier container:** only on macOS and Windows with contained frontier
+   escalation enabled: a pinned Linux build of the Codex CLI, mounted into
+   the frontier container in place of this machine's own codex.
 
 Every step that downloads or builds asks first, and declining leaves it for
 later. `bcode setup --check` reports the state; `bcode setup --yes` runs
 everything without asking. `--only` names steps (`config`, `tools`,
-`inference`, `model`, `sandbox`), and `--only STEP --force` runs a step that
+`inference`, `model`, `sandbox`, `frontier`), and `--only STEP --force` runs a step that
 already looks complete, for example `bcode setup --only inference --force`
 to rebuild llama.cpp with CUDA after installing the CUDA toolkit. `--force`
 never rewrites the configuration. Error messages for a missing dependency

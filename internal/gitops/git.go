@@ -13,6 +13,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/akynte/boundedcode/internal/pathutil"
 )
 
 // hardening disables every git mechanism that executes repository-controlled
@@ -253,8 +255,11 @@ func CheckWorktree(worktree, commonDir string) error {
 		return fmt.Errorf("worktree %s: .git is not a gitdir pointer", worktree)
 	}
 	ptr = filepath.Clean(ptr)
-	want := filepath.Join(filepath.Clean(commonDir), "worktrees") + string(filepath.Separator)
-	if !strings.HasPrefix(ptr, want) || strings.Contains(strings.TrimPrefix(ptr, want), string(filepath.Separator)) {
+	// Compare resolved paths, case-folded where the file system folds case:
+	// git may record /private/var/... for a /var/... common dir on macOS.
+	want := filepath.Join(pathutil.Resolve(commonDir), "worktrees")
+	rptr := pathutil.Resolve(ptr)
+	if !pathutil.Within(rptr, want) || pathutil.Equal(rptr, want) || strings.ContainsRune(rptr[len(want)+1:], filepath.Separator) {
 		return fmt.Errorf("worktree %s: .git points to %s, outside %s (tampered?)", worktree, ptr, want)
 	}
 	if fi, err := os.Lstat(ptr); err != nil || !fi.IsDir() {
@@ -296,12 +301,7 @@ func CheckTaskWorktree(worktree, commonDir, branch string) error {
 }
 
 func sameDir(a, b string) bool {
-	ra, err1 := filepath.EvalSymlinks(a)
-	rb, err2 := filepath.EvalSymlinks(b)
-	if err1 != nil || err2 != nil {
-		return filepath.Clean(a) == filepath.Clean(b)
-	}
-	return ra == rb
+	return pathutil.Equal(pathutil.Resolve(a), pathutil.Resolve(b))
 }
 
 var (

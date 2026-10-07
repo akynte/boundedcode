@@ -273,7 +273,7 @@ func TestSetupCheckAndConfigStep(t *testing.T) {
 	for _, s := range steps {
 		names = append(names, s.Name)
 	}
-	if strings.Join(names, ",") != "config,tools,inference,model,sandbox" {
+	if strings.Join(names, ",") != "config,tools,inference,model,sandbox,frontier" {
 		t.Fatalf("steps = %v", names)
 	}
 	if steps[0].OK {
@@ -310,7 +310,7 @@ func TestSetupCheckAndConfigStep(t *testing.T) {
 }
 
 func TestEmbeddedSetupAssets(t *testing.T) {
-	for _, f := range []string{"scripts/install-deps.sh", "scripts/build-llama-cpp.sh"} {
+	for _, f := range []string{"scripts/build-llama-cpp.sh"} {
 		if _, err := boundedcode.SetupScripts.ReadFile(f); err != nil {
 			t.Errorf("%s not embedded: %v", f, err)
 		}

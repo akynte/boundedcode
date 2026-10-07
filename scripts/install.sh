@@ -20,13 +20,24 @@ REPO="${BC_REPO:-akynte/boundedcode}"
 GIT_URL="${BC_GIT_URL:-https://github.com/$REPO.git}"
 BIN_DIR="${BC_BIN_DIR:-$HOME/.local/bin}"
 VERSION="${BC_VERSION:-}"
-ASSET="boundedcode-linux-amd64"
 
 say() { printf '\033[1;35m◆\033[0m %s\n' "$*"; }
 die() { printf '\033[1;31m✘\033[0m %s\n' "$*" >&2; exit 1; }
 
-[ "$(uname -s)" = Linux ] || die "BoundedCode supports Linux only for now."
-[ "$(uname -m)" = x86_64 ] || die "BoundedCode supports x86_64 only for now (found $(uname -m))."
+case "$(uname -s)" in
+  Linux) OS=linux ;;
+  Darwin) OS=darwin ;;
+  *) die "this installer supports Linux and macOS; on Windows use scripts/install.ps1." ;;
+esac
+case "$(uname -m)" in
+  x86_64|amd64) ARCH=amd64 ;;
+  arm64|aarch64) ARCH=arm64 ;;
+  *) die "unsupported CPU $(uname -m) (amd64 and arm64 are supported)." ;;
+esac
+ASSET="boundedcode-$OS-$ARCH"
+if command -v sha256sum >/dev/null; then sha256() { sha256sum -c --quiet -; }
+elif command -v shasum >/dev/null; then sha256() { shasum -a 256 -c --quiet -; }
+else die "sha256sum or shasum is required to verify the download."; fi
 command -v curl >/dev/null || die "curl is required."
 command -v git >/dev/null || die "git is required (BoundedCode works on git repositories)."
 
@@ -39,7 +50,9 @@ try_release() {
   local base="https://github.com/$REPO/releases/download/$1"
   curl -fsSL -o "$tmp/$ASSET" "$base/$ASSET" 2>/dev/null || return 1
   curl -fsSL -o "$tmp/SHA256SUMS" "$base/SHA256SUMS" 2>/dev/null || die "release $1 has no SHA256SUMS; refusing an unverified binary"
-  (cd "$tmp" && grep " $ASSET\$" SHA256SUMS | sha256sum -c --quiet -) || die "checksum mismatch for $ASSET ($1)"
+  line="$(grep " $ASSET\$" "$tmp/SHA256SUMS" || true)"
+  [ -n "$line" ] || die "release $1 lists no checksum for $ASSET"
+  (cd "$tmp" && printf '%s\n' "$line" | sha256) || die "checksum mismatch for $ASSET ($1)"
   chmod 0755 "$tmp/$ASSET"
   say "downloaded release $1 (checksum verified)"
 }

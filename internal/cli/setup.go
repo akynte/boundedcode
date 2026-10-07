@@ -20,6 +20,7 @@ import (
 	"github.com/akynte/boundedcode/internal/config"
 	"github.com/akynte/boundedcode/internal/inference"
 	"github.com/akynte/boundedcode/internal/inference/llamacpp"
+	"github.com/akynte/boundedcode/internal/install"
 	"github.com/akynte/boundedcode/internal/model"
 	"github.com/akynte/boundedcode/internal/repointel/cbm"
 	"github.com/akynte/boundedcode/internal/sandbox"
@@ -110,18 +111,23 @@ func setupSteps() []setupStep {
 				if _, err := exec.LookPath("gitleaks"); err != nil {
 					tools = append(tools, "gitleaks")
 				}
-				return a.runSetupScript(ctx, "install-deps.sh", append([]string{a.toolsDir()}, tools...)...)
+				for _, t := range tools {
+					pins := install.Gitleaks
+					if t == "codebase-memory-mcp" {
+						pins = install.CBM
+					}
+					if err := a.installTool(ctx, t, pins); err != nil {
+						return err
+					}
+				}
+				return nil
 			},
 		},
 		{
 			Name: "inference", Title: "Local inference server (llama.cpp)",
 			Ask: func(a *App) string {
-				gpu := "CPU-only (no NVIDIA GPU or CUDA toolkit found)"
-				if _, err := exec.LookPath("nvidia-smi"); err == nil {
-					gpu = "with CUDA"
-				}
-				return "Build the pinned llama.cpp v0.5.0 from source " + gpu + " into " + a.llamaPrefix() +
-					"? This needs git, cmake and a C++ compiler and takes several minutes. (To use a server you already run, set inference.mode: external and inference.external_url in " + a.configFile() + " instead.)"
+				return llamaPlan() + " into " + a.llamaPrefix() +
+					"? (To use a server you already run, set inference.mode: external and inference.external_url in " + a.configFile() + " instead, or choose a cloud provider with /setup.)"
 			},
 			check: func(ctx context.Context, a *App) (bool, string) {
 				c := a.Config.Inference
@@ -142,27 +148,21 @@ func setupSteps() []setupStep {
 				return true, v
 			},
 			run: func(ctx context.Context, a *App) error {
-				var missing []string
-				for _, t := range []string{"git", "cmake"} {
-					if _, err := exec.LookPath(t); err != nil {
-						missing = append(missing, t)
-					}
-				}
-				if _, err := exec.LookPath("c++"); err != nil {
-					if _, err := exec.LookPath("g++"); err != nil {
-						missing = append(missing, "a C++ compiler (g++)")
-					}
-				}
-				if len(missing) > 0 {
-					return fmt.Errorf("building llama.cpp needs %s; install them (e.g. `sudo apt install git cmake build-essential`) and run setup again", strings.Join(missing, ", "))
-				}
-				if err := a.runSetupScript(ctx, "build-llama-cpp.sh", "v0.5.0", a.llamaPrefix()); err != nil {
-					return err
-				}
 				bin := filepath.Join(a.llamaPrefix(), "bin")
+				if useLlamaSourceBuild() {
+					// Linux with a compiler: the validated, locally tuned build.
+					if err := a.runSetupScript(ctx, "build-llama-cpp.sh", install.LlamaTag, a.llamaPrefix()); err != nil {
+						return err
+					}
+				} else {
+					var err error
+					if bin, err = a.installLlamaPrebuilt(ctx); err != nil {
+						return err
+					}
+				}
 				return a.updateConfig(func(c *config.Config) {
-					c.Inference.ServerBinary = filepath.Join(bin, "llama-server")
-					c.Inference.BenchBinary = filepath.Join(bin, "llama-bench")
+					c.Inference.ServerBinary = filepath.Join(bin, exeName("llama-server"))
+					c.Inference.BenchBinary = filepath.Join(bin, exeName("llama-bench"))
 				})
 			},
 		},
@@ -236,6 +236,22 @@ func setupSteps() []setupStep {
 			run: func(ctx context.Context, a *App) error {
 				return a.buildSandboxImage(ctx, "", a.Out)
 			},
+		},
+		{
+			Name: "frontier", Title: "Frontier container (Codex for Linux)",
+			Ask: func(a *App) string {
+				return fmt.Sprintf("Download the Linux build of the Codex CLI %s (about 100 MB, checksum-verified) for the contained frontier route? This machine's own codex cannot run inside the Linux container.", install.CodexVersion)
+			},
+			check: func(_ context.Context, a *App) (bool, string) {
+				if !a.needsContainerCodex() {
+					return true, "not needed"
+				}
+				if _, err := os.Stat(a.containerCodex()); err != nil {
+					return false, "the contained frontier route needs a Linux codex"
+				}
+				return true, a.containerCodex()
+			},
+			run: func(ctx context.Context, a *App) error { return a.installContainerCodex(ctx) },
 		},
 	}
 }
@@ -441,7 +457,7 @@ installed under your user directories.`,
 	}
 	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "do not ask before downloads and builds")
 	cmd.Flags().BoolVar(&check, "check", false, "only report what is missing")
-	cmd.Flags().StringSliceVar(&only, "only", nil, "run only these steps: config,tools,inference,model,sandbox")
+	cmd.Flags().StringSliceVar(&only, "only", nil, "run only these steps: config,tools,inference,model,sandbox,frontier")
 	cmd.Flags().BoolVar(&force, "force", false, "with --only: run the named steps even if they look complete (not config)")
 	return cmd
 }

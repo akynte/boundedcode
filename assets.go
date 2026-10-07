@@ -7,7 +7,7 @@ import "embed"
 
 // SetupScripts are the pinned installers run by `setup`.
 //
-//go:embed scripts/install-deps.sh scripts/build-llama-cpp.sh
+//go:embed scripts/build-llama-cpp.sh
 var SetupScripts embed.FS
 
 // SandboxContext is the build context of the agent sandbox image

@@ -13,6 +13,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
+	"runtime"
 	"slices"
 	"sort"
 	"strings"
@@ -568,6 +570,10 @@ func (e *Engine) runStageFull(ctx context.Context, t RepoTarget, st Stage, packa
 	}
 	if sr.Status == "fail" || sr.Status == "error" {
 		sr.Digest = FailureDigest(full, 3000)
+		if hint := foreignDependencyHint(full, e.Sandbox); hint != "" {
+			sr.Output = hint + "\n" + sr.Output
+			sr.Digest = hint + "\n" + sr.Digest
+		}
 	}
 	return sr, full
 }
@@ -784,4 +790,23 @@ func LoadRuns(ctx context.Context, db *sql.DB, taskID string, limit int) ([]Resu
 		out = append(out, r)
 	}
 	return out, rows.Err()
+}
+
+// foreignDeps match JavaScript dependencies installed for another platform
+// failing to load in the Linux sandbox (esbuild, rollup, swc and other
+// native addons).
+var foreignDeps = regexp.MustCompile(`installed esbuild for another platform|Cannot find module '@rollup/rollup-linux|` +
+	`Failed to load native binding|invalid ELF header|not a valid Win32 application|Exec format error|` +
+	`@[a-z0-9-]+/[a-z0-9-]*-(darwin|win32)-(arm64|x64)`)
+
+// foreignDependencyHint explains a stage that failed because the checkout's
+// node_modules were installed on macOS or Windows: verification mounts them
+// read-only into a Linux container, where native packages do not load.
+func foreignDependencyHint(out string, sb sandbox.Sandbox) string {
+	if runtime.GOOS == "linux" || sb == nil || !sb.Isolated() || !foreignDeps.MatchString(out) {
+		return ""
+	}
+	return "hint: the repository's node_modules were installed on " + runtime.GOOS +
+		"; packages with native code do not load in the Linux sandbox. Install Linux dependencies into the checkout, " +
+		"for example `docker run --rm -v \"$PWD\":/w -w /w node:22 npm ci` (this replaces node_modules; reinstall for this machine afterwards if you also run the project here)."
 }

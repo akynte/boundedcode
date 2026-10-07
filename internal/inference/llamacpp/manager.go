@@ -1,7 +1,6 @@
 package llamacpp
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -15,7 +14,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/akynte/boundedcode/internal/buildinfo"
@@ -88,24 +86,6 @@ func (m *Manager) readState() (*serverState, error) {
 		return nil, fmt.Errorf("corrupt %s: %w", m.statePath(), err)
 	}
 	return &s, nil
-}
-
-// alive reports whether pid is a running llama-server (guards against PID reuse).
-func alive(pid int) bool {
-	if pid <= 0 || syscall.Kill(pid, 0) != nil {
-		return false
-	}
-	b, err := os.ReadFile(fmt.Sprintf("/proc/%d/cmdline", pid))
-	if err != nil {
-		return false
-	}
-	if st, err := os.ReadFile(fmt.Sprintf("/proc/%d/stat", pid)); err == nil {
-		// Field 3 is the state; Z means zombie (exited, not yet reaped).
-		if i := bytes.LastIndexByte(st, ')'); i > 0 && i+2 < len(st) && st[i+2] == 'Z' {
-			return false
-		}
-	}
-	return bytes.Contains(b, []byte("llama-server"))
 }
 
 // Ensure implements inference.Runtime.
@@ -181,9 +161,9 @@ func (m *Manager) start(ctx context.Context, p model.Profile, args []string, has
 	// Deliberately not exec.CommandContext: the server must outlive ctx.
 	cmd := exec.Command(bin, args...) //nolint:noctx // the server must outlive ctx and this process
 	cmd.Stdout, cmd.Stderr = logf, logf
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	cmd.SysProcAttr = detachedAttr()
 	// Prebuilt release archives ship shared libraries next to the binary.
-	cmd.Env = append(os.Environ(), "LD_LIBRARY_PATH="+joinEnvPath(filepath.Dir(bin), os.Getenv("LD_LIBRARY_PATH")))
+	cmd.Env = libraryEnv(bin)
 	started := time.Now()
 	if err := cmd.Start(); err != nil {
 		return 0, fmt.Errorf("start llama-server: %w", err)
@@ -269,8 +249,7 @@ func (m *Manager) Stop(ctx context.Context) error {
 		return err
 	}
 	if alive(st.PID) {
-		// Setsid made the server a process-group leader: signal the group.
-		_ = syscall.Kill(-st.PID, syscall.SIGTERM)
+		_ = terminate(st.PID)
 		deadline := time.Now().Add(30 * time.Second)
 		for alive(st.PID) && time.Now().Before(deadline) {
 			select {
@@ -280,7 +259,7 @@ func (m *Manager) Stop(ctx context.Context) error {
 			}
 		}
 		if alive(st.PID) {
-			_ = syscall.Kill(-st.PID, syscall.SIGKILL)
+			_ = kill(st.PID)
 		}
 	}
 	if err := os.Remove(m.statePath()); err != nil && !errors.Is(err, os.ErrNotExist) {
@@ -338,7 +317,7 @@ func Version(ctx context.Context, binary string) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, bin, "--version")
-	cmd.Env = append(os.Environ(), "LD_LIBRARY_PATH="+joinEnvPath(filepath.Dir(bin), os.Getenv("LD_LIBRARY_PATH")))
+	cmd.Env = libraryEnv(bin)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("%s --version: %w", bin, err)

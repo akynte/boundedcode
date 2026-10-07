@@ -2,6 +2,34 @@
 
 ## Unreleased
 
+### macOS (experimental; compiled and unit-tested, not yet run on a Mac)
+
+- Builds for macOS (arm64 and amd64). The llama.cpp manager checks and
+  stops its server through the kernel's process table on macOS instead of
+  `/proc`; hardware detection reads `sysctl` (Apple Silicon unified memory
+  for Metal).
+- Set-up installs tools without bash, curl or a compiler: gitleaks,
+  codebase-memory-mcp and prebuilt llama.cpp (the release build of the
+  pinned commit: Metal on Apple Silicon) are downloaded for this OS and CPU
+  and checked against pinned sha256 values. Linux with a compiler keeps the
+  validated source build of llama.cpp; without one it uses the prebuilt
+  build (CUDA 12.8 or CPU).
+- The sandbox caps its CPU and memory requests to what Docker Desktop's (or
+  Podman machine's) VM has, instead of failing to start.
+- Path checks compare case-insensitively on macOS and Windows and resolve
+  `/var` → `/private/var`; the forbidden-mount list adds the macOS keychain
+  and the macOS and Windows cloud-CLI credential folders.
+- Build-tag checks target Linux (the sandbox), not the host OS.
+- `doctor` accepts Metal and Vulkan devices and gives Docker Desktop hints on
+  macOS and Windows.
+- Contained frontier escalation on macOS and Windows mounts a pinned Linux
+  build of the Codex CLI (setup step `frontier`), since the host's codex
+  cannot run in the Linux container.
+- A verification stage that fails because `node_modules` were installed for
+  macOS or Windows says so and how to install Linux dependencies.
+- The installer supports macOS and Linux arm64 (`shasum` when `sha256sum`
+  is missing).
+
 ### Set-up wizard in the interface (experimental)
 
 - `/setup` (and `m` in System, `p` in Runtime, or the palette) opens a

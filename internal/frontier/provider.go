@@ -45,6 +45,10 @@ type CodexContainer struct {
 	Image  string // any image with CA certificates (the agent sandbox image works)
 	UID    int
 	GID    int
+	// LinuxBinary is a Linux build of codex to mount instead of the host's
+	// (macOS and Windows hosts: their codex cannot run in a Linux
+	// container). "" mounts the host binary (Linux hosts).
+	LinuxBinary string
 }
 
 // Name implements Provider.
@@ -140,12 +144,17 @@ func tailStr(s string, n int) string {
 // empty cwd and the output file) live under dir, which is mounted at the
 // same path. CODEX_HOME is mounted read-write for token refresh.
 func (c *Codex) containerCmd(ctx context.Context, args []string, dir string) (*exec.Cmd, error) {
-	bin, err := exec.LookPath(c.Binary)
-	if err != nil {
-		return nil, err
-	}
-	if bin, err = filepath.EvalSymlinks(bin); err != nil {
-		return nil, err
+	bin := c.Container.LinuxBinary
+	if bin == "" {
+		var err error
+		if bin, err = exec.LookPath(c.Binary); err != nil {
+			return nil, err
+		}
+		if bin, err = filepath.EvalSymlinks(bin); err != nil {
+			return nil, err
+		}
+	} else if _, err := os.Stat(bin); err != nil {
+		return nil, fmt.Errorf("the Linux codex build for the frontier container is missing (%s): run `setup --only frontier`", bin)
 	}
 	codexHome := os.Getenv("CODEX_HOME")
 	if codexHome == "" {

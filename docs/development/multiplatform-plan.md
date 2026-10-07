@@ -129,6 +129,16 @@ Windows probes compile but have not run on those systems.
 
 ### Phase 14: macOS
 
+**Done in code (2026-10-07); not run on a Mac.** Compiles and vets for
+darwin/arm64 and darwin/amd64; the macOS-specific code (sysctl probes, process
+table, prebuilt llama.cpp layout) is unit-tested where it can be from Linux,
+and the real llama.cpp macOS archive was unpacked here. The base images of
+the sandbox are multi-arch (linux/arm64 included); building the image on
+arm64 is not verified. Serena's orphan sweep remains Linux-only (on macOS an
+interrupted Serena can leave language servers running). JavaScript
+verification with native dependencies installed on the Mac needs Linux
+dependencies (the stage says so).
+
 - Compile fixes; process management for unix (linux and darwin); liveness via
   sysctl; hardware detection; prebuilt llama.cpp release binaries (Metal) by
   checksum instead of a source build; Docker Desktop resource clamping;

@@ -28,15 +28,20 @@ var platformTags = map[string]bool{
 	"cgo": true, "gc": true, "gccgo": true, "ignore": true,
 }
 
-// defaultTag reports whether a build tag is satisfied by a default build on
-// this platform.
-func defaultTag(tag string) bool {
-	return tag == runtime.GOOS || tag == runtime.GOARCH || tag == "unix" || tag == "gc" || tag == "cgo" || strings.HasPrefix(tag, "go1.")
+// defaultTag returns whether a build tag is satisfied by a default build
+// for goos (on this machine's architecture: a container engine runs images
+// of the host's architecture).
+func defaultTag(goos string) func(tag string) bool {
+	return func(tag string) bool {
+		unix := goos != "windows" && goos != "plan9" && goos != "js" && goos != "wasip1"
+		return tag == goos || tag == runtime.GOARCH || (tag == "unix" && unix) || tag == "gc" || tag == "cgo" || strings.HasPrefix(tag, "go1.")
+	}
 }
 
 // customTagsNeeded returns the custom tags under which a Go file (its
 // //go:build line) is compiled but the default build does not compile it.
-func customTagsNeeded(path string) []string {
+func customTagsNeeded(path, goos string) []string {
+	defaultTag := defaultTag(goos)
 	f, err := os.Open(path)
 	if err != nil {
 		return nil
@@ -89,12 +94,18 @@ func (e *Engine) buildTagsStage(ctx context.Context, t RepoTarget, changed []str
 	if _, err := os.Stat(filepath.Join(t.Worktree, "go.mod")); err != nil {
 		return StageResult{}, false
 	}
+	// Stages compile inside the Linux container; only the unsandboxed
+	// development mode builds for the host.
+	goos := "linux"
+	if e.Sandbox != nil && !e.Sandbox.Isolated() {
+		goos = runtime.GOOS
+	}
 	byTag := map[string]map[string]bool{}
 	for _, f := range changed {
 		if !strings.HasSuffix(f, ".go") || !safeRel(f) {
 			continue
 		}
-		for _, tag := range customTagsNeeded(filepath.Join(t.Worktree, f)) {
+		for _, tag := range customTagsNeeded(filepath.Join(t.Worktree, f), goos) {
 			if byTag[tag] == nil {
 				byTag[tag] = map[string]bool{}
 			}

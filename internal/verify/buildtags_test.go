@@ -2,6 +2,7 @@ package verify
 
 import (
 	"context"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"reflect"
@@ -24,7 +25,7 @@ func TestCustomTagsNeeded(t *testing.T) {
 	for src, want := range cases {
 		p := filepath.Join(dir, "f.go")
 		writeFiles(t, dir, map[string]string{"f.go": src})
-		got := customTagsNeeded(p)
+		got := customTagsNeeded(p, "linux")
 		if len(got) > 1 {
 			if got[0] > got[1] {
 				got[0], got[1] = got[1], got[0]
@@ -69,5 +70,27 @@ func TestBuildTagVariantsAreCompiled(t *testing.T) {
 		if s.Name == "go-build-tags" && s.Status != "pass" {
 			t.Fatalf("valid tagged variant failed: %+v", s)
 		}
+	}
+}
+
+// TestBuildTagsTargetLinux: in the container a darwin-only file is not part
+// of the default build, whatever the host is.
+func TestBuildTagsTargetLinux(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "x_darwin.go")
+	if err := os.WriteFile(p, []byte("//go:build darwin\n\npackage x\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := customTagsNeeded(p, "linux"); len(got) != 0 {
+		t.Fatalf("darwin is a platform tag, not a custom one: %v", got)
+	}
+	q := filepath.Join(t.TempDir(), "y.go")
+	if err := os.WriteFile(q, []byte("//go:build integration && linux\n\npackage y\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := customTagsNeeded(q, "linux"); len(got) != 1 || got[0] != "integration" {
+		t.Fatalf("linux target: %v", got)
+	}
+	if got := customTagsNeeded(q, "darwin"); len(got) != 0 {
+		t.Fatalf("darwin target: integration && linux can never build: %v", got)
 	}
 }

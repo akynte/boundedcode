@@ -196,7 +196,8 @@ func (a *App) buildRunnerWith(ctx context.Context, f runFlags, db *sql.DB, paths
 				if a.Config.Sandbox.Kind != "docker" {
 					return nil, nil, errors.New("frontier.contain requires a container engine (sandbox.kind: docker); set frontier.contain: false to run codex unconfined")
 				}
-				cx.Container = &frontier.CodexContainer{Engine: a.Config.Sandbox.Engine, Image: a.Config.Agent.Image, UID: os.Getuid(), GID: os.Getgid()}
+				cx.Container = &frontier.CodexContainer{Engine: a.Config.Sandbox.Engine, Image: a.Config.Agent.Image, UID: os.Getuid(), GID: os.Getgid(),
+					LinuxBinary: a.containerCodex()}
 			}
 			r.Frontier = cx
 		case "manual":

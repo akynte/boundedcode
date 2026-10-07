@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -14,7 +15,7 @@ import (
 // (daemon unreachable), noimage, or stage125 (engine fine, the stage itself
 // exits 125).
 const fakeEngine = `#!/bin/sh
-[ -n "$FAKE_ENGINE_LOG" ] && echo "$1" >> "$FAKE_ENGINE_LOG"
+[ -n "$FAKE_ENGINE_LOG" ] && echo "$*" >> "$FAKE_ENGINE_LOG"
 case "$1:$FAKE_ENGINE" in
 info:down) echo "Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?" >&2; exit 1 ;;
 info:*) exit 0 ;;
@@ -126,7 +127,21 @@ func TestEngineDiagnosisIsCached(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if n := strings.Count(string(b), "info\n"); n != 1 {
+	if n := strings.Count("\n"+string(b), "\ninfo\n"); n != 1 { // the diagnosis; the resource probe runs `info --format`
 		t.Fatalf("engine probed %d times for three stages, want 1:\n%s", n, b)
+	}
+}
+
+func TestForeignDependencyHint(t *testing.T) {
+	esbuild := "Error: You installed esbuild for another platform than the one you're currently using."
+	if got := foreignDependencyHint(esbuild, &sandbox.Container{}); (got != "") != (runtime.GOOS != "linux") {
+		t.Fatalf("hint on %s = %q", runtime.GOOS, got)
+	}
+	if foreignDependencyHint(esbuild, sandbox.None{}) != "" {
+		t.Fatal("hint without a container")
+	}
+	if !foreignDeps.MatchString(esbuild) || !foreignDeps.MatchString("Cannot find module '@rollup/rollup-linux-x64-gnu'") ||
+		foreignDeps.MatchString("expected 2, got 3") {
+		t.Fatal("pattern")
 	}
 }

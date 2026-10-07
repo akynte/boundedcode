@@ -12,8 +12,12 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
+	"sync"
 	"time"
+
+	"github.com/akynte/boundedcode/internal/pathutil"
 )
 
 // scratchSize bounds each scratch tmpfs; it counts against the container's
@@ -92,6 +96,15 @@ type Container struct {
 	// UID/GID run the container as the invoking user so files written to the
 	// worktree keep correct ownership.
 	UID, GID int
+
+	// MaxCPUs and MaxMemBytes are the engine's own resources (Docker
+	// Desktop and Podman machine run containers in a VM that is often
+	// smaller than the host). Command fills them once; Args caps CPUs and
+	// Memory to them, because the engine refuses a container that asks for
+	// more. 0 = unknown, no cap.
+	MaxCPUs     int
+	MaxMemBytes int64
+	probeOnce   sync.Once
 }
 
 // Name implements Sandbox.
@@ -106,6 +119,7 @@ func (c *Container) Command(ctx context.Context, s Spec) (*exec.Cmd, error) {
 	if s.Name == "" {
 		s.Name = "bc-v-" + randomSuffix()
 	}
+	c.probeOnce.Do(func() { c.probeResources(ctx) })
 	args, err := c.Args(s)
 	if err != nil {
 		return nil, err
@@ -166,11 +180,11 @@ func (c *Container) Args(s Spec) ([]string, error) {
 	if s.Interactive {
 		args = append(args, "-i")
 	}
-	if c.Memory != "" {
-		args = append(args, "--memory", c.Memory)
+	if mem := capMemory(c.Memory, c.MaxMemBytes); mem != "" {
+		args = append(args, "--memory", mem)
 	}
-	if c.CPUs != "" {
-		args = append(args, "--cpus", c.CPUs)
+	if cpus := capCPUs(c.CPUs, c.MaxCPUs); cpus != "" {
+		args = append(args, "--cpus", cpus)
 	}
 	if s.Name != "" {
 		args = append(args, "--name", sanitizeName(s.Name))
@@ -225,12 +239,14 @@ func (c *Container) Args(s Spec) ([]string, error) {
 func forbiddenHostMount(p string) bool {
 	p = filepath.Clean(p)
 	home, _ := os.UserHomeDir()
-	if p == "/" || p == home || p == "/var/run/docker.sock" || p == "/run/docker.sock" {
+	if p == filepath.VolumeName(p)+string(filepath.Separator) || pathutil.Equal(p, home) ||
+		p == "/var/run/docker.sock" || p == "/run/docker.sock" {
 		return true
 	}
-	for _, d := range []string{".ssh", ".aws", ".config/gcloud", ".azure", ".kube", ".codex", ".gnupg", ".docker", ".netrc", ".config/gh"} {
-		sens := filepath.Join(home, d)
-		if p == sens || strings.HasPrefix(p, sens+string(filepath.Separator)) {
+	for _, d := range []string{".ssh", ".aws", ".config/gcloud", ".azure", ".kube", ".codex", ".gnupg", ".docker", ".netrc", ".config/gh",
+		// macOS and Windows credential and cloud-tool locations.
+		"Library/Keychains", "Library/Application Support/gcloud", "AppData/Roaming/gcloud", "AppData/Roaming/GitHub CLI"} {
+		if pathutil.Within(p, filepath.Join(home, filepath.FromSlash(d))) {
 			return true
 		}
 	}
@@ -322,4 +338,74 @@ func emptyFile() (string, error) {
 		return "", err
 	}
 	return p, nil
+}
+
+// probeResources reads the engine's CPU count and memory (a few hundred
+// milliseconds; once per Container).
+func (c *Container) probeResources(ctx context.Context) {
+	if c.MaxCPUs > 0 || c.MaxMemBytes > 0 {
+		return
+	}
+	format := "{{.NCPU}} {{.MemTotal}}" // docker
+	if filepath.Base(c.Engine) == "podman" || strings.HasPrefix(filepath.Base(c.Engine), "podman.") {
+		format = "{{.Host.CPUs}} {{.Host.MemTotal}}"
+	}
+	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, c.Engine, "info", "--format", format).Output()
+	if err != nil {
+		return // the engine check reports an unusable engine with its fix
+	}
+	var cpus int
+	var mem int64
+	if _, err := fmt.Sscan(strings.TrimSpace(string(out)), &cpus, &mem); err == nil {
+		c.MaxCPUs, c.MaxMemBytes = cpus, mem
+	}
+}
+
+// capCPUs limits a --cpus value to the engine's CPU count.
+func capCPUs(v string, maxCPUs int) string {
+	if v == "" || maxCPUs <= 0 {
+		return v
+	}
+	if f, err := strconv.ParseFloat(v, 64); err == nil && f > float64(maxCPUs) {
+		return strconv.Itoa(maxCPUs)
+	}
+	return v
+}
+
+// capMemory limits a --memory value (512m, 8g, ...) to 90% of the engine's
+// memory, leaving room for the engine's own VM.
+func capMemory(v string, maxBytes int64) string {
+	if v == "" || maxBytes <= 0 {
+		return v
+	}
+	n, ok := parseBytes(v)
+	limit := maxBytes / 10 * 9
+	if ok && n > limit {
+		return fmt.Sprintf("%dm", limit>>20)
+	}
+	return v
+}
+
+// parseBytes reads docker's memory syntax: a number with an optional b, k,
+// m or g suffix.
+func parseBytes(v string) (int64, bool) {
+	v = strings.ToLower(strings.TrimSpace(v))
+	mult := int64(1)
+	switch {
+	case strings.HasSuffix(v, "g"):
+		mult, v = 1<<30, strings.TrimSuffix(v, "g")
+	case strings.HasSuffix(v, "m"):
+		mult, v = 1<<20, strings.TrimSuffix(v, "m")
+	case strings.HasSuffix(v, "k"):
+		mult, v = 1<<10, strings.TrimSuffix(v, "k")
+	case strings.HasSuffix(v, "b"):
+		v = strings.TrimSuffix(v, "b")
+	}
+	f, err := strconv.ParseFloat(v, 64)
+	if err != nil || f < 0 {
+		return 0, false
+	}
+	return int64(f * float64(mult)), true
 }
