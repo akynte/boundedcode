@@ -3,10 +3,17 @@ BIN := bin/boundedcode
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -s -w -X github.com/akynte/boundedcode/internal/buildinfo.Version=$(VERSION)
 
-.PHONY: build test race vet fmt lint check licenses sbom dist clean
+.PHONY: build install test race vet fmt lint check licenses sbom dist clean
 
 build:
 	CGO_ENABLED=0 $(GO) build -trimpath -ldflags '$(LDFLAGS)' -o $(BIN) ./cmd/boundedcode
+
+# Install the local build as boundedcode and bcode (PREFIX_BIN, default ~/.local/bin).
+PREFIX_BIN ?= $(HOME)/.local/bin
+install: build
+	install -d $(PREFIX_BIN)
+	install -m 0755 $(BIN) $(PREFIX_BIN)/boundedcode
+	ln -sf boundedcode $(PREFIX_BIN)/bcode
 
 test:
 	$(GO) test ./...

@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -86,17 +87,9 @@ func newRuntimeCmd(app *App) *cobra.Command {
 		Use:   "status",
 		Short: "Show inference server status",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			var st inference.Status
-			if rt := app.inferenceRuntime(); rt != nil {
-				var err error
-				if st, err = rt.Status(cmd.Context()); err != nil {
-					return err
-				}
-			} else {
-				c := inference.NewClient(app.Config.Inference.ExternalURL, 3*time.Second)
-				st.Endpoint.BaseURL = app.Config.Inference.ExternalURL
-				st.Healthy, _ = c.Healthy(cmd.Context())
-				st.Running = st.Healthy
+			st, err := app.runtimeStatus(cmd.Context())
+			if err != nil {
+				return err
 			}
 			if app.jsonOut {
 				return app.printJSON(st)
@@ -116,14 +109,9 @@ func newRuntimeCmd(app *App) *cobra.Command {
 		Use:   "logs",
 		Short: "Print the managed server log path and tail",
 		RunE: func(*cobra.Command, []string) error {
-			p := filepath.Join(app.llamaManager().StateDir, "llama-server.log")
-			b, err := os.ReadFile(p)
+			p, lines, err := app.runtimeLog(60)
 			if err != nil {
 				return err
-			}
-			lines := strings.Split(strings.TrimRight(string(b), "\n"), "\n")
-			if len(lines) > 60 {
-				lines = lines[len(lines)-60:]
 			}
 			app.printf("%s\n%s\n", p, strings.Join(lines, "\n"))
 			return nil
@@ -139,20 +127,7 @@ func newModelCmd(app *App) *cobra.Command {
 		Use:   "list",
 		Short: "List model profiles and whether their weights are present",
 		RunE: func(*cobra.Command, []string) error {
-			type row struct {
-				Name    string `json:"name"`
-				File    string `json:"file"`
-				Present bool   `json:"present"`
-				License string `json:"license"`
-				Default bool   `json:"default"`
-			}
-			var rows []row
-			for _, n := range app.Models.Names() {
-				p := app.Models[n]
-				path := p.ResolveFile(app.Config.ModelsDir)
-				_, err := os.Stat(path)
-				rows = append(rows, row{n, path, err == nil, p.Source.License, n == app.Config.DefaultModel})
-			}
+			rows := app.modelRows()
 			if app.jsonOut {
 				return app.printJSON(rows)
 			}
@@ -186,4 +161,51 @@ func newModelCmd(app *App) *cobra.Command {
 		},
 	})
 	return cmd
+}
+
+// runtimeStatus reports the managed server, or probes the external one.
+func (a *App) runtimeStatus(ctx context.Context) (inference.Status, error) {
+	if rt := a.inferenceRuntime(); rt != nil {
+		return rt.Status(ctx)
+	}
+	var st inference.Status
+	c := inference.NewClient(a.Config.Inference.ExternalURL, 3*time.Second)
+	st.Endpoint.BaseURL = a.Config.Inference.ExternalURL
+	st.Healthy, _ = c.Healthy(ctx)
+	st.Running = st.Healthy
+	return st, nil
+}
+
+// runtimeLog returns the managed server log path and its last n lines.
+func (a *App) runtimeLog(n int) (string, []string, error) {
+	p := filepath.Join(a.llamaManager().StateDir, "llama-server.log")
+	b, err := os.ReadFile(p)
+	if err != nil {
+		return p, nil, err
+	}
+	lines := strings.Split(strings.TrimRight(string(b), "\n"), "\n")
+	if len(lines) > n {
+		lines = lines[len(lines)-n:]
+	}
+	return p, lines, nil
+}
+
+// modelRow is a model profile and whether its weights are present.
+type modelRow struct {
+	Name    string `json:"name"`
+	File    string `json:"file"`
+	Present bool   `json:"present"`
+	License string `json:"license"`
+	Default bool   `json:"default"`
+}
+
+func (a *App) modelRows() []modelRow {
+	var rows []modelRow
+	for _, n := range a.Models.Names() {
+		p := a.Models[n]
+		path := p.ResolveFile(a.Config.ModelsDir)
+		_, err := os.Stat(path)
+		rows = append(rows, modelRow{n, path, err == nil, p.Source.License, n == a.Config.DefaultModel})
+	}
+	return rows
 }

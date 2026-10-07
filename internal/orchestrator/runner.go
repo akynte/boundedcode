@@ -7,6 +7,7 @@ package orchestrator
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -97,12 +98,50 @@ func (r *Runner) say(format string, args ...any) {
 	}
 }
 
+// agentEventData is the audit record of an agent event: its kind and tool,
+// errors, messages, and for actions a short summary of what the agent did
+// (for live progress views).
+func agentEventData(e agent.Event) map[string]any {
+	data := map[string]any{"kind": e.Kind}
+	if e.Tool != "" {
+		data["tool"] = e.Tool
+	}
+	if e.Error != "" {
+		data["error"] = trunc(e.Error, 400)
+	}
+	if e.Kind == "MessageEvent" || e.Kind == "Condensation" {
+		data["text"] = trunc(e.Text, 400)
+	}
+	if e.IsError {
+		data["is_error"] = true
+	}
+	if e.Kind == "ActionEvent" {
+		var a struct{ Thought, Action string }
+		if json.Unmarshal(e.Raw, &a) == nil {
+			if a.Thought != "" {
+				data["thought"] = trunc(a.Thought, 300)
+			}
+			if a.Action != "" {
+				data["action"] = trunc(a.Action, 300)
+			}
+		}
+	}
+	return data
+}
+
 // WorkDir is the agent-visible root for a task.
 func (r *Runner) WorkDir(taskID string) string { return filepath.Join(r.Paths.TaskDir(taskID), "work") }
 
 // Create registers a task and its worktrees. repos selects repository names
 // (empty = every repository in the workspace).
 func (r *Runner) Create(ctx context.Context, w workspace.Workspace, request string, repos, criteria []string) (*task.Task, error) {
+	return r.CreateFrom(ctx, w, request, repos, criteria, "")
+}
+
+// CreateFrom is Create for a follow-up: repositories the previous task
+// changed start from its branch (agent/<fromTask>) instead of HEAD, so the
+// new task builds on that work. An empty fromTask is Create.
+func (r *Runner) CreateFrom(ctx context.Context, w workspace.Workspace, request string, repos, criteria []string, fromTask string) (*task.Task, error) {
 	all, err := r.WS.Repos(ctx, w.ID)
 	if err != nil {
 		return nil, err
@@ -127,6 +166,9 @@ func (r *Runner) Create(ctx context.Context, w workspace.Workspace, request stri
 		AgentRuntime:   r.Agent.Name(), ModelProfile: r.Model,
 		Budget: task.Budget{MaxAttempts: b.MaxAttempts, MaxWallClockS: b.MaxWallClock.D().Seconds(),
 			MaxLocalTokens: b.MaxLocalTokens, MaxEscalations: b.MaxEscalations}}
+	if fromTask != "" {
+		t.Decide("user", "follow-up to task "+fromTask+": starts from its branch")
+	}
 	if err := r.Ledger.Create(ctx, t); err != nil {
 		return nil, err
 	}
@@ -135,8 +177,14 @@ func (r *Runner) Create(ctx context.Context, w workspace.Workspace, request stri
 		if err != nil {
 			return nil, err
 		}
+		base := info.Head
+		if fromTask != "" {
+			if head, err := gitops.Run(ctx, repo.Path, "rev-parse", "--verify", "--quiet", "refs/heads/"+gitops.TaskBranch(fromTask)+"^{commit}"); err == nil && head != "" {
+				base = head
+			}
+		}
 		wt := task.Worktree{TaskID: t.ID, RepositoryID: repo.ID, Path: filepath.Join(r.WorkDir(t.ID), repo.Name),
-			Branch: gitops.TaskBranch(t.ID), BaseCommit: info.Head}
+			Branch: gitops.TaskBranch(t.ID), BaseCommit: base}
 		if err := r.Ledger.AddWorktree(ctx, wt); err != nil { // persist intent first
 			return nil, err
 		}
@@ -144,7 +192,7 @@ func (r *Runner) Create(ctx context.Context, w workspace.Workspace, request stri
 			return nil, err
 		}
 	}
-	r.Rec.Emit(ctx, t.ID, "task.created", map[string]any{"workspace": w.Name, "repos": len(chosen), "request_chars": len(request)})
+	r.Rec.Emit(ctx, t.ID, "task.created", map[string]any{"workspace": w.Name, "repos": len(chosen), "request_chars": len(request), "from_task": fromTask})
 	return t, nil
 }
 
@@ -226,17 +274,7 @@ func (r *Runner) Run(ctx context.Context, taskID string, opt RunOptions) (*task.
 			condensations++
 			evMu.Unlock()
 		}
-		data := map[string]any{"kind": e.Kind}
-		if e.Tool != "" {
-			data["tool"] = e.Tool
-		}
-		if e.Error != "" {
-			data["error"] = trunc(e.Error, 400)
-		}
-		if e.Kind == "MessageEvent" || e.Kind == "Condensation" {
-			data["text"] = trunc(e.Text, 400)
-		}
-		r.Rec.Emit(context.WithoutCancel(ctx), t.ID, "agent.event", data)
+		r.Rec.Emit(context.WithoutCancel(ctx), t.ID, "agent.event", agentEventData(e))
 	}
 	masks, err := secretMasks(r.WorkDir(t.ID), wts)
 	if err != nil {

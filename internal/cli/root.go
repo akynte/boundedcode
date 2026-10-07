@@ -3,8 +3,10 @@ package cli
 import (
 	"context"
 	"os"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 
 	"github.com/akynte/boundedcode/internal/buildinfo"
 )
@@ -12,7 +14,15 @@ import (
 // Execute runs the CLI and returns the process exit code.
 func Execute(ctx context.Context, args []string) int {
 	app := &App{Out: os.Stdout, Err: os.Stderr}
+	// Like other coding agents, running the program with no arguments in a
+	// terminal opens the interactive interface for the current directory.
+	if len(args) == 0 && term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stdout.Fd())) {
+		args = []string{"tui"}
+	}
 	root := newRoot(app)
+	if name := filepath.Base(os.Args[0]); name == "bcode" {
+		root.Use = name
+	}
 	root.SetArgs(args)
 	err := root.ExecuteContext(ctx)
 	app.close()
@@ -53,6 +63,8 @@ func newRoot(app *App) *cobra.Command {
 		newSandboxCmd(app),
 		newSerenaCmd(app),
 		newStatsCmd(app),
+		newTUICmd(app),
+		newSetupCmd(app),
 	)
 	return root
 }

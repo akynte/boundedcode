@@ -230,6 +230,9 @@ func newSerenaCmd(app *App) *cobra.Command {
 }
 
 func confirm(app *App, prompt string) bool {
+	if app.confirmFn != nil {
+		return app.confirmFn(prompt)
+	}
 	if !term.IsTerminal(int(os.Stdin.Fd())) {
 		return false
 	}

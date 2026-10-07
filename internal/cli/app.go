@@ -10,9 +10,11 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"slices"
 
 	"github.com/akynte/boundedcode/configs"
 	"github.com/akynte/boundedcode/internal/config"
+	"github.com/akynte/boundedcode/internal/frontier"
 	"github.com/akynte/boundedcode/internal/model"
 	"github.com/akynte/boundedcode/internal/store"
 	"github.com/akynte/boundedcode/internal/telemetry"
@@ -30,6 +32,10 @@ type App struct {
 
 	jsonOut bool
 	st      *store.Store
+	// approve, when set, decides frontier escalations instead of a stdin
+	// prompt; confirmFn likewise replaces confirm (the terminal UI sets both).
+	approve   func(ctx context.Context, tr frontier.Trigger, packetPath string, tokens int) bool
+	confirmFn func(prompt string) bool
 }
 
 func (a *App) configFile() string { return filepath.Join(a.Paths.Config, "config.yaml") }
@@ -40,6 +46,10 @@ func (a *App) load() error {
 		return err
 	}
 	a.Paths = p
+	// Tools installed by `setup` are found like any other command.
+	if bin := a.toolsDir(); !slices.Contains(filepath.SplitList(os.Getenv("PATH")), bin) {
+		_ = os.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	}
 	cfg, err := config.Load(a.configFile())
 	if err != nil {
 		return err

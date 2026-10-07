@@ -24,7 +24,6 @@ import (
 	"github.com/akynte/boundedcode/internal/orchestrator"
 	"github.com/akynte/boundedcode/internal/repointel/cbm"
 	"github.com/akynte/boundedcode/internal/sandbox"
-	"github.com/akynte/boundedcode/internal/store"
 	"github.com/akynte/boundedcode/internal/task"
 	"github.com/akynte/boundedcode/internal/telemetry"
 	"github.com/akynte/boundedcode/internal/verify"
@@ -168,6 +167,9 @@ func (a *App) buildRunnerWith(ctx context.Context, f runFlags, db *sql.DB, paths
 		if f.approveFrontier {
 			return true
 		}
+		if a.approve != nil {
+			return a.approve(ctx, tr, packetPath, tokens)
+		}
 		if !term.IsTerminal(int(os.Stdin.Fd())) {
 			fmt.Fprintf(a.Err, "frontier escalation %s needs approval (non-interactive: declined; use --approve-frontier)\n", tr.Code)
 			return false
@@ -203,6 +205,7 @@ func newTaskCmd(app *App) *cobra.Command {
 		repos    []string
 		criteria []string
 		run      bool
+		fromTask string
 		rf       runFlags
 	)
 	create := &cobra.Command{
@@ -211,22 +214,11 @@ func newTaskCmd(app *App) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
-			w, err := app.resolveWorkspace(ctx, wsFlag)
-			if err != nil {
-				return err
-			}
-			if app.Config, err = app.Config.WithWorkspace(app.Paths.Config, w.Name); err != nil {
-				return err
-			}
-			r, cleanup, err := app.taskRunner(ctx, rf, run)
+			t, r, cleanup, err := app.createTask(ctx, wsFlag, args[0], repos, criteria, fromTask, rf, run)
 			if err != nil {
 				return err
 			}
 			defer cleanup()
-			t, err := r.Create(ctx, w, args[0], repos, criteria)
-			if err != nil {
-				return err
-			}
 			app.printf("created task %s (branch %s)\n", t.ID, gitops.TaskBranch(t.ID))
 			if !run {
 				return nil
@@ -238,6 +230,7 @@ func newTaskCmd(app *App) *cobra.Command {
 	create.Flags().StringSliceVarP(&repos, "repo", "r", nil, "repositories to include (default: all)")
 	create.Flags().StringArrayVarP(&criteria, "criteria", "c", nil, "acceptance criterion (repeatable)")
 	create.Flags().BoolVar(&run, "run", false, "run the task immediately")
+	create.Flags().StringVar(&fromTask, "from", "", "follow-up: start from this task's branch instead of HEAD")
 	addRunFlags(create, &rf)
 
 	var rf2 runFlags
@@ -346,58 +339,19 @@ func newTaskCmd(app *App) *cobra.Command {
 	diff := &cobra.Command{
 		Use: "diff TASK", Short: "Show the task's changes against its base commits", Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			ctx := cmd.Context()
-			s, err := app.Store(ctx)
+			diffs, err := app.taskDiffs(cmd.Context(), args[0])
 			if err != nil {
 				return err
 			}
-			l := task.Ledger{DB: s.DB}
-			t, err := l.Get(ctx, args[0])
-			if err != nil {
-				return err
-			}
-			wts, _ := l.Worktrees(ctx, t.ID)
-			if err := checkWorktrees(ctx, wts); err != nil {
-				return err
-			}
-			for _, w := range wts {
-				d, err := gitops.Diff(ctx, w.Path, w.BaseCommit, false)
-				if err != nil {
-					return err
-				}
-				if d != "" {
-					app.printf("### %s\n%s\n", w.RepoName, d)
-				}
+			for _, d := range diffs {
+				app.printf("### %s\n%s\n", d.Repo, d.Diff)
 			}
 			return nil
 		},
 	}
 	cancel := &cobra.Command{
 		Use: "cancel TASK", Short: "Cancel a task (worktrees and branch are kept)", Args: cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			ctx := cmd.Context()
-			s, err := app.Store(ctx)
-			if err != nil {
-				return err
-			}
-			l := task.Ledger{DB: s.DB}
-			t, err := l.Get(ctx, args[0])
-			if err != nil {
-				return err
-			}
-			t.Status, t.FinishedAt = task.StatusCancelled, store.Now()
-			t.Decide("user", "cancelled")
-			if err := l.Save(ctx, t); err != nil {
-				return err
-			}
-			orchestrator.FinishEscalations(ctx, s.DB, t.ID, "no_effect")
-			telemetry.New(s.DB, app.Log).Emit(ctx, t.ID, "task.cancelled", map[string]any{"phase": t.Phase, "attempts": t.AttemptCount})
-			if ls, _ := l.LeaseOf(ctx, t.ID); ls.Owner != "" {
-				app.printf("a run of this task is in progress (%s); it stops within ~15s\n", ls.Owner)
-			}
-			app.printf("cancelled %s; branch %s kept (`task cleanup %s` removes the worktrees)\n", t.ID, gitops.TaskBranch(t.ID), t.ID)
-			return nil
-		},
+		RunE: func(cmd *cobra.Command, args []string) error { return app.cancelTask(cmd.Context(), args[0]) },
 	}
 	var deleteBranch bool
 	cleanupCmd := &cobra.Command{
@@ -405,56 +359,53 @@ func newTaskCmd(app *App) *cobra.Command {
 		Short: "Remove a finished task's worktrees and caches (branch kept unless --delete-branch)",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			ctx := cmd.Context()
-			s, err := app.Store(ctx)
-			if err != nil {
-				return err
-			}
-			l := task.Ledger{DB: s.DB}
-			t, err := l.Get(ctx, args[0])
-			if err != nil {
-				return err
-			}
-			switch t.Status {
-			case task.StatusCompleted, task.StatusCancelled, task.StatusFailed:
-			default:
-				return fmt.Errorf("task %s is %s; cancel it first (cleanup only removes finished tasks)", t.ID, t.Status)
-			}
-			if ls, _ := l.LeaseOf(ctx, t.ID); ls.Owner != "" {
-				return fmt.Errorf("task %s is still being run by %s", t.ID, ls.Owner)
-			}
-			wts, err := l.Worktrees(ctx, t.ID)
-			if err != nil {
-				return err
-			}
-			intel := &cbm.Client{Binary: app.Config.RepoIntel.Binary, CacheDir: filepath.Join(app.Paths.Cache, "codebase-memory")}
-			for _, w := range wts {
-				if _, err := os.Stat(w.Path); err == nil {
-					if err := gitops.RemoveWorktree(ctx, w.RepoPath, w.Path); err != nil {
-						return fmt.Errorf("%s: %w", w.RepoName, err)
-					}
-				}
-				_ = gitops.PruneWorktrees(ctx, w.RepoPath)
-				if deleteBranch {
-					if err := gitops.DeleteTaskBranch(ctx, w.RepoPath, w.Branch); err != nil {
-						return fmt.Errorf("%s: %w", w.RepoName, err)
-					}
-				}
-				// The worktree's code-graph project, if one was built.
-				_, _ = intel.Call(ctx, "delete_project", map[string]any{"project": orchestrator.WorktreeProject(t.ID, w.RepoName)})
-				app.printf("%s: removed worktree %s%s\n", w.RepoName, w.Path, map[bool]string{true: " and branch " + w.Branch}[deleteBranch])
-			}
-			_ = intel.Close()
-			_ = os.RemoveAll(filepath.Join(app.Paths.Cache, "build", "gocache", t.ID))
-			_ = os.RemoveAll(filepath.Join(app.Paths.TaskDir(t.ID), "work"))
-			telemetry.New(s.DB, app.Log).Emit(ctx, t.ID, "task.cleaned", map[string]any{"delete_branch": deleteBranch, "worktrees": len(wts)})
-			app.printf("ledger, audit log and frontier packets of %s are kept\n", t.ID)
-			return nil
+			return app.cleanupTask(cmd.Context(), args[0], deleteBranch)
 		},
 	}
 	cleanupCmd.Flags().BoolVar(&deleteBranch, "delete-branch", false, "also delete the agent/<task> branch (discards its commits)")
-	cmd.AddCommand(create, runCmd, status, events, diff, cancel, cleanupCmd)
+	var applyCommit, applyForce bool
+	apply := &cobra.Command{
+		Use:   "apply TASK",
+		Short: "Bring the task's changes into your checkouts (staged for you to commit; --commit commits them)",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return app.applyTask(cmd.Context(), args[0], applyCommit, applyForce)
+		},
+	}
+	apply.Flags().BoolVar(&applyCommit, "commit", false, "commit the changes instead of leaving them staged")
+	apply.Flags().BoolVar(&applyForce, "force", false, "apply a task that is not completed (unverified changes)")
+	cmd.AddCommand(create, runCmd, status, events, diff, cancel, cleanupCmd, apply)
 	return cmd
+}
+
+// createTask creates a task in the workspace (--workspace, else the current
+// one). The returned runner can run it when willRun is set.
+func (a *App) createTask(ctx context.Context, wsFlag, request string, repos, criteria []string, fromTask string, rf runFlags, willRun bool) (*task.Task, *orchestrator.Runner, func(), error) {
+	w, err := a.resolveWorkspace(ctx, wsFlag)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	if a.Config, err = a.Config.WithWorkspace(a.Paths.Config, w.Name); err != nil {
+		return nil, nil, nil, err
+	}
+	r, cleanup, err := a.taskRunner(ctx, rf, willRun)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	if fromTask != "" {
+		prev, err := r.Ledger.Get(ctx, fromTask)
+		if err != nil {
+			cleanup()
+			return nil, nil, nil, err
+		}
+		fromTask = prev.ID
+	}
+	t, err := r.CreateFrom(ctx, w, request, repos, criteria, fromTask)
+	if err != nil {
+		cleanup()
+		return nil, nil, nil, err
+	}
+	return t, r, cleanup, nil
 }
 
 // applyTaskWorkspace applies the per-workspace config override of the
@@ -529,49 +480,24 @@ func newVerifyCmd(app *App) *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "verify TASK", Short: "Run deterministic verification on a task's worktrees", Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			ctx := cmd.Context()
-			s, err := app.Store(ctx)
+			res, err := app.verifyTask(cmd.Context(), args[0], full, unsafe)
 			if err != nil {
-				return err
-			}
-			l := task.Ledger{DB: s.DB}
-			t, err := l.Get(ctx, args[0])
-			if err != nil {
-				return err
-			}
-			sb, err := app.sandbox(unsafe)
-			if err != nil {
-				return err
-			}
-			gomodcache, _ := exec.CommandContext(ctx, "go", "env", "GOMODCACHE").Output()
-			e := &verify.Engine{Sandbox: sb, CacheDir: filepath.Join(app.Paths.Cache, "build"), GoModCache: strings.TrimSpace(string(gomodcache)),
-				DB: s.DB, Rec: telemetry.New(s.DB, app.Log)}
-			scope := verify.Targeted
-			if full {
-				scope = verify.Full
-			}
-			wts, _ := l.Worktrees(ctx, t.ID)
-			if err := checkWorktrees(ctx, wts); err != nil {
 				return err
 			}
 			ok := true
-			for _, w := range wts {
-				res, err := e.Run(ctx, verify.RepoTarget{Name: w.RepoName, Worktree: w.Path, Base: w.BaseCommit, TaskID: t.ID, Source: w.RepoPath}, scope)
-				if err != nil {
-					return err
-				}
+			for _, r := range res {
 				if app.jsonOut {
-					_ = app.printJSON(res)
+					_ = app.printJSON(r.Result)
 					continue
 				}
-				app.printf("## %s (%s): passed=%v\n", w.RepoName, scope, res.Passed)
-				for _, st := range res.Stages {
+				app.printf("## %s (%s): passed=%v\n", r.Repo, r.Scope, r.Result.Passed)
+				for _, st := range r.Result.Stages {
 					app.printf("  %-14s %-7s %6dms %s\n", st.Name, st.Status, st.DurationMS, st.Command)
 					if st.Status == "fail" || st.Status == "error" {
 						app.printf("%s\n", indent(st.Output, "      "))
 					}
 				}
-				ok = ok && res.Passed
+				ok = ok && r.Result.Passed
 			}
 			if !ok {
 				return errors.New("verification failed")
@@ -608,24 +534,11 @@ func newFrontierCmd(app *App) *cobra.Command {
 	answer := &cobra.Command{
 		Use: "answer TASK FILE", Short: "Store a manually obtained frontier answer for the task's pending escalation", Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			ctx := cmd.Context()
-			s, err := app.Store(ctx)
+			id, err := app.answerEscalation(cmd.Context(), args[0], args[1])
 			if err != nil {
 				return err
 			}
-			t, err := task.Ledger{DB: s.DB}.Get(ctx, args[0])
-			if err != nil {
-				return err
-			}
-			b, err := os.ReadFile(args[1])
-			if err != nil {
-				return err
-			}
-			id, err := orchestrator.AnswerEscalation(ctx, s.DB, app.Paths.TaskDir(t.ID), t.ID, b)
-			if err != nil {
-				return err
-			}
-			app.printf("stored answer for escalation %d; run `task resume %s`\n", id, t.ID)
+			app.printf("stored answer for escalation %d; run `task resume %s`\n", id, args[0])
 			return nil
 		},
 	}
@@ -639,72 +552,25 @@ func newFrontierCmd(app *App) *cobra.Command {
 				st, err := (&frontier.Codex{Binary: fc.Binary}).LoginStatus(ctx)
 				app.printf("codex: %s %v\n", st, errOrEmpty(err))
 			}
-			s, err := app.Store(ctx)
+			sum, err := app.escalationSummary(ctx)
 			if err != nil {
 				return err
 			}
-			rows, err := s.DB.QueryContext(ctx, `SELECT trigger, status, outcome, COUNT(*), COALESCE(SUM(packet_tokens),0) FROM escalations GROUP BY 1,2,3 ORDER BY 1,2`)
-			if err != nil {
-				return err
+			for _, r := range sum {
+				app.printf("  %s %-16s outcome=%-9s count=%d packet_tokens=%d\n", r.Trigger, r.Status, r.Outcome, r.Count, r.PacketTokens)
 			}
-			defer rows.Close()
-			for rows.Next() {
-				var trig, st, out string
-				var n, tok int
-				if err := rows.Scan(&trig, &st, &out, &n, &tok); err != nil {
-					return err
-				}
-				app.printf("  %s %-16s outcome=%-9s count=%d packet_tokens=%d\n", trig, st, out, n, tok)
-			}
-			return rows.Err()
+			return nil
 		},
 	}
 	list := &cobra.Command{
 		Use: "list [TASK]", Short: "List escalations with trigger, model, outcome and whether the advice changed the code", Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			ctx := cmd.Context()
-			s, err := app.Store(ctx)
-			if err != nil {
-				return err
-			}
-			q := `SELECT id, task_id, trigger, provider, model, status, outcome, task_outcome, packet_tokens, diff_before, diff_after, created_at, reason
-				FROM escalations`
-			var qargs []any
+			taskID := ""
 			if len(args) == 1 {
-				t, err := task.Ledger{DB: s.DB}.Get(ctx, args[0])
-				if err != nil {
-					return err
-				}
-				q += ` WHERE task_id = ?`
-				qargs = append(qargs, t.ID)
+				taskID = args[0]
 			}
-			rows, err := s.DB.QueryContext(ctx, q+` ORDER BY id`, qargs...)
+			out, err := app.escalations(cmd.Context(), taskID)
 			if err != nil {
-				return err
-			}
-			defer rows.Close()
-			type esc struct {
-				ID                                              int64
-				Task, Trigger, Provider, Model, Status, Outcome string
-				TaskOutcome                                     string
-				PacketTokens                                    int
-				DiffBefore, DiffAfter, Created, Reason          string
-				AdviceChangedCode                               *bool
-			}
-			var out []esc
-			for rows.Next() {
-				var e esc
-				if err := rows.Scan(&e.ID, &e.Task, &e.Trigger, &e.Provider, &e.Model, &e.Status, &e.Outcome, &e.TaskOutcome,
-					&e.PacketTokens, &e.DiffBefore, &e.DiffAfter, &e.Created, &e.Reason); err != nil {
-					return err
-				}
-				if e.DiffBefore != "" && e.DiffAfter != "" {
-					changed := e.DiffBefore != e.DiffAfter
-					e.AdviceChangedCode = &changed
-				}
-				out = append(out, e)
-			}
-			if err := rows.Err(); err != nil {
 				return err
 			}
 			if app.jsonOut {
