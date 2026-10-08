@@ -13,7 +13,7 @@ or a cloud model API you choose.
 [![secret-scan](https://github.com/akynte/boundedcode/actions/workflows/secrets.yml/badge.svg?branch=main)](https://github.com/akynte/boundedcode/actions/workflows/secrets.yml)
 [![dco](https://github.com/akynte/boundedcode/actions/workflows/dco.yml/badge.svg?branch=main)](https://github.com/akynte/boundedcode/actions/workflows/dco.yml)
 [![release](https://img.shields.io/github/v/release/akynte/boundedcode?include_prereleases&sort=semver&label=release)](https://github.com/akynte/boundedcode/releases)
-[![status: public alpha](https://img.shields.io/badge/status-public%20alpha-orange)](docs/releases/v0.1.0-alpha.2.md)
+[![status: public alpha](https://img.shields.io/badge/status-public%20alpha-orange)](docs/releases/v0.1.0-alpha.3.md)
 [![license](https://img.shields.io/github/license/akynte/boundedcode)](LICENSE)
 [![Go](https://img.shields.io/github/go-mod/go-version/akynte/boundedcode)](go.mod)
 
@@ -24,6 +24,13 @@ or a cloud model API you choose.
 [Security](#security) ·
 [Limitations](#known-limitations) ·
 [Docs](docs/)
+
+<br>
+
+<img src="docs/assets/demo.gif" alt="BoundedCode fixing a bug: the existing tests already pass, so after the agent's first change it asks for a test that demonstrates the fix; with that test the task ends task_verified, and the diff shows the fix and the new test" width="760">
+
+<sub>A real run with the local Qwen3.6-35B-A3B on an RTX 4060 laptop. Waits while the model works are shortened; the task took 1m43s.<br>
+The existing tests pass on the buggy code, so a green build proves nothing: BoundedCode asks for a test that fails without the fix.</sub>
 
 </div>
 
