@@ -15,7 +15,11 @@
   tests on macOS and Windows runners (tests report only for now), and
   parses `install.ps1`.
 
-### Windows (experimental; compiled and unit-tested, not yet run on Windows)
+### Windows (experimental; unit tests do not pass on Windows yet)
+
+On the CI Windows runner (at a8fce66), 17 of 31 test packages pass and 14
+fail; the full flow has not been run on a Windows machine.
+
 
 - Builds for Windows. Process trees are ended with `taskkill /T` (the
   llama.cpp server, codebase-memory-mcp, Serena); the llama.cpp server is
@@ -35,7 +39,11 @@
 - `scripts/install.ps1` installs from a release (checksum-verified) and adds
   the folder to the user's PATH. Serena is not supported on Windows yet.
 
-### macOS (experimental; compiled and unit-tested, not yet run on a Mac)
+### macOS (experimental; unit tests do not all pass on macOS yet)
+
+On the CI macOS runner (at a8fce66), 26 of 31 test packages pass and 5
+fail; the full flow has not been run on a Mac.
+
 
 - Builds for macOS (arm64 and amd64). The llama.cpp manager checks and
   stops its server through the kernel's process table on macOS instead of

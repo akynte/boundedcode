@@ -210,32 +210,56 @@ More detail:
 
 ### Install and run (one command)
 
+Linux and macOS:
+
 ```bash
 curl -fsSL https://raw.githubusercontent.com/akynte/boundedcode/main/scripts/install.sh | bash
 cd ~/src/my-service     # any git repository
 bcode
 ```
 
-The installer puts `boundedcode` and its short name `bcode` in `~/.local/bin`.
+Windows (PowerShell):
+
+```powershell
+irm https://raw.githubusercontent.com/akynte/boundedcode/main/scripts/install.ps1 | iex
+cd $HOME\src\my-service
+bcode
+```
+
+`install.sh` puts `boundedcode` and its short name `bcode` in `~/.local/bin`.
 It uses a checksum-verified release binary when the release ships one, and
-otherwise builds from source with Go. `bcode` opens a chat for the repository
+otherwise builds from source with Go. `install.ps1` installs the
+checksum-verified release binary into
+`%LOCALAPPDATA%\Programs\BoundedCode\bin` and adds it to your user PATH.
+Release binaries for macOS and Windows ship from the next release on; until
+then, build from source there. `bcode` opens a chat for the repository
 you are in. On the first run it checks the prerequisites and offers to install
 what is missing: tools, llama.cpp, the model weights and the Docker sandbox.
 It asks before every download or build. After that, describe a change and it
 runs as a task. See [the terminal interface](docs/usage/tui.md).
 
-You still need Linux x86-64, git and Docker, plus an NVIDIA GPU with the
-CUDA toolkit for fast local inference. `bcode setup --check` shows what is
-missing from the shell.
+You need git and a container engine (Docker, Podman, or Docker Desktop on
+macOS and Windows). For local inference, set-up recommends a model that fits
+this machine's memory and GPU (NVIDIA with CUDA, Apple Silicon with Metal,
+or CPU only), and downloads a prebuilt llama.cpp where it does not build one
+(it builds from source on Linux when a compiler and CMake are present).
+Without a capable machine, choose a cloud model API instead. `bcode setup
+--check` shows what is missing from the shell. Linux is the validated
+platform; macOS and Windows are experimental (see
+[Known limitations](#known-limitations) and the
+[platform table](docs/usage/getting-started.md#platforms)).
 
 ### Manual install
 
+This is the Linux path with a CUDA build of llama.cpp, as on the reference
+machine. On macOS and Windows, build the CLI with `go build` and let
+`bcode setup` install the rest (it downloads the pinned prebuilt tools).
+
 **Prerequisites:**
-- Linux x86-64
-- an NVIDIA GPU
+- Linux (x86-64 or arm64)
 - Go (see `go.mod`)
 - Git, ripgrep and Docker
-- the CUDA toolkit, to build llama.cpp
+- for GPU inference, an NVIDIA GPU and the CUDA toolkit, to build llama.cpp
 - `uv`, only for Serena
 
 The [getting-started guide](docs/usage/getting-started.md) lists tested
@@ -429,8 +453,9 @@ example by prompt injection in repository content.
    Qwen3.6-35B-A3B on the reference machine (Linux) is benchmarked. The other
    model profiles and the cloud providers work but their quality on
    BoundedCode tasks is unknown, and model fit is a rule of thumb. macOS and
-   Windows builds are tested in CI; the full flow has not yet been run on a
-   Mac or a Windows machine.
+   Windows build and vet in CI, but their unit tests do not pass there yet
+   (at a8fce66: 5 of 31 test packages fail on macOS, 14 of 31 on Windows),
+   and the full flow has not been run on a Mac or a Windows machine.
 4. **Recent evidence-check changes are not yet validated.** Data-driven
    test files are now attributed to the Go package that reads them, and
    tests that only fail to compile on the base no longer count. Both changes are unreleased

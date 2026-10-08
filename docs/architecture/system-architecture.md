@@ -37,11 +37,39 @@ Keep these markers accurate when code changes.
                                          v
                          LLM gateway (Go): metering, budgets, audit
                                          |
-                                         v
-                       inference.Runtime: llama-server (ext proc)
-                                         |
-                                 local GGUF model
+                       inference.Upstream (chosen by inference.provider)
+                         |                                  |
+                         v                                  v
+       local: llama-server (ext proc)        cloud [exp]: OpenAI, Anthropic,
+                         |                   Gemini or OpenAI-compatible API
+                 local GGUF model            (HTTPS from the host; the key is
+                                             added by the gateway only)
 ```
+
+The gateway speaks the OpenAI chat format to the agent and translates to
+each upstream (ADR-0010). Anthropic thinking blocks and Gemini thought
+signatures are kept in a replay store and sent back verbatim on the next
+turn. The agent sandbox never sees an API key and keeps `--network none`.
+
+### Model choice **[exp]**
+
+`internal/hw` probes the machine (RAM, GPUs and their memory, Apple Silicon
+unified memory, free disk) per OS. `model.FitFor` rates each catalog profile
+against that snapshot: whole model on the GPU, MoE experts offloaded to
+system RAM, dense layers split between GPU and RAM, CPU only, or too large
+(a rule of thumb). `model.Recommend` keeps the validated default when it
+runs on the accelerator (GPU or offload) and otherwise suggests the best
+fitting profile. `model fetch` downloads
+weights at a pinned revision, sha256-verified, with resume.
+
+### Platforms **[exp]**
+
+Linux is the validated platform. On macOS and Windows the agent and
+verification still run in a Linux container (Docker Desktop or a Podman
+machine). On Windows, host paths are mounted at `/host/<drive>/...` and
+translated in both directions (`sandbox.ContainerPath`), task worktrees use
+relative `.git` pointers, and process trees end with `taskkill /T`. Pinned
+tools come from per-platform release assets (`internal/install`).
 
 ### Interactive interface **[exp]**
 
@@ -86,11 +114,13 @@ Interfaces exist only where replacement is plausible:
 | Interface | Package | Implementations |
 |---|---|---|
 | `inference.Runtime` | `internal/inference` | `llamacpp` (managed or external) |
+| `inference.Upstream` **[exp]** | `internal/inference` | `OpenAIUpstream` (llama-server and OpenAI-compatible APIs), `AnthropicUpstream` (official Go SDK), `GeminiUpstream` (REST) |
+| `inference.ReplayStore` **[exp]** | `internal/inference` | file-backed store of provider reasoning blocks for verbatim replay |
 | `agent.Runtime` | `internal/agent` | `openhands` (adapter) and `scripted` (deterministic, for tests) |
 | `repointel.Intelligence` | `internal/repointel` | `cbm` (codebase-memory-mcp) |
 | — (concrete) | `internal/stats` | success metrics from the ledger (`boundedcode stats`) |
 | `repointel.Navigator` | `internal/repointel` | `serena` (Serena v1.7.0 over language servers; keyed by checkout root) |
-| `frontier.Provider` | `internal/frontier` | `codex` (subscription CLI) and a manual/clipboard provider |
+| `frontier.Provider` | `internal/frontier` | `codex` (subscription CLI) and a manual/clipboard provider (separate from the agent's model provider) |
 | `sandbox.Sandbox` | `internal/sandbox` | `docker` and `none` (development only, refused for autonomous tasks unless explicitly overridden) |
 
 Verification and telemetry are concrete packages. They have a single

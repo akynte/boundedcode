@@ -56,15 +56,17 @@ explains how).
 
 ## 1. Prerequisites
 
-Versions marked "tested" are what the reference machine (Debian 13) runs;
-older ones may work but are not checked.
+Versions marked "tested" are what the reference machine (Debian 13,
+x86-64) runs; older ones may work but are not checked. For macOS and
+Windows, see [Platforms](#platforms); the manual steps in section 2 are the
+Linux path, and `bcode setup` installs the same pieces on every platform.
 
 | Need | Version | Why | Check |
 |---|---|---|---|
-| Linux x86-64, NVIDIA GPU (8 GB+), 32–64 GB RAM | | local inference with MoE expert offload | `boundedcode doctor` |
+| A machine for local inference | default model (Qwen3.6-35B-A3B): NVIDIA GPU (8 GB+) and 32–64 GB RAM, as validated; smaller profiles fit smaller machines | local inference (MoE expert offload for the default); not needed with a cloud model API | `bcode model recommend` |
 | Go | 1.27.1+ (`go.mod`) | build the CLI (not needed with a release binary) | `go version` |
-| Docker (or Podman) | tested: Docker 29.8; Podman is configurable but not tested on the reference machine | agent sandbox, contained Codex | `docker version` |
-| CUDA toolkit | tested: 13.4 (`nvcc` in `/usr/local/cuda/bin`) | only to build llama.cpp with CUDA | `nvcc --version` |
+| Docker (or Podman) | tested: Docker 29.8; Podman is configurable but not tested on the reference machine; Docker Desktop on macOS and Windows | agent sandbox, contained Codex | `docker version` |
+| CUDA toolkit | tested: 13.4 (`nvcc` in `/usr/local/cuda/bin`) | only to build llama.cpp with CUDA on Linux (the prebuilt Windows CUDA build ships its runtime) | `nvcc --version` |
 | uv | 0.12.18 (the version the sandbox image and CI use) | adapter development without containers, Serena setup | `uv --version` |
 | Python | adapter: >= 3.12 (`requires-python`; the image uses 3.13); Serena: >= 3.11, < 3.15 | adapter outside containers, Serena | `python3 --version` |
 | git, ripgrep | git >= 2.17 | worktrees, search | `git --version` |
