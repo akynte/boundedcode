@@ -337,7 +337,7 @@ func newIntelCmd(app *App) *cobra.Command {
 	cmd.AddCommand(&cobra.Command{Use: "architecture", Short: "Architecture overview",
 		RunE: run(func(ctx context.Context, p string) (string, error) { return app.intel().Architecture(ctx, p) })})
 	var kindFilter string
-	links := &cobra.Command{Use: "links", Short: "Cross-service contract links (HTTP, topics, env) across the workspace",
+	links := &cobra.Command{Use: "links", Short: "Cross-service contract links (HTTP, OpenAPI, gRPC, protobuf, SQL, topics, env) across the workspace",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			eps, err := app.workspaceEndpoints(cmd.Context(), wsFlag)
 			if err != nil {
@@ -364,7 +364,7 @@ func newIntelCmd(app *App) *cobra.Command {
 			}
 			return nil
 		}}
-	links.Flags().StringVar(&kindFilter, "kind", "", "http | topic | topic_infra | env")
+	links.Flags().StringVar(&kindFilter, "kind", "", "http | topic | topic_infra | env | openapi | openapi_impl | grpc | grpc_def | proto | sql")
 	endpoints := &cobra.Command{Use: "endpoints", Short: "Cross-service contract endpoints found by the analyzers",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			eps, err := app.workspaceEndpoints(cmd.Context(), wsFlag)

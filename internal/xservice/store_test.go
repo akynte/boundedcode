@@ -29,17 +29,26 @@ func TestSaveLoadTouching(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	eps := []Endpoint{{Kind: TopicProduce, Repo: "r", File: "a.go", Line: 3, Topic: "t", Confidence: Exact}}
+	eps := []Endpoint{{Kind: TopicProduce, Repo: "r", File: "a.go", Line: 3, Topic: "t", Confidence: Exact},
+		{Kind: GRPCCall, Repo: "r", File: "b.go", Line: 4, Service: "pkg.S", RPC: "M", Ref: "go:x/y", Confidence: Resolved},
+		{Kind: ProtoDefine, Repo: "r", File: "a.proto", Line: 2, Proto: "pkg", Ref: "file:a", Confidence: Exact},
+		{Kind: SQLSchema, Repo: "r", File: "m.sql", Line: 1, Table: "orders", Confidence: Exact}}
 	for range 2 { // replace, not append
 		if err := SaveRepo(ctx, s.DB, w.ID, repo.ID, eps); err != nil {
 			t.Fatal(err)
 		}
 	}
 	got, err := LoadWorkspace(ctx, s.DB, w.ID)
-	if err != nil || len(got) != 1 || got[0].Topic != "t" {
+	if err != nil || len(got) != len(eps) {
 		t.Fatalf("load: %+v %v", got, err)
 	}
-	links := []Link{{From: got[0], To: Endpoint{Repo: "q", File: "b.go"}}}
+	SortEndpoints(eps)
+	for i := range eps {
+		if got[i] != eps[i] {
+			t.Fatalf("round trip:\n got %+v\nwant %+v", got[i], eps[i])
+		}
+	}
+	links := []Link{{From: eps[0], To: Endpoint{Repo: "q", File: "b.go"}}}
 	if len(Touching(links, []string{"r/a.go"})) != 1 || len(Touching(links, []string{"r/x.go"})) != 0 {
 		t.Fatal("Touching wrong")
 	}

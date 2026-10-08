@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+### Cross-service contracts: gRPC, protobuf, OpenAPI and SQL
+
+- Cross-service analysis now also extracts and links gRPC services (from
+  `.proto` definitions, servers and clients in Go, Python, Java/Kotlin, C#,
+  Rust, Ruby, PHP and TS/JS, down to the RPC called), protobuf packages and
+  the code importing their generated code, OpenAPI 3/Swagger 2 operations
+  (linked to the routes implementing them and the calls using them;
+  grpc-gateway annotations become routes) and SQL tables (from `.sql`
+  files, Liquibase, Prisma and the common migration frameworks, linked to
+  queries in string literals, MyBatis mappers and ORM mappings in another
+  repository that does not own the table).
+- The contract check in the run loop counts gRPC like HTTP (either side),
+  and definitions (specs, `.proto` files, schemas) only when the definition
+  changed, so editing a query never asks for another service's migration.
+- `intel links --kind` accepts `openapi`, `openapi_impl`, `grpc`,
+  `grpc_def`, `proto` and `sql`. The index gains five columns (migration 5);
+  run `boundedcode index` to fill them.
+- Validated on a 24-link multi-language fixture (exact) and on Online
+  Boutique (all 21 gRPC edges, none extra); fuzzed parsers.
+
 ### Verification for more languages
 
 - Built-in verification presets for Python (pytest or unittest), Rust

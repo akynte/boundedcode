@@ -1,0 +1,9 @@
+databaseChangeLog:
+  - changeSet:
+      id: 1
+      author: ledger
+      changes:
+        - createTable:
+            tableName: ledger_entries
+            columns:
+              - column: {name: id, type: bigint}

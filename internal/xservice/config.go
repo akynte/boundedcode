@@ -20,12 +20,13 @@ func analyzeYAML(repo, root string, relFiles []string) ([]Endpoint, []Diagnostic
 	var diags []Diagnostic
 	for _, rel := range relFiles {
 		b, err := os.ReadFile(filepath.Join(root, rel))
-		if err != nil || len(b) > 1<<20 {
+		if err != nil || len(b) > maxSpecBytes {
 			continue
 		}
 		if bytes.Contains(b, []byte("{{")) {
 			continue // Helm/Go template, not YAML
 		}
+		large := len(b) > 1<<20 // only API specifications are this large
 		dec := yaml.NewDecoder(bytes.NewReader(b))
 		for {
 			var doc yaml.Node
@@ -34,6 +35,18 @@ func analyzeYAML(repo, root string, relFiles []string) ([]Endpoint, []Diagnostic
 					diags = append(diags, Diagnostic{File: rel, Message: "yaml: " + err.Error()})
 				}
 				break
+			}
+			if _, ok := isOpenAPI(&doc); ok {
+				e, d := openAPIOperations(repo, rel, &doc)
+				out, diags = append(out, e...), append(diags, d...)
+				continue
+			}
+			if large {
+				break
+			}
+			if isLiquibase(&doc) {
+				out = append(out, liquibaseYAML(repo, rel, &doc)...)
+				continue
 			}
 			isConfigMap := kindOf(&doc) == "ConfigMap"
 			walkYAML(&doc, func(key string, val *yaml.Node, keyNode *yaml.Node) {

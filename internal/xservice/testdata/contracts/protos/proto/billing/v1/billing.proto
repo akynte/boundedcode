@@ -1,0 +1,9 @@
+syntax = "proto3";
+package billing.v1;
+option go_package = "github.com/acme/protos/gen/go/billing/v1;billingv1";
+
+// Same short name as payments.v1.PaymentService, another package.
+service PaymentService {
+  rpc CreatePayment(Invoice) returns (Invoice);
+}
+message Invoice { string id = 1; }

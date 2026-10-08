@@ -41,3 +41,50 @@ func FuzzNormalizePath(f *testing.F) {
 		}
 	})
 }
+
+func FuzzSQL(f *testing.F) {
+	for _, s := range []string{"SELECT * FROM a JOIN b ON", "WITH x AS (SELECT", "CREATE TABLE", "$$ unterminated", "'", `"`, "[x", "/* open",
+		"INSERT INTO", "UPDATE x", "DROP TABLE a,", "DELETE FROM", "select ( ( (", ")))"} {
+		f.Add(s)
+	}
+	f.Fuzz(func(t *testing.T, s string) {
+		for _, r := range analyzeSQL(s) {
+			if r.table == "" {
+				t.Fatalf("empty table from %q", s)
+			}
+		}
+		_ = looksLikeSQL(s)
+	})
+}
+
+func FuzzProto(f *testing.F) {
+	for _, s := range []string{"service S { rpc M(", "option (google.api.http) = { get:", "package", "message M { option", "service S { rpc M(stream", "/* x", `"x`} {
+		f.Add(s)
+	}
+	f.Fuzz(func(t *testing.T, s string) {
+		pf := parseProto(s)
+		for _, svc := range pf.services {
+			for _, r := range svc.rpcs {
+				for _, h := range r.http {
+					_ = NormalizePath(h.path)
+				}
+			}
+		}
+		_ = grpcGatewayPath(s)
+	})
+}
+
+func FuzzSource(f *testing.F) {
+	for _, s := range []string{"'''x", `r#"x`, `@"x`, "<<~SQL\nx", "<<<SQL\n", "=begin", "/* x", "'a", `"""`, "x = Stub(", "this.x = new AClient(", "$c = new XClient("} {
+		f.Add(s)
+	}
+	f.Fuzz(func(t *testing.T, s string) {
+		for _, l := range []srcLang{langPython, langJVM, langRust, langCSharp, langRuby, langPHP, langJS} {
+			sf := lexSource(l, s)
+			if len(sf.code) != len(s) || len(sf.bare) != len(s) {
+				t.Fatalf("%s: views changed length", l)
+			}
+			analyzeSource("r", "f", l, s)
+		}
+	})
+}

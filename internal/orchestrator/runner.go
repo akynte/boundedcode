@@ -1030,25 +1030,42 @@ func (r *Runner) contracts(ctx context.Context, t *task.Task, wts []task.Worktre
 	return out
 }
 
-// unupdatedCounterparts lists HTTP/topic contracts touched by the change
-// whose other side is in a repository the task did not change, split into
-// counterparts the agent can edit (task repos) and ones it cannot.
+// unupdatedCounterparts lists contracts touched by the change whose other
+// side is in a repository the task did not change, split into counterparts
+// the agent can edit (task repos) and ones it cannot. HTTP, topic and gRPC
+// contracts count from either side; definitions (OpenAPI specs, .proto
+// files, SQL schemas) only when the definition itself changed: changing a
+// query does not ask for the migration to change.
 func (r *Runner) unupdatedCounterparts(ctx context.Context, t *task.Task, wts []task.Worktree, changedFiles, changedRepos []string) (inTask, outside []string) {
-	links := xservice.Touching(r.contracts(ctx, t, wts), changedFiles)
-	changed := map[string]bool{}
-	for _, c := range changedRepos {
-		changed[c] = true
-	}
 	taskRepo := map[string]bool{}
 	for _, w := range wts {
 		taskRepo[w.RepoName] = true
 	}
+	return counterparts(r.contracts(ctx, t, wts), changedFiles, changedRepos, taskRepo)
+}
+
+// counterparts is unupdatedCounterparts for given links: changedFiles are
+// repo-qualified ("repo/path"), taskRepo the task's repositories.
+func counterparts(all []xservice.Link, changedFiles, changedRepos []string, taskRepo map[string]bool) (inTask, outside []string) {
+	links := xservice.Touching(all, changedFiles)
+	changed := map[string]bool{}
+	for _, c := range changedRepos {
+		changed[c] = true
+	}
+	changedFile := map[string]bool{}
+	for _, f := range changedFiles {
+		changedFile[f] = true
+	}
 	seen := map[string]bool{}
 	for _, l := range links {
-		if l.Kind != "http" && l.Kind != "topic" {
-			continue
+		var pairs [][2]xservice.Endpoint
+		switch {
+		case xservice.SymmetricLinks[l.Kind]:
+			pairs = [][2]xservice.Endpoint{{l.From, l.To}, {l.To, l.From}}
+		case xservice.DefinitionLinks[l.Kind] && changedFile[l.To.Repo+"/"+l.To.File]:
+			pairs = [][2]xservice.Endpoint{{l.To, l.From}}
 		}
-		for _, pair := range [][2]xservice.Endpoint{{l.From, l.To}, {l.To, l.From}} {
+		for _, pair := range pairs {
 			mine, other := pair[0], pair[1]
 			if !changed[mine.Repo] || changed[other.Repo] || mine.Repo == other.Repo {
 				continue

@@ -1,0 +1,15 @@
+openapi: 3.0.3
+info: {title: Payments REST, version: "1"}
+servers:
+  - url: https://{host}/api
+    variables:
+      host: {default: api.acme.com}
+paths:
+  /v1/refunds/{id}:
+    get:
+      operationId: getRefund
+      responses: {"200": {description: ok}}
+  /v1/refunds:
+    post:
+      operationId: createRefund
+      responses: {"201": {description: created}}

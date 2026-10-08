@@ -305,7 +305,7 @@ See [SECURITY.md](../../SECURITY.md) and [sandbox design](../design/sandbox.md).
 `cli` → `orchestrator` → {`task`, `contextplan`, `verify`, `policy`,
 `frontier`, `agent/*`, `inference/*`, `repointel/*`, `xservice`, `sandbox`,
 `gitops`, `workspace`, `telemetry`, `store`}. `xservice` extracts and links
-cross-service contracts (HTTP, topics, env, Terraform) to complement the
-code graph. `repointel/serena` manages Serena processes behind
+cross-service contracts (HTTP, OpenAPI, gRPC, protobuf, SQL, topics, env,
+Terraform) to complement the code graph. `repointel/serena` manages Serena processes behind
 `repointel.Navigator`. Lower layers never import `cli` or
 `orchestrator`.

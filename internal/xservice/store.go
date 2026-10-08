@@ -18,7 +18,8 @@ func SaveRepo(ctx context.Context, db *sql.DB, workspaceID, repositoryID string,
 		return err
 	}
 	stmt, err := tx.PrepareContext(ctx, `INSERT INTO xservice_endpoints(workspace_id, repository_id, repo, kind, file, line, symbol,
-		method, path, topic, env, confidence, detail, scanned_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+		method, path, topic, env, service, rpc, proto, ref, table_name, confidence, detail, scanned_at)
+		VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
 	if err != nil {
 		return err
 	}
@@ -26,7 +27,7 @@ func SaveRepo(ctx context.Context, db *sql.DB, workspaceID, repositoryID string,
 	now := time.Now().UTC().Format(time.RFC3339Nano)
 	for _, e := range eps {
 		if _, err := stmt.ExecContext(ctx, workspaceID, repositoryID, e.Repo, string(e.Kind), e.File, e.Line, e.Symbol,
-			e.Method, e.Path, e.Topic, e.Env, string(e.Confidence), e.Detail, now); err != nil {
+			e.Method, e.Path, e.Topic, e.Env, e.Service, e.RPC, e.Proto, e.Ref, e.Table, string(e.Confidence), e.Detail, now); err != nil {
 			return fmt.Errorf("save endpoint %s: %w", e.Where(), err)
 		}
 	}
@@ -36,7 +37,8 @@ func SaveRepo(ctx context.Context, db *sql.DB, workspaceID, repositoryID string,
 // LoadWorkspace returns all endpoints of a workspace, sorted.
 func LoadWorkspace(ctx context.Context, db *sql.DB, workspaceID string) ([]Endpoint, error) {
 	// Disabled repositories are excluded (workspace disable).
-	rows, err := db.QueryContext(ctx, `SELECT e.repo, e.kind, e.file, e.line, e.symbol, e.method, e.path, e.topic, e.env, e.confidence, e.detail
+	rows, err := db.QueryContext(ctx, `SELECT e.repo, e.kind, e.file, e.line, e.symbol, e.method, e.path, e.topic, e.env,
+		e.service, e.rpc, e.proto, e.ref, e.table_name, e.confidence, e.detail
 		FROM xservice_endpoints e JOIN repositories r ON r.id = e.repository_id
 		WHERE e.workspace_id = ? AND r.enabled = 1`, workspaceID)
 	if err != nil {
@@ -47,7 +49,8 @@ func LoadWorkspace(ctx context.Context, db *sql.DB, workspaceID string) ([]Endpo
 	for rows.Next() {
 		var e Endpoint
 		var kind, conf string
-		if err := rows.Scan(&e.Repo, &kind, &e.File, &e.Line, &e.Symbol, &e.Method, &e.Path, &e.Topic, &e.Env, &conf, &e.Detail); err != nil {
+		if err := rows.Scan(&e.Repo, &kind, &e.File, &e.Line, &e.Symbol, &e.Method, &e.Path, &e.Topic, &e.Env,
+			&e.Service, &e.RPC, &e.Proto, &e.Ref, &e.Table, &conf, &e.Detail); err != nil {
 			return nil, err
 		}
 		e.Kind, e.Confidence = Kind(kind), Confidence(conf)

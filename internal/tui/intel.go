@@ -26,7 +26,7 @@ var intelKinds = []intelKind{
 	{name: "snippet", arg: "symbol", help: "Source of a symbol"},
 	{name: "impact", noArg: true, help: "Change impact of the working tree against the default branch"},
 	{name: "architecture", noArg: true, help: "Architecture overview of each repository"},
-	{name: "links", arg: "kind filter: http | topic | topic_infra | env (optional)", help: "Cross-service contract links across the workspace"},
+	{name: "links", arg: "kind filter: http | topic | topic_infra | env | openapi | openapi_impl | grpc | grpc_def | proto | sql (optional)", help: "Cross-service contract links across the workspace"},
 	{name: "endpoints", noArg: true, help: "Cross-service endpoints found by the analyzers"},
 	{name: "symbol", arg: "symbol name", serena: true, help: "Find a symbol with Serena/LSP (includes its body)"},
 	{name: "refs", arg: "symbol name", serena: true, help: "Symbols referencing a symbol (Serena/LSP)"},

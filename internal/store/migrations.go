@@ -174,4 +174,12 @@ ALTER TABLE escalations ADD COLUMN task_outcome TEXT NOT NULL DEFAULT '';
 	`
 ALTER TABLE model_calls ADD COLUMN provider TEXT NOT NULL DEFAULT 'local';
 `,
+	// 5: gRPC, protobuf and SQL contract endpoints (internal/xservice).
+	`
+ALTER TABLE xservice_endpoints ADD COLUMN service TEXT NOT NULL DEFAULT '';
+ALTER TABLE xservice_endpoints ADD COLUMN rpc TEXT NOT NULL DEFAULT '';
+ALTER TABLE xservice_endpoints ADD COLUMN proto TEXT NOT NULL DEFAULT '';
+ALTER TABLE xservice_endpoints ADD COLUMN ref TEXT NOT NULL DEFAULT '';
+ALTER TABLE xservice_endpoints ADD COLUMN table_name TEXT NOT NULL DEFAULT '';
+`,
 }

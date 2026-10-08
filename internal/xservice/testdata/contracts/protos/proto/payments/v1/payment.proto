@@ -1,0 +1,39 @@
+// The payments API. Comments mentioning service Foo { rpc Bar } are ignored.
+syntax = "proto3";
+
+package payments.v1;
+
+import "google/api/annotations.proto";
+
+option go_package = "github.com/acme/protos/gen/go/payments/v1;paymentsv1";
+option java_package = "com.acme.payments.v1";
+option java_multiple_files = true;
+
+service PaymentService {
+  rpc CreatePayment(CreatePaymentRequest) returns (Payment) {
+    option (google.api.http) = {
+      post: "/v1/payments"
+      body: "*"
+      additional_bindings { post: "/v1/accounts/{account_id}/payments" body: "*" }
+    };
+  }
+  rpc GetPayment(GetPaymentRequest) returns (Payment) {
+    option (google.api.http) = { get: "/v1/{name=payments/*}" };
+  }
+  rpc WatchPayments(WatchRequest) returns (stream Payment);
+}
+
+service RefundService {
+  rpc IssueRefund(IssueRefundRequest) returns (Refund);
+}
+
+message CreatePaymentRequest {
+  string account_id = 1;
+  int64 amount_cents = 2;
+  message Metadata { option deprecated = true; map<string, string> labels = 1; }
+}
+message GetPaymentRequest { string name = 1; }
+message WatchRequest {}
+message Payment { string id = 1; }
+message IssueRefundRequest { string payment_id = 1; }
+message Refund { string id = 1; }

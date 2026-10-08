@@ -286,6 +286,10 @@ func (a *jsAnalyzer) scan() {
 	controller := "" // NestJS @Controller prefix (file scope)
 	for i := 0; i < len(t); i++ {
 		tk := t[i]
+		if tk.kind == jsString || tk.kind == jsTemplate {
+			i = a.scanSQL(i) - 1
+			continue
+		}
 		if tk.kind != jsIdent {
 			continue
 		}
@@ -455,4 +459,36 @@ func span(t []jsTok, lo, hi int) []jsTok {
 		return nil
 	}
 	return t[lo:hi]
+}
+
+// scanSQL analyzes the string at t[i], joined with strings concatenated to
+// it by +, as SQL when it is. Template substitutions become "{}", so a
+// table named by a substitution is not guessed. It returns the index after
+// the strings.
+func (a *jsAnalyzer) scanSQL(i int) int {
+	t := a.toks
+	var b strings.Builder
+	line, conf := t[i].line, Exact
+	j := i
+	for j < len(t) && (t[j].kind == jsString || t[j].kind == jsTemplate) {
+		if t[j].kind == jsTemplate {
+			b.WriteString(strings.Join(t[j].chunks, "{}"))
+			if len(t[j].subs) > 0 {
+				conf = Resolved
+			}
+		} else {
+			b.WriteString(t[j].text)
+		}
+		j++
+		if j+1 < len(t) && t[j].kind == jsPunct && t[j].text == "+" && (t[j+1].kind == jsString || t[j+1].kind == jsTemplate) {
+			j++
+			conf = worse(conf, Resolved)
+			continue
+		}
+		break
+	}
+	if v := b.String(); looksLikeSQL(v) && !sourceTestPath(a.rel) {
+		a.out = append(a.out, sqlEndpoints(a.repo, a.rel, line, v, conf, "", "query")...)
+	}
+	return j
 }

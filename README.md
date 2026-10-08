@@ -192,7 +192,7 @@ vendored source).
 | Verification engine and behavioural-evidence gate | `internal/verify` |
 | Sandbox setup, secret masking, command and path policy | `internal/sandbox`, `internal/policy` |
 | Git worktree management and tamper checks | `internal/gitops` |
-| Cross-service contract analysis (HTTP, topics, env, Terraform) | `internal/xservice` |
+| Cross-service contract analysis (HTTP, OpenAPI, gRPC, protobuf, SQL, topics, env, Terraform) | `internal/xservice` |
 | Model gateway (metering, tunnelled agent calls) and llama.cpp supervision | `internal/inference` |
 | Frontier escalation policy, packet building and sanitization | `internal/frontier` |
 | Process management for codebase-memory-mcp and Serena | `internal/repointel` |
@@ -505,8 +505,6 @@ example by prompt injection in repository content.
   other languages run the Makefile's `test`/`check` target, or say that no
   test runner was found
   ([reference](docs/usage/configuration.md#built-in-presets)).
-- Cross-service analysis does not cover gRPC, OpenAPI, protobuf or SQL
-  contracts.
 
 </details>
 

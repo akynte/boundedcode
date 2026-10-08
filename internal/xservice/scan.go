@@ -25,6 +25,7 @@ func Scan(repo, root string, opt ScanOptions) ([]Endpoint, []Diagnostic, error) 
 		opt.MaxFiles = 200000
 	}
 	var goFiles, jsFiles, yamlFiles, dockerFiles, envTemplates, tfFiles []string
+	var protoFiles, sqlFiles, jsonFiles, xmlFiles, prismaFiles, srcFiles []string
 	n := 0
 	err := filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -67,6 +68,18 @@ func Scan(repo, root string, opt ScanOptions) ([]Endpoint, []Diagnostic, error) 
 			envTemplates = append(envTemplates, rel)
 		case strings.HasSuffix(name, ".tf"):
 			tfFiles = append(tfFiles, rel)
+		case strings.HasSuffix(name, ".proto"):
+			protoFiles = append(protoFiles, rel)
+		case strings.HasSuffix(name, ".sql"):
+			sqlFiles = append(sqlFiles, rel)
+		case strings.HasSuffix(name, ".json"):
+			jsonFiles = append(jsonFiles, rel)
+		case strings.HasSuffix(name, ".xml"):
+			xmlFiles = append(xmlFiles, rel)
+		case strings.HasSuffix(name, ".prisma"):
+			prismaFiles = append(prismaFiles, rel)
+		case sourceLang(name) != "":
+			srcFiles = append(srcFiles, rel)
 		}
 		return nil
 	})
@@ -85,6 +98,17 @@ func Scan(repo, root string, opt ScanOptions) ([]Endpoint, []Diagnostic, error) 
 	eps = append(eps, analyzeEnvTemplate(repo, root, envTemplates)...)
 	e, d = analyzeTerraform(repo, root, tfFiles)
 	eps, diags = append(eps, e...), append(diags, d...)
+	e, d = analyzeProto(repo, root, protoFiles)
+	eps, diags = append(eps, e...), append(diags, d...)
+	e, d = analyzeOpenAPIJSON(repo, root, jsonFiles)
+	eps, diags = append(eps, e...), append(diags, d...)
+	eps = append(eps, analyzeSQLFiles(repo, root, sqlFiles)...)
+	eps = append(eps, analyzeXML(repo, root, xmlFiles)...)
+	e, models := analyzePrisma(repo, root, prismaFiles)
+	eps = append(eps, e...)
+	eps = append(eps, analyzeSources(repo, root, srcFiles, sourceLang)...)
+	eps = append(eps, analyzeSources(repo, root, jsFiles, func(string) srcLang { return langJS })...)
+	resolvePrisma(eps, models)
 	SortEndpoints(eps)
 	return dedupeEndpoints(eps), diags, nil
 }
@@ -93,7 +117,7 @@ func dedupeEndpoints(es []Endpoint) []Endpoint {
 	seen := map[string]bool{}
 	out := es[:0]
 	for _, e := range es {
-		k := string(e.Kind) + "|" + e.Where() + "|" + e.Key()
+		k := string(e.Kind) + "|" + e.Where() + "|" + e.Key() + "|" + e.Ref
 		if !seen[k] {
 			seen[k] = true
 			out = append(out, e)

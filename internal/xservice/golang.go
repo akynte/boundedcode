@@ -1,6 +1,7 @@
 package xservice
 
 import (
+	"bytes"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -8,6 +9,7 @@ import (
 	"path"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -20,11 +22,23 @@ type goModule struct {
 
 // goFile is a parsed (non-test) source file.
 type goFile struct {
-	rel     string // repo-relative
-	pkgPath string // import path
-	file    *ast.File
-	imports map[string]string // local name -> import path
+	rel       string // repo-relative
+	pkgPath   string // import path
+	module    string // module path ("" outside a module)
+	file      *ast.File
+	imports   map[string]string // local name -> import path
+	generated bool              // "Code generated ... DO NOT EDIT."
+	mayGRPC   bool              // the source mentions a client constructor (cheap pre-check)
+	grpcLike  bool              // imports a gRPC or Connect package
+	testPath  bool              // under a test directory: no gRPC, proto or SQL contracts
+	// grpcFields are struct fields assigned a gRPC client (s.payments =
+	// pb.NewPaymentServiceClient(conn)), so calls through them are RPCs.
+	grpcFields map[string]grpcClient
+	sqlLib     string // an imported SQL builder or ORM (gorm, squirrel, goqu, bun)
 }
+
+// grpcClient is a gRPC client constructor's service and package.
+type grpcClient struct{ service, ref string }
 
 // goAnalyzer extracts endpoints from Go sources of one repository.
 type goAnalyzer struct {
@@ -36,10 +50,16 @@ type goAnalyzer struct {
 	diags  []Diagnostic
 	out    []Endpoint
 	budget evalBudget // of the current top-level evaluation (see budget.go)
+	// sqlDone marks string expressions already analyzed as part of a larger
+	// one (a concatenation or a Sprintf format).
+	sqlDone map[ast.Node]bool
+	// protoUses records generated-code imports per package directory.
+	protoUses map[string]bool
 }
 
 func analyzeGo(repo, root string, relFiles []string) ([]Endpoint, []Diagnostic) {
-	a := &goAnalyzer{repo: repo, root: root, fset: token.NewFileSet(), consts: map[string]ast.Expr{}}
+	a := &goAnalyzer{repo: repo, root: root, fset: token.NewFileSet(), consts: map[string]ast.Expr{}, sqlDone: map[ast.Node]bool{},
+		protoUses: map[string]bool{}}
 	mods := findGoModules(root, relFiles)
 	for _, rel := range relFiles {
 		if strings.HasSuffix(rel, "_test.go") {
@@ -54,7 +74,10 @@ func analyzeGo(repo, root string, relFiles []string) ([]Endpoint, []Diagnostic) 
 			a.diags = append(a.diags, Diagnostic{File: rel, Message: "go parse: " + err.Error()})
 			continue
 		}
-		gf := &goFile{rel: filepath.ToSlash(rel), pkgPath: importPathFor(mods, filepath.Join(root, filepath.Dir(rel))), file: f, imports: map[string]string{}}
+		dir := filepath.Join(root, filepath.Dir(rel))
+		gf := &goFile{rel: filepath.ToSlash(rel), pkgPath: importPathFor(mods, dir), module: moduleFor(mods, dir), file: f,
+			imports: map[string]string{}, generated: isGeneratedGo(f), grpcFields: map[string]grpcClient{},
+			mayGRPC: bytes.Contains(src, []byte("Client(")), testPath: sourceTestPath(rel)}
 		for _, imp := range f.Imports {
 			p, _ := strconv.Unquote(imp.Path.Value)
 			name := path.Base(p)
@@ -65,6 +88,14 @@ func analyzeGo(repo, root string, relFiles []string) ([]Endpoint, []Diagnostic) 
 				name = imp.Name.Name
 			}
 			gf.imports[name] = p
+			if hasAnyPrefix(p, grpcPackages) {
+				gf.grpcLike = true
+			}
+			for _, lib := range goSQLLibs {
+				if p == lib || strings.HasPrefix(p, lib+"/") {
+					gf.sqlLib = path.Base(lib)
+				}
+			}
 		}
 		a.files = append(a.files, gf)
 		for _, d := range f.Decls {
@@ -83,9 +114,132 @@ func analyzeGo(repo, root string, relFiles []string) ([]Endpoint, []Diagnostic) 
 		}
 	}
 	for _, gf := range a.files {
+		a.sqlDone = map[ast.Node]bool{} // per file: nodes are not shared
+		a.protoImports(gf)
+		a.collectGRPCFields(gf)
 		a.walkFile(gf)
 	}
 	return a.out, a.diags
+}
+
+// grpcPackages are the gRPC and Connect runtimes; a file importing one
+// makes NewXClient constructors in it gRPC clients.
+var grpcPackages = []string{"google.golang.org/grpc", "connectrpc.com/connect", "github.com/bufbuild/connect-go",
+	"github.com/grpc-ecosystem/grpc-gateway"}
+
+// generatedPkgRE matches import paths that hold generated protobuf code.
+var generatedPkgRE = regexp.MustCompile(`(^|/)(gen|genproto|proto|protos|pb)(/|$)|pb(/v\d+)?$|proto$|connect$`)
+
+// goSQLLibs are query builders and ORMs whose table arguments are tables.
+var goSQLLibs = []string{"gorm.io/gorm", "github.com/jinzhu/gorm", "github.com/Masterminds/squirrel", "github.com/doug-martin/goqu",
+	"github.com/uptrace/bun", "github.com/go-pg/pg"}
+
+func moduleFor(mods []goModule, dir string) string {
+	best := goModule{}
+	for _, m := range mods {
+		if (dir == m.dir || strings.HasPrefix(dir, m.dir+string(filepath.Separator))) && len(m.dir) > len(best.dir) {
+			best = m
+		}
+	}
+	return best.path
+}
+
+func isGeneratedGo(f *ast.File) bool {
+	for _, cg := range f.Comments {
+		if cg.Pos() > f.Package {
+			break
+		}
+		for _, c := range cg.List {
+			if strings.HasPrefix(c.Text, "// Code generated ") && strings.HasSuffix(c.Text, " DO NOT EDIT.") {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// protoImports records imports that may be generated protobuf code: any
+// import outside the standard library and the file's own module, once per
+// package directory. Linking keeps those whose path is a .proto file's
+// go_package.
+func (a *goAnalyzer) protoImports(gf *goFile) {
+	if gf.generated || gf.testPath {
+		return
+	}
+	for _, imp := range gf.file.Imports {
+		p, _ := strconv.Unquote(imp.Path.Value)
+		first, _, _ := strings.Cut(p, "/")
+		if !strings.Contains(first, ".") || gf.module != "" && (p == gf.module || strings.HasPrefix(p, gf.module+"/")) {
+			continue
+		}
+		k := path.Dir(gf.rel) + "|" + p
+		if a.protoUses[k] {
+			continue
+		}
+		a.protoUses[k] = true
+		a.out = append(a.out, Endpoint{Kind: ProtoUse, Repo: a.repo, File: gf.rel, Line: a.fset.Position(imp.Pos()).Line,
+			Ref: "go:" + p, Confidence: Exact, Detail: "import"})
+	}
+}
+
+// grpcConstructor recognizes pkg.NewXClient(conn) (grpc-go, connect-go).
+func (a *goAnalyzer) grpcConstructor(gf *goFile, e ast.Expr) (grpcClient, bool) {
+	c, ok := e.(*ast.CallExpr)
+	if !ok {
+		return grpcClient{}, false
+	}
+	sel, ok := c.Fun.(*ast.SelectorExpr)
+	if !ok {
+		return grpcClient{}, false
+	}
+	id, ok := sel.X.(*ast.Ident)
+	if !ok {
+		return grpcClient{}, false
+	}
+	p, ok := gf.imports[id.Name]
+	if !ok {
+		return grpcClient{}, false
+	}
+	name := sel.Sel.Name
+	svc, ok := strings.CutPrefix(name, "New")
+	if !ok || !strings.HasSuffix(svc, "Client") || len(svc) == len("Client") {
+		return grpcClient{}, false
+	}
+	// NewXClient is a common constructor name: it is a gRPC client when the
+	// file uses gRPC, the argument is a connection, or the package is
+	// generated code.
+	conn := len(c.Args) > 0 && strings.Contains(strings.ToLower(exprString(c.Args[0])), "conn") ||
+		len(c.Args) > 0 && exprString(c.Args[0]) == "cc"
+	if !gf.grpcLike && !conn && !generatedPkgRE.MatchString(p) {
+		return grpcClient{}, false
+	}
+	return grpcClient{service: strings.TrimSuffix(svc, "Client"), ref: "go:" + p}, true
+}
+
+// collectGRPCFields finds struct fields holding gRPC clients.
+func (a *goAnalyzer) collectGRPCFields(gf *goFile) {
+	if gf.generated || gf.testPath || !gf.mayGRPC {
+		return
+	}
+	ast.Inspect(gf.file, func(n ast.Node) bool {
+		switch x := n.(type) {
+		case *ast.AssignStmt:
+			for i, l := range x.Lhs {
+				if sel, ok := l.(*ast.SelectorExpr); ok && i < len(x.Rhs) {
+					if gc, ok := a.grpcConstructor(gf, x.Rhs[i]); ok {
+						gf.grpcFields[sel.Sel.Name] = gc
+					}
+				}
+			}
+		case *ast.KeyValueExpr:
+			if k, ok := x.Key.(*ast.Ident); ok {
+				if gc, ok := a.grpcConstructor(gf, x.Value); ok {
+					gf.grpcFields[k.Name] = gc
+				}
+			}
+		}
+		return true
+	})
 }
 
 func majorSuffix(p string) string {
@@ -156,6 +310,16 @@ func (a *goAnalyzer) walkFile(gf *goFile) {
 			sym := fd.Name.Name
 			if fd.Recv != nil && len(fd.Recv.List) == 1 {
 				sym = recvName(fd.Recv.List[0].Type) + "." + sym
+			}
+			if fd.Name.Name == "TableName" && !gf.testPath && fd.Recv != nil && fd.Body != nil && len(fd.Body.List) == 1 {
+				if ret, ok := fd.Body.List[0].(*ast.ReturnStmt); ok && len(ret.Results) == 1 {
+					if lit, ok := ret.Results[0].(*ast.BasicLit); ok && lit.Kind == token.STRING {
+						if t, err := strconv.Unquote(lit.Value); err == nil && sqlTableNameRE.MatchString(t) {
+							a.out = append(a.out, Endpoint{Kind: SQLAccess, Repo: a.repo, File: gf.rel, Line: a.fset.Position(fd.Pos()).Line,
+								Symbol: sym, Table: strings.ToLower(t), Confidence: Exact, Detail: "TableName (ORM model)"})
+						}
+					}
+				}
 			}
 			if fd.Body != nil {
 				a.walkBody(&scope{gf: gf, locals: map[string]ast.Expr{}, prefixes: map[string]string{}, symbol: sym, methods: map[*ast.CallExpr][]string{}}, fd.Body)
@@ -315,11 +479,37 @@ func (a *goAnalyzer) emit(sc *scope, pos token.Pos, e Endpoint) {
 
 func (a *goAnalyzer) visit(sc *scope, n ast.Node) {
 	switch x := n.(type) {
+	case *ast.BasicLit:
+		if x.Kind == token.STRING && !a.sqlDone[x] {
+			if v, err := strconv.Unquote(x.Value); err == nil && looksLikeSQL(v) {
+				a.emitSQL(sc, x, v, Exact)
+			}
+		}
 	case *ast.CallExpr:
 		a.visitCall(sc, x)
 	case *ast.CompositeLit:
 		a.visitComposite(sc, x)
 	case *ast.BinaryExpr:
+		if x.Op == token.ADD && !a.sqlDone[x] && concatMayBeSQL(x) {
+			// A query concatenated from parts: analyze the whole once.
+			ast.Inspect(x, func(c ast.Node) bool {
+				if c != nil {
+					a.sqlDone[c] = true
+				}
+				return true
+			})
+			if v, conf := a.eval(sc, x); looksLikeSQL(v) {
+				a.emitSQL(sc, x, v, worse(conf, Resolved))
+			} else {
+				// Not SQL as a whole: its literals are judged on their own.
+				ast.Inspect(x, func(c ast.Node) bool {
+					if lit, ok := c.(*ast.BasicLit); ok {
+						delete(a.sqlDone, lit)
+					}
+					return true
+				})
+			}
+		}
 		// `msg.Topic == "orders"` / `!=` in a consumer: heuristic consume.
 		if x.Op == token.EQL || x.Op == token.NEQ {
 			for _, pair := range [][2]ast.Expr{{x.X, x.Y}, {x.Y, x.X}} {
@@ -362,6 +552,9 @@ func (a *goAnalyzer) visitCall(sc *scope, c *ast.CallExpr) {
 		pkg = sc.gf.imports[recvName]
 	}
 	name := sel.Sel.Name
+	if a.visitGRPC(sc, c, sel, pkg) || a.visitSQLCall(sc, c, sel, pkg) {
+		return
+	}
 	switch {
 	// Environment variables.
 	case (pkg == "os" || pkg == "syscall") && (name == "Getenv" || name == "LookupEnv") && len(c.Args) == 1:
@@ -752,4 +945,135 @@ func exprString(e ast.Expr) string {
 		return x.Op.String() + exprString(x.X)
 	}
 	return "expr"
+}
+
+var (
+	grpcGatewayRE = regexp.MustCompile(`^Register(\w+)Handler(?:FromEndpoint|Server|Client)?$`)
+	grpcServerRE  = regexp.MustCompile(`^Register(\w+)Server$`)
+	connectRE     = regexp.MustCompile(`^New(\w+)Handler$`)
+)
+
+// visitGRPC recognizes gRPC servers and clients by the functions generated
+// code exports: RegisterXServer (grpc-go), NewXHandler (connect-go),
+// RegisterXHandler... (grpc-gateway, a client of the service), NewXClient,
+// and calls through a client held in a variable or struct field.
+func (a *goAnalyzer) visitGRPC(sc *scope, c *ast.CallExpr, sel *ast.SelectorExpr, pkg string) bool {
+	if sc.gf.generated || sc.gf.testPath {
+		return false
+	}
+	name := sel.Sel.Name
+	ref := "go:" + pkg
+	if pkg != "" {
+		switch {
+		case grpcGatewayRE.MatchString(name):
+			svc := grpcGatewayRE.FindStringSubmatch(name)[1]
+			a.emit(sc, c.Pos(), Endpoint{Kind: GRPCCall, Service: svc, Ref: ref, Confidence: Resolved, Detail: "grpc-gateway " + name})
+			return true
+		case grpcServerRE.MatchString(name) && len(c.Args) == 2:
+			svc := grpcServerRE.FindStringSubmatch(name)[1]
+			a.emit(sc, c.Pos(), Endpoint{Kind: GRPCServe, Service: svc, Ref: ref, Confidence: Resolved, Detail: name})
+			return true
+		case connectRE.MatchString(name) && strings.HasSuffix(pkg, "connect"):
+			svc := connectRE.FindStringSubmatch(name)[1]
+			a.emit(sc, c.Pos(), Endpoint{Kind: GRPCServe, Service: svc, Ref: ref, Confidence: Resolved, Detail: "connect " + name})
+			return true
+		}
+		if gc, ok := a.grpcConstructor(sc.gf, c); ok {
+			a.emit(sc, c.Pos(), Endpoint{Kind: GRPCCall, Service: gc.service, Ref: gc.ref, Confidence: Resolved, Detail: name})
+			return true
+		}
+		return false
+	}
+	// client.Method(ctx, req) through a local or a field.
+	var gc grpcClient
+	found := false
+	switch x := sel.X.(type) {
+	case *ast.Ident:
+		if b, ok := sc.locals[x.Name]; ok {
+			gc, found = a.grpcConstructor(sc.gf, b)
+		}
+	case *ast.SelectorExpr:
+		gc, found = sc.gf.grpcFields[x.Sel.Name]
+	case *ast.CallExpr: // pb.NewXClient(conn).Method(ctx, req)
+		gc, found = a.grpcConstructor(sc.gf, x)
+	}
+	if !found || len(c.Args) == 0 || !ast.IsExported(name) {
+		return false
+	}
+	a.emit(sc, c.Pos(), Endpoint{Kind: GRPCCall, Service: gc.service, RPC: name, Ref: gc.ref, Confidence: Resolved, Detail: "client call"})
+	return true
+}
+
+// sqlBuilderMethods take a table name as their first argument in the
+// query builders and ORMs of goSQLLibs.
+var sqlBuilderMethods = map[string]bool{"Table": true, "From": true, "Into": true, "Insert": true, "Update": true, "Delete": true,
+	"ModelTableExpr": true, "TableExpr": true}
+
+var sqlTableNameRE = regexp.MustCompile(`^[A-Za-z_][\w$]*(\.[A-Za-z_][\w$]*)?$`)
+
+// visitSQLCall handles fmt.Sprintf formats that are SQL, and table
+// arguments of query builders.
+func (a *goAnalyzer) visitSQLCall(sc *scope, c *ast.CallExpr, sel *ast.SelectorExpr, pkg string) bool {
+	if sc.gf.testPath {
+		return false
+	}
+	if pkg == "fmt" && sel.Sel.Name == "Sprintf" && len(c.Args) > 0 {
+		if f, ok := c.Args[0].(*ast.BasicLit); ok && f.Kind == token.STRING {
+			if v, err := strconv.Unquote(f.Value); err == nil && looksLikeSQL(v) {
+				a.sqlDone[f] = true
+				full, conf := a.eval(sc, c)
+				a.emitSQL(sc, c, full, worse(conf, Resolved))
+			}
+		}
+		return false
+	}
+	if sc.gf.sqlLib == "" || !sqlBuilderMethods[sel.Sel.Name] || len(c.Args) == 0 {
+		return false
+	}
+	lit, ok := c.Args[0].(*ast.BasicLit)
+	if !ok || lit.Kind != token.STRING {
+		return false
+	}
+	t, err := strconv.Unquote(lit.Value)
+	if err != nil {
+		return false
+	}
+	t = strings.TrimSpace(strings.Fields(t + " ")[0]) // "payments AS p"
+	if !sqlTableNameRE.MatchString(t) {
+		return false
+	}
+	a.sqlDone[lit] = true
+	a.emit(sc, c.Pos(), Endpoint{Kind: SQLAccess, Table: strings.ToLower(t), Confidence: Resolved, Detail: sc.gf.sqlLib + " " + sel.Sel.Name})
+	return false
+}
+
+// emitSQL emits the tables of a SQL string found at n.
+func (a *goAnalyzer) emitSQL(sc *scope, n ast.Node, v string, conf Confidence) {
+	if sc.gf.testPath {
+		return
+	}
+	line := a.fset.Position(n.Pos()).Line
+	a.out = append(a.out, sqlEndpoints(a.repo, sc.gf.rel, line, v, conf, sc.symbol, "query")...)
+}
+
+// concatMayBeSQL is a cheap check that a + expression has a string part
+// with a SQL keyword, before it is evaluated as a whole.
+func concatMayBeSQL(x *ast.BinaryExpr) bool {
+	found := false
+	ast.Inspect(x, func(n ast.Node) bool {
+		if found {
+			return false
+		}
+		if lit, ok := n.(*ast.BasicLit); ok && lit.Kind == token.STRING {
+			u := strings.ToUpper(lit.Value)
+			for _, kw := range []string{"SELECT", "INSERT", "UPDATE", "DELETE", "FROM", "INTO", "TABLE", "WITH", "MERGE"} {
+				if strings.Contains(u, kw) {
+					found = true
+					return false
+				}
+			}
+		}
+		return true
+	})
+	return found
 }

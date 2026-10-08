@@ -1,7 +1,9 @@
 // Package xservice extracts cross-service contracts from source and
-// configuration — HTTP routes and client calls, message-topic producers and
-// consumers, environment variables read and provided — and links them across
-// repositories. It complements the code graph (codebase-memory-mcp), filling
+// configuration — HTTP routes and client calls, OpenAPI operations, gRPC
+// services and their servers and clients, protobuf packages and the code
+// that uses them, SQL tables and the code that queries them, message-topic
+// producers and consumers, environment variables read and provided — and
+// links them across repositories. It complements the code graph (codebase-memory-mcp), filling
 // the gaps measured in docs/design/repointel-gap-report.md.
 //
 // Analyzers are deterministic, parser-based where practical (go/ast for Go,
@@ -26,6 +28,17 @@ const (
 	TopicProvision Kind = "topic_provision" // infrastructure declares a topic
 	EnvRead        Kind = "env_read"        // code reads an environment variable
 	EnvProvide     Kind = "env_provide"     // deployment config supplies it
+
+	OpenAPIOperation Kind = "openapi_operation" // an OpenAPI/Swagger spec declares METHOD path
+
+	ProtoDefine Kind = "proto_define" // a .proto file declares a package (Ref: how code imports it)
+	ProtoUse    Kind = "proto_use"    // code imports a protobuf package's generated code (Ref)
+	GRPCDefine  Kind = "grpc_define"  // a .proto file declares service/rpc
+	GRPCServe   Kind = "grpc_serve"   // code implements or registers a gRPC service
+	GRPCCall    Kind = "grpc_call"    // code creates a client of, or calls, a gRPC service
+
+	SQLSchema Kind = "sql_schema" // DDL or a migration creates or alters a table
+	SQLAccess Kind = "sql_access" // a query or ORM mapping uses a table
 )
 
 // Confidence describes how a value was obtained.
@@ -44,15 +57,26 @@ const (
 
 // Endpoint is one contract occurrence in a repository.
 type Endpoint struct {
-	Kind       Kind       `json:"kind"`
-	Repo       string     `json:"repo"`
-	File       string     `json:"file"` // repo-relative, slash-separated
-	Line       int        `json:"line"`
-	Symbol     string     `json:"symbol,omitempty"` // enclosing function or handler
-	Method     string     `json:"method,omitempty"` // HTTP method, upper case; empty = any
-	Path       string     `json:"path,omitempty"`   // normalized HTTP path template
-	Topic      string     `json:"topic,omitempty"`
-	Env        string     `json:"env,omitempty"`
+	Kind   Kind   `json:"kind"`
+	Repo   string `json:"repo"`
+	File   string `json:"file"` // repo-relative, slash-separated
+	Line   int    `json:"line"`
+	Symbol string `json:"symbol,omitempty"` // enclosing function or handler
+	Method string `json:"method,omitempty"` // HTTP method, upper case; empty = any
+	Path   string `json:"path,omitempty"`   // normalized HTTP path template
+	Topic  string `json:"topic,omitempty"`
+	Env    string `json:"env,omitempty"`
+	// Service is a gRPC service: fully qualified (pkg.Service) when known,
+	// else its short name. RPC is the method, empty for the whole service.
+	Service string `json:"service,omitempty"`
+	RPC     string `json:"rpc,omitempty"`
+	// Proto is a protobuf package. Ref is how generated code is imported:
+	// "go:<import path>", "java:<package>" or "file:<proto file base name>".
+	Proto string `json:"proto,omitempty"`
+	Ref   string `json:"ref,omitempty"`
+	// Table is a SQL table or view, lower case, schema-qualified when the
+	// source qualifies it.
+	Table      string     `json:"table,omitempty"`
 	Confidence Confidence `json:"confidence"`
 	Detail     string     `json:"detail,omitempty"` // e.g. matched API ("sarama.ProducerMessage")
 }
@@ -68,6 +92,24 @@ func (e Endpoint) Key() string {
 		return m + " " + e.Path
 	case TopicProduce, TopicConsume, TopicProvision:
 		return "topic " + e.Topic
+	case OpenAPIOperation:
+		m := e.Method
+		if m == "" {
+			m = "ANY"
+		}
+		return m + " " + e.Path
+	case GRPCDefine, GRPCServe, GRPCCall:
+		if e.RPC != "" {
+			return "grpc " + e.Service + "/" + e.RPC
+		}
+		return "grpc " + e.Service
+	case ProtoDefine, ProtoUse:
+		if e.Proto != "" {
+			return "proto " + e.Proto
+		}
+		return "proto " + e.Ref
+	case SQLSchema, SQLAccess:
+		return "table " + e.Table
 	default:
 		return "env " + e.Env
 	}
@@ -78,7 +120,9 @@ func (e Endpoint) Where() string { return fmt.Sprintf("%s:%s:%d", e.Repo, e.File
 
 // Link connects two endpoints of the same contract.
 type Link struct {
-	Kind     string   `json:"kind"` // http | topic | topic_infra | env
+	// http | topic | topic_infra | env | openapi | openapi_impl | grpc |
+	// grpc_def | proto | sql (see LinkAll).
+	Kind     string   `json:"kind"`
 	Contract string   `json:"contract"`
 	From     Endpoint `json:"from"` // caller / producer / reader / provisioner
 	To       Endpoint `json:"to"`   // route / consumer / provider / user
