@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## v0.1.0-alpha.3 (2026-10-08): your model, your platform, your language
+
+Release notes: [docs/releases/v0.1.0-alpha.3.md](docs/releases/v0.1.0-alpha.3.md).
 
 ### Cross-service contracts: gRPC, protobuf, OpenAPI and SQL
 
