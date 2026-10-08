@@ -414,11 +414,7 @@ example by prompt injection in repository content.
 
 1. **Small validation sample.** 8 + 6 public tasks, each run once. The second
    set was screened for issue-derivable tests; real requests are not.
-2. **One machine and one model.** Other GPUs, platforms and models are
-   untested. Model choice, cloud providers, macOS and Windows support are
-   being added (see the [plan](docs/development/multiplatform-plan.md)); none
-   of them has run on other hardware yet.
-3. **Ambiguity detection is imperfect.** The task contract is derived by the
+2. **Ambiguity detection is imperfect.** The task contract is derived by the
    local model. It has flagged a clear request as ambiguous and misnamed real
    alternatives. The second validation ran with `task.ambiguity: proceed`,
    not the default `ask`; under the default, one clear task (vue) would have
@@ -429,21 +425,23 @@ example by prompt injection in repository content.
    its readings have a supporting quote there. This check, and the retry of
    a contract that names nothing required, have unit tests with scripted
    model replies only; they have not been run on real tasks.
-4. **New models and cloud providers are unmeasured.** Only Qwen3.6-35B-A3B
-   on the reference machine is validated. The other model profiles and the
-   cloud providers are experimental: their fit is a rule of thumb and their
-   quality on BoundedCode tasks is unknown.
-5. **Recent evidence-check changes are not yet validated.** Data-driven
+3. **New models, cloud providers and platforms are unmeasured.** Only
+   Qwen3.6-35B-A3B on the reference machine (Linux) is benchmarked. The other
+   model profiles and the cloud providers work but their quality on
+   BoundedCode tasks is unknown, and model fit is a rule of thumb. macOS and
+   Windows builds are tested in CI; the full flow has not yet been run on a
+   Mac or a Windows machine.
+4. **Recent evidence-check changes are not yet validated.** Data-driven
    test files are now attributed to the Go package that reads them, and
    tests that only fail to compile on the base no longer count. Both changes are unreleased
    and covered by unit tests only; non-Go stages are compared per stage, not
    per test.
-6. **Frontier escalation is unproven.** It was enabled but not triggered in
+5. **Frontier escalation is unproven.** It was enabled but not triggered in
    the second validation; in the first, 4 frontier calls were sent and no
    task was accepted.
-7. **The strategy governor** bounded runaway generation in development runs,
+6. **The strategy governor** bounded runaway generation in development runs,
    but did not trigger during the held-out validation.
-8. **No baseline advantage shown.** On the two-task baseline in the first
+7. **No baseline advantage shown.** On the two-task baseline in the first
    validation, BoundedCode did not improve the same local model's result and
    was slower on those tasks; no baseline was run on the held-out set
    ([baseline comparison](benchmarks/reports/small-real-world-validation-20261004/baseline-comparison.md)).
