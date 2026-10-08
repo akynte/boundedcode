@@ -13,7 +13,7 @@ or a cloud model API you choose.
 [![secret-scan](https://github.com/akynte/boundedcode/actions/workflows/secrets.yml/badge.svg?branch=main)](https://github.com/akynte/boundedcode/actions/workflows/secrets.yml)
 [![dco](https://github.com/akynte/boundedcode/actions/workflows/dco.yml/badge.svg?branch=main)](https://github.com/akynte/boundedcode/actions/workflows/dco.yml)
 [![release](https://img.shields.io/github/v/release/akynte/boundedcode?include_prereleases&sort=semver&label=release)](https://github.com/akynte/boundedcode/releases)
-[![status: public alpha](https://img.shields.io/badge/status-public%20alpha-orange)](docs/releases/v0.1.0-alpha.3.md)
+[![status: public alpha](https://img.shields.io/badge/status-public%20alpha-orange)](docs/releases/v0.1.0-alpha.4.md)
 [![license](https://img.shields.io/github/license/akynte/boundedcode)](LICENSE)
 [![Go](https://img.shields.io/github/go-mod/go-version/akynte/boundedcode)](go.mod)
 

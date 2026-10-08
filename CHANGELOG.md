@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## v0.1.0-alpha.4 (2026-10-08): do the repositories still work together?
+
+Release notes: [docs/releases/v0.1.0-alpha.4.md](docs/releases/v0.1.0-alpha.4.md).
 
 ### Cross-repository compatibility gate (experimental)
 
