@@ -130,17 +130,35 @@ on its own, with its own scope.
 flowchart LR
     U([Task request<br/>bcode chat or CLI]) --> CP[BoundedCode<br/>Go control plane]
     CP <--> L[(Task ledger<br/>SQLite)]
-    CP --> P[Context planner]
-    P --- CM[codebase-memory-mcp<br/>repository breadth]
-    P --- SE[Serena + LSP<br/>semantic depth]
+    CP --> C{Task contract:<br/>ambiguous?}
+    C -->|yes| Q([Asks you to clarify])
+    C -->|no| P[Context planner<br/>bounded pack]
+    CM[codebase-memory-mcp<br/>repository breadth] --- P
+    SE[Serena + LSP, optional<br/>semantic depth] --- P
     P --> A[OpenHands agent<br/>network-less container]
-    A <-->|model calls tunnelled| M[llama.cpp<br/>local model]
+    A <-->|model calls over stdio| G[Model gateway<br/>in the control plane]
+    G <--> M[llama.cpp<br/>local model, default]
+    G <-.-> K[Cloud API, optional<br/>OpenAI · Anthropic · Gemini]
     A --> W[Git worktree<br/>agent/task-id]
-    W --> V{Verification<br/>behavioural evidence}
-    V -->|TASK_VERIFIED| R([Branch ready for review])
-    V -->|failed| CP
-    CP -.->|policy-triggered, optional| F[Frontier<br/>Codex CLI]
+    W --> V{Verification<br/>targeted, then full,<br/>in the sandbox}
+    V -->|failed: retry pack| P
+    V -->|budget exhausted| B([Blocked<br/>task resume])
+    V -->|passed| E{A test demonstrates<br/>the change?}
+    E -->|no: ask once for one| P
+    E -->|yes| R([task_verified<br/>branch ready for review])
+    E -->|still no| R2([tests_green<br/>UNVERIFIED, review first])
+    CP -.->|policy: Z1 design risk,<br/>Z2 repeated failures,<br/>Z3 pre-merge review| F[Frontier advisor<br/>Codex CLI or manual]
+    F -.->|advice in the next pack| P
 ```
+
+Each attempt gets a bounded context pack; the agent has only terminal,
+file-edit and task-tracker tools, and its model calls go back over stdio to
+the gateway, so the container needs no network. Before verification the
+control plane checks the worktree's integrity and commits a checkpoint. A
+passing change that touches a cross-service contract without updating the
+other side gets one more round to check it, and frontier escalation also
+runs when you ask for it (Z4). A task that runs out of attempts, tokens or
+time is blocked, not failed: `task resume` continues it.
 
 | Layer | Role |
 |---|---|
@@ -150,10 +168,11 @@ flowchart LR
 | **Serena / LSP** (optional) | Semantic depth: definitions, references, implementations |
 | **Context planner** | Builds small task-specific packs |
 | **OpenHands SDK** | Agent runtime, in a sandboxed container |
-| **llama.cpp + local model** | Reasoning and editing |
-| **Verification engine** | Build, lint, tests and behavioural evidence |
+| **Model gateway** | Carries the agent's model calls to the local model or a cloud API; metering, budgets, API keys |
+| **llama.cpp + local model**, or a cloud API | Reasoning and editing (local by default) |
+| **Verification engine** | Build, lint and tests in the sandbox, a secret scan of the diff on the host, and behavioural evidence |
 | **Task ledger** | Persistent state and audit log; resume anywhere |
-| **Frontier gate** | Optional escalation when the policy triggers |
+| **Frontier gate** | Optional escalation when the policy triggers or you ask; advice goes into the next pack |
 
 ### What BoundedCode implements vs. what it integrates
 
