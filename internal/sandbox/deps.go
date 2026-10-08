@@ -6,14 +6,38 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
+	"slices"
 	"strings"
 )
 
 // DependencyDirNames are installed-dependency directories that a project's
 // tooling needs but git does not track. A task worktree is a fresh checkout,
-// so without them a JavaScript/TypeScript project cannot be type-checked or
-// tested offline. (Go needs no equivalent: its module cache is shared.)
-var DependencyDirNames = map[string]bool{"node_modules": true}
+// so without them a project cannot be type-checked or tested offline. Each
+// name maps to a check that the directory really holds installed
+// dependencies: "vendor" is also where Go projects commit their
+// dependencies, and a checkout's copy must never shadow tracked files. (Go,
+// Rust, Java and Gradle need no equivalent: their package caches are shared,
+// see PackageCaches.)
+var DependencyDirNames = map[string]func(dir string) bool{
+	"node_modules": func(string) bool { return true },
+	// Python virtual environments.
+	".venv": isVenv,
+	"venv":  isVenv,
+	// Composer (vendor/autoload.php) and Bundler (vendor/bundle).
+	"vendor": func(dir string) bool {
+		return fileExists(filepath.Join(dir, "autoload.php")) || isDir(filepath.Join(dir, "bundle"))
+	},
+	// Bundler's per-project settings (the path gems were installed to).
+	".bundle": func(dir string) bool { return fileExists(filepath.Join(dir, "config")) },
+}
+
+func isVenv(dir string) bool { return fileExists(filepath.Join(dir, "pyvenv.cfg")) }
+
+func fileExists(p string) bool {
+	st, err := os.Stat(p)
+	return err == nil && st.Mode().IsRegular()
+}
 
 // dependencyCacheDirs are the directories tools write inside a dependency
 // directory (Vite/Vitest, babel/eslint/terser loaders). They get a writable
@@ -81,7 +105,7 @@ func DependencyMounts(source, worktree string) (Dependencies, error) {
 		if d.Name() == ".git" || strings.Count(rel, string(filepath.Separator)) >= maxDependencyDepth {
 			return filepath.SkipDir
 		}
-		if !DependencyDirNames[d.Name()] {
+		if ok := DependencyDirNames[d.Name()]; ok == nil || !ok(p) {
 			return nil
 		}
 		if err := safeDependencyTarget(worktree, rel); err != nil {
@@ -92,6 +116,9 @@ func DependencyMounts(source, worktree string) (Dependencies, error) {
 		}
 		target := filepath.Join(worktree, rel)
 		out = append(out, Mount{Host: p, Target: target, ReadOnly: true})
+		if prefix := venvInterpreter(p); prefix != "" && !slices.ContainsFunc(out, func(m Mount) bool { return m.Host == prefix }) {
+			out = append(out, Mount{Host: prefix, Target: prefix, ReadOnly: true})
+		}
 		for _, c := range dependencyCacheDirs {
 			if ensureCacheDir(filepath.Join(p, c)) {
 				deps.Scratch = append(deps.Scratch, filepath.Join(target, c))
@@ -135,4 +162,49 @@ func safeDependencyTarget(worktree, rel string) error {
 		}
 	}
 	return nil
+}
+
+// venvInterpreter returns the installation prefix of the Python interpreter
+// a virtual environment was created from, when it can be mounted into the
+// sandbox at the same path: a self-contained installation (uv, pyenv,
+// conda, a Python built into a home directory) on a Linux host. A venv made
+// from a system Python (/usr/bin/python3) cannot be: its interpreter would
+// shadow the sandbox image's own; verification then uses the image's
+// Python with the venv's packages when the versions match.
+func venvInterpreter(venv string) string {
+	if runtime.GOOS != "linux" {
+		return "" // a macOS or Windows interpreter does not run in a Linux container
+	}
+	b, err := os.ReadFile(filepath.Join(venv, "pyvenv.cfg"))
+	if err != nil {
+		return ""
+	}
+	for line := range strings.SplitSeq(string(b), "\n") {
+		k, v, ok := strings.Cut(line, "=")
+		if !ok || strings.TrimSpace(k) != "home" {
+			continue
+		}
+		bin := filepath.Clean(strings.TrimSpace(v))
+		prefix := filepath.Dir(bin)
+		if !filepath.IsAbs(bin) || filepath.Base(bin) != "bin" || !isDir(bin) || systemPath(prefix) {
+			return ""
+		}
+		return prefix
+	}
+	return ""
+}
+
+// systemPath reports whether p is, or is inside, a directory the sandbox
+// image provides itself, or is too broad to mount (a home directory, /).
+func systemPath(p string) bool {
+	if strings.Count(p, "/") < 3 {
+		return true // /, /opt, /home/u, /opt/x
+	}
+	for _, d := range []string{"/usr", "/bin", "/sbin", "/lib", "/lib32", "/lib64", "/libx32", "/etc", "/proc", "/sys", "/dev", "/run", "/var", "/boot", "/root", "/opt/adapter", "/opt/jdk", "/opt/maven", "/opt/gradle"} {
+		if p == d || strings.HasPrefix(p, d+"/") {
+			return true
+		}
+	}
+	home, _ := os.UserHomeDir()
+	return home != "" && (p == home || strings.HasPrefix(home, p+"/"))
 }

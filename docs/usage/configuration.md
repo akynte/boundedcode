@@ -237,11 +237,9 @@ strictly, and the merged result goes through the same validation as
 Each repository can define its own verification stages. The file is read
 from the task's **base commit**, never from the worktree, so the agent cannot
 change how its own work is judged; a change to it takes effect for tasks that
-start after it is committed. Without the file, built-in presets are used for
-the languages found at the base commit: Go (`go.mod`), JavaScript and
-TypeScript (`package.json`, `tsconfig.json`), and the optional
-`terraform-fmt` and `helm-lint` checks. The file is decoded strictly: unknown
-keys are an error.
+start after it is committed. Without the file, the [built-in
+presets](#built-in-presets) are used for the languages found at the base
+commit. The file is decoded strictly: unknown keys are an error.
 
 ```yaml
 version: 1
@@ -269,6 +267,53 @@ stages:
 The `diff-scope` and `secret-scan` (gitleaks) stages always run in addition.
 Stages run in the sandbox without network access; dependencies come
 read-only from the repository checkout (for example its `node_modules`).
+
+### Built-in presets
+
+Without a `verification.yaml`, stages are chosen from the files at the base
+commit, for every language found; a repository with several gets the stages
+of each. The toolchains are in the sandbox image (`boundedcode sandbox
+build`; `boundedcode setup` rebuilds an image built from an older
+definition).
+
+| Language | Detected by (repository root) | Stages | Dependencies (offline) |
+|---|---|---|---|
+| Go | `go.mod` | `gofmt`, `go-build`, `go-vet`, `go-test`, `golangci-lint` (full gate, optional) | the host's module cache |
+| JavaScript/TypeScript | `package.json`, `tsconfig.json` | `tsc`, `npm-lint`, `npm-test`, `npm-build` (full gate), each when the project declares it | the checkout's `node_modules` |
+| Python | Python test files (`test_*.py`, `*_test.py`, `conftest.py`) | `python-test`: pytest, or `unittest` when the project does not use pytest | the checkout's `.venv` or `venv` |
+| Rust | `Cargo.toml` | `cargo-build`, `cargo-test` | the host's Cargo registry (`~/.cargo/registry`, `~/.cargo/git`) |
+| Java (Maven) | `pom.xml` | `maven-compile`, `maven-test` | the host's `~/.m2/repository` |
+| Java/Kotlin (Gradle) | `build.gradle(.kts)`, `settings.gradle(.kts)` | `gradle-compile`, `gradle-test` (with `./gradlew` when present) | the host's `~/.gradle` caches and wrapper distributions |
+| C/C++ | `CMakeLists.txt`, `meson.build`, `configure.ac`, or a `Makefile` with C/C++ sources | `cmake-build` + `ctest`, `meson-build` + `meson-test`, `autotools-build` + `make-check`, or `make-build` | none (system libraries must be in the image) |
+| Ruby | `Gemfile`, `Rakefile`, `*.gemspec` | `ruby-test`: RSpec, `rake test`, or the `test/` files with minitest | the checkout's `vendor/bundle` (`bundle config set --local path vendor/bundle`) |
+| PHP | `composer.json` | `php-test`: PHPUnit or Pest | the checkout's `vendor/` (`composer install`) |
+| Terraform, Helm | `*.tf`, `Chart.yaml` | `terraform-fmt`, `helm-lint` (optional) | — |
+| Any other | a `Makefile` with a `test` or `check` target | `make-test` | — |
+
+Notes:
+
+- A test stage whose dependencies are not installed fails and says how to
+  install them; skipping it would pass a change with no tests run. The same
+  goes for a tool missing from an outdated sandbox image.
+- Java builds use JDK 11, 17 or 21: the one the Gradle wrapper version runs
+  on, or the Java level the `pom.xml` declares (8 and earlier build with 11).
+- A Rust toolchain pinned in `rust-toolchain.toml` that is not in the image
+  is replaced by the image's (installing it would need the network).
+- A Python venv created from a self-contained interpreter (uv, pyenv, conda)
+  is used with that interpreter, mounted read-only. One created from the
+  system Python works when its version matches the image's (3.13);
+  otherwise recreate it with `uv venv --python 3.X`. The tree under test
+  always comes first on the import path, ahead of any installed copy of the
+  project.
+- Only Go has formatter and linter stages: a newer formatter or lint rule
+  would fail the untouched base of other projects.
+- When nothing applies, verification reports a skipped `tests` stage saying
+  that no test runner was found, rather than passing silently.
+- Behavioural evidence (a changed test that fails on the base and passes on
+  the change) compares failures per test for Go, pytest, unittest, Cargo,
+  Maven Surefire, Gradle, minitest, RSpec, PHPUnit, CTest and Meson, and
+  per stage otherwise. Rust unit tests inside a source file (`#[cfg(test)]`)
+  cannot be evidence: the file holds the code under test too.
 
 ## Workspace repositories
 

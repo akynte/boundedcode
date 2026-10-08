@@ -2,6 +2,32 @@
 
 ## Unreleased
 
+### Verification for more languages
+
+- Built-in verification presets for Python (pytest or unittest), Rust
+  (Cargo), Java and Kotlin (Maven, Gradle; JDK 11, 17 or 21 chosen per
+  project), C/C++ (CMake + CTest, Meson, Autotools, Make), Ruby (RSpec,
+  rake, minitest) and PHP (PHPUnit, Pest), alongside Go and
+  JavaScript/TypeScript, so these repositories no longer need a
+  `.boundedcode/verification.yaml`. Repositories in other languages run
+  their Makefile's `test`/`check` target; when nothing applies, a skipped
+  `tests` stage says so instead of passing silently.
+- The sandbox image adds Rust 1.99, Temurin JDK 11/17/21, Maven 3.9, Gradle
+  9, Ruby 3.3 with Bundler, PHP 8.4 with Composer, g++, CMake, Meson, Ninja
+  and Autotools (pinned by digest; about 5 GB instead of 2 GB). The image is
+  labelled with a hash of its definition, and `setup` rebuilds one built
+  from an older definition.
+- Offline dependencies for those languages: the checkout's `.venv`/`venv`,
+  Composer and Bundler `vendor/` and `.bundle/` are mounted read-only like
+  `node_modules`; the host's Cargo registry, Maven repository and Gradle
+  caches are mounted read-only, with per-task tool homes and build outputs
+  for verification and, separately, for the agent. Package-manager
+  credential files are refused as mount sources.
+- Behavioural evidence recognises test files of these languages and compares
+  failures per named test for pytest, unittest, Cargo, Maven Surefire,
+  Gradle, minitest, RSpec, PHPUnit, CTest and Meson, so tests that already
+  fail on the base no longer hide the change's own evidence.
+
 ### Release packaging
 
 - `make dist` builds static binaries for linux, darwin and windows on amd64

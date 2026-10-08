@@ -2,6 +2,8 @@ package cli
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -218,7 +220,7 @@ func setupSteps() []setupStep {
 			Name: "sandbox", Title: "Agent sandbox image (Docker)",
 			Ask: func(a *App) string {
 				return "Build the agent sandbox image " + a.Config.Agent.Image + " locally with " + a.Config.Sandbox.Engine +
-					"? It downloads pinned base images (about 2 GB) and takes a few minutes. It is never pushed."
+					"? It downloads pinned base images with the toolchains verification uses (about 5 GB) and takes a few minutes. It is never pushed."
 			},
 			check: func(ctx context.Context, a *App) (bool, string) {
 				c := a.Config.Sandbox
@@ -230,6 +232,11 @@ func setupSteps() []setupStep {
 					return false, ee.Problem()
 				} else if err != nil {
 					return false, err.Error()
+				}
+				if !sandboxImageCurrent(ctx, c.Engine, a.Config.Agent.Image) {
+					// Built from an older definition: it may lack toolchains
+					// that verification presets now use.
+					return false, a.Config.Agent.Image + " was built from an older sandbox definition; it needs a rebuild"
 				}
 				return true, a.Config.Agent.Image
 			},
@@ -275,9 +282,46 @@ func (a *App) buildSandboxImage(ctx context.Context, dir string, out io.Writer) 
 		}
 		dir = filepath.Join(tmp, "adapters", "openhands")
 	}
-	cmd := exec.CommandContext(ctx, a.Config.Sandbox.Engine, "build", "-t", a.Config.Agent.Image, dir)
+	cmd := exec.CommandContext(ctx, a.Config.Sandbox.Engine, "build", "--label", sandboxContextLabel+"="+sandboxContextHash(dir),
+		"-t", a.Config.Agent.Image, dir)
 	cmd.Stdout, cmd.Stderr = out, out
 	return cmd.Run()
+}
+
+// sandboxContextLabel records which sandbox definition an image was built
+// from, so setup can tell an outdated image from a current one.
+const sandboxContextLabel = "io.boundedcode.sandbox-context"
+
+// sandboxContextHash fingerprints the sandbox build context in dir (the
+// files embedded as boundedcode.SandboxContext); with dir empty, the
+// embedded ones.
+func sandboxContextHash(dir string) string {
+	h := sha256.New()
+	_ = fs.WalkDir(boundedcode.SandboxContext, ".", func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		var b []byte
+		if dir == "" {
+			b, err = fs.ReadFile(boundedcode.SandboxContext, p)
+		} else {
+			b, err = os.ReadFile(filepath.Join(dir, filepath.FromSlash(strings.TrimPrefix(p, "adapters/openhands/"))))
+		}
+		if err != nil {
+			b = nil
+		}
+		fmt.Fprintf(h, "%s\x00%d\x00", p, len(b))
+		h.Write(b)
+		return nil
+	})
+	return hex.EncodeToString(h.Sum(nil))[:16]
+}
+
+// sandboxImageCurrent reports whether image was built from this binary's
+// sandbox definition. An image without the label predates it.
+func sandboxImageCurrent(ctx context.Context, engine, image string) bool {
+	out, err := exec.CommandContext(ctx, engine, "image", "inspect", "-f", `{{index .Config.Labels "`+sandboxContextLabel+`"}}`, image).Output()
+	return err == nil && strings.TrimSpace(string(out)) == sandboxContextHash("")
 }
 
 // checkSetup reports every step.

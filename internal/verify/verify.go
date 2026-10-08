@@ -58,6 +58,8 @@ type Stage struct {
 	// stages on the base commit with the change's tests (see delta.go).
 	// Without it, a stage whose name or command mentions "test" counts.
 	Tests bool `yaml:"tests"`
+
+	preset bool // built in (presetFor): Tests is authoritative
 }
 
 // Config is a repository's verification configuration
@@ -69,6 +71,8 @@ type Config struct {
 	MaxChangedFiles int `yaml:"max_changed_files"`
 	// DenyPaths are extra workspace-relative globs the change must not touch.
 	DenyPaths []string `yaml:"deny_paths"`
+
+	preset bool // chosen by language, not configured by the repository
 }
 
 // StageResult is the outcome of one stage.
@@ -124,8 +128,11 @@ type Engine struct {
 	CacheDir string
 	// GoModCache is mounted read-only so builds work with --network none.
 	GoModCache string
-	DB         *sql.DB
-	Rec        *telemetry.Recorder
+	// Packages are the host's other package caches (Cargo, Maven, Gradle),
+	// likewise read-only (see sandbox.PackageCaches).
+	Packages sandbox.PackageCaches
+	DB       *sql.DB
+	Rec      *telemetry.Recorder
 	// Gitleaks is the secret scanner binary ("" = gitleaks on PATH).
 	Gitleaks string
 
@@ -229,16 +236,18 @@ func blobMissing(ctx context.Context, worktree, base, path string) bool {
 // base is empty).
 func baseFiles(ctx context.Context, worktree, base string) (map[string]bool, error) {
 	files := map[string]bool{}
+	var out string
+	var err error
 	if base == "" {
-		for _, f := range []string{"go.mod", "package.json", "tsconfig.json"} {
-			if _, err := os.Stat(filepath.Join(worktree, f)); err == nil {
-				files[f] = true
+		// The tracked files, or the root's marker files outside a repository.
+		if out, err = gitops.Run(ctx, worktree, "ls-files"); err != nil {
+			ents, _ := os.ReadDir(worktree)
+			for _, e := range ents {
+				files[e.Name()] = true
 			}
+			return files, nil
 		}
-		return files, nil
-	}
-	out, err := gitops.Run(ctx, worktree, "ls-tree", "-r", "--name-only", base)
-	if err != nil {
+	} else if out, err = gitops.Run(ctx, worktree, "ls-tree", "-r", "--name-only", base); err != nil {
 		return nil, err
 	}
 	for f := range strings.SplitSeq(out, "\n") {
@@ -266,62 +275,6 @@ func (c Config) validate() error {
 		}
 	}
 	return nil
-}
-
-// presetFor returns built-in stages for the languages found in files.
-// Optional stages are skipped when their tool is not installed in the
-// sandbox image.
-func presetFor(files map[string]bool) Config {
-	c := Config{Version: 1}
-	anySuffix := func(suffix string) bool {
-		for f := range files {
-			if strings.HasSuffix(f, suffix) {
-				return true
-			}
-		}
-		return false
-	}
-	if files["go.mod"] {
-		c.Stages = append(c.Stages,
-			Stage{Name: "gofmt", Run: []string{"sh", "-c", `out=$(gofmt -l $(git ls-files '*.go' | grep -v '^vendor/') 2>&1); [ -z "$out" ] || { echo "files need gofmt:"; echo "$out"; exit 1; }`}, Requires: []string{"go.mod"}},
-			Stage{Name: "go-build", Run: []string{"go", "build", "./..."}, Requires: []string{"go.mod"}},
-			Stage{Name: "go-vet", Run: []string{"go", "vet", "{packages}"}, Requires: []string{"go.mod"}},
-			Stage{Name: "go-test", Run: []string{"go", "test", "-count=1", "{packages}"}, Requires: []string{"go.mod"}, Timeout: config.Duration(20 * time.Minute), Tests: true},
-			Stage{Name: "golangci-lint", Run: []string{"golangci-lint", "run", "./..."}, Scope: "full", Optional: true, Requires: []string{"go.mod"}},
-		)
-	}
-	if files["package.json"] {
-		// Dependencies are never installed by verification (no network): they
-		// come read-only from the repository's own checkout (see
-		// sandbox.DependencyMounts). A script the project declares, with no
-		// dependencies installed, fails: skipping it would pass the change
-		// with no tests run. A script the project lacks is skipped.
-		const missingDeps = `{ echo "node_modules missing: install the project's dependencies in the repository checkout (e.g. npm ci) so verification can run them"; exit 1; }`
-		npmScript := func(name string) string {
-			return `node -e 'process.exit(require("./package.json").scripts?.["` + name + `"] ? 0 : 3)'; rc=$?; ` +
-				`[ $rc = 3 ] && { echo "no ` + name + ` script"; exit 127; }; [ $rc = 0 ] || exit $rc; ` +
-				`[ -d node_modules ] || ` + missingDeps + `; npm run --silent ` + name
-		}
-		tsc := `if [ -x node_modules/.bin/tsc ]; then node_modules/.bin/tsc --noEmit; ` +
-			`elif [ ! -d node_modules ] && grep -q '"typescript"' package.json; then ` + missingDeps + `; ` +
-			`else echo "tsc not installed"; exit 127; fi`
-		c.Stages = append(c.Stages,
-			Stage{Name: "tsc", Run: []string{"sh", "-c", tsc}, Optional: true, Requires: []string{"tsconfig.json"}},
-			Stage{Name: "npm-lint", Run: []string{"sh", "-c", npmScript("lint")}, Optional: true, Requires: []string{"package.json"}},
-			Stage{Name: "npm-test", Run: []string{"sh", "-c", npmScript("test")}, Optional: true, Requires: []string{"package.json"}, Timeout: config.Duration(20 * time.Minute), Tests: true},
-			Stage{Name: "npm-build", Run: []string{"sh", "-c", npmScript("build")}, Scope: "full", Optional: true, Requires: []string{"package.json"}},
-		)
-	}
-	if anySuffix(".tf") {
-		// Offline checks only: validate/plan need providers and credentials.
-		c.Stages = append(c.Stages, Stage{Name: "terraform-fmt", Optional: true,
-			Run: []string{"sh", "-c", `command -v terraform >/dev/null || exit 127; terraform fmt -check -recursive -diff`}})
-	}
-	if anySuffix("Chart.yaml") {
-		c.Stages = append(c.Stages, Stage{Name: "helm-lint", Optional: true,
-			Run: []string{"sh", "-c", `command -v helm >/dev/null || exit 127; for c in $(git ls-files '*Chart.yaml'); do helm lint "$(dirname "$c")" || exit 1; done`}})
-	}
-	return c
 }
 
 // Run verifies one repository at the given scope. Built-in stages
@@ -358,6 +311,11 @@ func (e *Engine) Run(ctx context.Context, t RepoTarget, scope Scope) (Result, er
 				continue
 			}
 			res.Stages = append(res.Stages, e.runStage(ctx, t, st, packages))
+		}
+		if cfg.preset && !cfg.runsTests() {
+			// Say so instead of passing silently with nothing tested.
+			res.Stages = append(res.Stages, StageResult{Name: "tests", Status: "skipped", Command: "(built-in)",
+				Output: "no test runner was found for this repository's languages; add stages to " + ConfigPath + " to run its tests"})
 		}
 		// Undo what the stages changed (see sideeffects.go).
 		undone, err := undoSideEffects(ctx, t.Worktree, before)
@@ -635,6 +593,28 @@ func (e *Engine) spec(t RepoTarget, argv []string) (sandbox.Spec, error) {
 		}
 	}
 	var scratch []string
+	if e.Sandbox != nil && e.Sandbox.Isolated() && e.CacheDir != "" {
+		// Tool homes and build outputs, one set per task like the Go build
+		// cache, and never the agent's (see sandbox.PackageCaches.Apply).
+		key := t.TaskID
+		if key == "" {
+			key = "_adhoc"
+		}
+		work := filepath.Join(e.CacheDir, "toolchains", key)
+		pm, err := e.Packages.Apply(work, env)
+		if err != nil {
+			return sandbox.Spec{}, fmt.Errorf("package caches: %w", err)
+		}
+		mounts = append(mounts, pm...)
+		build := filepath.Join(work, "build")
+		if err := os.MkdirAll(build, 0o700); err != nil {
+			return sandbox.Spec{}, err
+		}
+		env["BC_BUILD_DIR"] = build
+		if err := e.Packages.PrepareGradleWrapper(t.Worktree, work); err != nil {
+			return sandbox.Spec{}, err
+		}
+	}
 	if e.Sandbox != nil && e.Sandbox.Isolated() {
 		deps, err := sandbox.DependencyMounts(t.Source, t.Worktree)
 		if err != nil {

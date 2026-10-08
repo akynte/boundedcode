@@ -248,6 +248,9 @@ func forbiddenHostMount(p string) bool {
 		return true
 	}
 	for _, d := range []string{".ssh", ".aws", ".config/gcloud", ".azure", ".kube", ".codex", ".gnupg", ".docker", ".netrc", ".config/gh",
+		// Package-manager credentials next to the caches that are mounted.
+		".cargo/credentials", ".cargo/credentials.toml", ".m2/settings.xml", ".m2/settings-security.xml",
+		".gradle/gradle.properties", ".pypirc", ".gem/credentials", ".composer/auth.json", ".config/composer/auth.json",
 		// macOS and Windows credential and cloud-tool locations.
 		"Library/Keychains", "Library/Application Support/gcloud", "AppData/Roaming/gcloud", "AppData/Roaming/GitHub CLI"} {
 		if pathutil.Within(p, filepath.Join(home, filepath.FromSlash(d))) {

@@ -171,7 +171,7 @@ func (a *App) buildRunnerWith(ctx context.Context, f runFlags, db *sql.DB, paths
 	gomodcache, _ := exec.CommandContext(ctx, "go", "env", "GOMODCACHE").Output()
 	r := &orchestrator.Runner{
 		DB: db, Ledger: task.Ledger{DB: db}, Rec: rec, Agent: rt,
-		Verify: &verify.Engine{Sandbox: sb, CacheDir: filepath.Join(paths.Cache, "build"), GoModCache: strings.TrimSpace(string(gomodcache)), DB: db, Rec: rec},
+		Verify: &verify.Engine{Sandbox: sb, CacheDir: filepath.Join(paths.Cache, "build"), GoModCache: strings.TrimSpace(string(gomodcache)), Packages: sandbox.HostPackageCaches(), DB: db, Rec: rec},
 		Cfg:    a.Config, Paths: paths, Model: modelName, CtxSize: ctxSize, Log: a.Log, Out: a.Err,
 		CondenseEachRetry: f.condenseRetry,
 		CrossService:      a.Config.RepoIntel.CrossService,

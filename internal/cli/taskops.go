@@ -11,6 +11,7 @@ import (
 	"github.com/akynte/boundedcode/internal/gitops"
 	"github.com/akynte/boundedcode/internal/orchestrator"
 	"github.com/akynte/boundedcode/internal/repointel/cbm"
+	"github.com/akynte/boundedcode/internal/sandbox"
 	"github.com/akynte/boundedcode/internal/store"
 	"github.com/akynte/boundedcode/internal/task"
 	"github.com/akynte/boundedcode/internal/telemetry"
@@ -176,7 +177,7 @@ func (a *App) verifyTask(ctx context.Context, id string, full, unsafe bool) ([]r
 		return nil, err
 	}
 	gomodcache, _ := exec.CommandContext(ctx, "go", "env", "GOMODCACHE").Output()
-	e := &verify.Engine{Sandbox: sb, CacheDir: filepath.Join(a.Paths.Cache, "build"), GoModCache: strings.TrimSpace(string(gomodcache)),
+	e := &verify.Engine{Sandbox: sb, CacheDir: filepath.Join(a.Paths.Cache, "build"), GoModCache: strings.TrimSpace(string(gomodcache)), Packages: sandbox.HostPackageCaches(),
 		DB: s.DB, Rec: telemetry.New(s.DB, a.Log)}
 	scope := verify.Targeted
 	if full {

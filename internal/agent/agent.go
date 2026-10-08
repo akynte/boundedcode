@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/akynte/boundedcode/internal/inference"
+	"github.com/akynte/boundedcode/internal/sandbox"
 )
 
 // Runtime opens agent sessions. Implementations: openhands (adapter), and a
@@ -64,6 +65,11 @@ type Toolchain struct {
 	// verification's: Go caches test results, and an agent-written cache
 	// could otherwise turn a failing verification test into a cached "ok".
 	GoCache string
+	// Packages are the host's other package caches (Cargo, Maven, Gradle),
+	// mounted read-only as for verification; Work holds the agent's own
+	// tool homes and build outputs (never verification's).
+	Packages sandbox.PackageCaches
+	Work     string
 }
 
 // DependencyMount maps an installed-dependency directory read-only to Target.

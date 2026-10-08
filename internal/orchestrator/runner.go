@@ -919,9 +919,11 @@ func (r *Runner) hasEvent(ctx context.Context, taskID, kind string) bool {
 // agentToolchain is the agent's build environment: the module cache
 // verification uses, and a build cache of the agent's own in the task dir.
 func (r *Runner) agentToolchain(taskID string) agent.Toolchain {
-	tc := agent.Toolchain{GoCache: filepath.Join(r.Paths.TaskDir(taskID), "agent-gocache")}
+	tc := agent.Toolchain{GoCache: filepath.Join(r.Paths.TaskDir(taskID), "agent-gocache"),
+		Work: filepath.Join(r.Paths.TaskDir(taskID), "agent-toolchains")}
 	if r.Verify != nil {
 		tc.GoModCache = r.Verify.GoModCache
+		tc.Packages = r.Verify.Packages
 	}
 	return tc
 }

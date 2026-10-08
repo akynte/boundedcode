@@ -126,6 +126,14 @@ func (r *Runtime) Open(ctx context.Context, req agent.OpenRequest) (agent.Sessio
 	env := map[string]string{"OPENHANDS_SUPPRESS_BANNER": "1", "BC_ADAPTER_LOG": "INFO", "PYTHONUNBUFFERED": "1"}
 	if r.Sandbox.Isolated() {
 		mounts = append(mounts, toolchainMounts(req.Toolchain, env)...)
+		pm, err := req.Toolchain.Packages.Apply(req.Toolchain.Work, env)
+		if err != nil {
+			return nil, fmt.Errorf("package caches: %w", err)
+		}
+		mounts = append(mounts, pm...)
+		if err := req.Toolchain.Packages.PrepareGradleWrapper(req.Workspace, req.Toolchain.Work); err != nil {
+			return nil, err
+		}
 	}
 	spec := sandbox.Spec{
 		Argv: r.Argv, Workdir: req.Workspace, Mounts: mounts, Scratch: scratch, Masks: masks, Interactive: true,

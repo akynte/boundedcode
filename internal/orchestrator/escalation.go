@@ -128,6 +128,12 @@ func (r *Runner) packetPaths(t *task.Task, wts []task.Worktree) frontier.PathMap
 		if r.Verify.GoModCache != "" {
 			paths[r.Verify.GoModCache] = "$GOMODCACHE"
 		}
+		for from, to := range map[string]string{r.Verify.Packages.Cargo: "$CARGO_HOME", r.Verify.Packages.Maven: "<maven-repository>",
+			r.Verify.Packages.Gradle: "$GRADLE_USER_HOME"} {
+			if from != "" {
+				paths[from] = to
+			}
+		}
 	}
 	return paths
 }

@@ -32,7 +32,18 @@ type Evidence struct {
 	Reason    string   `json:"reason"`
 }
 
-var testFileRE = regexp.MustCompile(`(^|/)[^/]*(_test\.go|\.(test|spec)\.[cm]?[jt]sx?)$`)
+// testFileRE matches the test file naming conventions of the languages
+// verification has presets for (and a few more).
+var testFileRE = regexp.MustCompile(`(^|/)(` +
+	`[^/]*(_test\.go|\.(test|spec)\.[cm]?[jt]sx?)` + // Go, JavaScript/TypeScript
+	`|test_[^/]*\.py|[^/]*_test\.py|tests\.py|conftest\.py` + // Python
+	`|[^/]*(Test|Tests|IT|TestCase|Spec|Suite)\.(java|kt|kts|scala|groovy)` + // JVM
+	`|[^/]*_(test|spec)\.rb|test_[^/]*\.rb` + // Ruby
+	`|[^/]*Test\.php` + // PHP
+	`|[^/]*Tests?\.(cs|fs|vb|swift)` + // .NET, Swift
+	`|[^/]*_(test|unittest)\.(c|cc|cpp|cxx)|test_[^/]*\.(c|cc|cpp|cxx)` + // C, C++
+	`|[^/]*_test\.(exs|dart)|[^/]*Spec\.hs` + // Elixir, Dart, Haskell
+	`)$`)
 
 // IsTestFile reports whether a workspace-relative path is test code or test
 // data: a conventional test file, or anything under a directory that marks
@@ -80,8 +91,8 @@ func testDirName(d string) bool {
 
 // isTestStage reports whether a verification stage runs tests.
 func isTestStage(st Stage) bool {
-	if st.Tests {
-		return true
+	if st.Tests || st.preset {
+		return st.Tests
 	}
 	if strings.Contains(strings.ToLower(st.Name), "test") {
 		return true
@@ -200,6 +211,7 @@ func (e *Engine) BehaviourEvidence(ctx context.Context, t RepoTarget) (Evidence,
 	}
 	sort.Strings(packages)
 
+	attr := newAttribution(t.Worktree, ev.TestFiles)
 	ran, notBuilt, timedOut := false, false, false
 	envErr := "" // a stage that could not run (sandbox or engine problem)
 	seen := map[string]bool{}
@@ -272,7 +284,33 @@ func (e *Engine) BehaviourEvidence(ctx context.Context, t RepoTarget) (Evidence,
 		if c.Status == "error" && envErr == "" {
 			envErr = st.Name + " (control): " + firstLine(c.Output)
 		}
-		if c.Status != "pass" || stageTimedOut(c) {
+		if stageTimedOut(c) {
+			timedOut = true
+			continue
+		}
+		// Per test where the runner names its failures: a test counts when
+		// it fails with the changed tests and not without them, so tests
+		// that already fail on the base do not hide the change's own. When
+		// the base without them fails naming no test (it does not build),
+		// nothing can be attributed.
+		if failing := testFailures(out); len(failing) > 0 && (c.Status == "pass" || c.Status == "fail") {
+			before := testFailures(cout)
+			if c.Status == "fail" && len(before) == 0 {
+				continue
+			}
+			found := false
+			for _, name := range slices.Sorted(maps.Keys(failing)) {
+				if !before[name] && !seen[name] && attr.owns(name) {
+					seen[name] = true
+					ev.Tests = append(ev.Tests, name)
+					found = true
+				}
+			}
+			if found || c.Status != "pass" {
+				continue
+			}
+		}
+		if c.Status != "pass" {
 			continue
 		}
 		// The stage passes without the changed tests; a load failure that
@@ -372,12 +410,105 @@ var goBuildFailRE = regexp.MustCompile(`(?m)^FAIL\s+\S+\s+\[(build|setup) failed
 // goBuildFailed reports whether a package failed to compile or load.
 func goBuildFailed(out string) bool { return goBuildFailRE.MatchString(out) }
 
-// loadFailureRE matches JavaScript/TypeScript test runs that failed before
-// any test ran because a module or export is missing (the tests import code
-// the change adds) or a file does not parse.
-var loadFailureRE = regexp.MustCompile(`Cannot find module|ERR_MODULE_NOT_FOUND|Module not found|` +
-	`does not provide an export named|Failed to resolve import|Failed to load url|` +
-	`Test suite failed to run|error TS\d+:`)
+// loadFailureRE matches test runs that failed before any test ran because
+// a module, export or symbol is missing (the tests use code the change adds)
+// or a file does not parse or compile.
+var loadFailureRE = regexp.MustCompile(
+	// JavaScript/TypeScript
+	`Cannot find module|ERR_MODULE_NOT_FOUND|Module not found|` +
+		`does not provide an export named|Failed to resolve import|Failed to load url|` +
+		`Test suite failed to run|error TS\d+:|` +
+		// Python
+		`ModuleNotFoundError|ImportError|cannot import name|` +
+		// Rust (any compile error), Java/Kotlin
+		`error\[E\d{4}\]|cannot find symbol|COMPILATION ERROR|Compilation failed|Unresolved reference|` +
+		// Ruby, PHP
+		`LoadError|uninitialized constant|Class "[^"]+" not found|Call to undefined (function|method)|` +
+		// C/C++
+		`was not declared in this scope|undefined reference to|has no member named|no matching function for call|implicit declaration of function`)
+
+// testFailureREs match the failing tests a runner names; the first group
+// (or the first non-empty one) is the test.
+var testFailureREs = []*regexp.Regexp{
+	regexp.MustCompile(`(?m)^FAILED (\S+?)(?: - .*)?\s*$`),                                                                       // pytest
+	regexp.MustCompile(`(?m)^(?:FAIL|ERROR): (\w+) \((?:[\w.]+)\)`),                                                              // unittest
+	regexp.MustCompile(`(?m)^test (\S+) \.\.\. FAILED\s*$`),                                                                      // cargo test
+	regexp.MustCompile(`(?m)^\[ERROR\] ((?:[\w$]+\.)*[\w$]+(?:\([\w.$]+\))?)\s+(?:--\s+)?Time elapsed:.*<<< (?:FAILURE|ERROR)!`), // Maven Surefire
+	regexp.MustCompile(`(?m)^(\S[^\n]*? > [^\n]+?) FAILED\s*$`),                                                                  // Gradle
+	regexp.MustCompile(`(?m)^\s*\d+\) (?:Failure|Error):\n\s*(\S+#\S+)`),                                                         // minitest
+	regexp.MustCompile(`(?m)^rspec (\./\S+:\d+)`),                                                                                // RSpec
+	regexp.MustCompile(`(?m)^\d+\) ([\w\\]+::\w+)`),                                                                              // PHPUnit
+	regexp.MustCompile(`(?m)^\s*\d+ - (\S+) \((?:Failed|SEGFAULT|Subprocess aborted|Timeout|Exception|Child aborted)\)`),         // CTest
+	regexp.MustCompile(`(?m)^\s*\d+/\d+\s+(?:\S+:)?(\S[^\n]*?)\s+(?:FAIL|TIMEOUT)\s`),                                            // meson test
+}
+
+// testFailures are the failing tests named in a non-Go test run.
+func testFailures(out string) map[string]bool {
+	m := map[string]bool{}
+	for _, re := range testFailureREs {
+		for _, f := range re.FindAllStringSubmatch(out, -1) {
+			// unittest reports a module that does not import as a test.
+			if name := strings.TrimSpace(f[1]); name != "" && !strings.Contains(f[0], "_FailedTest") {
+				m[name] = true
+			}
+		}
+	}
+	return m
+}
+
+// attribution decides whether a failing test belongs to the change's test
+// files: its file is one of them, or its name appears in one. When test
+// data changed (fixtures, golden files), any test can read it.
+type attribution struct {
+	paths    []string
+	contents []string
+	data     bool
+}
+
+func newAttribution(worktree string, testFiles []string) attribution {
+	var a attribution
+	for _, f := range testFiles {
+		if !testFileRE.MatchString(f) && !sourceFileRE.MatchString(f) {
+			a.data = true
+		}
+		a.paths = append(a.paths, filepath.ToSlash(f))
+		if b, err := os.ReadFile(filepath.Join(worktree, f)); err == nil {
+			a.contents = append(a.contents, string(b))
+		}
+	}
+	return a
+}
+
+var sourceFileRE = regexp.MustCompile(`\.(go|[cm]?[jt]sx?|py|java|kt|kts|scala|groovy|rb|php|cs|fs|vb|swift|rs|c|cc|cpp|cxx|h|hpp|exs?|dart|hs)$`)
+
+// testNameTailRE is the last name segment of a test identifier.
+var testNameTailRE = regexp.MustCompile(`[\w$]+$`)
+
+func (a attribution) owns(name string) bool {
+	if a.data {
+		return true
+	}
+	for _, p := range a.paths {
+		if strings.Contains(name, p) {
+			return true
+		}
+	}
+	// test_x[param], testX(com.Foo), Foo > testX(), Foo::testX
+	n := name
+	if i := strings.IndexAny(n, "[("); i > 0 {
+		n = n[:i]
+	}
+	tail := testNameTailRE.FindString(strings.TrimSpace(n))
+	if len(tail) < 3 {
+		return false
+	}
+	for _, c := range a.contents {
+		if strings.Contains(c, tail) {
+			return true
+		}
+	}
+	return false
+}
 
 // newLoadFailure reports a load failure in out on a line the control run
 // did not print.

@@ -497,9 +497,14 @@ example by prompt injection in repository content.
 
 - Terminal only (the CLI and the full-screen `bcode` interface); there is
   no daemon or GUI.
-- Verification presets cover Go and JavaScript/TypeScript. Other languages
-  need a `.boundedcode/verification.yaml`
-  ([reference](docs/usage/configuration.md#repository-verification-boundedcodeverificationyaml)).
+- Verification runs offline, so a project's dependencies must already be
+  installed: in the checkout (`node_modules`, `.venv`, `vendor`) or in this
+  machine's package caches (Go, Cargo, Maven, Gradle). Built-in presets
+  cover Go, JavaScript/TypeScript, Python, Rust, Java (Maven, Gradle),
+  C/C++ (CMake, Meson, Autotools, Make), Ruby and PHP without configuration;
+  other languages run the Makefile's `test`/`check` target, or say that no
+  test runner was found
+  ([reference](docs/usage/configuration.md#built-in-presets)).
 - Cross-service analysis does not cover gRPC, OpenAPI, protobuf or SQL
   contracts.
 
