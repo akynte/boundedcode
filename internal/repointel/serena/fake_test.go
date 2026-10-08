@@ -486,6 +486,16 @@ func TestSweepOrphans(t *testing.T) {
 	}
 	orphan := start("2147483646")            // owner pid that does not exist
 	mine := start(strconv.Itoa(os.Getpid())) // owned by a live control plane
+	// Start can return before the kernel has set up the new program's
+	// environment, so /proc/<pid>/environ may still be empty: wait until
+	// both processes are visible (a busy CI runner hits this window).
+	deadline := time.Now().Add(5 * time.Second)
+	for len(taggedProcesses(func(t string) bool { return strings.HasPrefix(t, key+":") })) < 2 {
+		if time.Now().After(deadline) {
+			t.Fatal("the test processes never showed their environment")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
 	if n := sweepOrphans(key); n != 1 {
 		t.Fatalf("swept %d processes, want 1", n)
 	}
