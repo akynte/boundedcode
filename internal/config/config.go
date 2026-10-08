@@ -158,6 +158,12 @@ type RepoIntelConfig struct {
 	// CrossService enables the built-in cross-service contract analyzers
 	// (internal/xservice) in indexing, context packs and escalation policy.
 	CrossService bool `yaml:"cross_service"`
+	// CompatGate runs the cross-repository compatibility gate
+	// (internal/compat) when verification passes: gRPC, protobuf and
+	// OpenAPI links the change affects must be shown compatible by the
+	// repositories' own checks before a task is TASK_VERIFIED. Needs
+	// CrossService.
+	CompatGate bool `yaml:"compat_gate"`
 	// Serena adds LSP-backed symbol navigation (ADR-0008).
 	Serena SerenaConfig `yaml:"serena"`
 }
@@ -250,7 +256,7 @@ func Defaults() Config {
 			MaxIterations: 150, CondenserMaxEvents: 80, MaxOutputTokens: 8192,
 			Strategy: StrategyBudget{NoProgressTokens: 40000, MaxTokens: 50000, MaxDuration: Duration(35 * time.Minute)},
 		},
-		RepoIntel: RepoIntelConfig{Provider: "codebase-memory-mcp", Binary: "codebase-memory-mcp", CrossService: true,
+		RepoIntel: RepoIntelConfig{Provider: "codebase-memory-mcp", Binary: "codebase-memory-mcp", CrossService: true, CompatGate: true,
 			Serena: SerenaConfig{Enabled: false, Version: SerenaVersion, Transport: "stdio", MaxInstances: 2,
 				IdleTimeout: Duration(10 * time.Minute), StartupTimeout: Duration(90 * time.Second), CallTimeout: Duration(30 * time.Second)}},
 		Frontier: FrontierConfig{

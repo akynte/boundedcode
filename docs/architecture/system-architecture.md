@@ -169,6 +169,7 @@ it to a per-task `adapter.log` beside the task's runtime directory.
 | code graph | codebase-memory-mcp cache | derived; rebuildable |
 | Serena instance config and symbol caches | `$XDG_CACHE_HOME/boundedcode/serena/instances/<hash>-<repo>/`, keyed by worktree path (never inside the worktree) | derived; rebuildable; not product state |
 | frontier packets and responses | `…/tasks/<id>/frontier/NNN-{packet,response}.md` and a DB row | canonical |
+| cross-repository compatibility results **[exp]** | SQLite `compat_evaluations`, `compat_results` (per link and per check run, keyed by `base..head` commits) | canonical for the commits they name; stale once a commit moves |
 
 Writes follow *persist-then-act*: the ledger records the intended transition
 before a destructive or long-running action starts, and records the outcome
@@ -186,8 +187,9 @@ create task ──> create worktree ──> task contract (local model)
       |                       agent.Send(instruction + pack)
       |                                    |
       |                                    v
-      |                       verification (impact-selected, then full)
-      |                          | pass                 | fail
+      |                       verification (impact-selected, then full,
+      |                       then the cross-repository gate [exp])
+      |                          | pass                 | fail or broken link
       |                          v                      v
       |                    merge candidate      record attempt/strategy
       |                                                 |
@@ -211,6 +213,21 @@ test the change adds or modifies fails on an export of the base commit and
 passes with the change. Otherwise the agent is asked once for such a test,
 and the task can end `tests_green` (UNVERIFIED), never as a verified merge
 candidate.
+
+**[exp]** When the full gate passes in every repository, the
+cross-repository compatibility gate (`internal/compat`,
+[design](../design/cross-repo-compatibility.md)) evaluates the gRPC,
+protobuf and OpenAPI links that the change affects, between the base and
+head commits. For each link it runs the dependent repository's own checks
+(from its base-commit config) in the sandbox, in a tree composed of exact
+commits: a generated `go.work` for Go modules, or the work-directory layout
+with an OpenAPI operation knocked out. Coverage or the knock-out shows
+whether the checks exercise the link, and control runs at the base commits
+attribute failures. A `broken` link fails the attempt and is retried with
+the report. An `untested` link that a test could settle is asked for once.
+`task_verified` additionally requires every affected link to be
+`compatible`. Results are recorded per link and per check run, keyed by
+commits: a resumed run reuses them, and a new commit makes them stale.
 Exhausting a budget parks the task in `blocked`; it never deletes work.
 
 Failure handling inside the loop:
@@ -304,8 +321,10 @@ See [SECURITY.md](../../SECURITY.md) and [sandbox design](../design/sandbox.md).
 
 `cli` → `orchestrator` → {`task`, `contextplan`, `verify`, `policy`,
 `frontier`, `agent/*`, `inference/*`, `repointel/*`, `xservice`, `sandbox`,
-`gitops`, `workspace`, `telemetry`, `store`}. `xservice` extracts and links
+`gitops`, `workspace`, `telemetry`, `store`, `compat`}. `xservice` extracts and links
 cross-service contracts (HTTP, OpenAPI, gRPC, protobuf, SQL, topics, env,
-Terraform) to complement the code graph. `repointel/serena` manages Serena processes behind
+Terraform) to complement the code graph. `compat` decides, for the links a
+change affects, whether the repositories' own checks show them compatible,
+using `xservice`, `verify` (composed sandbox runs) and `gitops`. `repointel/serena` manages Serena processes behind
 `repointel.Navigator`. Lower layers never import `cli` or
 `orchestrator`.

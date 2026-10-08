@@ -190,3 +190,25 @@ func TestFullGateRequiresSecretScanner(t *testing.T) {
 		t.Fatalf("targeted without scanner: %+v", sr)
 	}
 }
+
+// TestVendoredModuleUsesVendor: with a module cache configured, verification
+// resolves modules from it (-mod=mod), except in a vendored module, which
+// builds from vendor/ (-mod=mod would ignore it and try to download).
+func TestVendoredModuleUsesVendor(t *testing.T) {
+	dir, cache := t.TempDir(), t.TempDir()
+	e := &Engine{Sandbox: sandbox.None{}, GoModCache: cache}
+	spec, err := e.spec(RepoTarget{Worktree: dir}, []string{"go", "build", "./..."})
+	if err != nil || !strings.Contains(spec.Env["GOFLAGS"], "-mod=mod") {
+		t.Fatalf("not vendored: %q %v", spec.Env["GOFLAGS"], err)
+	}
+	if err := os.MkdirAll(filepath.Join(dir, "vendor"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "vendor", "modules.txt"), []byte("# example.com/x v0.1.0\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	spec, err = e.spec(RepoTarget{Worktree: dir}, []string{"go", "build", "./..."})
+	if err != nil || strings.Contains(spec.Env["GOFLAGS"], "-mod=") || spec.Env["GOPROXY"] != "off" {
+		t.Fatalf("vendored: GOFLAGS %q GOPROXY %q %v", spec.Env["GOFLAGS"], spec.Env["GOPROXY"], err)
+	}
+}

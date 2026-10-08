@@ -465,17 +465,24 @@ func (e *Engine) runStageFull(ctx context.Context, t RepoTarget, st Stage, packa
 		sr.Status, sr.Output = "error", err.Error()
 		return sr, full
 	}
+	spec, err := e.spec(t, argv)
+	if err != nil {
+		sr.Status, sr.Output = "error", err.Error()
+		return sr, full
+	}
+	return e.execStage(ctx, st, argv, spec, sr)
+}
+
+// execStage runs a stage's expanded command with a prepared sandbox spec and
+// classifies the outcome.
+func (e *Engine) execStage(ctx context.Context, st Stage, argv []string, spec sandbox.Spec, sr StageResult) (StageResult, string) {
+	full := ""
 	timeout := st.Timeout.D()
 	if timeout == 0 {
 		timeout = 10 * time.Minute
 	}
 	sctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	spec, err := e.spec(t, argv)
-	if err != nil {
-		sr.Status, sr.Output = "error", err.Error()
-		return sr, full
-	}
 	cmd, err := e.Sandbox.Command(sctx, spec)
 	if err != nil {
 		sr.Status, sr.Output = "error", err.Error()
@@ -589,7 +596,12 @@ func (e *Engine) spec(t RepoTarget, argv []string) (sandbox.Spec, error) {
 			mounts = append(mounts, sandbox.Mount{Host: e.GoModCache, Target: e.GoModCache, ReadOnly: true})
 			env["GOMODCACHE"] = e.GoModCache
 			env["GOPROXY"] = "off"
-			env["GOFLAGS"] = "-buildvcs=false -mod=mod"
+			// -mod=mod lets a module resolve from the cache offline, but it
+			// ignores vendor/: a vendored module builds from its vendor
+			// directory (Go's default when vendor/modules.txt exists).
+			if !goVendored(t.Worktree) {
+				env["GOFLAGS"] = "-buildvcs=false -mod=mod"
+			}
 		}
 	}
 	var scratch []string
@@ -632,6 +644,13 @@ func (e *Engine) spec(t RepoTarget, argv []string) (sandbox.Spec, error) {
 		masks = append(masks, filepath.Join(t.Worktree, s))
 	}
 	return sandbox.Spec{Argv: argv, Workdir: t.Worktree, Mounts: mounts, Scratch: scratch, Env: env, Masks: masks}, nil
+}
+
+// goVendored reports whether a tree's root module is vendored
+// (vendor/modules.txt is a regular file).
+func goVendored(root string) bool {
+	fi, err := os.Lstat(filepath.Join(root, "vendor", "modules.txt"))
+	return err == nil && fi.Mode().IsRegular()
 }
 
 // goImpactedPackages returns the Go packages containing changed files plus

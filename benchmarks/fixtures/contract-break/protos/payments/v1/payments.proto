@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package shop.payments.v1;
+
+option go_package = "example.com/shop/protos/payments/v1;paymentsv1";
+
+// PaymentService captures and refunds order payments.
+service PaymentService {
+  rpc Charge(ChargeRequest) returns (ChargeResponse);
+  rpc Refund(RefundRequest) returns (RefundResponse);
+}
+
+message ChargeRequest {
+  string order_id = 1;
+  int64 amount_cents = 2;
+  string currency = 3;
+}
+
+message ChargeResponse {
+  string payment_id = 1;
+  Status status = 2;
+}
+
+enum Status {
+  STATUS_UNSPECIFIED = 0;
+  STATUS_CAPTURED = 1;
+  STATUS_DECLINED = 2;
+}
+
+message RefundRequest {
+  string payment_id = 1;
+}
+
+message RefundResponse {
+  bool ok = 1;
+}

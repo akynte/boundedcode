@@ -87,8 +87,17 @@ implemented on the same class) is dropped.
    for the queries that use the table to be checked.
 4. **Z3.** A touched contract whose counterpart is *outside* the task
    triggers a pre-merge frontier review, when frontier is enabled.
+5. **Cross-repository compatibility gate.** For gRPC, protobuf and OpenAPI
+   links, the gate decides whether the change affects each link
+   (`CompareRPC`/`CompareFile` for `.proto`, an operation digest for
+   OpenAPI, enclosing functions for Go code). It runs the dependent
+   repository's own checks against the other repositories' candidate
+   commits and records `compatible`, `broken` or `untested` for each link.
+   `TASK_VERIFIED` needs every affected link to be `compatible`. See
+   [cross-repo-compatibility.md](cross-repo-compatibility.md).
 
-Disable with `repointel.cross_service: false`.
+Disable with `repointel.cross_service: false` (this also disables the gate;
+`repointel.compat_gate: false` disables only the gate).
 
 ## Evidence
 

@@ -17,6 +17,7 @@ import (
 	"golang.org/x/term"
 
 	"github.com/akynte/boundedcode/internal/buildinfo"
+	"github.com/akynte/boundedcode/internal/compat"
 	"github.com/akynte/boundedcode/internal/config"
 	"github.com/akynte/boundedcode/internal/frontier"
 	"github.com/akynte/boundedcode/internal/gitops"
@@ -234,6 +235,14 @@ func (b *tuiBackend) Task(ctx context.Context, id string) (tui.TaskDetail, error
 
 func (b *tuiBackend) Events(ctx context.Context, taskID string, after int64, limit int) ([]telemetry.Event, error) {
 	return telemetry.Events(ctx, b.base.st.DB, taskID, after, limit)
+}
+
+func (b *tuiBackend) Compat(ctx context.Context, taskID string) (compat.Report, bool, error) {
+	wts, err := task.Ledger{DB: b.base.st.DB}.Worktrees(ctx, taskID)
+	if err != nil {
+		return compat.Report{}, false, err
+	}
+	return taskCompat(ctx, b.base.st.DB, taskID, wts)
 }
 
 func (b *tuiBackend) Verifications(ctx context.Context, taskID string, limit int) ([]verify.Result, error) {

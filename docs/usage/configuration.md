@@ -133,6 +133,7 @@ change approach. Stopping does not by itself escalate to the frontier.
 | `provider` | `codebase-memory-mcp` | The only supported value. The key is kept so older files still load. |
 | `binary` | `codebase-memory-mcp` | The integration is tested against release 0.11.0 (`doctor` compares). |
 | `cross_service` | `true` | Built-in cross-service contract analyzers in indexing, context packs and escalation. |
+| `compat_gate` | `true` | Cross-repository compatibility gate (experimental). After the full gate passes, each gRPC, protobuf or OpenAPI link that the change affects is checked with the dependent repository's own checks, built against the other task repositories' candidate commits. A `broken` link fails verification; an `untested` one withholds `TASK_VERIFIED`. Needs `cross_service`. Not overridable per workspace. See [cross-repo-compatibility.md](../design/cross-repo-compatibility.md). |
 
 #### `repointel.serena`
 

@@ -1,5 +1,36 @@
 # Changelog
 
+## Unreleased
+
+### Cross-repository compatibility gate (experimental)
+
+- When verification passes in every repository of a task, each gRPC,
+  protobuf or OpenAPI link that the change affects is checked across the
+  task's repositories. The result is `compatible`, `broken` or `untested`,
+  with the reason, the commands and outcomes, and the repositories and
+  commits involved (`internal/compat`,
+  [design](docs/design/cross-repo-compatibility.md)).
+- Affected means changed in substance. `.proto` messages and RPCs are
+  compared structurally, with breaking changes classified. OpenAPI
+  operations are compared by digest, including referenced schemas. Go
+  code is compared by enclosing function. Comments, other RPCs and other
+  functions do not count.
+- Go sides are built against the provider's candidate commit through a
+  generated `go.work`. A vendored or replaced copy does not count, and
+  `go list -m` confirms where the module resolves. Coverage must show the
+  side ran. OpenAPI sides must fail with the operation knocked out of the
+  spec. Control runs at the base commits attribute failures.
+- `broken` fails verification and is retried with the report. `untested`
+  withholds `TASK_VERIFIED`, and a test is asked for once when one could
+  settle it. `task status`, `verify --full` (JSON too) and the TUI's
+  Verification tab show the per-link report.
+- Results are recorded per link and per check run, keyed by the commits
+  they checked. A resumed evaluation reuses them, and a new commit makes
+  them stale (migration 6). `repointel.compat_gate: false` turns the gate
+  off.
+- New fixture `benchmarks/fixtures/contract-break`: a protobuf field rename
+  that every repository's own tests pass and the gate reports broken.
+
 ## v0.1.0-alpha.3 (2026-10-08): your model, your platform, your language
 
 Release notes: [docs/releases/v0.1.0-alpha.3.md](docs/releases/v0.1.0-alpha.3.md).

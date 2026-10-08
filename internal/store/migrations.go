@@ -182,4 +182,30 @@ ALTER TABLE xservice_endpoints ADD COLUMN proto TEXT NOT NULL DEFAULT '';
 ALTER TABLE xservice_endpoints ADD COLUMN ref TEXT NOT NULL DEFAULT '';
 ALTER TABLE xservice_endpoints ADD COLUMN table_name TEXT NOT NULL DEFAULT '';
 `,
+	// 6: cross-repository compatibility gate (internal/compat): one row per
+	// evaluation, one per link result, tied to the commits it checked.
+	`
+CREATE TABLE compat_evaluations (
+	id          INTEGER PRIMARY KEY AUTOINCREMENT,
+	task_id     TEXT NOT NULL,
+	state       TEXT NOT NULL DEFAULT 'running', -- running | none | compatible | broken | untested | error
+	error       TEXT NOT NULL DEFAULT '',
+	unaffected  TEXT NOT NULL DEFAULT '[]',      -- JSON []LinkResult
+	started_at  TEXT NOT NULL,
+	finished_at TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX compat_evaluations_task ON compat_evaluations(task_id, id);
+CREATE TABLE compat_results (
+	id            INTEGER PRIMARY KEY AUTOINCREMENT,
+	evaluation_id INTEGER REFERENCES compat_evaluations(id) ON DELETE CASCADE, -- NULL: a recorded check run (link_id "run:…")
+	task_id       TEXT NOT NULL,
+	link_id       TEXT NOT NULL,
+	commits       TEXT NOT NULL,   -- repo=base..head, sorted: the result is stale once any moves
+	result        TEXT NOT NULL,   -- compatible | broken | untested
+	record        TEXT NOT NULL,   -- JSON LinkResult
+	created_at    TEXT NOT NULL
+);
+CREATE INDEX compat_results_link ON compat_results(task_id, link_id, commits);
+CREATE INDEX compat_results_eval ON compat_results(evaluation_id);
+`,
 }

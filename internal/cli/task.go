@@ -324,8 +324,16 @@ func newTaskCmd(app *App) *cobra.Command {
 			}
 			strats, _ := l.Strategies(ctx, t.ID)
 			wts, _ := l.Worktrees(ctx, t.ID)
+			gate, gated, gerr := taskCompat(ctx, s.DB, t.ID, wts)
+			if gerr != nil {
+				return gerr
+			}
 			if app.jsonOut {
-				return app.printJSON(map[string]any{"task": t, "strategies": strats, "worktrees": wts})
+				out := map[string]any{"task": t, "strategies": strats, "worktrees": wts}
+				if gated {
+					out["cross_repository"] = gate
+				}
+				return app.printJSON(out)
 			}
 			app.printf("task %s  status=%s phase=%s verification=%s\n", t.ID, t.Status, t.Phase, t.VerificationState)
 			app.printf("request: %s\n", t.OriginalRequest)
@@ -348,6 +356,13 @@ func newTaskCmd(app *App) *cobra.Command {
 			}
 			for _, d := range t.Decisions {
 				app.printf("  decision [%s] %s\n", d.Source, oneLine(d.Text, 120))
+			}
+			if gated {
+				lines := gate.Lines()
+				if gate.Stale() {
+					lines[0] += " — STALE: recorded for earlier commits or unfinished; `verify " + t.ID + " --full` re-checks"
+				}
+				app.printf("%s\n", strings.Join(lines, "\n"))
 			}
 			return nil
 		},
@@ -529,7 +544,7 @@ func newVerifyCmd(app *App) *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "verify TASK", Short: "Run deterministic verification on a task's worktrees", Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			res, err := app.verifyTask(cmd.Context(), args[0], full, unsafe)
+			res, gate, err := app.verifyTask(cmd.Context(), args[0], full, unsafe)
 			if err != nil {
 				return err
 			}
@@ -548,13 +563,23 @@ func newVerifyCmd(app *App) *cobra.Command {
 				}
 				ok = ok && r.Result.Passed
 			}
+			if gate != nil {
+				if app.jsonOut {
+					_ = app.printJSON(map[string]any{"cross_repository": gate})
+				} else {
+					app.printf("## cross-repository\n%s\n", strings.Join(gate.Lines(), "\n"))
+				}
+			}
 			if !ok {
 				return errors.New("verification failed")
+			}
+			if gate != nil && (gate.State() == "broken" || gate.State() == "error") {
+				return errors.New("cross-repository compatibility: " + gate.State())
 			}
 			return nil
 		},
 	}
-	cmd.Flags().BoolVar(&full, "full", false, "run the full merge-candidate gate")
+	cmd.Flags().BoolVar(&full, "full", false, "run the full merge-candidate gate (and, with cross-service analysis on, the cross-repository compatibility gate)")
 	cmd.Flags().BoolVar(&unsafe, "unsafe-no-sandbox", false, "run verification on the host")
 	return cmd
 }

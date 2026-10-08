@@ -2,12 +2,14 @@ package cli
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 
+	"github.com/akynte/boundedcode/internal/compat"
 	"github.com/akynte/boundedcode/internal/gitops"
 	"github.com/akynte/boundedcode/internal/orchestrator"
 	"github.com/akynte/boundedcode/internal/repointel/cbm"
@@ -16,6 +18,7 @@ import (
 	"github.com/akynte/boundedcode/internal/task"
 	"github.com/akynte/boundedcode/internal/telemetry"
 	"github.com/akynte/boundedcode/internal/verify"
+	"github.com/akynte/boundedcode/internal/xservice"
 )
 
 // Task operations shared by the CLI commands and the terminal UI.
@@ -161,20 +164,25 @@ type repoVerification struct {
 	Result verify.Result `json:"result"`
 }
 
-// verifyTask runs deterministic verification on every task worktree.
-func (a *App) verifyTask(ctx context.Context, id string, full, unsafe bool) ([]repoVerification, error) {
+// verifyTask runs deterministic verification on every task worktree. The
+// full gate also runs the cross-repository compatibility gate (when
+// enabled) and returns its report.
+func (a *App) verifyTask(ctx context.Context, id string, full, unsafe bool) ([]repoVerification, *compat.Report, error) {
 	s, err := a.Store(ctx)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	l := task.Ledger{DB: s.DB}
 	t, err := l.Get(ctx, id)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
+	}
+	if err := a.applyTaskWorkspace(ctx, t.ID); err != nil {
+		return nil, nil, err
 	}
 	sb, err := a.sandbox(unsafe)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	gomodcache, _ := exec.CommandContext(ctx, "go", "env", "GOMODCACHE").Output()
 	e := &verify.Engine{Sandbox: sb, CacheDir: filepath.Join(a.Paths.Cache, "build"), GoModCache: strings.TrimSpace(string(gomodcache)), Packages: sandbox.HostPackageCaches(),
@@ -185,17 +193,49 @@ func (a *App) verifyTask(ctx context.Context, id string, full, unsafe bool) ([]r
 	}
 	wts, _ := l.Worktrees(ctx, t.ID)
 	if err := checkWorktrees(ctx, wts); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	var out []repoVerification
+	passed := true
 	for _, w := range wts {
 		res, err := e.Run(ctx, verify.RepoTarget{Name: w.RepoName, Worktree: w.Path, Base: w.BaseCommit, TaskID: t.ID, Source: w.RepoPath}, scope)
 		if err != nil {
-			return out, err
+			return out, nil, err
 		}
+		passed = passed && res.Passed
 		out = append(out, repoVerification{w.RepoName, scope, res})
 	}
-	return out, nil
+	// The gate checks the worktrees' commits: uncommitted edits are not
+	// part of what it reports on (the runner commits after each attempt).
+	if !full || !passed || !a.Config.RepoIntel.CrossService || !a.Config.RepoIntel.CompatGate {
+		return out, nil, nil
+	}
+	scratch := filepath.Join(a.Paths.Cache, "build", "compat")
+	if err := os.MkdirAll(scratch, 0o700); err != nil {
+		return out, nil, err
+	}
+	others, _ := xservice.LoadWorkspace(ctx, s.DB, t.WorkspaceID)
+	g := &compat.Gate{DB: s.DB, Verify: e, Rec: telemetry.New(s.DB, a.Log), Log: a.Log, Scratch: scratch}
+	rep, err := g.Evaluate(ctx, t.ID, orchestrator.CompatRepos(wts), others)
+	if err != nil && ctx.Err() != nil {
+		return out, nil, err
+	}
+	return out, &rep, nil
+}
+
+// taskCompat loads a task's latest cross-repository gate report; results
+// recorded for commits that have moved since are marked stale. ok is false
+// when the gate never ran for the task.
+func taskCompat(ctx context.Context, db *sql.DB, taskID string, wts []task.Worktree) (compat.Report, bool, error) {
+	cur := map[string]string{}
+	if checkWorktrees(ctx, wts) == nil {
+		for _, w := range wts {
+			if h, err := gitops.Run(ctx, w.Path, "rev-parse", "HEAD"); err == nil {
+				cur[w.RepoName] = compat.CommitRange(w.BaseCommit, h)
+			}
+		}
+	}
+	return compat.Load(ctx, db, taskID, cur)
 }
 
 // escalation is one frontier escalation record.

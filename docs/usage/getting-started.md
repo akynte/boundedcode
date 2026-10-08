@@ -150,6 +150,43 @@ like any pull request, or bring it into your checkout:
 The same is available in the chat (`bcode`), where each message becomes a
 task.
 
+### Multi-repository tasks: the compatibility report
+
+When a task changes a gRPC, protobuf or OpenAPI contract between task
+repositories, the full gate also runs the
+[cross-repository compatibility gate](../design/cross-repo-compatibility.md)
+(experimental). Each affected link gets `compatible`, `broken` or
+`untested`, with the commits, commands and reason. `task status <id>` shows
+the latest report and marks results recorded for earlier commits as stale.
+`verify <id> --full` re-checks the current commits. The TUI shows the same
+report in the task's Verification tab.
+
+For example, on the [`contract-break` fixture](../../benchmarks/fixtures/contract-break/README.md),
+with the Docker sandbox, after `protos` renamed a field that `checkout` still
+uses (excerpt; every repository's own full gate passed):
+
+```text
+cross-repository compatibility: BROKEN (3 broken, 2 untested, 0 compatible)
+  BROKEN     grpc_def     grpc shop.payments.v1.PaymentService/Charge [changed]
+             checkout@a5f2bdbb99 internal/pay/client.go:23 -> protos@f70b3b206e payments/v1/payments.proto:9
+             checkout's checks fail with protos's candidate (checkout@a5f2bdbb99 + protos@f70b3b206e) and pass with protos's base commit: internal/pay/client.go:23:77: unknown field AmountCents in struct literal of type paymentsv1.ChargeRequest
+             breaking: field 2 of shop.payments.v1.ChargeRequest renamed amount_cents -> amount_minor
+             resolve checkout: `go list -m -f {{.Dir}} example.com/shop/protos` in checkout@a5f2bdbb99 + protos@f70b3b206e => pass; example.com/shop/protos => protos@f70b3b206e
+             candidate checkout: `go test -count=1 -covermode=set -coverpkg=example.com/shop/checkout/internal/pay example.com/shop/checkout/internal/pay` in checkout@a5f2bdbb99 + protos@f70b3b206e => fail
+             control checkout: `go test -count=1 -covermode=set -coverpkg=example.com/shop/checkout/internal/pay example.com/shop/checkout/internal/pay` in checkout@a5f2bdbb99 + protos@b7ec3cc04e => pass
+  UNTESTED   grpc_def     grpc shop.payments.v1.PaymentService [changed]
+             payments@6a984796cc internal/server/server.go:25 -> protos@f70b3b206e payments/v1/payments.proto:8
+             the task's repositories pass against the candidate, but the definition change is breaking for code built from the base definition (services already deployed, or consumers outside the task); nothing tests that compatibility
+             breaking: field 2 of shop.payments.v1.ChargeRequest renamed amount_cents -> amount_minor
+             candidate payments: `go test -count=1 -covermode=set -coverpkg=example.com/shop/payments/internal/server example.com/shop/payments/internal/server` in payments@6a984796cc + protos@f70b3b206e => pass; internal/server/server.go:29-42 ran
+  ...
+```
+
+An `untested` link withholds `TASK_VERIFIED`; the reason says which
+evidence is missing. Supported: Go sides of gRPC and protobuf links, built
+against the provider's committed generated code, and OpenAPI sides whose
+tests read the specification. Other shapes are reported `untested`.
+
 ## 6. Frontier escalation (optional)
 
 Escalation is off by default. To use a ChatGPT subscription through the

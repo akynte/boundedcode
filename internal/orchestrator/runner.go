@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/akynte/boundedcode/internal/agent"
+	"github.com/akynte/boundedcode/internal/compat"
 	"github.com/akynte/boundedcode/internal/config"
 	"github.com/akynte/boundedcode/internal/contextplan"
 	"github.com/akynte/boundedcode/internal/frontier"
@@ -576,6 +577,7 @@ func (r *Runner) Run(ctx context.Context, taskID string, opt RunOptions) (*task.
 		}
 
 		passed, sig, failSummary := false, "", ""
+		var gate *compat.Report // the cross-repository gate's report, when it ran
 		if !changedAny {
 			sig, failSummary = "no-changes", "the agent made no changes"
 		} else {
@@ -584,6 +586,17 @@ func (r *Runner) Run(ctx context.Context, taskID string, opt RunOptions) (*task.
 				t.VerificationState = "targeted_pass"
 				t.MarkStep("verify (targeted)")
 				passed, sig, failSummary = r.verifyAll(ctx, t, wts, verify.Full)
+			}
+			// Each repository passes on its own; the affected contract links
+			// must also hold across the task's repositories (see
+			// internal/compat). A broken link fails verification.
+			if passed {
+				if rep, ok := r.runCompat(ctx, t, wts); ok {
+					gate = &rep
+					if rep.State() == string(compat.Broken) {
+						passed, sig, failSummary = false, rep.Signature(), rep.FailureSummary()
+					}
+				}
 			}
 		}
 		if ctx.Err() != nil {
@@ -646,11 +659,35 @@ func (r *Runner) Run(ctx context.Context, taskID string, opt RunOptions) (*task.
 				mode = contextplan.ModeRetry
 				continue
 			}
+			// Nor are they proof that the task's repositories still work
+			// together: an untested or broken contract link withholds
+			// TASK_VERIFIED, and an untested one a test could decide is
+			// asked for once.
+			if gate != nil && !gate.Clear() {
+				if req := gate.EvidenceRequest(); req != "" && roundsLeft && !r.hasEvent(ctx, t.ID, "compat.evidence_requested") {
+					r.Rec.Emit(ctx, t.ID, "compat.evidence_requested", map[string]any{"untested": gate.Count(compat.Untested)})
+					r.say("verification passed but %d cross-repository link(s) are untested; asking the agent for tests that exercise them", gate.Count(compat.Untested))
+					_ = r.Ledger.ResolveStrategy(ctx, stratID, "succeeded", "verification passed; cross-repository evidence requested")
+					_ = r.updateStrategySummary(ctx, stratID, summary)
+					advice = req
+					mode = contextplan.ModeRetry
+					continue
+				}
+				if verified {
+					why = compatGap(*gate) + " (a test does demonstrate the change)"
+				} else {
+					why += "; and " + compatGap(*gate)
+				}
+				verified = false
+			}
 			_ = r.Ledger.ResolveStrategy(ctx, stratID, "succeeded", "verification passed (targeted + full)")
 			_ = r.updateStrategySummary(ctx, stratID, summary)
 			t.MarkStep("implement")
 			t.MarkStep("verify (full gate)")
 			t.Status, t.Phase, t.FinishedAt = task.StatusCompleted, task.PhaseReview, store.Now()
+			if gate != nil {
+				t.Decide("policy", gate.Summary())
+			}
 			if verified {
 				t.VerificationState = task.VerificationTaskVerified
 				t.Decide("policy", "merge candidate: all verification passed and a test demonstrates the change, on branch "+gitops.TaskBranch(t.ID))
@@ -698,6 +735,11 @@ func (r *Runner) Run(ctx context.Context, taskID string, opt RunOptions) (*task.
 				reviewedZ1 = true
 			}
 			advice = r.escalate(ctx, t, wts, tr, contextplan.ModeRetry)
+		}
+		if gate != nil && gate.State() == string(compat.Broken) {
+			// The per-repository results in the pack are all green: say what
+			// failed across repositories.
+			advice = strings.TrimSpace(gate.BrokenRequest() + "\n\n" + advice)
 		}
 		mode = contextplan.ModeRetry
 		if r.CondenseEachRetry {
@@ -992,6 +1034,68 @@ func firstLine(s string) string {
 		}
 	}
 	return ""
+}
+
+// compatGate returns the cross-repository compatibility gate, or nil when
+// it is disabled (repointel.compat_gate, or cross-service analysis off).
+func (r *Runner) compatGate() *compat.Gate {
+	if !r.CrossService || !r.Cfg.RepoIntel.CompatGate || r.Verify == nil {
+		return nil
+	}
+	scratch := os.TempDir()
+	if r.Verify.CacheDir != "" {
+		scratch = filepath.Join(r.Verify.CacheDir, "compat")
+		if err := os.MkdirAll(scratch, 0o700); err != nil {
+			scratch = os.TempDir()
+		}
+	}
+	return &compat.Gate{DB: r.DB, Verify: r.Verify, Rec: r.Rec, Log: r.Log, Scratch: scratch}
+}
+
+// runCompat evaluates the task's affected contract links at the worktrees'
+// current commits; ok is false when the gate is disabled. A failure to
+// evaluate is reported in the report (state error), never as compatible.
+func (r *Runner) runCompat(ctx context.Context, t *task.Task, wts []task.Worktree) (compat.Report, bool) {
+	g := r.compatGate()
+	if g == nil {
+		return compat.Report{}, false
+	}
+	rep, err := g.Evaluate(ctx, t.ID, CompatRepos(wts), r.indexedEndpoints(ctx, t))
+	if err != nil && ctx.Err() == nil {
+		r.Log.Warn("cross-repository gate", "err", err)
+	}
+	if ctx.Err() == nil {
+		for _, l := range rep.Lines() {
+			r.say("%s", l)
+		}
+	}
+	return rep, true
+}
+
+// CompatRepos are a task's worktrees as the gate sees them.
+func CompatRepos(wts []task.Worktree) []compat.Repo {
+	out := make([]compat.Repo, 0, len(wts))
+	for _, w := range wts {
+		out = append(out, compat.Repo{Name: w.RepoName, Worktree: w.Path, Source: w.RepoPath, Base: w.BaseCommit})
+	}
+	return out
+}
+
+func (r *Runner) indexedEndpoints(ctx context.Context, t *task.Task) []xservice.Endpoint {
+	eps, err := xservice.LoadWorkspace(ctx, r.DB, t.WorkspaceID)
+	if err != nil {
+		r.Log.Warn("load cross-service index", "err", err)
+	}
+	return eps
+}
+
+// compatGap says why the gate withholds TASK_VERIFIED.
+func compatGap(rep compat.Report) string {
+	if rep.Error != "" {
+		return "the cross-repository compatibility gate could not run (" + rep.Error + ")"
+	}
+	return fmt.Sprintf("%d affected cross-repository link(s) are not shown compatible (%d broken, %d untested)",
+		rep.Count(compat.Broken)+rep.Count(compat.Untested), rep.Count(compat.Broken), rep.Count(compat.Untested))
 }
 
 // contracts returns cross-service links involving the task's repositories.

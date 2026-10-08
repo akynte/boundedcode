@@ -10,6 +10,7 @@ import (
 	"io"
 	"time"
 
+	"github.com/akynte/boundedcode/internal/compat"
 	"github.com/akynte/boundedcode/internal/inference"
 	"github.com/akynte/boundedcode/internal/stats"
 	"github.com/akynte/boundedcode/internal/task"
@@ -27,6 +28,9 @@ type Backend interface {
 	Task(ctx context.Context, id string) (TaskDetail, error)
 	Events(ctx context.Context, taskID string, after int64, limit int) ([]telemetry.Event, error)
 	Verifications(ctx context.Context, taskID string, limit int) ([]verify.Result, error)
+	// Compat is the task's latest cross-repository compatibility report
+	// (ok false: the gate never ran for it); stale results are marked.
+	Compat(ctx context.Context, taskID string) (compat.Report, bool, error)
 	Diffs(ctx context.Context, taskID string) ([]RepoDiff, error)
 	Escalations(ctx context.Context, taskID string) ([]Escalation, error)
 	EscalationSummary(ctx context.Context) ([]EscalationGroup, error)

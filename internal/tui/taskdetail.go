@@ -11,6 +11,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/akynte/boundedcode/internal/compat"
 	"github.com/akynte/boundedcode/internal/task"
 	"github.com/akynte/boundedcode/internal/telemetry"
 	"github.com/akynte/boundedcode/internal/verify"
@@ -98,6 +99,7 @@ type taskView struct {
 	diffErr error
 	diffAt  time.Time
 	verifs  []verify.Result
+	gate    *compat.Report // nil: the cross-repository gate never ran
 	escs    []Escalation
 	scroll  [6]scroller
 	h       int
@@ -117,6 +119,7 @@ type taskDetailMsg struct {
 	err    error
 	events []telemetry.Event
 	verifs []verify.Result
+	gate   *compat.Report
 	escs   []Escalation
 }
 
@@ -170,6 +173,9 @@ func (v *taskView) load(m *Model) tea.Cmd {
 		}
 		msg.events, _ = be.Events(ctx, msg.d.Task.ID, after, 5000)
 		msg.verifs, _ = be.Verifications(ctx, msg.d.Task.ID, 50)
+		if rep, ok, err := be.Compat(ctx, msg.d.Task.ID); err == nil && ok {
+			msg.gate = &rep
+		}
 		msg.escs, _ = be.Escalations(ctx, msg.d.Task.ID)
 		return msg
 	}
@@ -203,7 +209,7 @@ func (v *taskView) update(m *Model, msg tea.Msg) tea.Cmd {
 		if n := len(v.events); n > 0 {
 			v.lastEv = v.events[n-1].ID
 		}
-		v.verifs, v.escs = msg.verifs, msg.escs
+		v.verifs, v.escs, v.gate = msg.verifs, msg.escs, msg.gate
 		return nil
 	case taskDiffMsg:
 		if msg.id == v.id {
@@ -724,7 +730,10 @@ func (v *taskView) verifyLines(w int) []string {
 	if len(v.verifs) == 0 {
 		return []string{sMuted.Render("No verification runs yet. Press ") + sKey.Render("v") + sMuted.Render(" (targeted) or ") + sKey.Render("V") + sMuted.Render(" (full gate).")}
 	}
-	var out []string
+	out := compatLines(v.gate, w)
+	if len(out) > 0 {
+		out = append(out, "")
+	}
 	for i, r := range v.verifs {
 		icon, st := sOK.Render("✔"), sOK
 		verdict := "passed"
@@ -762,6 +771,43 @@ func (v *taskView) verifyLines(w int) []string {
 			}
 		}
 		out = append(out, "")
+	}
+	return out
+}
+
+// compatLines renders the cross-repository compatibility report: a header
+// with the state, then one entry per link (result, kind, contract, the two
+// sides at their commits, and why).
+func compatLines(rep *compat.Report, w int) []string {
+	if rep == nil {
+		return nil
+	}
+	state := rep.State()
+	color := map[string]lipgloss.AdaptiveColor{"compatible": cOK, "none": cOK, "broken": cErr, "error": cErr, "untested": cWarn}[state]
+	head := sBold.Render("Cross-repository compatibility ") + lipgloss.NewStyle().Foreground(color).Render(strings.ToUpper(state))
+	head += sFaint.Render(fmt.Sprintf("  %d broken · %d untested · %d compatible", rep.Count(compat.Broken), rep.Count(compat.Untested), rep.Count(compat.Compatible)))
+	if rep.Stale() {
+		head += "  " + sErr.Render("STALE")
+	}
+	out := []string{head}
+	if rep.Error != "" {
+		out = append(out, "    "+sErr.Render(trunc(rep.Error, w-4)))
+	}
+	if len(rep.Links) == 0 && rep.Error == "" {
+		out = append(out, "    "+sMuted.Render("no gRPC, protobuf or OpenAPI link is affected by the change"))
+	}
+	icons := map[compat.Result]string{compat.Compatible: sOK.Render("✔"), compat.Broken: sErr.Render("✘"), compat.Untested: sWarn.Render("?")}
+	for _, l := range rep.Links {
+		line := fmt.Sprintf("  %s %s %s %s", icons[l.Result], fit(string(l.Result), 10), sFaint.Render(fit(l.Kind, 12)), l.Contract)
+		if l.Stale {
+			line += sErr.Render("  stale")
+		}
+		out = append(out, trunc(line, w+40))
+		out = append(out, "      "+sMuted.Render(trunc(fmt.Sprintf("%s@%.10s %s:%d → %s@%.10s %s:%d", l.From.Repo, l.From.Commit, l.From.File, l.From.Line,
+			l.To.Repo, l.To.Commit, l.To.File, l.To.Line), w-6)))
+		for _, ln := range strings.Split(wrap(l.Reason, w-8), "\n") {
+			out = append(out, "      "+sText.Render(ln))
+		}
 	}
 	return out
 }

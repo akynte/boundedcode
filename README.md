@@ -163,7 +163,10 @@ file-edit and task-tracker tools, and its model calls go back over stdio to
 the gateway, so the container needs no network. Before verification the
 control plane checks the worktree's integrity and commits a checkpoint. A
 passing change that touches a cross-service contract without updating the
-other side gets one more round to check it, and frontier escalation also
+other side gets one more round to check it. In multi-repository tasks, the
+affected gRPC, protobuf and OpenAPI links must also be shown compatible by
+the repositories' own checks against each other's candidate commits
+(experimental), and frontier escalation also
 runs when you ask for it (Z4). A task that runs out of attempts, tokens or
 time is blocked, not failed: `task resume` continues it.
 
@@ -423,6 +426,16 @@ See [ADR-0009](docs/architecture/adr/0009-frontier-escalation.md).
 - **Missing evidence:** the agent is asked once for a reproduction test.
   Without one, the task ends `tests_green` (UNVERIFIED) and is never presented
   as a verified merge candidate.
+- **Cross-repository compatibility (experimental):** in a multi-repository
+  task, each gRPC, protobuf or OpenAPI link that the change affects gets a
+  result: `compatible`, `broken` or `untested`, tied to exact commits. The
+  dependent repository's own checks run in the sandbox against the other
+  repositories' candidate commits. Coverage, or a run with the OpenAPI
+  operation removed, must show that the checks execute the link. A broken
+  link fails verification and is retried. An untested one withholds
+  `TASK_VERIFIED`. The report is shown by `task status`, `verify --full` and
+  the TUI's Verification tab. Supported for Go sides only
+  ([design and limits](docs/design/cross-repo-compatibility.md)).
 - **Gate integrity:** the verification config is read from the base commit,
   so the agent cannot change which stages run. It can still edit tests and
   build scripts in its worktree; only review catches an adversarial change
@@ -492,7 +505,14 @@ example by prompt injection in repository content.
    task was accepted.
 6. **The strategy governor** bounded runaway generation in development runs,
    but did not trigger during the held-out validation.
-7. **No baseline advantage shown.** On the two-task baseline in the first
+7. **Cross-repository compatibility covers a narrow set of cases.** The gate
+   checks gRPC/protobuf sides written in Go (single module at the
+   repository root, a `go test` stage, generated code committed in a task
+   repository). It checks OpenAPI sides whose tests read the specification.
+   Every other shape is reported `untested`, which withholds
+   `TASK_VERIFIED`. It never runs a client against the real server. It is
+   tested on fixtures only, not on real tasks.
+8. **No baseline advantage shown.** On the two-task baseline in the first
    validation, BoundedCode did not improve the same local model's result and
    was slower on those tasks; no baseline was run on the held-out set
    ([baseline comparison](benchmarks/reports/small-real-world-validation-20261004/baseline-comparison.md)).

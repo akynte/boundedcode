@@ -14,6 +14,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/akynte/boundedcode/internal/compat"
 	"github.com/akynte/boundedcode/internal/inference"
 	"github.com/akynte/boundedcode/internal/stats"
 	"github.com/akynte/boundedcode/internal/task"
@@ -25,6 +26,7 @@ import (
 // fakeBackend serves canned data and records Exec calls.
 type fakeBackend struct {
 	mu       sync.Mutex
+	compat   compat.Report
 	execs    [][]string
 	created  []CreateTaskRequest
 	execOut  string
@@ -153,6 +155,9 @@ func (f *fakeBackend) Events(_ context.Context, _ string, after int64, _ int) ([
 	return out, nil
 }
 
+func (f *fakeBackend) Compat(context.Context, string) (compat.Report, bool, error) {
+	return f.compat, f.compat.Links != nil, nil
+}
 func (f *fakeBackend) Verifications(context.Context, string, int) ([]verify.Result, error) {
 	return []verify.Result{{Repository: "orders", Scope: verify.Targeted, Passed: false, Started: time.Now(), Duration: 3 * time.Second,
 		Stages: []verify.StageResult{{Name: "gofmt", Status: "pass", DurationMS: 20, Command: "gofmt -l ."}, {Name: "go-test", Status: "fail", DurationMS: 2000, Command: "go test ./...", Output: "--- FAIL: TestX\nFAIL"}}}}, nil
@@ -508,6 +513,27 @@ func TestTaskListAndDetail(t *testing.T) {
 	hn.mustSee("Z2", "repeated failures", "changed code: true")
 	hn.keys("esc")
 	hn.mustSee("TRIES")
+}
+
+// TestVerificationTabShowsCompatibility: the per-link cross-repository
+// report heads the Verification tab.
+func TestVerificationTabShowsCompatibility(t *testing.T) {
+	be := defaultBackend()
+	be.compat = compat.Report{Links: []compat.LinkResult{
+		{Kind: "grpc_def", Contract: "grpc shop.payments.v1.PaymentService/Charge", Result: compat.Broken, Change: compat.ChangeModified,
+			From:   compat.Side{Repo: "checkout", File: "internal/pay/client.go", Line: 23, Commit: "eb64811de3aa"},
+			To:     compat.Side{Repo: "protos", File: "payments/v1/payments.proto", Line: 9, Commit: "cd37af09f7bb"},
+			Reason: "checkout's checks fail with protos's candidate and pass with protos's base commit"},
+		{Kind: "proto", Contract: "proto shop.payments.v1", Result: compat.Untested, Stale: true,
+			From: compat.Side{Repo: "payments", File: "internal/server/server.go", Line: 10}, To: compat.Side{Repo: "protos", File: "payments/v1/payments.proto", Line: 3},
+			Reason: "breaking for code built from the base definition"},
+	}}
+	hn := newChatHarness(t, 140, 50, be)
+	hn.gotoView("Tasks")
+	hn.keys("enter", "tab", "tab", "tab")
+	hn.mustSee("Cross-repository compatibility BROKEN", "1 broken · 1 untested · 0 compatible", "STALE",
+		"grpc shop.payments.v1.PaymentService/Charge", "checkout@eb64811de3 internal/pay/client.go:23", "pass with protos's base commit",
+		"go-test")
 }
 
 func TestMissingTaskShowsError(t *testing.T) {
