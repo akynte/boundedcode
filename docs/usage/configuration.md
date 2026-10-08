@@ -279,7 +279,7 @@ definition).
 
 | Language | Detected by (repository root) | Stages | Dependencies (offline) |
 |---|---|---|---|
-| Go | `go.mod` | `gofmt`, `go-build`, `go-vet`, `go-test`, `golangci-lint` (full gate, optional) | the host's module cache |
+| Go | `go.mod` | `gofmt`, `go-build`, `go-vet`, `go-test`, `golangci-lint` (full gate, optional) | the host's module cache, or the module's own `vendor/` when it has `vendor/modules.txt` |
 | JavaScript/TypeScript | `package.json`, `tsconfig.json` | `tsc`, `npm-lint`, `npm-test`, `npm-build` (full gate), each when the project declares it | the checkout's `node_modules` |
 | Python | Python test files (`test_*.py`, `*_test.py`, `conftest.py`) | `python-test`: pytest, or `unittest` when the project does not use pytest | the checkout's `.venv` or `venv` |
 | Rust | `Cargo.toml` | `cargo-build`, `cargo-test` | the host's Cargo registry (`~/.cargo/registry`, `~/.cargo/git`) |

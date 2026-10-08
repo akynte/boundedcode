@@ -57,7 +57,7 @@ BoundedCode is built around the opposite defaults:
 |---|---|
 | **Bounded context** | The model starts from a small task-specific pack drawn from repository intelligence and reads further code through tools as needed, instead of receiving the whole repository. |
 | **Local by default** | Inference runs on your machine through llama.cpp unless you choose a cloud model API (OpenAI, Anthropic, Gemini or an OpenAI-compatible service; unvalidated, see [Cloud models](#cloud-models)). A frontier model is an optional, policy-triggered exception: enabled but not triggered in the second validation; in the first validation 4 frontier calls were sent and no task was accepted. |
-| **Evidence, not just green tests** | A task is `TASK_VERIFIED` only when a test it adds fails on the base commit and passes with the change (fail-before/pass-after evidence, not proof of correctness). |
+| **Evidence, not just green tests** | A task is `TASK_VERIFIED` only when a test it adds fails on the base commit and passes with the change (fail-before/pass-after evidence, not proof of correctness). In a multi-repository task, every gRPC, protobuf or OpenAPI link that the change affects must also be shown compatible by the repositories' own checks (experimental). |
 | **Durable tasks** | A persistent ledger lets long tasks resume after Ctrl-C, a crash or a reboot. |
 | **Contained agent** | The agent runs in a network-less container on its own git worktree. Nothing is pushed or merged for you. |
 
@@ -150,7 +150,10 @@ flowchart LR
     W --> V{Verification<br/>targeted, then full,<br/>in the sandbox}
     V -->|failed: retry pack| P
     V -->|budget exhausted| B([Blocked<br/>task resume])
-    V -->|passed| E{A test demonstrates<br/>the change?}
+    V -->|passed| X{Affected cross-repo<br/>links compatible?<br/>experimental}
+    X -->|broken: retry pack| P
+    X -->|untested, after one request<br/>for a test that exercises it| R2
+    X -->|compatible or none| E{A test demonstrates<br/>the change?}
     E -->|no: ask once for one| P
     E -->|yes| R([task_verified<br/>branch ready for review])
     E -->|still no| R2([tests_green<br/>UNVERIFIED, review first])
@@ -421,7 +424,7 @@ See [ADR-0009](docs/architecture/adr/0009-frontier-escalation.md).
 |---|---|
 | **builds** | It compiles and lints. |
 | **`tests_green`** | The repository's checks pass. Not enough on its own: in the initial validation, patches that changed nothing passed existing tests. |
-| **`TASK_VERIFIED`** | Checks pass **and** there is behavioural evidence: a test the change adds or modifies (test code or test data) **fails on the base commit with the changed tests, does not fail there without them, and passes with the change**. |
+| **`TASK_VERIFIED`** | Checks pass **and** there is behavioural evidence: a test the change adds or modifies (test code or test data) **fails on the base commit with the changed tests, does not fail there without them, and passes with the change**. In a multi-repository task, every gRPC, protobuf or OpenAPI link that the change affects must also be `compatible` (see below). |
 
 - **Missing evidence:** the agent is asked once for a reproduction test.
   Without one, the task ends `tests_green` (UNVERIFIED) and is never presented

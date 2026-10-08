@@ -63,7 +63,8 @@ Changes to any of the following need tests that try to break them:
 - the sandbox, masks and mounts (`internal/sandbox`);
 - command and path policy (`internal/policy`);
 - git worktree handling;
-- verification integrity (`internal/verify`);
+- verification integrity (`internal/verify`), including the
+  cross-repository compatibility gate (`internal/compat`);
 - frontier packet sanitization (`internal/frontier`).
 
 Add a case to the adversarial suites and describe the threat in the PR. Never
