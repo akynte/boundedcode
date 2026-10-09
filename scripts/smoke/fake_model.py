@@ -7,10 +7,14 @@ cloud account. It is not a model: replies are fixed.
 
 * Requests without tools come from the control plane (the task contract):
   the reply is the JSON contract in CONTRACT.
-* Agent requests (with tools): until the agent has run a command, the reply
-  calls the terminal tool with the command in the file named by
-  --command-file; afterwards it calls the finish tool. Tool names and
-  required arguments are read from the request's tool schemas.
+* Agent requests (with tools): when the last message is an instruction
+  (the task, or BoundedCode's retry message), the reply calls the terminal
+  tool with the next command from the file named by --command-file;
+  after the command's result it calls the finish tool. The file holds one
+  command, or several separated by lines containing only "---": the first
+  for the task, the next for the first retry, and so on (the last one
+  repeats). Tool names and required arguments are read from the request's
+  tool schemas.
 
 Every request is appended, summarised, to --log. The server listens on
 127.0.0.1 only and prints the port it bound on stdout.
@@ -75,16 +79,18 @@ class Handler(BaseHTTPRequestHandler):
         body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))) or b"{}")
         tools = body.get("tools") or []
         msgs = body.get("messages") or []
-        ran = any(m.get("role") == "tool" for m in msgs)
+        last = msgs[-1].get("role") if msgs else ""
+        turn = sum(1 for m in msgs if m.get("role") == "user") - 1
         if not tools:
             kind, message = "control", {"role": "assistant", "content": json.dumps(CONTRACT)}
             finish = "stop"
         else:
             term, fin = pick(tools, "terminal", "bash", "execute"), pick(tools, "finish")
-            if not ran and term:
-                cmd = open(self.server.command_file).read()
+            if last != "tool" and term:
+                cmds = [c.strip() for c in open(self.server.command_file).read().split("\n---\n")]
+                cmd = cmds[min(max(turn, 0), len(cmds) - 1)]
                 call = (term["name"], fill_required(term.get("parameters"), {"command": cmd}))
-                kind = "agent:command"
+                kind = "agent:command %d" % turn
             else:
                 call = (fin["name"], fill_required(fin.get("parameters"), {"message": "Done."}))
                 kind = "agent:finish"

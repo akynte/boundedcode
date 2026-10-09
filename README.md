@@ -88,31 +88,26 @@ the agent chooses which reading of the request its test checks. See
 
 ## Demo
 
-<img src="docs/assets/demo.gif" alt="BoundedCode fixing a bug: the existing tests already pass, so after the agent's first change it asks for a test that demonstrates the fix; with that test the task ends task_verified, and the diff shows the fix and the new test" width="760">
+<img src="docs/assets/evidence-demo/demo.gif" alt="Evidence demo: go run shows 10 items priced at 1000 cents instead of 900; go test passes anyway; bcode task create runs the agent, whose first change passes all checks but adds no test, so BoundedCode asks for one; the second attempt adds a test; replayed by hand, that test fails on the original code and passes with the change; the evidence record and the final state task_verified follow" width="680">
 
-A real run with the local Qwen3.6-35B-A3B on an RTX 4060 laptop; the
-recording shortens the waits. An excerpt of the terminal output:
+<sub>A real, unscripted run with the local Qwen3.6-35B-A3B on an RTX 4060
+laptop, on a small fixture made for the demo
+([`demo/evidence`](demo/evidence/README.md)). Waits longer than 2 s are cut
+to 2 s, so 150 s plays in about 33 s; the timestamps on each line are real.
+[Unedited log](docs/assets/evidence-demo/session.log).</sub>
 
-```text
-$ go test ./...
-ok      example.com/shop        0.001s
+What happened in this run:
+1. `go test ./...` passed on the buggy code.
+2. The agent's first change passed every check but added no test, so
+   BoundedCode asked for one.
+3. The test it then added fails on the original code
+   (`Total = 1000, want 900`) and passes with the change. The demo
+   re-checks that by hand, outside BoundedCode.
+4. Only then did the task end `task_verified`.
 
-$ bcode task create --run "Orders of exactly 10 items do not get the 10% bulk discount:
-  Total([]Item{{PriceCents: 100, Qty: 10}}) returns 1000 but should be 900."
-08:22:15 attempt 1/6: sending initial context pack (499 tokens)
-08:23:14 verify full shop: passed=true (2.33s)
-08:23:14 verification passed but the change adds or modifies no tests; asking the agent for a test that demonstrates the change
-08:23:16 attempt 2/6: sending retry context pack (999 tokens)
-08:23:46 verify full shop: passed=true (2.354s)
-08:23:48 task t20261008-c8c85e is a verified merge candidate on agent/t20261008-c8c85e
-task t20261008-c8c85e: status=completed phase=review verification=task_verified attempts=2 tokens=13348 escalations=0 (1m43s)
-```
-
-After the first attempt every check passed, but the change added no test,
-so BoundedCode asked for one. The second attempt added
-`TestTotalBulkDiscountExactly10`, which fails on the original code. The
-final diff (`bcode task diff`) shows the fix (`count > 10` becomes
-`count >= 10`) and the new test.
+The [demo's README](demo/evidence/README.md) covers how to reproduce it
+(also without a model), every run made for it, and what one run on a toy
+fixture does and does not show.
 
 ## Quick start
 

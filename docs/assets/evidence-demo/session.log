@@ -1,0 +1,62 @@
+Script started on 2026-10-09 14:34:33+00:00 [COMMAND="stty cols 100 rows 34 2>/dev/null; bash "$DEMO_SCENARIO"" <not executed on terminal>]
+[2mBoundedCode evidence demo. Controlled fixture: demo/evidence/testdata/shop.
+Model: local Qwen3.6-35B-A3B (UD-Q4_K_M) on llama.cpp, RTX 4060 laptop. Unscripted run.[0m
+
+[1;36m# 1. The bug: 10 items should get the 10% bulk discount (900 cents)[0m
+[1;32m$[0m go run ./cmd/quote 10
+10 items at 100 cents: total 1000 cents
+
+[1;36m# 2. The existing tests pass anyway[0m
+[1;32m$[0m go test ./...
+ok  	example.com/shop	0.001s
+?   	example.com/shop/cmd/quote	[no test files]
+
+[1;36m# 3. Ask BoundedCode to fix it[0m
+[1;32m$[0m bcode task create "Orders of exactly 10 items do not get the 10% bulk discount: go run ./cmd/quote 10 prints a total of 1000 cents, but it should be 900." -c 'go test ./... passes' --run
+created task t20261009-807365 (branch agent/t20261009-807365)
+14:34:54 attempt 1/6: sending initial context pack (429 tokens)
+14:36:06 agent stopped: status=finished events=18 stuck=false
+14:36:12 verify targeted shop: passed=true (6.343s)
+14:36:15 verify full shop: passed=true (2.542s)
+14:36:15 cross-repository compatibility: no affected gRPC, protobuf or OpenAPI link
+14:36:15 verification passed but the change adds or modifies no tests; asking the agent for a test that demonstrates the change
+14:36:16 attempt 2/6: sending retry context pack (964 tokens)
+14:36:47 agent stopped: status=finished events=7 stuck=false
+14:36:49 verify targeted shop: passed=true (2.658s)
+14:36:52 verify full shop: passed=true (2.547s)
+14:36:52 cross-repository compatibility: no affected gRPC, protobuf or OpenAPI link
+14:36:54 task t20261009-807365 is a verified merge candidate on agent/t20261009-807365
+task t20261009-807365: status=completed phase=review verification=task_verified attempts=2 tokens=15024 escalations=0 (2m13s)
+
+[1;36m# 4. Check the evidence by hand: the change's tests on the ORIGINAL code[0m
+[1;32m$[0m git checkout agent/t20261009-807365 -- cart_test.go 
+[1;32m$[0m go test ./...
+--- FAIL: TestTotalExactlyTen (0.00s)
+    cart_test.go:19: Total = 1000, want 900
+FAIL
+FAIL	example.com/shop	0.002s
+?   	example.com/shop/cmd/quote	[no test files]
+FAIL
+
+[1;36m# 5. The same tests with the change, and the fix itself[0m
+[1;32m$[0m git checkout agent/t20261009-807365 -- .
+[1;32m$[0m go test ./...
+ok  	example.com/shop	0.002s
+?   	example.com/shop/cmd/quote	[no test files]
+[1;32m$[0m git diff -U0 HEAD -- . ':!*_test.go' | grep '^[-+][^-+]'
+-	if count > 10 {
++	if count >= 10 {
+[1;32m$[0m go run ./cmd/quote 10
+10 items at 100 cents: total 900 cents
+
+[1;36m# 6. BoundedCode's own evidence record and the final state[0m
+[1;32m$[0m bcode task events t20261009-807365 | grep -E 'verify.evidence|verify.evidence_requested' | cut -c1-200
+14:36:15 verify.evidence      {"reason":"the change adds or modifies no tests","repo":"shop","test_files":0,"tests":null,"verified":false}
+14:36:15 verify.evidence_requested {"reason":"the change adds or modifies no tests"}
+14:36:54 verify.evidence      {"reason":"1 test(s) fail on the base and pass on the change","repo":"shop","test_files":1,"tests":["TestTotalExactlyTen"],"verified":true}
+[1;32m$[0m bcode task status t20261009-807365 | head -3
+task t20261009-807365  status=completed phase=review verification=task_verified
+request: Orders of exactly 10 items do not get the 10% bulk discount: go run ./cmd/quote 10 prints a total of 1000 cents, but it should be 900.
+  criterion: go test ./... passes
+
+Script done on 2026-10-09 14:37:03+00:00 [COMMAND_EXIT_CODE="0"]

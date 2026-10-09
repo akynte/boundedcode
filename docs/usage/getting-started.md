@@ -86,8 +86,8 @@ explains how).
 
 ## Your first task
 
-This small example uses the bug from the README demo. With a model it takes a
-minute or two, and it needs only Go, which the sandbox image has. Git must
+This small example uses the same kind of bug as the README demo. With a
+model it takes a minute or two, and it needs only Go, which the sandbox image has. Git must
 know who you are (`git config --global user.name "Your Name"` and
 `user.email`) for the first commit.
 
@@ -153,9 +153,11 @@ If the agent changes the code but adds no test, BoundedCode asks for one
 once. Without a test, the task ends `verification=tests_green`
 (UNVERIFIED).
 
-The result depends on the model, and a model can fail this task. The README
-demo shows the local Qwen3.6-35B-A3B succeeding in 1m43s. The same flow runs
-without a model, with a scripted stand-in, in `scripts/smoke/first-task.sh`.
+The result depends on the model, and a model can fail this task.
+
+The README demo is a recorded, reproducible version of this scenario, with
+the evidence re-checked by hand. Its script, [`demo/evidence/demo.sh`](../../demo/evidence/README.md),
+runs with your model, or without one using a scripted stand-in.
 
 ## When a step fails
 

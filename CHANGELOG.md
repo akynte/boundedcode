@@ -60,6 +60,25 @@ Fixes from the public-launch readiness audit
     (`first-task.sh`).
   - CI runs them in `.github/workflows/smoke.yml`.
 
+### Evidence demo
+
+- `demo/evidence/` is a reproducible demonstration of behavioural
+  verification. A controlled Go fixture has a bug its passing tests miss.
+  `demo.sh` runs BoundedCode on it with a real model (an OpenAI-compatible
+  URL) or with a scripted stand-in. It then re-checks the evidence by hand
+  (the change's test fails on the original code and passes with the
+  change) and shows BoundedCode's evidence record and final state.
+  `--record` captures the session with `script`, converts it to asciicast
+  and renders a GIF with agg.
+- The README's demo is now a recorded real local-model run of this
+  scenario. Its unedited log is in `docs/assets/evidence-demo/`, and the
+  GIF caption discloses the shortened waits.
+- Tests check the fixture's premises, that each claimed step appears in
+  the published logs, and that the cast is a lossless conversion of the
+  log. The CI first-task job also runs the scripted demo.
+- `scripts/smoke/fake_model.py` can script several agent turns (separated
+  by `---`).
+
 ### Installer and diagnostic fixes from the audit
 
 - `install.ps1` no longer closes the user's PowerShell window when it fails

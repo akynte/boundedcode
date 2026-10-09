@@ -73,3 +73,5 @@ jobs:
           bin/boundedcode setup --only sandbox --yes
       - name: first-task smoke (scripted model, Docker sandbox)
         run: scripts/smoke/first-task.sh "$PWD/bin/boundedcode"
+      - name: evidence demo, scripted (demo/evidence)
+        run: demo/evidence/demo.sh --binary "$PWD/bin/boundedcode"

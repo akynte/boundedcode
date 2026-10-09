@@ -27,6 +27,7 @@
 | Page | What it covers |
 |---|---|
 | [Evaluation overview](benchmarks/README.md) | What was measured, how to read it, and its limits |
+| [Evidence demo](../demo/evidence/README.md) | The README demo: reproducible scenario, recordings, what it does and does not show |
 | [Second (held-out) validation](benchmarks/second-independent-validation-2026-10.md) | 6 screened public tasks, 5 of 6 `TASK_VERIFIED` |
 | [Initial validation](benchmarks/small-real-world-validation-2026-10.md) | 8 public tasks, 0/8 then 1/8, with the failures |
 | [Failure-driven engineering](benchmarks/failure-driven-engineering-2026-10.md) and [targeted pass](benchmarks/targeted-engineering-pass-2026-10.md) | Development evidence, including false verification passes |
