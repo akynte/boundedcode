@@ -1,0 +1,32 @@
+# Environment-only verification config for this evaluation task (deviations.md D1),
+# committed into the task's base. BoundedCode's preset for this repository
+# (env-configs/preset/), minus what fails or times out on the untouched base in
+# the offline sandbox (measured before any frozen run, 2026-10-09):
+#   cargo-test: the integration test no_args_doesnt_break aborts its test binary on the
+#   base under Rust 1.99 ("IO Safety violation: owned file descriptor already closed");
+#   skipped by exact name.
+version: 1
+stages:
+- name: cargo-build
+  run:
+  - sh
+  - -c
+  - 'command -v cargo >/dev/null 2>&1 || { echo "cargo is not installed in the sandbox image; rebuild it"; exit 1; }; if [ -f rust-toolchain.toml ] || [ -f rust-toolchain ]; then rustup which cargo >/dev/null 2>&1 || { d=$(rustup default 2>/dev/null | cut -d'' '' -f1); echo "note: the toolchain the project pins is not installed; using $d"; export RUSTUP_TOOLCHAIN=$d; }; fi; cargo build --workspace'
+  timeout: 20m0s
+  requires:
+  - Cargo.toml
+- name: cargo-test
+  run:
+  - sh
+  - -c
+  - 'command -v cargo >/dev/null 2>&1 || { echo "cargo is not installed in the sandbox image; rebuild it"; exit 1; }; if [ -f rust-toolchain.toml ] || [ -f rust-toolchain ]; then rustup which cargo >/dev/null 2>&1 || { d=$(rustup default 2>/dev/null | cut -d'' '' -f1); echo "note: the toolchain the project pins is not installed; using $d"; export RUSTUP_TOOLCHAIN=$d; }; fi; cargo test --workspace --no-fail-fast -- --skip no_args_doesnt_break --exact'
+  timeout: 30m0s
+  requires:
+  - Cargo.toml
+  tests: true
+- name: terraform-fmt
+  run:
+  - sh
+  - -c
+  - command -v terraform >/dev/null || exit 127; terraform fmt -check -recursive -diff
+  optional: true

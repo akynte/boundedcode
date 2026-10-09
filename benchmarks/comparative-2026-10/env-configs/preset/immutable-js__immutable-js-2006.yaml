@@ -1,0 +1,48 @@
+version: 1
+stages:
+    - name: tsc
+      run:
+        - sh
+        - -c
+        - 'if [ -x node_modules/.bin/tsc ]; then node_modules/.bin/tsc --noEmit; elif [ ! -d node_modules ] && grep -q ''"typescript"'' package.json; then { echo "node_modules missing: install the project''s dependencies in the repository checkout (e.g. npm ci) so verification can run them"; exit 1; }; else echo "tsc not installed"; exit 127; fi'
+      scope: ""
+      timeout: 0s
+      optional: true
+      requires:
+        - tsconfig.json
+      tests: false
+    - name: npm-lint
+      run:
+        - sh
+        - -c
+        - 'node -e ''process.exit(require("./package.json").scripts?.["lint"] ? 0 : 3)''; rc=$?; [ $rc = 3 ] && { echo "no lint script"; exit 127; }; [ $rc = 0 ] || exit $rc; [ -d node_modules ] || { echo "node_modules missing: install the project''s dependencies in the repository checkout (e.g. npm ci) so verification can run them"; exit 1; }; npm run --silent lint'
+      scope: ""
+      timeout: 0s
+      optional: true
+      requires:
+        - package.json
+      tests: false
+    - name: npm-test
+      run:
+        - sh
+        - -c
+        - 'node -e ''process.exit(require("./package.json").scripts?.["test"] ? 0 : 3)''; rc=$?; [ $rc = 3 ] && { echo "no test script"; exit 127; }; [ $rc = 0 ] || exit $rc; [ -d node_modules ] || { echo "node_modules missing: install the project''s dependencies in the repository checkout (e.g. npm ci) so verification can run them"; exit 1; }; npm run --silent test'
+      scope: ""
+      timeout: 20m0s
+      optional: true
+      requires:
+        - package.json
+      tests: true
+    - name: npm-build
+      run:
+        - sh
+        - -c
+        - 'node -e ''process.exit(require("./package.json").scripts?.["build"] ? 0 : 3)''; rc=$?; [ $rc = 3 ] && { echo "no build script"; exit 127; }; [ $rc = 0 ] || exit $rc; [ -d node_modules ] || { echo "node_modules missing: install the project''s dependencies in the repository checkout (e.g. npm ci) so verification can run them"; exit 1; }; npm run --silent build'
+      scope: full
+      timeout: 0s
+      optional: true
+      requires:
+        - package.json
+      tests: false
+max_changed_files: 0
+deny_paths: []

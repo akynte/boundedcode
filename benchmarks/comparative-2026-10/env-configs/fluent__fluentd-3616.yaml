@@ -1,0 +1,11 @@
+# Environment-only verification config for this evaluation task (deviations.md D1),
+# committed into the task's base. BoundedCode's preset for this repository
+# (env-configs/preset/), minus what fails or times out on the untouched base in
+# the offline sandbox (measured before any frozen run, 2026-10-09):
+#   ruby-test: rake test fails on the base and is not stable offline: four base runs gave
+#   14 failures and 3 errors; then, with those excluded, 2 failures; 0 (cut short by the
+#   plugin generator test ending the process); and, with that excluded too, 56 failures
+#   and 962 errors in later test files. Excluding single tests is not viable, so the stage
+#   is removed and no test stage remains.
+version: 1
+stages: []

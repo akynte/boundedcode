@@ -1,0 +1,60 @@
+version: 1
+stages:
+    - name: gofmt
+      run:
+        - sh
+        - -c
+        - out=$(gofmt -l $(git ls-files '*.go' | grep -v '^vendor/') 2>&1); [ -z "$out" ] || { echo "files need gofmt:"; echo "$out"; exit 1; }
+      scope: ""
+      timeout: 0s
+      optional: false
+      requires:
+        - go.mod
+      tests: false
+    - name: go-build
+      run:
+        - go
+        - build
+        - ./...
+      scope: ""
+      timeout: 0s
+      optional: false
+      requires:
+        - go.mod
+      tests: false
+    - name: go-vet
+      run:
+        - go
+        - vet
+        - '{packages}'
+      scope: ""
+      timeout: 0s
+      optional: false
+      requires:
+        - go.mod
+      tests: false
+    - name: go-test
+      run:
+        - go
+        - test
+        - -count=1
+        - '{packages}'
+      scope: ""
+      timeout: 20m0s
+      optional: false
+      requires:
+        - go.mod
+      tests: true
+    - name: golangci-lint
+      run:
+        - golangci-lint
+        - run
+        - ./...
+      scope: full
+      timeout: 0s
+      optional: true
+      requires:
+        - go.mod
+      tests: false
+max_changed_files: 0
+deny_paths: []

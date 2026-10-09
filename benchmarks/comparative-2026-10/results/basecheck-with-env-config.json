@@ -1,0 +1,323 @@
+[
+ {
+  "id": "briannesbitt__carbon-3103",
+  "repo": "carbon",
+  "stages": [
+   {
+    "name": "diff-scope",
+    "status": "pass",
+    "exit_code": 0,
+    "duration_ms": 0,
+    "command": "(built-in)"
+   },
+   {
+    "name": "secret-scan",
+    "status": "pass",
+    "exit_code": 0,
+    "duration_ms": 270,
+    "command": "git diff | gitleaks stdin",
+    "output": "\u001b[90m2:20PM\u001b[0m \u001b[32mINF\u001b[0m \u001b[1mscanned ~0 bytes (0) in 92.6ms\u001b[0m\n\u001b[90m2:20PM\u001b[0m \u001b[32mINF\u001b[0m \u001b[1mno leaks found\u001b[0m\n"
+   },
+   {
+    "name": "php-test",
+    "status": "pass",
+    "exit_code": 0,
+    "duration_ms": 18086,
+    "command": "sh -c command -v php >/dev/null 2>&1 || { echo \"php is not installed in the sandbox image; rebuild it with `boundedcode sandbox build`\"; exit 1; }; set --; [ -f phpunit.xml ] || [ -f phpunit.xml.dist ] || [ -f phpunit.dist.xml ] || { [ -d tests ] && set -- tests; }; if [ -f vendor/bin/phpunit ]; then php vendor/bin/phpunit --filter '/^(?!.*(testStartAndEndFallback|testCreateFromPartialFormat)).*$/' \"$@\"; exit $?; fi; if [ -f vendor/bin/pest ]; then php vendor/bin/pest; exit $?; fi; if grep -qsE '\"(phpunit/phpunit|pestphp/pest)\"' composer.json; then echo \"vendor/ missing: install the project's dependencies in the repository checkout (composer install) so verification can run them\"; exit 1; fi; echo \"no test runner\"; exit 127",
+    "output": "\u2026................................ 1464 / 5805 ( 25%)\n............................................................. 1525 / 5805 ( 26%)\n............................................................. 1586 / 5805 ( 27%)\n............................................................. 1647 / 5805 ( 28%)\n............................................................. 1708 / 5805 ( 29%)\n...................................S......................... 1769 / 5805 ( 30%)\n............................................................. 1830 / 5805 ( 31%)\n............................................................. 1891 / 5805 ( 32%)\n............................................................. 1952 / 5805 ( 33%)\n............................................................. 2013 / 5805 ( 34%)\n............................................................. 2074 / 5805 ( 35%)\n.................................................SS.......... 2135 / 5805 ( 36%)\n............................................................. 2196 / 5805 ( 37%)\n............................................................. 2257 / 5805 ( 38%)\n............................................................. 2318 / 5805 ( 39%)\n............................................................. 2379 / 5805 ( 40%)\n............................................................. 2440 / 5805 ( 42%)\n............................................................. 2501 / 5805 ( 43%)\n............................................................. 2562 / 5805 ( 44%)\n............................................................. 2623 / 5805 ( 45%)\n............................................................. 2684 / 5805 ( 46%)\n.............S............................................... 2745 / 5805 ( 47%)\n............................................................. 2806 / 5805 ( 48%)\n............................................................. 2867 / 5805 ( 49%)\n............................................................. 2928 / 5805 ( 50%)\n............................................................. 2989 / 5805 ( 51%)\n............................................................. 3050 / 5805 ( 52%)\n............................................................. 3111 / 5805 ( 53%)\n............................................................. 3172 / 5805 ( 54%)\n............................................................. 3233 / 5805 ( 55%)\n............................................................. 3294 / 5805 ( 56%)\n............................................................. 3355 / 5805 ( 57%)\n...........................................S................. 3416 / 5805 ( 58%)\n............................................................. 3477 / 5805 ( 59%)\n............................................................. 3538 / 5805 ( 60%)\n............................................................. 3599 / 5805 ( 61%)\n............................................................. 3660 / 5805 ( 63%)\n............................................................. 3721 / 5805 ( 64%)\n......................................SS..................... 3782 / 5805 ( 65%)\n............................................................. 3843 / 5805 ( 66%)\n............................................................. 3904 / 5805 ( 67%)\n............................................................. 3965 / 5805 ( 68%)\n............................................................. 4026 / 5805 ( 69%)\n............................................................. 4087 / 5805 ( 70%)\n............................................................. 4148 / 5805 ( 71%)\n............................................................. 4209 / 5805 ( 72%)\n............................................................. 4270 / 5805 ( 73%)\n............................................................. 4331 / 5805 ( 74%)\n............................................................. 4392 / 5805 ( 75%)\n............................................................. 4453 / 5805 ( 76%)\n............................................................. 4514 / 5805 ( 77%)\n............................................................. 4575 / 5805 ( 78%)\n............................................................. 4636 / 5805 ( 79%)\n............................................................. 4697 / 5805 ( 80%)\n............................................................. 4758 / 5805 ( 81%)\n............................................................. 4819 / 5805 ( 83%)\n............................................................. 4880 / 5805 ( 84%)\n............................................................. 4941 / 5805 ( 85%)\n............................................................. 5002 / 5805 ( 86%)\n............................................................. 5063 / 5805 ( 87%)\n............................................................. 5124 / 5805 ( 88%)\n............................................................. 5185 / 5805 ( 89%)\n............................................................. 5246 / 5805 ( 90%)\n............................................................. 5307 / 5805 ( 91%)\n............................................................. 5368 / 5805 ( 92%)\n............................................................. 5429 / 5805 ( 93%)\n............................................................. 5490 / 5805 ( 94%)\n............................................................. 5551 / 5805 ( 95%)\n............................................................. 5612 / 5805 ( 96%)\n.................SSSS...................................S.... 5673 / 5805 ( 97%)\n............................................................. 5734 / 5805 ( 98%)\n..................SSSSSSSSSSSSSSSSSSS........................ 5795 / 5805 ( 99%)\n..........                                                    5805 / 5805 (100%)\n\nTime: 00:17.075, Memory: 128.00 MB\n\nOK, but some tests were skipped!\nTests: 5805, Assertions: 191825, Skipped: 32.\n"
+   }
+  ]
+ },
+ {
+  "id": "fluent__fluentd-3616",
+  "repo": "fluentd",
+  "stages": [
+   {
+    "name": "diff-scope",
+    "status": "pass",
+    "exit_code": 0,
+    "duration_ms": 0,
+    "command": "(built-in)"
+   },
+   {
+    "name": "secret-scan",
+    "status": "pass",
+    "exit_code": 0,
+    "duration_ms": 277,
+    "command": "git diff | gitleaks stdin",
+    "output": "\u001b[90m2:20PM\u001b[0m \u001b[32mINF\u001b[0m \u001b[1mscanned ~0 bytes (0) in 98.6ms\u001b[0m\n\u001b[90m2:20PM\u001b[0m \u001b[32mINF\u001b[0m \u001b[1mno leaks found\u001b[0m\n"
+   }
+  ]
+ },
+ {
+  "id": "gin-gonic__gin-3820",
+  "repo": "gin",
+  "stages": [
+   {
+    "name": "diff-scope",
+    "status": "pass",
+    "exit_code": 0,
+    "duration_ms": 0,
+    "command": "(built-in)"
+   },
+   {
+    "name": "secret-scan",
+    "status": "pass",
+    "exit_code": 0,
+    "duration_ms": 252,
+    "command": "git diff | gitleaks stdin",
+    "output": "\u001b[90m2:24PM\u001b[0m \u001b[32mINF\u001b[0m \u001b[1mscanned ~0 bytes (0) in 86.9ms\u001b[0m\n\u001b[90m2:24PM\u001b[0m \u001b[32mINF\u001b[0m \u001b[1mno leaks found\u001b[0m\n"
+   },
+   {
+    "name": "gofmt",
+    "status": "pass",
+    "exit_code": 0,
+    "duration_ms": 526,
+    "command": "sh -c out=$(gofmt -l $(git ls-files '*.go' | grep -v '^vendor/') 2>&1); [ -z \"$out\" ] || { echo \"files need gofmt:\"; echo \"$out\"; exit 1; }"
+   },
+   {
+    "name": "go-build",
+    "status": "pass",
+    "exit_code": 0,
+    "duration_ms": 7677,
+    "command": "go build ./..."
+   },
+   {
+    "name": "go-vet",
+    "status": "pass",
+    "exit_code": 0,
+    "duration_ms": 7766,
+    "command": "go vet ./..."
+   },
+   {
+    "name": "go-test",
+    "status": "pass",
+    "exit_code": 0,
+    "duration_ms": 8148,
+    "command": "go test -count=1 -skip ^(TestRunTLS|TestPusher)$ ./...",
+    "output": "ok  \tgithub.com/gin-gonic/gin\t0.242s\nok  \tgithub.com/gin-gonic/gin/binding\t0.010s\n?   \tgithub.com/gin-gonic/gin/ginS\t[no test files]\nok  \tgithub.com/gin-gonic/gin/internal/bytesconv\t0.002s\n?   \tgithub.com/gin-gonic/gin/internal/json\t[no test files]\nok  \tgithub.com/gin-gonic/gin/render\t0.004s\n"
+   },
+   {
+    "name": "golangci-lint",
+    "status": "skipped",
+    "exit_code": 127,
+    "duration_ms": 7649,
+    "command": "golangci-lint run ./...",
+    "output": "[FATAL tini (7)] exec golangci-lint failed: No such file or directory\n"
+   }
+  ]
+ },
+ {
+  "id": "gin-gonic__gin-4003",
+  "repo": "gin",
+  "stages": [
+   {
+    "name": "diff-scope",
+    "status": "pass",
+    "exit_code": 0,
+    "duration_ms": 0,
+    "command": "(built-in)"
+   },
+   {
+    "name": "secret-scan",
+    "status": "pass",
+    "exit_code": 0,
+    "duration_ms": 256,
+    "command": "git diff | gitleaks stdin",
+    "output": "\u001b[90m2:26PM\u001b[0m \u001b[32mINF\u001b[0m \u001b[1mscanned ~0 bytes (0) in 85.9ms\u001b[0m\n\u001b[90m2:26PM\u001b[0m \u001b[32mINF\u001b[0m \u001b[1mno leaks found\u001b[0m\n"
+   },
+   {
+    "name": "gofmt",
+    "status": "pass",
+    "exit_code": 0,
+    "duration_ms": 528,
+    "command": "sh -c out=$(gofmt -l $(git ls-files '*.go' | grep -v '^vendor/') 2>&1); [ -z \"$out\" ] || { echo \"files need gofmt:\"; echo \"$out\"; exit 1; }"
+   },
+   {
+    "name": "go-build",
+    "status": "pass",
+    "exit_code": 0,
+    "duration_ms": 7605,
+    "command": "go build ./..."
+   },
+   {
+    "name": "go-vet",
+    "status": "pass",
+    "exit_code": 0,
+    "duration_ms": 7804,
+    "command": "go vet ./..."
+   },
+   {
+    "name": "go-test",
+    "status": "pass",
+    "exit_code": 0,
+    "duration_ms": 8355,
+    "command": "go test -count=1 -skip ^(TestRunTLS|TestPusher|TestRunQUIC)$ ./...",
+    "output": "ok  \tgithub.com/gin-gonic/gin\t0.209s\nok  \tgithub.com/gin-gonic/gin/binding\t0.009s\n?   \tgithub.com/gin-gonic/gin/ginS\t[no test files]\nok  \tgithub.com/gin-gonic/gin/internal/bytesconv\t0.002s\n?   \tgithub.com/gin-gonic/gin/internal/json\t[no test files]\nok  \tgithub.com/gin-gonic/gin/render\t0.004s\n"
+   },
+   {
+    "name": "golangci-lint",
+    "status": "skipped",
+    "exit_code": 127,
+    "duration_ms": 7674,
+    "command": "golangci-lint run ./...",
+    "output": "[FATAL tini (7)] exec golangci-lint failed: No such file or directory\n"
+   }
+  ]
+ },
+ {
+  "id": "immutable-js__immutable-js-2006",
+  "repo": "immutable-js",
+  "stages": [
+   {
+    "name": "diff-scope",
+    "status": "pass",
+    "exit_code": 0,
+    "duration_ms": 0,
+    "command": "(built-in)"
+   },
+   {
+    "name": "secret-scan",
+    "status": "pass",
+    "exit_code": 0,
+    "duration_ms": 264,
+    "command": "git diff | gitleaks stdin",
+    "output": "\u001b[90m2:26PM\u001b[0m \u001b[32mINF\u001b[0m \u001b[1mscanned ~0 bytes (0) in 93.1ms\u001b[0m\n\u001b[90m2:26PM\u001b[0m \u001b[32mINF\u001b[0m \u001b[1mno leaks found\u001b[0m\n"
+   },
+   {
+    "name": "tsc",
+    "status": "skipped",
+    "exit_code": 0,
+    "duration_ms": 0,
+    "command": "",
+    "output": "missing tsconfig.json"
+   },
+   {
+    "name": "npm-lint",
+    "status": "pass",
+    "exit_code": 0,
+    "duration_ms": 10541,
+    "command": "sh -c node -e 'process.exit(require(\"./package.json\").scripts?.[\"lint\"] ? 0 : 3)'; rc=$?; [ $rc = 3 ] && { echo \"no lint script\"; exit 127; }; [ $rc = 0 ] || exit $rc; [ -d node_modules ] || { echo \"node_modules missing: install the project's dependencies in the repository checkout (e.g. npm ci) so verification can run them\"; exit 1; }; npm run --silent lint",
+    "output": "Checking formatting...\nAll matched files use Prettier code style!\n"
+   },
+   {
+    "name": "npm-test",
+    "status": "pass",
+    "exit_code": 0,
+    "duration_ms": 19610,
+    "command": "sh -c [ -d node_modules ] || { echo \"node_modules missing\"; exit 1; }; npm run --silent build:clean && npm run --silent build:dist && npm run --silent build:esm && npm run --silent build:copy && npm run --silent build:prepare && npm run --silent type-check:flow && npm run --silent unit-test",
+    "output": "\n~/.cache/bc-comparative/basecheck/immutable-js__immutable-js-2006/src/Immutable.js \u2192 dist/immutable.js...\n(!) Circular dependencies\nsrc/Seq.js -> src/Collection.js -> src/Seq.js\nsrc/Map.js -> src/Operations.js -> src/Map.js\nsrc/OrderedMap.js -> src/Map.js -> src/Operations.js -> src/OrderedMap.js\n...and 6 more\ncreated dist/immutable.js in 712ms\n\n~/.cache/bc-comparative/basecheck/immutable-js__immutable-js-2006/src/Immutable.js \u2192 dist/immutable.es.js...\n(!) Circular dependencies\nsrc/Seq.js -> src/Collection.js -> src/Seq.js\nsrc/Map.js -> src/Operations.js -> src/Map.js\nsrc/OrderedMap.js -> src/Map.js -> src/Operations.js -> src/OrderedMap.js\n...and 6 more\ncreated dist/immutable.es.js in 285ms\nFound 0 errors\nPASS __tests__/issues.ts\nPASS __tests__/getIn.ts\nPASS __tests__/concat.ts\nPASS __tests__/updateIn.ts\nPASS __tests__/OrderedSet.ts\nPASS __tests__/merge.ts\nPASS __tests__/Range.ts\nPASS __tests__/Set.ts\nPASS __tests__/Record.ts\nPASS __tests__/Seq.ts\nPASS __tests__/slice.ts\nPASS __tests__/OrderedMap.ts\nPASS __tests__/flatten.ts\nPASS __tests__/Conversion.ts\nPASS __tests__/ArraySeq.ts\nPASS __tests__/transformerProtocol.ts\nPASS __tests__/partition.ts\nPASS __tests__/zip.ts\nPASS __tests__/groupBy.ts\nPASS __tests__/count.ts\nPASS __tests__/hasIn.ts\nPASS __tests__/Comparator.ts\nPASS __tests__/fromJS.ts\nPASS __tests__/sort.ts\nPASS __tests__/KeyedSeq.ts\nPASS __tests__/ObjectSeq.ts\nPASS __tests__/splice.ts\nPASS __tests__/Stack.ts\nPASS __tests__/Predicates.ts\nPASS __tests__/Equality.ts\nPASS __tests__/hash.ts\nPASS __tests__/interpose.ts\nPASS __tests__/get.ts\nPASS __tests__/IndexedSeq.ts\nPASS __tests__/RecordJS.js\nPASS __tests__/find.ts\nPASS __tests__/ListJS.js\nPASS __tests__/Repeat.ts\nPASS __tests__/MultiRequire.js\nPASS __tests__/minmax.ts\nPASS __tests__/join.ts\nPASS __tests__/utils.js\nPASS __tests__/List.ts (5.403 s)\nPASS __tests__/Map.ts (5.505 s)\n\nTest Suites: 44 passed, 44 total\nTests:       1 skipped, 683 passed, 684 total\nSnapshots:   3 passed, 3 total\nTime:        6.301 s\nRan all test suites.\n"
+   },
+   {
+    "name": "npm-build",
+    "status": "pass",
+    "exit_code": 0,
+    "duration_ms": 10964,
+    "command": "sh -c [ -d node_modules ] || { echo \"node_modules missing\"; exit 1; }; npm run --silent build:clean && npm run --silent build:dist && npm run --silent build:esm && npm run --silent build:copy && npm run --silent build:prepare",
+    "output": "\n~/.cache/bc-comparative/basecheck/immutable-js__immutable-js-2006/src/Immutable.js \u2192 dist/immutable.js...\n(!) Circular dependencies\nsrc/Seq.js -> src/Collection.js -> src/Seq.js\nsrc/Map.js -> src/Operations.js -> src/Map.js\nsrc/OrderedMap.js -> src/Map.js -> src/Operations.js -> src/OrderedMap.js\n...and 6 more\ncreated dist/immutable.js in 711ms\n\n~/.cache/bc-comparative/basecheck/immutable-js__immutable-js-2006/src/Immutable.js \u2192 dist/immutable.es.js...\n(!) Circular dependencies\nsrc/Seq.js -> src/Collection.js -> src/Seq.js\nsrc/Map.js -> src/Operations.js -> src/Map.js\nsrc/OrderedMap.js -> src/Map.js -> src/Operations.js -> src/OrderedMap.js\n...and 6 more\ncreated dist/immutable.es.js in 264ms\n"
+   }
+  ]
+ },
+ {
+  "id": "phpoffice__phpspreadsheet-3463",
+  "repo": "phpspreadsheet",
+  "stages": [
+   {
+    "name": "diff-scope",
+    "status": "pass",
+    "exit_code": 0,
+    "duration_ms": 0,
+    "command": "(built-in)"
+   },
+   {
+    "name": "secret-scan",
+    "status": "pass",
+    "exit_code": 0,
+    "duration_ms": 257,
+    "command": "git diff | gitleaks stdin",
+    "output": "\u001b[90m2:22PM\u001b[0m \u001b[32mINF\u001b[0m \u001b[1mscanned ~0 bytes (0) in 88.4ms\u001b[0m\n\u001b[90m2:22PM\u001b[0m \u001b[32mINF\u001b[0m \u001b[1mno leaks found\u001b[0m\n"
+   }
+  ]
+ },
+ {
+  "id": "sharkdp__bat-2393",
+  "repo": "bat",
+  "stages": [
+   {
+    "name": "diff-scope",
+    "status": "pass",
+    "exit_code": 0,
+    "duration_ms": 0,
+    "command": "(built-in)"
+   },
+   {
+    "name": "secret-scan",
+    "status": "pass",
+    "exit_code": 0,
+    "duration_ms": 269,
+    "command": "git diff | gitleaks stdin",
+    "output": "\u001b[90m2:22PM\u001b[0m \u001b[32mINF\u001b[0m \u001b[1mscanned ~0 bytes (0) in 93.9ms\u001b[0m\n\u001b[90m2:22PM\u001b[0m \u001b[32mINF\u001b[0m \u001b[1mno leaks found\u001b[0m\n"
+   },
+   {
+    "name": "cargo-build",
+    "status": "pass",
+    "exit_code": 0,
+    "duration_ms": 13173,
+    "command": "sh -c command -v cargo >/dev/null 2>&1 || { echo \"cargo is not installed in the sandbox image; rebuild it\"; exit 1; }; if [ -f rust-toolchain.toml ] || [ -f rust-toolchain ]; then rustup which cargo >/dev/null 2>&1 || { d=$(rustup default 2>/dev/null | cut -d' ' -f1); echo \"note: the toolchain the project pins is not installed; using $d\"; export RUSTUP_TOOLCHAIN=$d; }; fi; cargo build --workspace",
+    "output": "\u2026eInSet> {\n    |                 ^^^^^^^^^^^^^^^^^^^^ the same lifetime is hidden here\n    |\n    = help: the same lifetime is referred to in inconsistent ways, making the signature confusing\n    = note: `#[warn(mismatched_lifetime_syntaxes)]` on by default\nhelp: use `'_` for type paths\n    |\n205 |     ) -> Result<SyntaxReferenceInSet<'_>> {\n    |                                     ++++\n\nwarning: hiding a lifetime that's elided elsewhere is confusing\n   --> src/assets.rs:258:9\n    |\n258 |         &self,\n    |         ^^^^^ the lifetime is elided here\n...\n262 |     ) -> Result<SyntaxReferenceInSet> {\n    |                 ^^^^^^^^^^^^^^^^^^^^ the same lifetime is hidden here\n    |\n    = help: the same lifetime is referred to in inconsistent ways, making the signature confusing\nhelp: use `'_` for type paths\n    |\n262 |     ) -> Result<SyntaxReferenceInSet<'_>> {\n    |                                     ++++\n\nwarning: hiding a lifetime that's elided elsewhere is confusing\n   --> src/assets.rs:292:9\n    |\n292 |         &self,\n    |         ^^^^^ the lifetime is elided here\n293 |         syntax_name: &str,\n294 |     ) -> Result<Option<SyntaxReferenceInSet>> {\n    |                        ^^^^^^^^^^^^^^^^^^^^ the same lifetime is hidden here\n    |\n    = help: the same lifetime is referred to in inconsistent ways, making the signature confusing\nhelp: use `'_` for type paths\n    |\n294 |     ) -> Result<Option<SyntaxReferenceInSet<'_>>> {\n    |                                            ++++\n\nwarning: hiding a lifetime that's elided elsewhere is confusing\n   --> src/assets.rs:301:33\n    |\n301 |     fn find_syntax_by_extension(&self, e: Option<&OsStr>) -> Result<Option<SyntaxReferenceInSet>> {\n    |                                 ^^^^^ the lifetime is elided here          ^^^^^^^^^^^^^^^^^^^^ the same lifetime is hidden here\n    |\n    = help: the same lifetime is referred to in inconsistent ways, making the signature confusing\nhelp: use `'_` for type paths\n    |\n301 |     fn find_syntax_by_extension(&self, e: Option<&OsStr>) -> Result<Option<SyntaxReferenceInSet<'_>>> {\n    |                                                                                                ++++\n\nwarning: hiding a lifetime that's elided elsewhere is confusing\n   --> src/assets.rs:310:9\n    |\n310 |         &self,\n    |         ^^^^^ the lifetime is elided here\n...\n313 |     ) -> Result<Option<SyntaxReferenceInSet>> {\n    |                        ^^^^^^^^^^^^^^^^^^^^ the same lifetime is hidden here\n    |\n    = help: the same lifetime is referred to in inconsistent ways, making the signature confusing\nhelp: use `'_` for type paths\n    |\n313 |     ) -> Result<Option<SyntaxReferenceInSet<'_>>> {\n    |                                            ++++\n\nwarning: hiding a lifetime that's elided elsewhere is confusing\n   --> src/assets.rs:326:9\n    |\n326 |         &self,\n    |         ^^^^^ the lifetime is elided here\n...\n329 |     ) -> Result<Option<SyntaxReferenceInSet>> {\n    |                        ^^^^^^^^^^^^^^^^^^^^ the same lifetime is hidden here\n    |\n    = help: the same lifetime is referred to in inconsistent ways, making the signature confusing\nhelp: use `'_` for type paths\n    |\n329 |     ) -> Result<Option<SyntaxReferenceInSet<'_>>> {\n    |                                            ++++\n\nwarning: hiding a lifetime that's elided elsewhere is confusing\n   --> src/assets.rs:342:9\n    |\n342 |         &self,\n    |         ^^^^^ the lifetime is elided here\n343 |         reader: &mut InputReader,\n344 |     ) -> Result<Option<SyntaxReferenceInSet>> {\n    |                        ^^^^^^^^^^^^^^^^^^^^ the same lifetime is hidden here\n    |\n    = help: the same lifetime is referred to in inconsistent ways, making the signature confusing\nhelp: use `'_` for type paths\n    |\n344 |     ) -> Result<Option<SyntaxReferenceInSet<'_>>> {\n    |                                            ++++\n\nwarning: `bat` (lib) generated 10 warnings (run `cargo fix --lib -p bat` to apply 7 suggestions)\nwarning: hiding a lifetime that's elided elsewhere is confusing\n  --> src/bin/bat/app.rs:92:19\n   |\n92 |     pub fn config(&self, inputs: &[Input]) -> Result<Config> {\n   |                   ^^^^^ the lifetime is elided here  ^^^^^^ the same lifetime is hidden here\n   |\n   = help: the same lifetime is referred to in inconsistent ways, making the signature confusing\n   = note: `#[warn(mismatched_lifetime_syntaxes)]` on by default\nhelp: use `'_` for type paths\n   |\n92 |     pub fn config(&self, inputs: &[Input]) -> Result<Config<'_>> {\n   |                                                            ++++\n\nwarning: hiding a lifetime that's elided elsewhere is confusing\n   --> src/bin/bat/app.rs:279:19\n    |\n279 |     pub fn inputs(&self) -> Result<Vec<Input>> {\n    |                   ^^^^^                ^^^^^ the same lifetime is hidden here\n    |                   |\n    |                   the lifetime is elided here\n    |\n    = help: the same lifetime is referred to in inconsistent ways, making the signature confusing\nhelp: use `'_` for type paths\n    |\n279 |     pub fn inputs(&self) -> Result<Vec<Input<'_>>> {\n    |                                             ++++\n\nwarning: hiding a lifetime that's elided elsewhere is confusing\n --> src/bin/bat/input.rs:8:37\n  |\n8 | pub fn new_stdin_input(name: Option<&Path>) -> Input {\n  |                                     ^^^^^      ^^^^^ the same lifetime is hidden here\n  |                                     |\n  |                                     the lifetime is elided here\n  |\n  = help: the same lifetime is referred to in inconsistent ways, making the signature confusing\nhelp: use `'_` for type paths\n  |\n8 | pub fn new_stdin_input(name: Option<&Path>) -> Input<'_> {\n  |                                                     ++++\n\nwarning: `bat` (bin \"bat\") generated 3 warnings (run `cargo fix --bin \"bat\" -p bat` to apply 3 suggestions)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 6.29s\n"
+   },
+   {
+    "name": "cargo-test",
+    "status": "pass",
+    "exit_code": 0,
+    "duration_ms": 11580,
+    "command": "sh -c command -v cargo >/dev/null 2>&1 || { echo \"cargo is not installed in the sandbox image; rebuild it\"; exit 1; }; if [ -f rust-toolchain.toml ] || [ -f rust-toolchain ]; then rustup which cargo >/dev/null 2>&1 || { d=$(rustup default 2>/dev/null | cut -d' ' -f1); echo \"note: the toolchain the project pins is not installed; using $d\"; export RUSTUP_TOOLCHAIN=$d; }; fi; cargo test --workspace --no-fail-fast -- --skip no_args_doesnt_break --exact",
+    "output": "\u2026hlight_underline ... ok\ntest concatenate_single_line ... ok\ntest concatenate_empty_first ... ok\ntest concatenate_empty_last ... ok\ntest concatenate_empty_first_and_last ... ok\ntest config_location_when_generating ... ok\ntest concatenate_single_line_empty ... ok\ntest config_location_from_bat_config_dir_variable ... ok\ntest concatenate_stdin ... ok\ntest diagnostic_sanity_check ... ok\ntest config_location_test ... ok\ntest disable_pager_if_disable_paging_flag_comes_after_paging ... ok\ntest config_read_arguments_from_file ... ok\ntest ansi_passthrough_emit ... ok\ntest do_not_exit_directory ... ok\ntest does_not_print_unwanted_file_named_cache ... ok\ntest empty_file_cycle_is_ok ... ok\ntest env_var_bat_pager_value_bat ... ok\ntest fail_directory ... ok\ntest fail_non_existing ... ok\ntest env_var_pager_value_bat ... ok\ntest filename_multiple_err ... ok\ntest empty_file_leads_to_empty_output_with_grid_enabled ... ok\ntest file_with_invalid_utf8_filename ... ok\ntest filename_stdin_binary ... ok\ntest first_file_cyclic_is_ok ... ok\ntest all_global_git_config_locations_syntax_mapping_work ... ok\ntest empty_file_leads_to_empty_output_with_rule_enabled ... ok\ntest filename_stdin ... ok\ntest filename_multiple_ok ... ok\ntest header_binary ... ok\ntest grid_overrides_rule ... ok\ntest header_arg_overrides_env ... ok\ntest grid_for_file_without_newline ... ok\ntest header_default ... ok\ntest header_full_binary ... ok\ntest header_default_is_default ... ok\ntest header_full_basic ... ok\ntest header_env_basic ... ok\ntest header_basic ... ok\ntest do_not_detect_different_syntax_for_stdin_and_files ... ok\ntest header_full_padding ... ok\ntest header_full_padding_rule ... ok\ntest header_padding ... ok\ntest header_padding_rule ... ok\ntest line_range_2_3 ... ok\ntest line_range_last_3 ... ok\ntest line_range_first_two ... ok\ntest line_range_multiple ... ok\ntest highlighting_is_skipped_on_long_lines ... ok\ntest line_numbers ... ok\ntest no_first_line_fallback_when_mapping_to_invalid_syntax ... ok\ntest line_wrapping_when_auto ... ok\ntest no_pager_arg ... ok\ntest no_paging_arg ... ok\ntest no_line_wrapping_when_set_to_never ... ok\ntest no_paging_short_arg ... ok\ntest pager_arg_override_env_withconfig ... ok\ntest pager_basic ... ok\ntest pager_arg_override_env_noconfig ... ok\ntest no_line_wrapping_with_s_flag ... ok\ntest pager_basic_arg ... ok\ntest pager_env_pager_nooverride_config ... ok\ntest pager_env_bat_pager_override_config ... ok\ntest ignored_suffix_arg ... ok\ntest pager_disable ... ok\ntest do_not_panic_regression_tests ... ok\ntest no_wrapping_with_chop_long_lines ... ok\ntest pager_failed_to_parse ... ok\ntest pager_value_bat ... ok\ntest pager_overwrite ... ok\ntest map_syntax_and_ignored_suffix_work_together ... ok\ntest pager_more ... ok\ntest show_all_mode ... ok\ntest show_all_extends_tab_markers_to_next_tabstop ... ok\ntest show_all_extends_tab_markers_to_next_tabstop_width_8 ... ok\ntest pager_most_from_bat_pager_env_var ... ok\ntest stdin ... ok\ntest stdin_to_stdout_cycle ... ok\ntest plain_mode_does_not_add_nonexisting_newline ... ok\ntest pager_most_from_pager_arg ... ok\ntest snip ... ok\ntest tabs_4_arg_overrides_env_noconfig ... ok\ntest tabs_4_arg_overrides_env ... ok\ntest tabs_4 ... ok\ntest pager_most_from_pager_env_var ... ok\ntest tabs_4_env_overrides_config ... ok\ntest tabs_4_wrapped ... ok\ntest tabs_8 ... ok\ntest pager_most_with_arg ... ok\ntest tabs_numbers ... ok\ntest tabs_passthrough ... ok\ntest tabs_passthrough_wrapped ... ok\ntest theme_arg_overrides_env_withconfig ... ok\ntest theme_arg_overrides_env ... ok\ntest tabs_8_wrapped ... ok\ntest unicode_wrap ... ok\ntest theme_env_overrides_config ... ok\ntest utf16 ... ok\n\ntest result: ok. 115 passed; 0 failed; 1 ignored; 0 measured; 1 filtered out; finished in 0.84s\n\n     Running tests/no_duplicate_extensions.rs (~/.cache/bc-comparative/basecheck/build/toolchains/basecheck-sharkdp__bat-2393/cargo-target/debug/deps/no_duplicate_extensions-beb7c3d08f851943)\n\nrunning 1 test\ntest no_duplicate_extensions ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s\n\n     Running tests/snapshot_tests.rs (~/.cache/bc-comparative/basecheck/build/toolchains/basecheck-sharkdp__bat-2393/cargo-target/debug/deps/snapshot_tests-0b818d77efe5ab90)\n\nrunning 27 tests\ntest changes_grid_numbers ... ok\ntest changes ... ok\ntest changes_grid ... ok\ntest changes_grid_header_numbers ... ok\ntest changes_grid_header ... ok\ntest changes_grid_rule ... ok\ntest changes_grid_header_rule ... ok\ntest changes_grid_header_numbers_rule ... ok\ntest full ... ok\ntest changes_numbers ... ok\ntest changes_header_numbers ... ok\ntest changes_header ... ok\ntest changes_rule ... ok\ntest changes_header_rule ... ok\ntest grid ... ok\ntest grid_header ... ok\ntest grid_header_numbers ... ok\ntest grid_numbers ... ok\ntest grid_rule ... ok\ntest grid_header_rule ... ok\ntest header ... ok\ntest numbers ... ok\ntest header_numbers ... ok\ntest header_rule ... ok\ntest header_numbers_rule ... ok\ntest plain ... ok\ntest rule ... ok\n\ntest result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.31s\n\n     Running tests/system_wide_config.rs (~/.cache/bc-comparative/basecheck/build/toolchains/basecheck-sharkdp__bat-2393/cargo-target/debug/deps/system_wide_config-945f4e45b966f459)\n\nrunning 2 tests\ntest config_overrides_system_config ... ignored\ntest use_systemwide_config ... ignored\n\ntest result: ok. 0 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n     Running tests/test_pretty_printer.rs (~/.cache/bc-comparative/basecheck/build/toolchains/basecheck-sharkdp__bat-2393/cargo-target/debug/deps/test_pretty_printer-11fa42da366f9287)\n\nrunning 1 test\ntest syntaxes ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s\n\n   Doc-tests bat\n\nrunning 1 test\ntest src/lib.rs - (line 12) ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.24s\n\n"
+   },
+   {
+    "name": "terraform-fmt",
+    "status": "skipped",
+    "exit_code": 127,
+    "duration_ms": 7667,
+    "command": "sh -c command -v terraform >/dev/null || exit 127; terraform fmt -check -recursive -diff"
+   }
+  ]
+ },
+ {
+  "id": "tokio-rs__axum-691",
+  "repo": "axum",
+  "stages": [
+   {
+    "name": "diff-scope",
+    "status": "pass",
+    "exit_code": 0,
+    "duration_ms": 0,
+    "command": "(built-in)"
+   },
+   {
+    "name": "secret-scan",
+    "status": "pass",
+    "exit_code": 0,
+    "duration_ms": 275,
+    "command": "git diff | gitleaks stdin",
+    "output": "\u001b[90m2:23PM\u001b[0m \u001b[32mINF\u001b[0m \u001b[1mscanned ~0 bytes (0) in 95.2ms\u001b[0m\n\u001b[90m2:23PM\u001b[0m \u001b[32mINF\u001b[0m \u001b[1mno leaks found\u001b[0m\n"
+   },
+   {
+    "name": "cargo-build",
+    "status": "pass",
+    "exit_code": 0,
+    "duration_ms": 29545,
+    "command": "sh -c command -v cargo >/dev/null 2>&1 || { echo \"cargo is not installed in the sandbox image; rebuild it\"; exit 1; }; if [ -f rust-toolchain.toml ] || [ -f rust-toolchain ]; then rustup which cargo >/dev/null 2>&1 || { d=$(rustup default 2>/dev/null | cut -d' ' -f1); echo \"note: the toolchain the project pins is not installed; using $d\"; export RUSTUP_TOOLCHAIN=$d; }; fi; cargo build --workspace",
+    "output": "\u2026um-691/axum)\n   Compiling hyper-rustls v0.24.2\n   Compiling metrics-exporter-prometheus v0.7.0\n   Compiling axum-server v0.3.3\n   Compiling reqwest v0.11.27\nwarning: lint `private_in_public` has been removed: replaced with another group of lints, see RFC <https://rust-lang.github.io/rfcs/2145-type-privacy.html> for more information\n   --> axum/src/lib.rs:448:26\n    |\n448 | #![deny(unreachable_pub, private_in_public)]\n    |                          ^^^^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(renamed_and_removed_lints)]` on by default\n\n   Compiling oauth2 v4.4.2\n   Compiling axum-extra v0.1.1 (~/.cache/bc-comparative/basecheck/tokio-rs__axum-691/axum-extra)\nwarning: lint `private_in_public` has been removed: replaced with another group of lints, see RFC <https://rust-lang.github.io/rfcs/2145-type-privacy.html> for more information\n  --> axum-extra/src/lib.rs:40:26\n   |\n40 | #![deny(unreachable_pub, private_in_public)]\n   |                          ^^^^^^^^^^^^^^^^^\n   |\n   = note: `#[warn(renamed_and_removed_lints)]` on by default\n\nwarning: `axum` (lib) generated 1 warning\n   Compiling example-tls-rustls v0.1.0 (~/.cache/bc-comparative/basecheck/tokio-rs__axum-691/examples/tls-rustls)\n   Compiling example-readme v0.1.0 (~/.cache/bc-comparative/basecheck/tokio-rs__axum-691/examples/readme)\n   Compiling example-templates v0.1.0 (~/.cache/bc-comparative/basecheck/tokio-rs__axum-691/examples/templates)\nwarning: `axum-extra` (lib) generated 1 warning\n   Compiling example-print-request-response v0.1.0 (~/.cache/bc-comparative/basecheck/tokio-rs__axum-691/examples/print-request-response)\n   Compiling example-prometheus-metrics v0.1.0 (~/.cache/bc-comparative/basecheck/tokio-rs__axum-691/examples/prometheus-metrics)\n   Compiling example-websockets v0.1.0 (~/.cache/bc-comparative/basecheck/tokio-rs__axum-691/examples/websockets)\n   Compiling example-customize-path-rejection v0.1.0 (~/.cache/bc-comparative/basecheck/tokio-rs__axum-691/examples/customize-path-rejection)\n   Compiling example-unix-domain-socket v0.1.0 (~/.cache/bc-comparative/basecheck/tokio-rs__axum-691/examples/unix-domain-socket)\n   Compiling example-key-value-store v0.1.0 (~/.cache/bc-comparative/basecheck/tokio-rs__axum-691/examples/key-value-store)\n   Compiling example-chat v0.1.0 (~/.cache/bc-comparative/basecheck/tokio-rs__axum-691/examples/chat)\n   Compiling example-todos v0.1.0 (~/.cache/bc-comparative/basecheck/tokio-rs__axum-691/examples/todos)\n   Compiling example-oauth v0.1.0 (~/.cache/bc-comparative/basecheck/tokio-rs__axum-691/examples/oauth)\n   Compiling example-validator v0.1.0 (~/.cache/bc-comparative/basecheck/tokio-rs__axum-691/examples/validator)\n   Compiling example-cors v0.1.0 (~/.cache/bc-comparative/basecheck/tokio-rs__axum-691/examples/cors)\n   Compiling example-tokio-postgres v0.1.0 (~/.cache/bc-comparative/basecheck/tokio-rs__axum-691/examples/tokio-postgres)\n   Compiling example-testing v0.1.0 (~/.cache/bc-comparative/basecheck/tokio-rs__axum-691/examples/testing)\n   Compiling example-tracing-aka-logging v0.1.0 (~/.cache/bc-comparative/basecheck/tokio-rs__axum-691/examples/tracing-aka-logging)\n   Compiling example-error-handling-and-dependency-injection v0.1.0 (~/.cache/bc-comparative/basecheck/tokio-rs__axum-691/examples/error-handling-and-dependency-injection)\n   Compiling example-sessions v0.1.0 (~/.cache/bc-comparative/basecheck/tokio-rs__axum-691/examples/sessions)\n   Compiling example-async-graphql v0.1.0 (~/.cache/bc-comparative/basecheck/tokio-rs__axum-691/examples/async-graphql)\n   Compiling example-hello-world v0.1.0 (~/.cache/bc-comparative/basecheck/tokio-rs__axum-691/examples/hello-world)\n   Compiling example-query-params-with-empty-strings v0.1.0 (~/.cache/bc-comparative/basecheck/tokio-rs__axum-691/examples/query-params-with-empty-strings)\n   Compiling example-customize-extractor-error v0.1.0 (~/.cache/bc-comparative/basecheck/tokio-rs__axum-691/examples/customize-extractor-error)\n   Compiling example-graceful-shutdown v0.1.0 (~/.cache/bc-comparative/basecheck/tokio-rs__axum-691/examples/graceful-shutdown)\n   Compiling example-jwt v0.1.0 (~/.cache/bc-comparative/basecheck/tokio-rs__axum-691/examples/jwt)\n   Compiling example-multipart-form v0.1.0 (~/.cache/bc-comparative/basecheck/tokio-rs__axum-691/examples/multipart-form)\n   Compiling example-low-level-rustls v0.1.0 (~/.cache/bc-comparative/basecheck/tokio-rs__axum-691/examples/low-level-rustls)\n   Compiling example-routes-and-handlers-close-together v0.1.0 (~/.cache/bc-comparative/basecheck/tokio-rs__axum-691/examples/routes-and-handlers-close-together)\n   Compiling example-global-404-handler v0.1.0 (~/.cache/bc-comparative/basecheck/tokio-rs__axum-691/examples/global-404-handler)\n   Compiling example-form v0.1.0 (~/.cache/bc-comparative/basecheck/tokio-rs__axum-691/examples/form)\n   Compiling example-http-proxy v0.1.0 (~/.cache/bc-comparative/basecheck/tokio-rs__axum-691/examples/http-proxy)\n   Compiling example-sse v0.1.0 (~/.cache/bc-comparative/basecheck/tokio-rs__axum-691/examples/sse)\n   Compiling example-static-file-server v0.1.0 (~/.cache/bc-comparative/basecheck/tokio-rs__axum-691/examples/static-file-server)\n   Compiling example-reverse-proxy v0.1.0 (~/.cache/bc-comparative/basecheck/tokio-rs__axum-691/examples/reverse-proxy)\n   Compiling example-versioning v0.1.0 (~/.cache/bc-comparative/basecheck/tokio-rs__axum-691/examples/versioning)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 23.41s\nwarning: the following packages contain code that will be rejected by a future version of Rust: nom v6.1.2\nnote: to see what the problems were, use the option `--future-incompat-report`, or run `cargo report future-incompatibilities --id 1`\n"
+   },
+   {
+    "name": "cargo-test",
+    "status": "pass",
+    "exit_code": 0,
+    "duration_ms": 24717,
+    "command": "sh -c command -v cargo >/dev/null 2>&1 || { echo \"cargo is not installed in the sandbox image; rebuild it\"; exit 1; }; if [ -f rust-toolchain.toml ] || [ -f rust-toolchain ]; then rustup which cargo >/dev/null 2>&1 || { d=$(rustup default 2>/dev/null | cut -d' ' -f1); echo \"note: the toolchain the project pins is not installed; using $d\"; export RUSTUP_TOOLCHAIN=$d; }; fi; cargo test --workspace --no-fail-fast -- --skip ui --exact",
+    "output": "\u2026st axum/src/routing/method_routing.rs - routing::method_routing::MethodRouter<ReqBody,E>::fallback (line 628) ... ok\ntest axum/src/routing/method_routing.rs - routing::method_routing::MethodRouter<ReqBody,E>::get_service (line 620) ... ok\ntest axum/src/routing/method_routing.rs - routing::method_routing::MethodRouter<ReqBody,E>::fallback (line 654) ... ok\ntest axum/src/routing/method_routing.rs - routing::method_routing::MethodRouter<ReqBody,E>::layer (line 661) ... ok\ntest axum/src/routing/method_routing.rs - routing::method_routing::MethodRouter<ReqBody,E>::merge (line 722) ... ok\ntest axum/src/routing/method_routing.rs - routing::method_routing::MethodRouter<ReqBody,E>::route_layer (line 694) ... ok\ntest axum/src/routing/method_routing.rs - routing::method_routing::any (line 433) ... ok\ntest axum/src/routing/method_routing.rs - routing::method_routing::any (line 450) ... ok\ntest axum/src/routing/method_routing.rs - routing::method_routing::MethodRouter<ReqBody,E>::on_service (line 582) ... ok\ntest axum/src/routing/method_routing.rs - routing::method_routing::get (line 397) ... ok\ntest axum/src/routing/method_routing.rs - routing::method_routing::any_service (line 333) ... ok\ntest axum/src/routing/method_routing.rs - routing::method_routing::any_service (line 356) ... ok\ntest axum/src/routing/method_routing.rs - routing::method_routing::get_service (line 287) ... ok\ntest axum/src/routing/mod.rs - routing::Router<B>::fallback (line 355) ... ok\ntest axum/src/routing/mod.rs - routing::Router<B>::into_make_service (line 367) ... ok\ntest axum/src/routing/method_routing.rs - routing::method_routing::on (line 405) ... ok\ntest axum/src/routing/method_routing.rs - routing::method_routing::on_service (line 295) ... ok\ntest axum/src/routing/mod.rs - routing::Router<B>::into_make_service_with_connect_info (line 422) ... ok\ntest axum/src/routing/mod.rs - routing::Router<B>::layer (line 287) ... ok\ntest axum/src/routing/mod.rs - routing::Router<B>::into_make_service_with_connect_info (line 396) ... ok\ntest axum/src/routing/mod.rs - routing::Router<B>::layer (line 378) ... ok\ntest axum/src/routing/mod.rs - routing::Router<B>::merge (line 242) ... ok\ntest axum/src/routing/mod.rs - routing::Router<B>::nest (line 170) ... ok\ntest axum/src/routing/mod.rs - routing::Router<B>::layer (line 316) ... ok\ntest axum/src/routing/mod.rs - routing::Router<B>::route (line 223) - compile ... ok\ntest axum/src/routing/mod.rs - routing::Router<B>::layer (line 344) ... ok\ntest axum/src/routing/mod.rs - routing::Router<B>::nest (line 265) ... ok\ntest axum/src/routing/mod.rs - routing::Router<B>::route (line 173) ... ok\ntest axum/src/routing/mod.rs - routing::Router<B>::route (line 193) ... ok\ntest axum/src/routing/mod.rs - routing::Router<B>::nest (line 206) ... ok\ntest axum/src/routing/mod.rs - routing::Router<B>::route (line 286) ... ok\ntest axum/src/routing/mod.rs - routing::Router<B>::nest (line 234) ... ok\ntest axum/src/routing/mod.rs - routing::Router<B>::route (line 303) ... ok\ntest axum/src/routing/mod.rs - routing::Router<B>::route (line 324) ... ok\ntest axum/src/routing/mod.rs - routing::Router<B>::route_layer (line 322) ... ok\n\ntest result: ok. 94 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.42s\n\n   Doc-tests axum_core\nwarning: lint `private_in_public` has been removed: replaced with another group of lints, see RFC <https://rust-lang.github.io/rfcs/2145-type-privacy.html> for more information\n  --> axum-core/src/lib.rs:46:26\n   |\n46 | #![deny(unreachable_pub, private_in_public)]\n   |                          ^^^^^^^^^^^^^^^^^\n   |\n   = note: `#[warn(renamed_and_removed_lints)]` on by default\n\nwarning: 1 warning emitted\n\n\nrunning 4 tests\ntest axum-core/src/extract/mod.rs - extract::FromRequest (line 37) ... ok\ntest axum-core/src/response/mod.rs - response::IntoResponse (line 89) ... ok\ntest axum-core/src/response/headers.rs - response::headers::Headers (line 15) ... ok\ntest axum-core/src/response/mod.rs - response::IntoResponse (line 43) ... ok\n\ntest result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.37s\n\n   Doc-tests axum_debug\nwarning: lint `private_in_public` has been removed: replaced with another group of lints, see RFC <https://rust-lang.github.io/rfcs/2145-type-privacy.html> for more information\n   --> axum-debug/src/lib.rs:135:26\n    |\n135 | #![deny(unreachable_pub, private_in_public)]\n    |                          ^^^^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(renamed_and_removed_lints)]` on by default\n\nwarning: 1 warning emitted\n\n\nrunning 4 tests\ntest axum-debug/src/lib.rs - (line 5) - compile fail ... ok\ntest axum-debug/src/lib.rs - (line 26) - compile fail ... ok\ntest axum-debug/src/lib.rs - (line 56) - compile fail ... ok\ntest axum-debug/src/lib.rs - (line 84) ... ok\n\ntest result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.19s\n\n   Doc-tests axum_extra\nwarning: lint `private_in_public` has been removed: replaced with another group of lints, see RFC <https://rust-lang.github.io/rfcs/2145-type-privacy.html> for more information\n  --> axum-extra/src/lib.rs:40:26\n   |\n40 | #![deny(unreachable_pub, private_in_public)]\n   |                          ^^^^^^^^^^^^^^^^^\n   |\n   = note: `#[warn(renamed_and_removed_lints)]` on by default\n\nwarning: 1 warning emitted\n\n\nrunning 6 tests\ntest axum-extra/src/extract/cached.rs - extract::cached::Cached (line 26) ... ok\ntest axum-extra/src/middleware/middleware_fn.rs - middleware::middleware_fn::from_fn (line 73) ... ok\ntest axum-extra/src/middleware/middleware_fn.rs - middleware::middleware_fn::from_fn (line 36) ... ok\ntest axum-extra/src/middleware/middleware_fn.rs - middleware::middleware_fn::from_fn (line 106) ... ok\ntest axum-extra/src/routing/mod.rs - routing::RouterExt::with (line 17) ... ok\ntest axum-extra/src/routing/resource.rs - routing::resource::Resource (line 17) ... ok\n\ntest result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.55s\n\n"
+   }
+  ]
+ }
+]

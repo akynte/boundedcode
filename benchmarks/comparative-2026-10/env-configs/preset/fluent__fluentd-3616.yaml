@@ -1,0 +1,15 @@
+version: 1
+stages:
+    - name: ruby-test
+      run:
+        - sh
+        - -c
+        - 'command -v ruby >/dev/null 2>&1 || { echo "ruby is not installed in the sandbox image; rebuild it with `boundedcode sandbox build`"; exit 1; }; run=; if [ -f Gemfile ]; then if [ -z "$BUNDLE_PATH" ] && [ -d vendor/bundle ] && [ ! -f .bundle/config ]; then export BUNDLE_PATH="$PWD/vendor/bundle"; fi; bundle check >/dev/null 2>&1 || { bundle check 2>&1 | tail -n 5; echo "gems missing: install them in the repository checkout (bundle config set --local path vendor/bundle && bundle install) so verification can use them"; exit 1; }; run="bundle exec"; fi; if [ -d spec ] && { [ -f .rspec ] || grep -qs rspec Gemfile Gemfile.lock *.gemspec; }; then $run rspec; exit $?; fi; if [ -f Rakefile ] && $run rake -P 2>/dev/null | grep -q ''^rake test$''; then $run rake test; exit $?; fi; if [ -d test ]; then $run ruby -Ilib -Itest -e ''Dir.glob("test/**/{*_test,test_*}.rb").sort.each { |f| require File.expand_path(f) }''; exit $?; fi; echo "no tests"; exit 127'
+      scope: ""
+      timeout: 20m0s
+      optional: false
+      requires:
+        - Gemfile
+      tests: true
+max_changed_files: 0
+deny_paths: []

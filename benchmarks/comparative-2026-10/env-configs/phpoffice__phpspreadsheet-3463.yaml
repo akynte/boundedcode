@@ -1,0 +1,8 @@
+# Environment-only verification config for this evaluation task (deviations.md D1),
+# committed into the task's base. BoundedCode's preset for this repository
+# (env-configs/preset/), minus what fails or times out on the untouched base in
+# the offline sandbox (measured before any frozen run, 2026-10-09):
+#   php-test: the full PHPUnit suite (19,726 tests) times out after the preset's 20
+#   minutes on the base; the stage is removed, so no test stage remains.
+version: 1
+stages: []

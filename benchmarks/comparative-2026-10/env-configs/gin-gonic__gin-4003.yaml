@@ -1,0 +1,51 @@
+# Environment-only verification config for this evaluation task (deviations.md D1),
+# committed into the task's base. BoundedCode's preset for this repository
+# (env-configs/preset/), minus what fails or times out on the untouched base in
+# the offline sandbox (measured before any frozen run, 2026-10-09):
+#   go-test: TestRunTLS, TestPusher and TestRunQUIC fail on the base (masked certificate
+#   files, as for gin-3820; each failure shows once the previous one, which panics, is
+#   skipped).
+version: 1
+stages:
+- name: gofmt
+  run:
+  - sh
+  - -c
+  - out=$(gofmt -l $(git ls-files '*.go' | grep -v '^vendor/') 2>&1); [ -z "$out" ] || { echo "files need gofmt:"; echo "$out"; exit 1; }
+  requires:
+  - go.mod
+- name: go-build
+  run:
+  - go
+  - build
+  - ./...
+  requires:
+  - go.mod
+- name: go-vet
+  run:
+  - go
+  - vet
+  - '{packages}'
+  requires:
+  - go.mod
+- name: go-test
+  run:
+  - go
+  - test
+  - -count=1
+  - -skip
+  - ^(TestRunTLS|TestPusher|TestRunQUIC)$
+  - '{packages}'
+  timeout: 20m0s
+  requires:
+  - go.mod
+  tests: true
+- name: golangci-lint
+  run:
+  - golangci-lint
+  - run
+  - ./...
+  scope: full
+  optional: true
+  requires:
+  - go.mod

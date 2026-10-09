@@ -1,0 +1,47 @@
+# Environment-only verification config for this evaluation task (deviations.md D1),
+# committed into the task's base. BoundedCode's preset for this repository
+# (env-configs/preset/), minus what fails or times out on the untouched base in
+# the offline sandbox (measured before any frozen run, 2026-10-09):
+#   npm-test: the project's test script runs format, lint, type-check, build and
+#   unit-test; type-check:ts (dtslint downloads TypeScript versions) and build:stats
+#   (bundlephobia.com) need the network and fail offline. The stage runs, in the script's
+#   order, the offline parts that pass on the base: the build without build:stats (the
+#   jest tests import the built dist/), type-check:flow and unit-test (jest). npm-build:
+#   the same build without build:stats.
+version: 1
+stages:
+- name: tsc
+  run:
+  - sh
+  - -c
+  - 'if [ -x node_modules/.bin/tsc ]; then node_modules/.bin/tsc --noEmit; elif [ ! -d node_modules ] && grep -q ''"typescript"'' package.json; then { echo "node_modules missing: install the project''s dependencies in the repository checkout (e.g. npm ci) so verification can run them"; exit 1; }; else echo "tsc not installed"; exit 127; fi'
+  optional: true
+  requires:
+  - tsconfig.json
+- name: npm-lint
+  run:
+  - sh
+  - -c
+  - 'node -e ''process.exit(require("./package.json").scripts?.["lint"] ? 0 : 3)''; rc=$?; [ $rc = 3 ] && { echo "no lint script"; exit 127; }; [ $rc = 0 ] || exit $rc; [ -d node_modules ] || { echo "node_modules missing: install the project''s dependencies in the repository checkout (e.g. npm ci) so verification can run them"; exit 1; }; npm run --silent lint'
+  optional: true
+  requires:
+  - package.json
+- name: npm-test
+  run:
+  - sh
+  - -c
+  - '[ -d node_modules ] || { echo "node_modules missing"; exit 1; }; npm run --silent build:clean && npm run --silent build:dist && npm run --silent build:esm && npm run --silent build:copy && npm run --silent build:prepare && npm run --silent type-check:flow && npm run --silent unit-test'
+  timeout: 20m0s
+  optional: true
+  requires:
+  - package.json
+  tests: true
+- name: npm-build
+  run:
+  - sh
+  - -c
+  - '[ -d node_modules ] || { echo "node_modules missing"; exit 1; }; npm run --silent build:clean && npm run --silent build:dist && npm run --silent build:esm && npm run --silent build:copy && npm run --silent build:prepare'
+  scope: full
+  optional: true
+  requires:
+  - package.json

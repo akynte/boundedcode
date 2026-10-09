@@ -88,16 +88,41 @@ def freeze(a, c, m):
         print(t["slot"], t["id"])
 
 
+def apply_configs(a):
+    """Deviation D1: commits env-configs/<id>.yaml into each frozen task's
+    base as .boundedcode/verification.yaml (a set-up edit) and records the
+    new task-spec digests next to the original ones."""
+    path = os.path.join(HERE, "frozen-tasks.json")
+    frozen = json.load(open(path))
+    for t in frozen["tasks"]:
+        spec = os.path.join(a.eval, "tasks", "frozen", t["id"] + ".yaml")
+        task = json.load(open(spec))
+        cfg = os.path.join(HERE, "env-configs", t["id"] + ".yaml")
+        task["setup"] = [{"repo": task["repos"][0], "file": ".boundedcode/verification.yaml", "old": "", "new": open(cfg).read()}]
+        with open(spec, "w", encoding="utf-8") as f:
+            json.dump(task, f, indent=1, ensure_ascii=False)
+        t.setdefault("task_spec_sha256_at_freeze", t["task_spec_sha256"])
+        t["task_spec_sha256"] = sha(spec)
+        t["env_config_sha256"] = sha(cfg)
+        print(t["id"], t["task_spec_sha256"][:12])
+    json.dump(frozen, open(path, "w"), indent=1)
+
+
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("step", choices=["screen", "freeze"])
+    ap.add_argument("step", choices=["screen", "freeze", "apply-configs"])
     ap.add_argument("--eval", default=os.path.expanduser("~/.cache/bc-comparative"))
     ap.add_argument("--binary", default=os.path.join(ROOT, "bin", "boundedcode"))
     ap.add_argument("--final", action="store_true", help="screen: record candidates whose preparation failed as invalid")
     a = ap.parse_args()
     c = json.load(open(os.path.join(HERE, "candidates.json")))
     m = json.load(open(os.path.join(HERE, "manifest.json")))
-    screen(a, c) if a.step == "screen" else freeze(a, c, m)
+    if a.step == "apply-configs":
+        apply_configs(a)
+    elif a.step == "screen":
+        screen(a, c)
+    else:
+        freeze(a, c, m)
 
 
 if __name__ == "__main__":

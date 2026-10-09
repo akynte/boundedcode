@@ -106,6 +106,7 @@ def main():
         if e["git_dirty"]:
             sys.exit("the checkout has uncommitted changes to tracked files: run from the frozen commit")
         json.dump(e, open(envp, "w"), indent=1)
+        scrub(envp)
     taskdir = os.path.join(ev, "tasks", "tasks" if a.pilot else "frozen")
     env = env_for(ev)
     for t in frozen["tasks"]:
@@ -135,7 +136,8 @@ def main():
             sampler.wait()
             scrub(stem + ".json", stem + ".stderr.log")
             rec = {"system": sysname, "task": tid, "exit": rc, "wall_seconds": round(wall, 1),
-                   "started_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(start)), "command": cmd[1:]}
+                   "started_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(start)),
+                   "command": [c.replace(os.path.expanduser("~"), "~") for c in cmd[1:]]}
             with open(os.path.join(HERE, "results", "pilot-log.jsonl" if a.pilot else "run-log.jsonl"), "a") as f:
                 f.write(json.dumps(rec) + "\n")
             print(time.strftime("%H:%M:%S"), "done", sysname, tid, "exit", rc, "%.0fs" % wall, flush=True)

@@ -1,0 +1,15 @@
+version: 1
+stages:
+    - name: php-test
+      run:
+        - sh
+        - -c
+        - 'command -v php >/dev/null 2>&1 || { echo "php is not installed in the sandbox image; rebuild it with `boundedcode sandbox build`"; exit 1; }; set --; [ -f phpunit.xml ] || [ -f phpunit.xml.dist ] || [ -f phpunit.dist.xml ] || { [ -d tests ] && set -- tests; }; if [ -f vendor/bin/phpunit ]; then php vendor/bin/phpunit "$@"; exit $?; fi; if [ -f vendor/bin/pest ]; then php vendor/bin/pest; exit $?; fi; if grep -qsE ''"(phpunit/phpunit|pestphp/pest)"'' composer.json; then echo "vendor/ missing: install the project''s dependencies in the repository checkout (composer install) so verification can run them"; exit 1; fi; echo "no test runner"; exit 127'
+      scope: ""
+      timeout: 20m0s
+      optional: false
+      requires:
+        - composer.json
+      tests: true
+max_changed_files: 0
+deny_paths: []
