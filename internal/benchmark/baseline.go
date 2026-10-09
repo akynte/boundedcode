@@ -10,6 +10,7 @@ import (
 
 	"github.com/akynte/boundedcode/internal/agent"
 	"github.com/akynte/boundedcode/internal/gitops"
+	"github.com/akynte/boundedcode/internal/task"
 )
 
 // RunBaseline runs a task with the plain agent runtime and the same local
@@ -79,10 +80,20 @@ func (s *SuiteRunner) RunBaseline(ctx context.Context, model string, spec TaskSp
 		tctx, cancel = context.WithTimeout(ctx, spec.Timeout.D())
 		defer cancel()
 	}
+	// The same sandbox environment a BoundedCode agent gets: secret masks,
+	// the checkout's installed dependencies and the offline module and
+	// package caches. Without them the agent could not build or run the
+	// repository's tests offline.
+	masks, deps, scratch, toolchain, err := r.AgentEnvironment(id, wt, []task.Worktree{{RepoName: name, RepoPath: repo, Path: wt, BaseCommit: base, Branch: "baseline"}})
+	if err != nil {
+		res.Error = "agent environment: " + err.Error()
+		return res
+	}
 	sess, err := r.Agent.Open(tctx, agent.OpenRequest{TaskID: id, Workspace: wt, GitCommonDirs: []string{common}, GitAdminDirs: []string{admin},
 		PersistenceDir: filepath.Join(dir, "state", "runtime"), MaxIterations: r.Cfg.Agent.MaxIterations,
-		MaxInputTokens: r.CtxSize, MaxOutputTokens: 8192, CondenserMaxEvents: r.Cfg.Agent.CondenserMaxEvents,
-		CondenserMaxTokens: r.CtxSize * 7 / 10, Gateway: gw, LLMTimeout: r.Cfg.Inference.RequestTimeout.D()})
+		MaxInputTokens: r.CtxSize, MaxOutputTokens: r.Cfg.Agent.MaxOutputTokens, CondenserMaxEvents: r.Cfg.Agent.CondenserMaxEvents,
+		CondenserMaxTokens: r.CtxSize * 7 / 10, Masks: masks, DependencyMounts: deps, DependencyScratch: scratch, Toolchain: toolchain,
+		Gateway: gw, LLMTimeout: r.Cfg.Inference.RequestTimeout.D()})
 	if err != nil {
 		res.Error = "open: " + err.Error()
 		return res

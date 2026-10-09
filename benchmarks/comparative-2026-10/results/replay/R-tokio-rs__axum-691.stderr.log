@@ -1,0 +1,15 @@
+22:10:19 task tokio-rs__axum-691 (rust)
+using openai-compatible model replay (working context 131072 tokens)
+22:10:36 attempt 1/2: sending initial context pack (1664 tokens)
+22:10:38 agent stopped: status=finished events=10 stuck=false
+22:11:17 verify targeted axum: passed=false (38.554s)
+22:11:17 verification failed: axum/cargo-build: error: could not compile `axum` (lib) due to 1 previous error; 1 warning emitted; axum/cargo-test: error: could not compile `axum` (lib) due to 1 previous error; 1 warning emitted
+22:11:19 attempt 2/2: sending retry context pack (5795 tokens)
+22:11:19 agent stopped: status=finished events=5 stuck=false
+22:11:36 verify targeted axum: passed=false (16.514s)
+22:11:36 verification failed: axum/cargo-build: error: could not compile `axum` (lib) due to 1 previous error; 1 warning emitted; axum/cargo-test: error: could not compile `axum` (lib) due to 1 previous error; 1 warning emitted
+22:11:36 escalation Z2 suggested (the same verification failure repeated across attempts) but frontier is disabled; continuing locally
+22:11:36 task t20261009-31b1b2 blocked: attempt budget exhausted (2) (work preserved on agent/t20261009-31b1b2; `task resume` to continue)
+22:11:58 task tokio-rs__axum-691: success=false status=blocked attempts=2 tokens=720 escalations=0 99s 
+verified 0/1 (0%), local-only 0%, escalation rate 0%, 0.0 verified/hour, 99s/task
+report: ~/boundedcode/benchmarks/comparative-2026-10/results/replay/R-tokio-rs__axum-691.md

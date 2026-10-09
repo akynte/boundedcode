@@ -65,3 +65,59 @@ baseline's agent can read the file, as BoundedCode's can.
 **Pilot.** The pilot ran before this fix, so its BoundedCode result reflects
 the missing config. It is published, and it is excluded from the analysis,
 as declared.
+
+## D2. Saved agent patches lacked their final newline
+
+**What happened.** The harness saved each agent's patch with
+`gitops.Diff`, which trims trailing newlines. `git apply` therefore
+rejected the saved files as "corrupt patch at line N". The saved content
+is otherwise complete, and the recorded results do not depend on it.
+
+**Change.**
+- `gate_replay.py` and the analysis restore the final newline before
+  applying a patch. All 16 saved patches then apply cleanly to their bases
+  (checked with `git apply --check`).
+- `saveAgentPatch` now writes the newline itself (test:
+  `TestSaveAgentPatch`). The corrected baseline arm (D3) is the first
+  recorded run to use it.
+
+**Effect on results.** None.
+
+## D3. The baseline's agent ran without the offline build environment
+
+**What happened.** Analysing axum-691 showed that the baseline's agent got
+"no matching package named `async-trait`" for every `cargo` command. The
+harness's baseline (`internal/benchmark/baseline.go`) opened the agent
+session without the parts of the environment that BoundedCode's
+orchestrator passes to its agent:
+- the offline toolchain (Go module cache, Cargo, Maven and Gradle caches);
+- the checkout's installed dependencies (`node_modules`, `vendor`, gems);
+- the secret masks.
+
+As a result, the baseline's agent could not build or run the tests of any
+of the eight repositories offline. It also saw files that BoundedCode's
+agent sees masked. The protocol stated "the same mounts", which was false
+for this harness, and the first validation's two-task baseline had the same
+defect. This is an environment-parity defect in the harness, against the
+baseline.
+
+**Change.**
+- `orchestrator.Runner.AgentEnvironment` returns exactly the environment the
+  orchestrator gives its agent, and the baseline now uses it (test:
+  `TestAgentEnvironment`). Both agents now get the same masks, dependency
+  mounts and caches.
+- The baseline arm is re-run on all eight tasks with the corrected harness
+  (`run.py --systems O --outdir runs-baseline-corrected`), one run each,
+  strictly sequential, on the same model server.
+- BoundedCode's runs are not repeated: its environment was the one
+  intended.
+
+**How results are reported.**
+- Both baseline arms are published: `runs/O-*` (environment defect) and
+  `runs-baseline-corrected/O-*`.
+- The primary comparison uses the corrected arm, because the protocol
+  intended identical environments. The original arm is reported alongside
+  it, not dropped.
+- The corrected arm runs after all BoundedCode runs, not alternated with
+  them. This order differs from the frozen one, and the report notes it.
+- The gate replay is run on both arms' patches.

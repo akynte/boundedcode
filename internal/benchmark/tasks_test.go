@@ -148,7 +148,7 @@ func TestSaveAgentPatch(t *testing.T) {
 	dir := t.TempDir()
 	p := saveAgentPatch(ctx, dir, "r", repo, base)
 	b, err := os.ReadFile(p)
-	if err != nil || !strings.Contains(string(b), "+var X = 1") || !strings.Contains(string(b), "a_test.go") {
+	if err != nil || !strings.Contains(string(b), "+var X = 1") || !strings.Contains(string(b), "a_test.go") || !strings.HasSuffix(string(b), "\n") {
 		t.Fatalf("patch %q: %v\n%s", p, err, b)
 	}
 }

@@ -960,6 +960,21 @@ func (r *Runner) hasEvent(ctx context.Context, taskID, kind string) bool {
 
 // agentToolchain is the agent's build environment: the module cache
 // verification uses, and a build cache of the agent's own in the task dir.
+// AgentEnvironment returns the sandbox environment an agent working in
+// workDir on these worktrees gets: secret masks, the repositories' installed
+// dependencies and the offline toolchain (module and package caches). The
+// benchmark baseline uses it, so a comparison runs both agents in the same
+// environment.
+func (r *Runner) AgentEnvironment(taskID, workDir string, wts []task.Worktree) (masks []string, deps []agent.DependencyMount, scratch []string, tc agent.Toolchain, err error) {
+	if masks, err = secretMasks(workDir, wts); err != nil {
+		return nil, nil, nil, tc, err
+	}
+	if deps, scratch, err = dependencyMounts(wts); err != nil {
+		return nil, nil, nil, tc, err
+	}
+	return masks, deps, scratch, r.agentToolchain(taskID), nil
+}
+
 func (r *Runner) agentToolchain(taskID string) agent.Toolchain {
 	tc := agent.Toolchain{GoCache: filepath.Join(r.Paths.TaskDir(taskID), "agent-gocache"),
 		Work: filepath.Join(r.Paths.TaskDir(taskID), "agent-toolchains")}

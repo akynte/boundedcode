@@ -1,0 +1,58 @@
+{
+  "id": "suite-20261009T204605Z",
+  "model": "qwen3.6-35b-a3b",
+  "started": "2026-10-09T20:46:05.336740529Z",
+  "finished": "2026-10-09T20:53:31.218173444Z",
+  "results": [
+    {
+      "id": "tokio-rs__axum-691",
+      "category": "rust",
+      "model": "qwen3.6-35b-a3b",
+      "success": false,
+      "task_status": "finished",
+      "self_verified": false,
+      "tests_green": false,
+      "attempts": 1,
+      "local_tokens": 60571,
+      "generated_tokens": 8692,
+      "cached_prompt_tokens": 1248025,
+      "escalations": 0,
+      "local_only": false,
+      "condensations": 0,
+      "resumes": 0,
+      "wall_seconds": 445.876735649,
+      "failed_checks": [
+        "axum: …             ---------------------- expected because of this\n210 | |                     } else {\n211 | |                         format!(\"{}{}\", path, nested_path)\n    | |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Arc\u003cstr\u003e`, found `String`\n212 | |                     };\n    | |_____________________- `if` and `else` have incompatible types\n    |\n    = note: expected struct `Arc\u003cstr\u003e`\n               found struct `std::string::String`\n\nFor more information about this error, try `rustc --explain E0308`.\nerror: could not compile `axum` (lib test) due to 1 previous error\n"
+      ],
+      "task_id": "baseline-tokio-rs--axum-691",
+      "state_dir": "~/.cache/bc-comparative/home/cache/bench-work/baseline-tokio-rs__axum-691-1791578765336772951/state",
+      "agent_patch": "~/.cache/bc-comparative/home/cache/bench-work/baseline-tokio-rs__axum-691-1791578765336772951/agent-axum.patch",
+      "intel": {
+        "context_packs": 0,
+        "pack_tokens": 0,
+        "code_tokens": 0,
+        "serena_calls": 0,
+        "serena_errors": 0,
+        "serena_ms": 0,
+        "graph_calls": 0,
+        "graph_ms": 0,
+        "serena_symbols": 0,
+        "graph_symbols": 0,
+        "fallbacks": 0,
+        "agent_tool_calls": 0
+      }
+    }
+  ],
+  "summary": {
+    "tasks": 1,
+    "verified": 0,
+    "success_rate": 0,
+    "local_only_completion_rate": 0,
+    "frontier_escalation_rate": 0,
+    "verified_tasks_per_hour": 0,
+    "attempts_per_successful_task": 0,
+    "wall_seconds_per_task": 445.876735649,
+    "local_tokens_per_task": 60571,
+    "self_verified_but_hidden_failed": 0
+  }
+}

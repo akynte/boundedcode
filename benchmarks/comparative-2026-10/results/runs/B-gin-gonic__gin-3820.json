@@ -1,0 +1,65 @@
+{
+  "id": "suite-20261009T183154Z",
+  "model": "qwen3.6-35b-a3b",
+  "started": "2026-10-09T18:31:54.978320122Z",
+  "finished": "2026-10-09T19:12:48.6700731Z",
+  "results": [
+    {
+      "id": "gin-gonic__gin-3820",
+      "category": "go-dev",
+      "model": "qwen3.6-35b-a3b",
+      "success": false,
+      "task_status": "completed",
+      "self_verified": true,
+      "tests_green": true,
+      "attempts": 3,
+      "local_tokens": 326657,
+      "generated_tokens": 58686,
+      "cached_prompt_tokens": 4155505,
+      "escalations": 0,
+      "local_only": false,
+      "condensations": 3,
+      "resumes": 0,
+      "wall_seconds": 2453.687166441,
+      "failed_checks": [
+        "gin: sh -c go test -v ./binding -run \"^TestMapping\": …tMappingTime\n--- PASS: TestMappingTime (0.00s)\n=== RUN   TestMappingTimeDuration\n--- PASS: TestMappingTimeDuration (0.00s)\n=== RUN   TestMappingSlice\n--- PASS: TestMappingSlice (0.00s)\n=== RUN   TestMappingArray\n--- PASS: TestMappingArray (0.00s)\n=== RUN   TestMappingStructField\n--- PASS: TestMappingStructField (0.00s)\n=== RUN   TestMappingPtrField\n--- PASS: TestMappingPtrField (0.00s)\n=== RUN   TestMappingMapField\n--- PASS: TestMappingMapField (0.00s)\n=== RUN   TestMappingIgnoredCircularRef\n--- PASS: TestMappingIgnoredCircularRef (0.00s)\nFAIL\nFAIL\tgithub.com/gin-gonic/gin/binding\t0.006s\nFAIL\n"
+      ],
+      "task_id": "t20261009-bc7177",
+      "state_dir": "~/.cache/bc-comparative/home/cache/bench-work/gin-gonic__gin-3820-1791570714978346862/state",
+      "agent_patch": "~/.cache/bc-comparative/home/cache/bench-work/gin-gonic__gin-3820-1791570714978346862/agent-gin.patch",
+      "intel": {
+        "context_packs": 3,
+        "pack_tokens": 15563,
+        "code_tokens": 7490,
+        "serena_calls": 0,
+        "serena_errors": 0,
+        "serena_ms": 0,
+        "graph_calls": 21,
+        "graph_ms": 201.72199999999998,
+        "serena_symbols": 0,
+        "graph_symbols": 3,
+        "fallbacks": 0,
+        "agent_tool_calls": 89,
+        "agent_tools": {
+          "file_editor": 24,
+          "finish": 3,
+          "task_tracker": 5,
+          "terminal": 52,
+          "think": 5
+        }
+      }
+    }
+  ],
+  "summary": {
+    "tasks": 1,
+    "verified": 0,
+    "success_rate": 0,
+    "local_only_completion_rate": 0,
+    "frontier_escalation_rate": 0,
+    "verified_tasks_per_hour": 0,
+    "attempts_per_successful_task": 0,
+    "wall_seconds_per_task": 2453.687166441,
+    "local_tokens_per_task": 326657,
+    "self_verified_but_hidden_failed": 1
+  }
+}

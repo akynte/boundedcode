@@ -46,7 +46,7 @@ def peaks(path):
 
 
 def model_calls(state_dir, task_id):
-    db = os.path.join(os.path.expanduser(state_dir or ""), "state.db")
+    db = os.path.join(os.path.expanduser(state_dir or ""), "data", "state.db")
     if not os.path.exists(db):
         return None
     try:

@@ -10,8 +10,10 @@ import (
 	"testing"
 
 	"github.com/akynte/boundedcode/internal/agent/scripted"
+	"github.com/akynte/boundedcode/internal/config"
 	"github.com/akynte/boundedcode/internal/inference"
 	"github.com/akynte/boundedcode/internal/task"
+	"github.com/akynte/boundedcode/internal/verify"
 )
 
 // contractFixture is the ledger fixture with a scripted request-reading
@@ -463,5 +465,31 @@ func TestContractUsesCloudUpstream(t *testing.T) {
 	got, err := r.chatReader(context.Background(), &task.Task{ID: "t"}, ContractCall{Purpose: ContractCallDerive}, 100, 0)
 	if err != nil || got != `{"required":["x"]}` {
 		t.Fatalf("chatReader = %q, %v", got, err)
+	}
+}
+
+// TestAgentEnvironment: the environment shared with the benchmark baseline
+// carries the secret masks, installed dependencies and offline caches.
+func TestAgentEnvironment(t *testing.T) {
+	src, wt := t.TempDir(), t.TempDir()
+	if err := os.MkdirAll(filepath.Join(src, "node_modules", "x"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(wt, ".env"), []byte("K=v\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	r := &Runner{Verify: &verify.Engine{GoModCache: "/gomod"}, Paths: config.Paths{Data: t.TempDir()}}
+	masks, deps, _, tc, err := r.AgentEnvironment("t1", wt, []task.Worktree{{RepoName: "r", RepoPath: src, Path: wt}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(masks) != 1 || masks[0] != ".env" {
+		t.Fatalf("masks = %v", masks)
+	}
+	if len(deps) != 1 || filepath.Base(deps[0].Host) != "node_modules" {
+		t.Fatalf("deps = %+v", deps)
+	}
+	if tc.GoModCache != "/gomod" || tc.Work == "" {
+		t.Fatalf("toolchain = %+v", tc)
 	}
 }

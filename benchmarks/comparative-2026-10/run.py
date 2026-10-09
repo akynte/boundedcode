@@ -88,6 +88,8 @@ def main():
     ap.add_argument("--eval", default=os.path.expanduser("~/.cache/bc-comparative"))
     ap.add_argument("--binary", default=os.path.join(HERE, "..", "..", "bin", "boundedcode"))
     ap.add_argument("--only", nargs="*")
+    ap.add_argument("--systems", default="B,O", help="which systems to run (deviation D3 re-runs O alone)")
+    ap.add_argument("--outdir", default="runs", help="directory under results/ for the run records")
     ap.add_argument("--pilot", help="run this unpicked candidate as the declared pilot (results/pilot/, excluded from analysis)")
     a = ap.parse_args()
     m = json.load(open(os.path.join(HERE, "manifest.json")))
@@ -98,9 +100,9 @@ def main():
     home_cfg = os.path.join(ev, "home", "config")
     os.makedirs(home_cfg, exist_ok=True)
     shutil.copy(os.path.join(HERE, "config.yaml"), os.path.join(home_cfg, "config.yaml"))
-    out = os.path.join(HERE, "results", "pilot" if a.pilot else "runs")
+    out = os.path.join(HERE, "results", "pilot" if a.pilot else a.outdir)
     os.makedirs(out, exist_ok=True)
-    envp = os.path.join(HERE, "results", "environment.json")
+    envp = os.path.join(out, "environment.json") if a.outdir != "runs" else os.path.join(HERE, "results", "environment.json")
     if not os.path.exists(envp):
         e = environment(a.binary)
         if e["git_dirty"]:
@@ -113,7 +115,7 @@ def main():
         tid = t["id"]
         if a.only and tid not in a.only:
             continue
-        systems = ["B", "O"] if order(m["seed"], tid) else ["O", "B"]
+        systems = [x for x in (["B", "O"] if order(m["seed"], tid) else ["O", "B"]) if x in a.systems.split(",")]
         for sysname in systems:
             stem = os.path.join(out, "%s-%s" % (sysname, tid))
             if os.path.exists(stem + ".json"):
@@ -138,7 +140,8 @@ def main():
             rec = {"system": sysname, "task": tid, "exit": rc, "wall_seconds": round(wall, 1),
                    "started_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(start)),
                    "command": [c.replace(os.path.expanduser("~"), "~") for c in cmd[1:]]}
-            with open(os.path.join(HERE, "results", "pilot-log.jsonl" if a.pilot else "run-log.jsonl"), "a") as f:
+            log = "pilot-log.jsonl" if a.pilot else ("run-log.jsonl" if a.outdir == "runs" else a.outdir + "-log.jsonl")
+            with open(os.path.join(HERE, "results", log), "a") as f:
                 f.write(json.dumps(rec) + "\n")
             print(time.strftime("%H:%M:%S"), "done", sysname, tid, "exit", rc, "%.0fs" % wall, flush=True)
 

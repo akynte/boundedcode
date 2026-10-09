@@ -688,6 +688,9 @@ func saveAgentPatch(ctx context.Context, dir, repo, worktree, base string) strin
 		return ""
 	}
 	p := filepath.Join(dir, "agent-"+repo+".patch")
+	if d != "" && !strings.HasSuffix(d, "\n") {
+		d += "\n" // Diff trims it; git apply needs it
+	}
 	if err := os.WriteFile(p, []byte(d), 0o644); err != nil {
 		return ""
 	}

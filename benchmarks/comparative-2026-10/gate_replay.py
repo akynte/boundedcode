@@ -31,7 +31,12 @@ CHUNK = 6000  # base64 characters per terminal command
 
 
 def commands(repo, patch):
-    b = base64.b64encode(open(patch, "rb").read()).decode()
+    data = open(patch, "rb").read()
+    # The harness saved patches without their final newline (deviation D2);
+    # git apply needs it.
+    if not data.endswith(b"\n"):
+        data += b"\n"
+    b = base64.b64encode(data).decode()
     steps = ["rm -f /tmp/agent.patch.b64"]
     for i in range(0, len(b), CHUNK):
         steps.append("printf %%s '%s' >> /tmp/agent.patch.b64" % b[i:i + CHUNK])

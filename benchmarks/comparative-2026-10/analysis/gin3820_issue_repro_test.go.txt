@@ -1,0 +1,42 @@
+package gin
+
+// The reproduction from the gin-3820 issue as a test (analysis only; never
+// shown to an agent): binding a multipart form whose optional file field is
+// absent must not fail.
+
+import (
+	"bytes"
+	"mime/multipart"
+	"net/http"
+	"net/http/httptest"
+	"net/textproto"
+	"testing"
+)
+
+type issueBindFile struct {
+	Name  string                `form:"name" binding:"required"`
+	Email string                `form:"email" binding:"required"`
+	File  *multipart.FileHeader `form:"file" `
+}
+
+func TestIssue3820Reproduction(t *testing.T) {
+	body := &bytes.Buffer{}
+	w := multipart.NewWriter(body)
+	_ = w.WriteField("name", "n")
+	_ = w.WriteField("email", "e@example.com")
+	// A browser sends an unselected file input as an empty part with an
+	// empty filename.
+	h := make(textproto.MIMEHeader)
+	h.Set("Content-Disposition", `form-data; name="file"; filename=""`)
+	h.Set("Content-Type", "application/octet-stream")
+	_, _ = w.CreatePart(h)
+	_ = w.Close()
+	req, _ := http.NewRequest(http.MethodPost, "/upload", body)
+	req.Header.Set("Content-Type", w.FormDataContentType())
+	c, _ := CreateTestContext(httptest.NewRecorder())
+	c.Request = req
+	var b issueBindFile
+	if err := c.ShouldBind(&b); err != nil {
+		t.Fatalf("ShouldBind without the optional file: %v", err)
+	}
+}

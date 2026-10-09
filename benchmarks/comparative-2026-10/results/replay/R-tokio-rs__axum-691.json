@@ -1,0 +1,62 @@
+{
+  "id": "suite-20261009T221019Z",
+  "model": "qwen3.6-35b-a3b",
+  "started": "2026-10-09T22:10:19.529115254Z",
+  "finished": "2026-10-09T22:11:58.790221027Z",
+  "results": [
+    {
+      "id": "tokio-rs__axum-691",
+      "category": "rust",
+      "model": "qwen3.6-35b-a3b",
+      "success": false,
+      "task_status": "blocked",
+      "self_verified": false,
+      "tests_green": false,
+      "attempts": 2,
+      "local_tokens": 720,
+      "generated_tokens": 120,
+      "cached_prompt_tokens": 0,
+      "escalations": 0,
+      "local_only": false,
+      "condensations": 0,
+      "resumes": 0,
+      "wall_seconds": 99.255603719,
+      "failed_checks": [
+        "axum: sh -c RUSTFLAGS=-Awarnings cargo test --package axum --lib -- routing::tests::nest::nesting_router_at_root --exact: …             ---------------------- expected because of this\n210 | |                     } else {\n211 | |                         format!(\"{}{}\", path, nested_path)\n    | |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Arc\u003cstr\u003e`, found `String`\n212 | |                     };\n    | |_____________________- `if` and `else` have incompatible types\n    |\n    = note: expected struct `Arc\u003cstr\u003e`\n               found struct `std::string::String`\n\nFor more information about this error, try `rustc --explain E0308`.\nerror: could not compile `axum` (lib test) due to 1 previous error\n"
+      ],
+      "task_id": "t20261009-31b1b2",
+      "state_dir": "~/.cache/bc-comparative/home-replay/cache/bench-work/tokio-rs__axum-691-1791583819529144013/state",
+      "agent_patch": "~/.cache/bc-comparative/home-replay/cache/bench-work/tokio-rs__axum-691-1791583819529144013/agent-axum.patch",
+      "intel": {
+        "context_packs": 2,
+        "pack_tokens": 7459,
+        "code_tokens": 2879,
+        "serena_calls": 0,
+        "serena_errors": 0,
+        "serena_ms": 0,
+        "graph_calls": 11,
+        "graph_ms": 128.49099999999999,
+        "serena_symbols": 0,
+        "graph_symbols": 3,
+        "fallbacks": 0,
+        "agent_tool_calls": 6,
+        "agent_tools": {
+          "finish": 2,
+          "terminal": 4
+        }
+      }
+    }
+  ],
+  "summary": {
+    "tasks": 1,
+    "verified": 0,
+    "success_rate": 0,
+    "local_only_completion_rate": 0,
+    "frontier_escalation_rate": 0,
+    "verified_tasks_per_hour": 0,
+    "attempts_per_successful_task": 0,
+    "wall_seconds_per_task": 99.255603719,
+    "local_tokens_per_task": 720,
+    "self_verified_but_hidden_failed": 0
+  }
+}
