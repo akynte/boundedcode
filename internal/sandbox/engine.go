@@ -139,7 +139,7 @@ func engineErrorLine(out string) string {
 			first = l
 		}
 		low := strings.ToLower(l)
-		if strings.Contains(low, "cannot connect") || strings.Contains(low, "permission denied") || strings.HasPrefix(low, "error") {
+		if strings.Contains(low, "cannot connect") || strings.Contains(low, "failed to connect") || strings.Contains(low, "permission denied") || strings.HasPrefix(low, "error") {
 			return truncate(l, 200)
 		}
 	}

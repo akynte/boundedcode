@@ -101,3 +101,16 @@ func TestEngineHintForEnginePath(t *testing.T) {
 		t.Fatalf("hint for /usr/bin/docker = %q, want %q", byPath, byName)
 	}
 }
+
+// TestEngineErrorLine picks the daemon error out of `docker info`, whose
+// output starts with client details.
+func TestEngineErrorLine(t *testing.T) {
+	out := "Client: Docker Engine - Community\n Version:    29.8.2\n Context:    default\n\nServer:\n" +
+		"failed to connect to the docker API at unix:///var/run/docker.sock; check if the path is correct and if the daemon is running: dial unix /var/run/docker.sock: connect: no such file or directory\n"
+	if got := engineErrorLine(out); !strings.HasPrefix(got, "failed to connect to the docker API") {
+		t.Fatalf("got %q", got)
+	}
+	if got := engineErrorLine("Cannot connect to the Docker daemon at unix:///var/run/docker.sock.\n"); !strings.HasPrefix(got, "Cannot connect") {
+		t.Fatalf("got %q", got)
+	}
+}
