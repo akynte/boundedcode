@@ -112,8 +112,11 @@ var goFailRE = regexp.MustCompile(`(?m)^\s*--- FAIL: (Test[A-Za-z0-9_]*)`)
 // commit, and the repository's test stages run there and on the untouched
 // base (control). A test counts when it fails with the changed tests and not
 // without them. For Go, failures are compared per test function, in the
-// packages whose test code or test data changed. Other stages have no per-test
-// names: the stage must fail with the changed tests and pass without them.
+// packages whose test code or test data changed, and each such test must
+// then pass (not fail or skip) when run on the change. Other stages compare
+// per test where the runner names its failures, otherwise per stage: the
+// stage must fail with the changed tests and pass without them; for them,
+// "passes on the change" is the full gate's pass of the whole stage.
 //
 // A test that cannot be observed on the base does not count: one that does
 // not compile or load there (it uses code the change adds) shows that the API
@@ -212,7 +215,7 @@ func (e *Engine) BehaviourEvidence(ctx context.Context, t RepoTarget) (Evidence,
 	sort.Strings(packages)
 
 	attr := newAttribution(t.Worktree, ev.TestFiles)
-	ran, notBuilt, timedOut := false, false, false
+	ran, notBuilt, timedOut, notPassing := false, false, false, false
 	envErr := "" // a stage that could not run (sandbox or engine problem)
 	seen := map[string]bool{}
 	controlTarget := RepoTarget{Name: t.Name, Worktree: control, TaskID: t.TaskID, Source: t.Source}
@@ -269,11 +272,31 @@ func (e *Engine) BehaviourEvidence(ctx context.Context, t RepoTarget) (Evidence,
 				continue
 			}
 			before := goFailures(cout)
+			var candidates []string
 			for _, name := range slices.Sorted(maps.Keys(failing)) {
 				if !before[name] && !seen[name] && (goData || goTests[name]) {
-					seen[name] = true
-					ev.Tests = append(ev.Tests, name)
+					candidates = append(candidates, name)
 				}
+			}
+			if len(candidates) == 0 {
+				continue
+			}
+			// The tests must also pass on the change itself: a test that
+			// fails, is skipped or does not run there demonstrates nothing.
+			passed, cr := e.goTestsPass(ctx, t, st, pkgs, candidates)
+			if cr.Status == "error" || cr.Status == "skipped" {
+				if envErr == "" {
+					envErr = st.Name + " (change): " + firstLine(cr.Output)
+				}
+				continue
+			}
+			for _, name := range candidates {
+				if !passed[name] {
+					notPassing = true
+					continue
+				}
+				seen[name] = true
+				ev.Tests = append(ev.Tests, name)
 			}
 			continue
 		}
@@ -325,6 +348,9 @@ func (e *Engine) BehaviourEvidence(ctx context.Context, t RepoTarget) (Evidence,
 	switch {
 	case ev.Verified:
 		ev.Reason = fmt.Sprintf("%d test(s) fail on the base and pass on the change", len(ev.Tests))
+	case notPassing:
+		ev.Reason = "the changed tests fail on the base commit but do not pass on the change (they fail, are skipped or do not run there), " +
+			"so they do not demonstrate it"
 	case notBuilt:
 		ev.Reason = "the changed tests do not build or load against the base commit (they use code the change adds), " +
 			"so they cannot show a change in behaviour; a test that also runs on the original code, for example through its existing API, is needed"
@@ -338,6 +364,32 @@ func (e *Engine) BehaviourEvidence(ctx context.Context, t RepoTarget) (Evidence,
 		ev.Reason = "the changed tests also pass on the base commit, so they do not demonstrate the change"
 	}
 	return ev, nil
+}
+
+// goTestRE matches a top-level Go test result in `go test -v` output.
+var goTestRE = regexp.MustCompile(`(?m)^--- (PASS|FAIL|SKIP): (Test[A-Za-z0-9_]*)`)
+
+// goTestsPass runs the named Go tests on the change, in the sandbox, and
+// reports which of them passed: a PASS result and no FAIL or SKIP for that
+// name in any package.
+func (e *Engine) goTestsPass(ctx context.Context, t RepoTarget, st Stage, pkgs, names []string) (map[string]bool, StageResult) {
+	args := append([]string{"-run", "^(" + strings.Join(names, "|") + ")$", "-v"}, pkgs...)
+	r, out := e.runStageFull(ctx, t, st, args)
+	if r.Status == "error" || r.Status == "skipped" || stageTimedOut(r) {
+		return nil, r
+	}
+	pass, bad := map[string]bool{}, map[string]bool{}
+	for _, m := range goTestRE.FindAllStringSubmatch(out, -1) {
+		if m[1] == "PASS" {
+			pass[m[2]] = true
+		} else {
+			bad[m[2]] = true
+		}
+	}
+	for n := range bad {
+		delete(pass, n)
+	}
+	return pass, r
 }
 
 // linkDeps links the checkout's installed dependencies into an exported tree
