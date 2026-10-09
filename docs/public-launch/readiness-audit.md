@@ -18,7 +18,7 @@ anything on macOS or Windows hardware.
 | Critical | 1 | 1 | – | – (the fix is not released) |
 | High | 6 | 3 | 3 | 3 open risks, now disclosed |
 | Medium | 7 | 1 | 5 | 5 |
-| Low | 8 | 1 | 6 | 2 |
+| Low | 8 | 1 | 6 | 1 |
 
 **Launch blocker:** the critical fix (C1) is on `main` only. Both installers
 download the newest release binary, v0.1.0-alpha.4, which still has the
@@ -261,9 +261,10 @@ figures refreshed.**
   row is corrected.
 - **L7. Installer location was wrong for Windows. Docs.** Getting-started
   said `~/.local/bin` for all platforms. It now gives the Windows path too.
-- **L8. The demo duration "1m43s" has no run record in the repository.
-  Open.** The source is the message of commit `4a531d0`. Add the run record
-  or soften the caption.
+- **L8. The demo duration "1m43s" seemed to have no run record. Resolved,
+  no change needed.** The GIF's last frame shows the task's own status line
+  (`attempts=2 tokens=13348 escalations=0 (1m43s)`). A later README revision
+  quotes that output as text.
 
 ### Checked and found accurate
 

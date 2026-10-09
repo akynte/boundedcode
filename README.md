@@ -2,198 +2,245 @@
 
 # BoundedCode
 
-**Bounded context. Bounded cost. Unbounded codebases.**
+**A control plane for AI coding agents that does not treat a green test run as proof.**
 
-An AI software-engineering platform for long-running work on large
-repositories, with bounded context, deterministic verification, persistent
-task state and optional frontier escalation. It runs a local model by default,
-or a cloud model API you choose.
+BoundedCode runs a coding agent on your repository inside a network-less
+sandbox. It reports a change as verified only when a test that the change
+adds fails on the original code and passes with the change. It uses a local
+model through llama.cpp by default, or a cloud model API you choose.
 
 [![ci](https://github.com/akynte/boundedcode/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/akynte/boundedcode/actions/workflows/ci.yml)
-[![secret-scan](https://github.com/akynte/boundedcode/actions/workflows/secrets.yml/badge.svg?branch=main)](https://github.com/akynte/boundedcode/actions/workflows/secrets.yml)
-[![dco](https://github.com/akynte/boundedcode/actions/workflows/dco.yml/badge.svg?branch=main)](https://github.com/akynte/boundedcode/actions/workflows/dco.yml)
 [![release](https://img.shields.io/github/v/release/akynte/boundedcode?include_prereleases&sort=semver&label=release)](https://github.com/akynte/boundedcode/releases)
-[![status: public alpha](https://img.shields.io/badge/status-public%20alpha-orange)](docs/releases/v0.1.0-alpha.4.md)
 [![license](https://img.shields.io/github/license/akynte/boundedcode)](LICENSE)
-[![Go](https://img.shields.io/github/go-mod/go-version/akynte/boundedcode)](go.mod)
 
+[Problem](#the-problem-green-tests-are-weak-evidence) ·
+[What it does](#what-boundedcode-does) ·
+[Demo](#demo) ·
 [Quick start](#quick-start) ·
+[Results](#results) ·
 [How it works](#how-it-works) ·
-[Validation](#validation) ·
-[Verification](#verification) ·
-[Security](#security) ·
 [Limitations](#known-limitations) ·
-[Docs](docs/)
-
-<br>
-
-<img src="docs/assets/demo.gif" alt="BoundedCode fixing a bug: the existing tests already pass, so after the agent's first change it asks for a test that demonstrates the fix; with that test the task ends task_verified, and the diff shows the fix and the new test" width="760">
-
-<sub>A real run with the local Qwen3.6-35B-A3B on an RTX 4060 laptop. Waits while the model works are shortened; the task took 1m43s.<br>
-The existing tests pass on the buggy code, so a green build proves nothing: BoundedCode asks for a test that fails without the fix.</sub>
+[Docs](docs/README.md)
 
 </div>
 
 > [!IMPORTANT]
-> **Public Alpha.** BoundedCode is usable and has been validated on a small
-> held-out sample of real software-engineering tasks (tasks not used during
-> development and never shown to the agent). It has been tested on one
-> machine with one model. Commands, configuration and APIs may change, and it
-> is not production-ready. Issue reports, compatibility reports and
-> contributions are welcome.
+> **Public alpha.** BoundedCode has been validated on one Linux machine with
+> one local model, on 14 public tasks (6 of them held out). macOS, Windows,
+> cloud providers and other models are experimental. Commands and
+> configuration may change, and it is not production-ready.
 
-## Why BoundedCode
+## The problem: green tests are weak evidence
 
-Coding agents working on large codebases tend to fail in two ways:
+Coding agents usually stop when the build and the tests pass. On real
+repositories, that often proves little:
 
-- **They overflow context.** Pouring the repository into the prompt exceeds
-  what a local model can hold and drives up frontier cost.
-- **They mistake green tests for done.** An agent reports success because the
-  tests pass, even when no test exercises the change.
+- The existing tests may never exercise the behaviour the request is
+  about. In the [demo](#demo), `go test ./...` passes on the buggy code
+  before any change is made.
+- In BoundedCode's own first validation, with an earlier gate that accepted
+  green checks:
+  - patches that changed nothing passed the existing tests;
+  - 4 of 8 frozen runs passed the repository's checks but failed the
+    dataset's hidden acceptance tests
+    ([report](docs/benchmarks/small-real-world-validation-2026-10.md#model-and-task-failures)).
 
-BoundedCode is built around the opposite defaults:
+A test run that would also have passed without the change does not show
+that the change did anything.
 
-| Principle | What it means |
+## What BoundedCode does
+
+BoundedCode does not implement a new agent loop. It wraps an existing one
+(the [OpenHands Software Agent SDK](https://github.com/OpenHands/software-agent-sdk))
+in a control plane, written in Go, that decides what the agent sees, where
+it runs, and when its work counts as done.
+
+1. **Bounded context.** The agent starts from a small task-specific context
+   pack built from repository intelligence: roughly 18–35 K tokens per task
+   in the held-out validation. It reads further code through tools as
+   needed.
+2. **Sandboxed execution.** The agent works in its own git worktree, inside
+   a container with no network. Its model calls go over stdio to a gateway
+   on the host, so neither API keys nor the network enter the sandbox.
+3. **Deterministic checks.** Build, lint and tests run in the sandbox, with
+   the stages read from the base commit, so the agent cannot change which
+   ones run. A secret scan and a protected-path check run on the diff.
+4. **Behavioural evidence.** A test that the change adds or modifies must
+   fail on the base commit, must not fail there without the change's tests
+   (a control run), and must pass with the change. If no test does, the
+   agent is asked once for one. Without it, the task ends `tests_green`
+   (UNVERIFIED), never as a verified merge candidate.
+5. **Durable tasks.** Task state and an audit log are kept in a SQLite
+   ledger. A task resumes after Ctrl-C, a crash or a reboot. Running out of attempts,
+   tokens or time blocks a task; it does not fail it.
+6. **Review, not merge.** The result is a branch, `agent/<task-id>`.
+   Nothing is pushed or merged for you.
+
+| Result | Meaning |
 |---|---|
-| **Bounded context** | The model starts from a small task-specific pack drawn from repository intelligence and reads further code through tools as needed, instead of receiving the whole repository. |
-| **Local by default** | Inference runs on your machine through llama.cpp unless you choose a cloud model API (OpenAI, Anthropic, Gemini or an OpenAI-compatible service; unvalidated, see [Cloud models](#cloud-models)). A frontier model is an optional, policy-triggered exception: enabled but not triggered in the second validation; in the first validation 4 frontier calls were sent and none of the tasks that made them was accepted. |
-| **Evidence, not just green tests** | A task is `TASK_VERIFIED` only when a test it adds fails on the base commit and passes with the change (fail-before/pass-after evidence, not proof of correctness). In a multi-repository task, every gRPC, protobuf or OpenAPI link that the change affects must also be shown compatible by the repositories' own checks (experimental). |
-| **Durable tasks** | A persistent ledger lets long tasks resume after Ctrl-C, a crash or a reboot. |
-| **Contained agent** | The agent runs in a network-less container on its own git worktree. Nothing is pushed or merged for you. |
+| `tests_green` | The repository's checks pass, but no test shows the change. Review it first. |
+| `TASK_VERIFIED` | The checks pass, and a test the change adds fails on the base and passes with the change. |
 
-## Validation
+`TASK_VERIFIED` is evidence that a test captures a change in behaviour. It
+is not formal verification and does not guarantee the change is correct:
+the agent chooses which reading of the request its test checks. See
+[Verification](#verification).
+
+## Demo
+
+<img src="docs/assets/demo.gif" alt="BoundedCode fixing a bug: the existing tests already pass, so after the agent's first change it asks for a test that demonstrates the fix; with that test the task ends task_verified, and the diff shows the fix and the new test" width="760">
+
+A real run with the local Qwen3.6-35B-A3B on an RTX 4060 laptop; the
+recording shortens the waits. An excerpt of the terminal output:
+
+```text
+$ go test ./...
+ok      example.com/shop        0.001s
+
+$ bcode task create --run "Orders of exactly 10 items do not get the 10% bulk discount:
+  Total([]Item{{PriceCents: 100, Qty: 10}}) returns 1000 but should be 900."
+08:22:15 attempt 1/6: sending initial context pack (499 tokens)
+08:23:14 verify full shop: passed=true (2.33s)
+08:23:14 verification passed but the change adds or modifies no tests; asking the agent for a test that demonstrates the change
+08:23:16 attempt 2/6: sending retry context pack (999 tokens)
+08:23:46 verify full shop: passed=true (2.354s)
+08:23:48 task t20261008-c8c85e is a verified merge candidate on agent/t20261008-c8c85e
+task t20261008-c8c85e: status=completed phase=review verification=task_verified attempts=2 tokens=13348 escalations=0 (1m43s)
+```
+
+After the first attempt every check passed, but the change added no test,
+so BoundedCode asked for one. The second attempt added
+`TestTotalBulkDiscountExactly10`, which fails on the original code. The
+final diff (`bcode task diff`) shows the fix (`count > 10` becomes
+`count >= 10`) and the new test.
+
+## Quick start
+
+Linux and macOS:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/akynte/boundedcode/main/scripts/install.sh | bash
+cd ~/src/my-service     # any git repository
+bcode
+```
+
+Windows (PowerShell):
+
+```powershell
+irm https://raw.githubusercontent.com/akynte/boundedcode/main/scripts/install.ps1 | iex
+cd $HOME\src\my-service
+bcode
+```
+
+The installers download a checksum-verified release binary:
+
+- `install.sh` installs `boundedcode` and its short name `bcode` into
+  `~/.local/bin`. It builds from source with Go when no release has a
+  binary for your platform.
+- `install.ps1` installs into `%LOCALAPPDATA%\Programs\BoundedCode\bin` and
+  adds that folder to your PATH.
+
+On the first run, `bcode` checks the prerequisites and offers to install
+what is missing: tools, llama.cpp, model weights and the sandbox image. It
+asks before every download or build. After that, describe a change in the
+chat and it runs as a task. `bcode setup --check` lists what is missing from
+the shell.
+
+**What you need:**
+- git and a container engine: Docker, Podman, or Docker Desktop on macOS
+  and Windows.
+- For the default local model, a machine like the reference one: an NVIDIA
+  GPU with 8 GB and 32–64 GB of RAM. `bcode model recommend` suggests a
+  model that fits yours.
+- Or a cloud model API instead.
+- The project's dependencies installed, in the checkout or in the package
+  caches: verification runs offline.
+
+| Platform | Status |
+|---|---|
+| Linux (x86-64) | Validated on the reference machine |
+| Linux (arm64) | Builds; not run |
+| macOS (Apple Silicon, Intel) | Experimental: release binaries exist, but the full flow has not been run on a Mac |
+| Windows (x64) | Experimental: release binaries exist, but the full flow has not been run on Windows |
+
+More:
+- [Getting started](docs/usage/getting-started.md): the manual install,
+  workspaces, multi-repository tasks and the plain CLI.
+- [Terminal interface](docs/usage/tui.md): the chat and its views.
+- The manual Linux path was tested from a clean clone with an empty home
+  directory ([record](benchmarks/reports/publication-20261005/fresh-clone-test.md)).
+
+## Results
 
 | Stage | Result | Report |
 |---|---|---|
-| Initial validation: 8 real public tasks, frozen build | **0/8**, then **1/8** after the first defect fixes | [report](docs/benchmarks/small-real-world-validation-2026-10.md) |
-| Engineering: the failures used as a development corpus (development evidence, not a validation) | fixes to verification, agent tooling, resource handling, retrieval and execution control | [failure-driven](docs/benchmarks/failure-driven-engineering-2026-10.md) · [targeted](docs/benchmarks/targeted-engineering-pass-2026-10.md) |
-| **Second validation (held out):** 6 tasks not used during development and never shown to the agent, screened for issue-derivable acceptance tests, run once | **5 of 6** strict `TASK_VERIFIED` and passing the datasets' hidden acceptance tests (hidden from the agent) · **6 of 6** hidden tests pass · all **5** successes local-only: no frontier calls (escalation enabled, not triggered) · **0** false verification passes among the 5 `TASK_VERIFIED` tasks | [report](docs/benchmarks/second-independent-validation-2026-10.md) |
+| Initial validation: 8 public tasks, screened for environment validity only; frozen build | **0/8**, then **1/8** after fixing four BoundedCode defects | [report](docs/benchmarks/small-real-world-validation-2026-10.md) |
+| Engineering on those failures (development evidence, not a validation) | fixes to verification, agent tooling, resource handling, retrieval and execution control | [failure-driven](docs/benchmarks/failure-driven-engineering-2026-10.md) · [targeted](docs/benchmarks/targeted-engineering-pass-2026-10.md) |
+| **Second validation (held out):** 6 tasks not used during development and never shown to the agent, screened for issue-derivable acceptance tests; each run once | **5 of 6** `TASK_VERIFIED` and passing the datasets' hidden acceptance tests · **6 of 6** hidden tests pass · all 5 successes local-only, with no frontier calls · **0** false verification passes among the 5 | [report](docs/benchmarks/second-independent-validation-2026-10.md) |
 
-In a fresh small validation on 6 public engineering tasks not used during
-development and never shown to the agent, whose hidden acceptance criteria
-were screened for consistency with the issue before execution, 5 of the 6
-tasks succeeded, and all 5 successes used only the local model; no task made
-a frontier call.
+The held-out tasks come from SWE-bench Multilingual and Multi-SWE-bench.
+They cover Go, JavaScript, TypeScript, an infrastructure tool and a
+repository of 1.8 M estimated source tokens. The sixth task passed its
+hidden test, but BoundedCode classified it UNVERIFIED because it could not
+link changed test data to its test. It is counted as a failure.
 
-The tasks were selected before execution from the SWE-bench Multilingual and
-Multi-SWE-bench benchmark datasets. They cover Go, JavaScript, TypeScript, an
-infrastructure tool and a repository of 1.8 M estimated source tokens.
-Screening rejected 10 of 24 candidates whose hidden tests could not be
-derived from their issue. There was no human code intervention.
+How to read these numbers:
 
-Context use was roughly 18–35 K tokens per task across repositories of
-0.12–1.83 M estimated source tokens, so the share of the repository that
-entered context depends on repository size: at most about 1.6 % on the
-largest repository, 29.1 % on the smallest (gin). These figures include all
-tool output (files read, search and test output) and are therefore upper
-bounds; source tokens are estimated as bytes × 10/32.
+- **The two validations are not an improvement curve.** Their task sets
+  were selected differently, so 0/8 → 5/6 does not measure system
+  improvement.
+- **The sample is small.** 5 of 6 has a 95% interval of about 36–99.6%, and
+  each task ran once.
+- **The held-out set was screened.** Screening removed tasks whose hidden
+  tests could not be derived from the issue, which are failure classes seen
+  in development. Real requests are not screened.
+- **The held-out tasks share repositories with development.** They are new
+  tasks from the same six repositories as the development corpus. They are
+  public issues whose fixes may be in the model's training data.
+- **The run used a non-default setting.** It ran with `task.ambiguity:
+  proceed`. Under the default `ask`, one clear task would have stopped on a
+  false ambiguity flag.
+- **No baseline advantage has been shown.** On a two-task baseline in the
+  first validation, BoundedCode did not improve the same local model's
+  result and was slower.
+- **False passes still occur.** In development runs with the current gate
+  design, 5 tasks were `TASK_VERIFIED` yet failed hidden tests. In most of
+  them the issue allowed another reading, or the hidden test required
+  details the issue did not state.
 
-The 0 false verification passes covers the 5 `TASK_VERIFIED` tasks, on a task
-set screened for issue-derivable tests. In development runs with the same
-gate design, tasks were `TASK_VERIFIED` but failed hidden tests: 3 in the
-final failure-driven run, where the issue allowed another reading or the
-hidden test required details the issue did not state
-([§C](docs/benchmarks/failure-driven-engineering-2026-10.md#c-verification-why-false-passes-happened-what-prevents-them-now)),
-and 2 in the targeted pass's development checks, one on another valid reading
-and one whose only evidence was a test that does not compile on the base
-([verification honesty](docs/benchmarks/targeted-engineering-pass-2026-10.md#verification-honesty-in-the-development-checks)).
-
-<details>
-<summary><b>Why 5/6 and not 6/6?</b></summary>
-
-<br>
-
-The sixth task (Prometheus) was implemented so that its hidden acceptance
-test passed. BoundedCode still classified it **UNVERIFIED**: its
-evidence checker did not associate the modified data-driven test file
-(`promql/testdata/functions.test`) with the Go test function that reads it.
-The official score stays **5 of 6**; 6 of 6 hidden acceptance tests passed.
-A verifier that withholds `TASK_VERIFIED` when it cannot show fail-before/
-pass-after evidence is behaving as intended. After this validation, the
-checker was changed to attribute changed test data to the Go package whose
-tests read it (released in v0.1.0-alpha.3; covered by unit tests, not yet
-re-validated on real tasks).
-
-</details>
-
-> This is a small practical validation sample, not a statistically
-> comprehensive evaluation.
-
-### Why the two validations are not an improvement curve
-
-The second set was screened for acceptance tests derivable from the issue;
-the first set was screened for environment validity only, and three of its
-tasks failed on identifiers that only the reference solution introduces. The
-first set also had a "difficult" slot (a multi-file reference patch); the
-second did not. The second validation ran with `task.ambiguity: proceed`, not
-the default `ask`. On the development tasks, the candidate build's checks
-before the freeze passed 0 of 2 (0 of 3 runs), per the
-[targeted engineering pass](docs/benchmarks/targeted-engineering-pass-2026-10.md#development-regression-result).
-Therefore 0/8 → 5/6 does not measure system improvement; each result stands
-on its own, with its own scope.
+The [evaluation overview](docs/benchmarks/README.md) gives the full method,
+the caveats and the raw data.
 
 ## How it works
 
 ```mermaid
 flowchart LR
-    U([Task request<br/>bcode chat or CLI]) --> CP[BoundedCode<br/>Go control plane]
-    CP <--> L[(Task ledger<br/>SQLite)]
-    CP --> C{Task contract:<br/>ambiguous?}
-    C -->|yes| Q([Asks you to clarify])
-    C -->|no| P[Context planner<br/>bounded pack]
-    CM[codebase-memory-mcp<br/>repository breadth] --- P
-    SE[Serena + LSP, optional<br/>semantic depth] --- P
-    P --> A[OpenHands agent<br/>network-less container]
-    A <-->|model calls over stdio| G[Model gateway<br/>in the control plane]
-    G <--> M[llama.cpp<br/>local model, default]
-    G <-.-> K[Cloud API, optional<br/>OpenAI · Anthropic · Gemini]
+    U([Your request]) --> CP[Control plane<br/>Go, task ledger]
+    CP --> P[Bounded context pack]
+    P --> A[OpenHands agent<br/>container, no network]
+    A <-->|model calls over stdio| G[Model gateway<br/>on the host]
+    G <--> M[llama.cpp local model<br/>or a cloud API]
     A --> W[Git worktree<br/>agent/task-id]
-    W --> V{Verification<br/>targeted, then full,<br/>in the sandbox}
-    V -->|failed: retry pack| P
-    V -->|budget exhausted| B([Blocked<br/>task resume])
-    V -->|passed| X{Affected cross-repo<br/>links compatible?<br/>experimental}
-    X -->|broken: retry pack| P
-    X -->|untested, after one request<br/>for a test that exercises it| R2
-    X -->|compatible or none| E{A test demonstrates<br/>the change?}
-    E -->|no: ask once for one| P
-    E -->|yes| R([task_verified<br/>branch ready for review])
-    E -->|still no| R2([tests_green<br/>UNVERIFIED, review first])
-    CP -.->|policy: Z1 design risk,<br/>Z2 repeated failures,<br/>Z3 pre-merge review| F[Frontier advisor<br/>Codex CLI or manual]
-    F -.->|advice in the next pack| P
+    W --> V{Checks pass<br/>in the sandbox?}
+    V -->|no: retry| P
+    V -->|yes| E{A changed test fails<br/>on the base and<br/>passes on the change?}
+    E -->|no: ask once| P
+    E -->|yes| R([TASK_VERIFIED<br/>branch for review])
+    E -->|still no| R2([tests_green<br/>UNVERIFIED])
 ```
 
-Each attempt gets a bounded context pack; the agent has only terminal,
-file-edit and task-tracker tools, and its model calls go back over stdio to
-the gateway, so the container needs no network. Before verification the
-control plane checks the worktree's integrity and commits a checkpoint. A
-passing change that touches a cross-service contract without updating the
-other side gets one more round to check it. In multi-repository tasks, the
-affected gRPC, protobuf and OpenAPI links must also be shown compatible by
-the repositories' own checks against each other's candidate commits
-(experimental), and frontier escalation also
-runs when you ask for it (Z4). A task that runs out of attempts, tokens or
-time is blocked, not failed: `task resume` continues it.
-
-| Layer | Role |
-|---|---|
-| **`bcode` chat / CLI** | Interactive chat and views (experimental) or plain commands, over the same operations |
-| **Go control plane** | Orchestrates tasks, budgets, retries and escalation policy |
-| **codebase-memory-mcp** | Repository breadth: code graph, impact, search |
-| **Serena / LSP** (optional) | Semantic depth: definitions, references, implementations |
-| **Context planner** | Builds small task-specific packs |
-| **OpenHands SDK** | Agent runtime, in a sandboxed container |
-| **Model gateway** | Carries the agent's model calls to the local model or a cloud API; metering, budgets, API keys |
-| **llama.cpp + local model**, or a cloud API | Reasoning and editing (local by default) |
-| **Verification engine** | Build, lint and tests in the sandbox, a secret scan of the diff on the host, and behavioural evidence |
-| **Task ledger** | Persistent state and audit log; resume anywhere |
-| **Frontier gate** | Optional escalation when the policy triggers or you ask; advice goes into the next pack |
+The [verification guide](docs/usage/verification.md#task-flow) has the
+full flow, including:
+- ambiguity checks on the request;
+- cross-repository compatibility;
+- budgets and resume;
+- frontier escalation.
 
 ### What BoundedCode implements vs. what it integrates
 
-BoundedCode is the control plane around existing tools. The model, the agent
-loop, code indexing and language servers come from upstream projects, used
-unmodified as separate processes or pinned dependencies (no forks, no
-vendored source).
+The model, the agent loop, code indexing and language servers come from
+upstream projects. They are used unmodified, as separate processes or
+pinned dependencies (no forks, no vendored source).
 
 **Implemented in this repository** (Go, plus a small Python adapter):
 
@@ -204,6 +251,7 @@ vendored source).
 | Context planner and ranked retrieval seeds | `internal/contextplan` |
 | Strategy governor (runaway control) and task contract (ambiguity handling) | `internal/orchestrator`, `internal/task` |
 | Verification engine and behavioural-evidence gate | `internal/verify` |
+| Cross-repository compatibility gate (experimental) | `internal/compat` |
 | Sandbox setup, secret masking, command and path policy | `internal/sandbox`, `internal/policy` |
 | Git worktree management and tamper checks | `internal/gitops` |
 | Cross-service contract analysis (HTTP, OpenAPI, gRPC, protobuf, SQL, topics, env, Terraform) | `internal/xservice` |
@@ -230,246 +278,50 @@ vendored source).
 | [Codex CLI](https://github.com/openai/codex) (optional) | Frontier escalation | External `codex exec` process, run in its own container |
 | Go libraries: cobra, yaml, modernc.org/sqlite | CLI, config, embedded database | Go module dependencies |
 
-Version pins and update policy:
-[upstream components](docs/architecture/upstream-components.md).
-
 More detail:
-[system architecture](docs/architecture/system-architecture.md) ·
-[product spec](docs/product-spec.md) ·
-[implementation status](docs/development/status.md) ·
-[ADRs](docs/architecture/adr/)
+- [system architecture](docs/architecture/system-architecture.md)
+- [upstream components and pins](docs/architecture/upstream-components.md)
+- [ADRs](docs/architecture/adr/)
 
-## Quick start
+### How it differs from a general-purpose coding agent
 
-### Install and run (one command)
+BoundedCode makes no claim to generate better code than the agent and
+model it runs. The editing is done by OpenHands and the model you choose.
+What it adds sits around that loop:
 
-Linux and macOS:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/akynte/boundedcode/main/scripts/install.sh | bash
-cd ~/src/my-service     # any git repository
-bcode
-```
-
-Windows (PowerShell):
-
-```powershell
-irm https://raw.githubusercontent.com/akynte/boundedcode/main/scripts/install.ps1 | iex
-cd $HOME\src\my-service
-bcode
-```
-
-`install.sh` puts `boundedcode` and its short name `bcode` in `~/.local/bin`.
-It uses a checksum-verified release binary when the release ships one, and
-otherwise builds from source with Go. `install.ps1` installs the
-checksum-verified release binary into
-`%LOCALAPPDATA%\Programs\BoundedCode\bin` and adds it to your user PATH.
-Releases ship binaries for Linux, macOS and Windows (amd64 and arm64); the
-macOS and Windows binaries have not yet been run on those systems. `bcode` opens a chat for the repository
-you are in. On the first run it checks the prerequisites and offers to install
-what is missing: tools, llama.cpp, the model weights and the Docker sandbox.
-It asks before every download or build. After that, describe a change and it
-runs as a task. See [the terminal interface](docs/usage/tui.md).
-
-You need git and a container engine (Docker, Podman, or Docker Desktop on
-macOS and Windows). For local inference, set-up recommends a model that fits
-this machine's memory and GPU (NVIDIA with CUDA, Apple Silicon with Metal,
-or CPU only), and downloads a prebuilt llama.cpp where it does not build one
-(it builds from source on Linux when a compiler and CMake are present).
-Without a capable machine, choose a cloud model API instead. `bcode setup
---check` shows what is missing from the shell. Linux is the validated
-platform; macOS and Windows are experimental (see
-[Known limitations](#known-limitations) and the
-[platform table](docs/usage/getting-started.md#platforms)).
-
-### Manual install
-
-This is the Linux path with a CUDA build of llama.cpp, as on the reference
-machine. On macOS and Windows, build the CLI with `go build` and let
-`bcode setup` install the rest (it downloads the pinned prebuilt tools).
-
-**Prerequisites:**
-- Linux (x86-64 or arm64)
-- Go (see `go.mod`)
-- Git, ripgrep and Docker
-- for GPU inference, an NVIDIA GPU and the CUDA toolkit, to build llama.cpp
-- `uv`, only for Serena
-
-The [getting-started guide](docs/usage/getting-started.md) lists tested
-versions.
-
-```bash
-git clone https://github.com/akynte/boundedcode.git
-cd boundedcode
-make build                                  # ./bin/boundedcode
-./scripts/install-deps.sh ~/.local/bin      # gitleaks + codebase-memory-mcp (checksum-pinned)
-./scripts/build-llama-cpp.sh                # pinned llama.cpp v0.5.0 with CUDA
-
-# Download a model (see "Models"), pinned to a commit and sha256-verified:
-./bin/boundedcode model recommend               # the model that suits this machine
-./bin/boundedcode model fetch qwen3.6-35b-a3b   # into ~/.local/share/boundedcode/models
-
-L=~/.local/share/boundedcode/runtimes/llama.cpp/v0.5.0/bin
-./bin/boundedcode init \
-    --llama-server $L/llama-server --llama-bench $L/llama-bench \
-    --adapter-dir $PWD/adapters/openhands/python
-./bin/boundedcode sandbox build --dir adapters/openhands   # agent sandbox image
-./bin/boundedcode doctor                                   # checks everything above
-```
-
-Run your first task:
-
-```bash
-./bin/boundedcode workspace create demo
-./bin/boundedcode workspace add ~/src/my-service
-./bin/boundedcode index
-./bin/boundedcode task create "Return 404 instead of 500 for unknown users" \
-    -c "go test ./... passes" --run
-./bin/boundedcode task diff <id>        # review the agent/<id> branch like a pull request
-./bin/boundedcode task resume <id>      # after Ctrl-C, a crash or a reboot
-```
-
-Prefer a full-screen interface? `./bin/boundedcode tui` covers all of the above
-and the rest of the CLI: live task activity, diffs, verification, workspaces,
-repository intelligence, the runtime, frontier escalations, stats and
-`doctor`. See [docs/usage/tui.md](docs/usage/tui.md).
-
-> [!TIP]
-> Already running an OpenAI-compatible server? Use
-> `init --external-url http://127.0.0.1:8080` instead of the llama.cpp flags.
-> Run `boundedcode doctor` whenever something fails: it reports missing
-> dependencies with an install hint.
-
-This exact path was tested from a clean clone with an empty home directory
-([record](benchmarks/reports/publication-20261005/fresh-clone-test.md)).
-
-## Models
-
-Model weights are **not** distributed with this project. You download them
-from their publisher and are responsible for complying with each model's
-license.
-
-- **Profiles:** each file in [`configs/models/`](configs/models) pins the
-  upstream source and revision, the file, the license and the llama.cpp
-  settings.
-- **Choice:** `bcode model recommend` rates every profile against this
-  machine's RAM and GPU (a rule of thumb, not a measurement) and proposes one;
-  `bcode model list` shows them all. Only the default is validated; the others
-  are marked experimental until they are benchmarked here.
-- **Download:** `bcode model fetch NAME` downloads at the pinned commit,
-  resumes interrupted downloads, and checks the file against the sha256 in its
-  profile.
-- **Tooling:** `bcode model use NAME` makes a model the default;
-  `boundedcode bench infra --apply` tunes one for your machine.
-
-| Model profiles | Status |
-|---|---|
-| **Validated configuration** | Qwen3.6-35B-A3B, UD-Q4_K_M (Apache-2.0) on llama.cpp v0.5.0 |
-| **Other profiles** | Present, but not part of the validation |
-
-## Cloud models
-
-Instead of a local model, the agent can use a cloud model API:
-
-```bash
-bcode provider use anthropic --model claude-opus-5-5   # or openai, gemini, openai-compatible
-bcode provider key set anthropic                        # prompts without echo
-bcode provider test                                     # one short request
-```
-
-- **Keys** are stored in the OS credential store (Secret Service, macOS
-  Keychain, Windows Credential Manager), or an owner-only file where none
-  exists, never in the configuration file. Only the host-side gateway uses
-  them; the agent's sandbox has no network and never sees a key.
-- **Your code goes to the provider.** With a cloud provider, everything the
-  agent reads (context packs, file contents, command and test output) is sent
-  to that provider, under its data policy. Secrets are masked as with a local
-  model, but repository code is not. Use the local model for code that must
-  not leave the machine.
-- **Cost** is per token. `bcode stats` shows usage per provider, and an
-  estimate when you enter prices (`--input-price`, `--output-price`).
-- **Status:** experimental. The translations are tested against the providers'
-  documented request and response shapes with fake servers, not on real
-  tasks; the validation results above are for the local model only.
-
-See [ADR-0010](docs/architecture/adr/0010-cloud-model-providers.md) and the
-[configuration reference](docs/usage/configuration.md#model-provider).
-
-## Frontier escalation (optional)
-
-BoundedCode runs **fully local without any frontier account**. Escalation is
-off by default. If you enable it:
-
-```text
-local model first ──> escalation policy (Z1-Z4) ──> frontier only when the policy triggers
-```
-
-The policy triggers on repeated failures, rejected strategies, architectural
-risk or a high-risk review.
-
-- **Routes:** the Codex CLI with a ChatGPT subscription sign-in, or a manual
-  mode that writes the packet to disk for you to answer.
-- **No API keys for the frontier:** escalation uses only the Codex
-  subscription sign-in (the agent's cloud provider is a separate setting).
-- **Packets:** sanitized (host paths, secrets), and each one needs approval
-  unless pre-approved.
-
-Escalation was enabled but not triggered in the second validation. In the
-first validation, 4 frontier calls were sent and none of the tasks that made
-them was accepted
-([report](docs/benchmarks/small-real-world-validation-2026-10.md#answers)).
-See [ADR-0009](docs/architecture/adr/0009-frontier-escalation.md).
+- **Done means evidence.** A task is done when the checks pass and a test
+  shows the change, not when the model says it is finished. Tasks without
+  that evidence are labelled as such.
+- **Containment by default.** There is no network in the sandbox, secrets
+  are masked, a command policy applies to verification, and host git is
+  hardened.
+- **Long-running work.** Tasks have budgets, a resumable ledger and runaway
+  control.
+- **Context that does not grow with the repository.** The agent starts from
+  a bounded pack instead of a repository dump.
 
 ## Verification
 
 | State | Meaning |
 |---|---|
 | **builds** | It compiles and lints. |
-| **`tests_green`** | The repository's checks pass. Not enough on its own: in the initial validation, patches that changed nothing passed existing tests. |
-| **`TASK_VERIFIED`** | Checks pass **and** there is behavioural evidence: a test the change adds or modifies (test code or test data) **fails on the base commit with the changed tests, does not fail there without them, and passes with the change** (for Go, each such test is also run on the change and must pass rather than skip, unreleased as of v0.1.0-alpha.4; for other languages, the whole test stage must pass). In a multi-repository task, every gRPC, protobuf or OpenAPI link that the change affects must also be `compatible` (see below). |
+| **`tests_green`** | The repository's checks pass. Not enough on its own. |
+| **`TASK_VERIFIED`** | The checks pass **and** a test the change adds or modifies (test code or test data) **fails on the base commit with the changed tests, does not fail there without them, and passes with the change**. In a multi-repository task, every gRPC, protobuf or OpenAPI link the change affects must also be shown `compatible` (experimental). |
 
-- **Missing evidence:** the agent is asked once for a reproduction test.
-  Without one, the task ends `tests_green` (UNVERIFIED) and is never presented
-  as a verified merge candidate.
-- **Cross-repository compatibility (experimental):** in a multi-repository
-  task, each gRPC, protobuf or OpenAPI link that the change affects gets a
-  result: `compatible`, `broken` or `untested`, tied to exact commits. The
-  dependent repository's own checks run in the sandbox against the other
-  repositories' candidate commits. Coverage, or a run with the OpenAPI
-  operation removed, must show that the checks execute the link. A broken
-  link fails verification and is retried. An untested one withholds
-  `TASK_VERIFIED`. The report is shown by `task status`, `verify --full` and
-  the TUI's Verification tab. Supported for Go sides only
-  ([design and limits](docs/design/cross-repo-compatibility.md)).
-- **Gate integrity:** the verification config is read from the base commit,
-  so the agent cannot change which stages run. It can still edit tests and
-  build scripts in its worktree; only review catches an adversarial change
-  there (see the sandbox's [residual risks](docs/design/sandbox.md#residual-risks-known-accepted-for-now)).
+Main limits:
+- **Comparison granularity.** Go is compared per test function. Other
+  languages are compared per test where the runner names its failures, and
+  otherwise per stage.
+- **Single runs.** Each evidence run happens once, so a flaky test can count.
+- **New API.** A Go test that does not compile on the base is rejected as
+  evidence. A Python or JavaScript test that fails on the base only because
+  new API is missing currently counts.
+- **Editable tests and build scripts.** The agent can edit tests and build
+  scripts in its worktree. The checks catch mistakes; an adversarial change
+  needs review.
 
-A changed Go test that does not compile on the base (it calls code the
-change adds) shows that the API exists, not that it behaves as asked, so it is
-not evidence; nor is a stage that times out on the base. For other languages
-this is only detected when the whole stage fails to load: a Python or
-JavaScript test that fails on the base only because a function or module the
-change adds is missing (`AttributeError`, `ModuleNotFoundError`,
-`TypeError: … is not a function`) currently counts as evidence.
-
-This is not formal verification. Known limits:
-- Go failures are compared per test function; other languages per test
-  where the runner names its failures (pytest, unittest, cargo, Maven,
-  Gradle, RSpec, minitest, PHPUnit, CTest, Meson), otherwise per stage (the
-  stage must fail with the changed tests and pass without them; JavaScript
-  is always per stage);
-- each run happens once: a flaky test that happens to fail on the base can
-  count as evidence;
-- a change that only adds new API needs a test that also runs on the
-  original code, or it ends `tests_green` (Go; see above for other
-  languages);
-- a custom Go stage in `.boundedcode/verification.yaml` is treated as a
-  non-Go stage unless its first `requires` entry is `go.mod`;
-- a test can only demonstrate the reading of a request that the agent chose,
-  and a deliberately adversarial test (one that detects where it runs) is
-  caught only by review.
+The [verification guide](docs/usage/verification.md) has the full rules,
+the cross-repository gate and every known limit.
 
 ## Security
 
@@ -478,10 +330,10 @@ example by prompt injection in repository content.
 
 | Control | Mechanism |
 |---|---|
-| Sandbox | Agent tools run in a container with no network (unless you set `sandbox.network: bridge`). The host paths it can write are the task worktree and BoundedCode's per-task state for it (git admin dir, caches); there is no host home, SSH agent or credentials. |
-| Secrets | `.env*`, keys, cloud credentials and kubeconfigs in the worktree are masked in the sandbox and denied by path policy. The repository's git object store and `.git/config` are mounted read-only, so a secret **committed to git history**, or a credential embedded in a remote URL, is still readable by the agent. |
-| Protected paths | Changes to `.boundedcode/`, `.github/workflows/`, `.gitlab-ci.yml`, `.gitmodules` or CODEOWNERS fail verification (other CI systems' files are not protected). |
-| Git integrity | Worktree pointers, admin dirs and `HEAD` are verified before host git touches them, and a nested git repository in the worktree is refused (unreleased). Nothing is pushed. |
+| Sandbox | Agent tools run in a container with no network, unless you set `sandbox.network: bridge`. The host paths it can write are the task worktree and BoundedCode's per-task state for it (git admin dir, caches). There is no host home, SSH agent or credentials. |
+| Secrets | `.env*`, keys, cloud credentials and kubeconfigs in the worktree are masked in the sandbox and denied by path policy. The repository's git object store and `.git/config` are mounted read-only. A secret **committed to git history** is still readable by the agent, and so is a credential embedded in a remote URL. |
+| Protected paths | Changes to `.boundedcode/`, `.github/workflows/`, `.gitlab-ci.yml`, `.gitmodules` or CODEOWNERS fail verification. Other CI systems' files are not protected. |
+| Git integrity | Worktree pointers, admin dirs and `HEAD` are verified before host git touches them. A nested git repository in the worktree is refused (unreleased). Nothing is pushed. |
 | Command policy | A deterministic policy blocks push, destructive and deploy commands in verification. |
 | Host reads | Context building never follows symlinks out of a worktree. |
 | Frontier | Packets are sanitized, and the gate fails closed. |
@@ -492,91 +344,102 @@ example by prompt injection in repository content.
 > production credentials are reachable. See [SECURITY.md](SECURITY.md) and the
 > [sandbox design and residual risks](docs/design/sandbox.md).
 
+## Models, cloud providers and frontier escalation
+
+**Local models.**
+- Weights are **not** distributed with this project. You download them from
+  their publisher and are responsible for complying with each model's
+  license.
+- Each profile in [`configs/models/`](configs/models) pins the source,
+  revision, file, license and llama.cpp settings.
+- `bcode model recommend` rates the profiles against this machine's RAM and
+  GPU. This is a rule of thumb, not a measurement.
+- `bcode model fetch NAME` downloads a model at the pinned commit and checks
+  its sha256.
+- Only Qwen3.6-35B-A3B (UD-Q4_K_M, Apache-2.0) on llama.cpp v0.5.0 is
+  validated; the other profiles are untested.
+
+**Cloud models (experimental).**
+
+```bash
+bcode provider use anthropic --model claude-opus-5-5   # or openai, gemini, openai-compatible
+bcode provider key set anthropic                        # prompts without echo
+bcode provider test                                     # one short request
+```
+
+- **Keys** are stored in the OS credential store, or in an owner-only file
+  where there is none. They are never in the configuration file. Only the
+  host-side gateway uses them.
+- **Your code goes to the provider.** With a cloud provider, everything the
+  agent reads (context packs, file contents, command and test output) is
+  sent to that provider. Secrets are masked; repository code is not.
+- **Cost** is per token. `bcode stats` shows usage per provider.
+- **Status:** the request and response translations are tested with fake
+  servers against the providers' documented formats, not on real tasks.
+
+See [ADR-0010](docs/architecture/adr/0010-cloud-model-providers.md) and the
+[configuration reference](docs/usage/configuration.md#model-provider).
+
+**Frontier escalation (optional, off by default).**
+- When the policy triggers (repeated failures, rejected strategies,
+  architectural risk, a high-risk review) or you ask, a sanitized packet goes
+  to a frontier model for advice. The advice goes into the agent's next
+  context pack.
+- Routes: the Codex CLI with a ChatGPT subscription sign-in, run in its own
+  container, or a manual mode that writes the packet to disk. API keys are
+  not used for this.
+- Each packet needs approval unless pre-approved.
+- **Status: unproven.** It was enabled but not triggered in the second
+  validation. In the first validation, 4 frontier calls were sent and none
+  of the tasks that made them was accepted.
+
+See [ADR-0009](docs/architecture/adr/0009-frontier-escalation.md).
+
 ## Known limitations
 
-1. **Small validation sample.** 8 + 6 public tasks, each run once. The second
-   set was screened for issue-derivable tests; real requests are not. The
-   screen rejects the failure classes seen in development (tests needing
-   names only the reference fix introduces, issues allowing several
-   outcomes). The held-out tasks are new tasks, but from the same six
-   repositories as the development corpus, and they are public issues
-   whose fixes may be in the model's training data. The candidate list and
-   screening first appear in git together with the frozen build, so the
-   order "selection rule before screening" is stated, not provable from
-   history. 5 of 6 is uncertain: its exact (Clopper-Pearson)
-   95% interval is about 36–99.6%.
-2. **Ambiguity detection is imperfect.** The task contract is derived by the
-   local model. It has flagged a clear request as ambiguous and misnamed real
-   alternatives. The second validation ran with `task.ambiguity: proceed`,
-   not the default `ask`; under the default, one clear task (vue) would have
-   stopped on a false ambiguity flag. Since then, a material ambiguity is
-   checked against the request text before it can stop a task: a second
-   local-model call quotes the request, and the ambiguity is dropped when a
-   quote that settles it occurs in the request, or when fewer than two of
-   its readings have a supporting quote there. This check, and the retry of
-   a contract that names nothing required, have unit tests with scripted
-   model replies only; they have not been run on real tasks.
-3. **New models, cloud providers and platforms are unmeasured.** Only
-   Qwen3.6-35B-A3B on the reference machine (Linux) is benchmarked. The other
-   model profiles and the cloud providers work but their quality on
-   BoundedCode tasks is unknown, and model fit is a rule of thumb. macOS and
-   Windows build and vet in CI, but their unit tests do not pass there yet
-   (CI at fa36de7: 5 of 32 test packages fail on macOS, 14 of 32 on
-   Windows; the failures sampled in the readiness audit are mostly test
-   assumptions about paths and Docker, but they are not fully triaged),
-   and the full flow has not been run on a Mac or a Windows machine.
-4. **Recent evidence-check changes are not yet validated.** Data-driven
-   test files are now attributed to the Go package that reads them, and
-   Go tests that only fail to compile on the base no longer count. Both
-   changes shipped in v0.1.0-alpha.3 and are covered by unit tests only;
-   non-Go stages are compared per stage unless the runner names its failures.
-5. **Frontier escalation is unproven.** It was enabled but not triggered in
-   the second validation; in the first, 4 frontier calls were sent and none
-   of the tasks that made them was accepted.
+1. **Small, screened validation.** 8 + 6 public tasks, each run once, on one
+   machine with one model. See [Results](#results) and the
+   [evaluation overview](docs/benchmarks/README.md#what-limits-these-results)
+   for how the held-out set was screened and what that means.
+2. **Ambiguity detection is imperfect.**
+   - The task contract is derived by the local model. It has flagged a
+     clear request as ambiguous and misnamed real alternatives.
+   - A material ambiguity is now checked against the request text before
+     it can stop a task. That check, and the retry of a contract that names
+     nothing required, have unit tests with scripted model replies only.
+3. **New models, cloud providers and platforms are unmeasured.**
+   - Only Qwen3.6-35B-A3B on the reference machine (Linux) is benchmarked.
+   - macOS and Windows build and vet in CI, but their unit tests do not
+     pass there yet. CI at fa36de7: 5 of 32 test packages fail on macOS and
+     14 of 32 on Windows, mostly from test assumptions about paths and
+     Docker; the failures are not fully triaged.
+   - The full flow has not been run on a Mac or a Windows machine.
+4. **Verification has known gaps.**
+   - Single runs.
+   - New API in dynamic languages.
+   - Changed test data is attributed to whole packages or stages.
+   - Evidence-check changes since the held-out validation are covered by
+     unit tests only.
+   - See the [verification guide](docs/usage/verification.md#known-limits).
+5. **Frontier escalation is unproven** (see above).
 6. **The strategy governor** bounded runaway generation in development runs,
    but did not trigger during the held-out validation.
-7. **Cross-repository compatibility covers a narrow set of cases.** The gate
-   checks gRPC/protobuf sides written in Go (single module at the
-   repository root, a `go test` stage, generated code committed in a task
-   repository). It checks OpenAPI sides whose tests read the specification.
-   Every other shape is reported `untested`, which withholds
-   `TASK_VERIFIED`. It never runs a client against the real server. It is
-   tested on fixtures only, not on real tasks.
-8. **No baseline advantage shown.** On the two-task baseline in the first
-   validation, BoundedCode did not improve the same local model's result and
-   was slower on those tasks; no baseline was run on the held-out set
+7. **Cross-repository compatibility covers a narrow set of cases.**
+   - It covers Go gRPC/protobuf sides, and OpenAPI sides whose tests read
+     the specification.
+   - Every other shape is reported `untested`, which withholds
+     `TASK_VERIFIED`.
+   - It is tested on fixtures only.
+8. **No baseline advantage shown.** BoundedCode did not improve the same
+   model's result on a two-task baseline, and no baseline was run on the
+   held-out set
    ([baseline comparison](benchmarks/reports/small-real-world-validation-20261004/baseline-comparison.md)).
-
-<details>
-<summary>Smaller limitations</summary>
-
-<br>
-
-- Terminal only (the CLI and the full-screen `bcode` interface); there is
-  no daemon or GUI.
-- Verification runs offline, so a project's dependencies must already be
-  installed: in the checkout (`node_modules`, `.venv`, `vendor`) or in this
-  machine's package caches (Go, Cargo, Maven, Gradle). Built-in presets
-  cover Go, JavaScript/TypeScript, Python, Rust, Java (Maven, Gradle),
-  C/C++ (CMake, Meson, Autotools, Make), Ruby and PHP without configuration;
-  other languages run the Makefile's `test`/`check` target, or say that no
-  test runner was found
-  ([reference](docs/usage/configuration.md#built-in-presets)).
-
-</details>
-
-## How this was built
-
-I designed the architecture, the threat model, the verification model and
-the evaluation protocol, and made the release and scope decisions.
-Implementation, test runs and first drafts of the reports were produced with
-heavy use of AI coding agents, under that design and review. The validation
-reports, errata and failures are published with their results unedited,
-including results that did not support a release.
+9. **Terminal only.** There is the CLI and the full-screen `bcode`
+   interface, but no daemon or GUI.
 
 ## Reference hardware
 
-**Tested configuration, not a minimum requirement:**
+The tested configuration below is not a minimum requirement:
 
 | Component | Tested configuration |
 |---|---|
@@ -587,15 +450,18 @@ including results that did not support a release.
 | OS | Debian 13 |
 | Model | Qwen3.6-35B-A3B, UD-Q4_K_M, 131 K context, MoE experts partly on CPU |
 
-During validation the model server used up to 28.6 GiB (29,310 MiB) of RAM, and
-BoundedCode itself under 70 MiB. No minimum requirement has been measured.
-Smaller machines may work with smaller models or contexts, but this is
-untested.
+During validation the model server used up to 28.6 GiB (29,310 MiB) of RAM,
+and BoundedCode itself used under 70 MiB. No minimum requirement has been
+measured.
 
-Earlier development benchmarks (decode speed, an 11-task synthetic suite,
-kill/resume and cross-service ablations) are in
-[benchmarks/reports/](benchmarks/reports/) and the
-[model evaluation](docs/design/model-evaluation.md).
+## How this was built
+
+I designed the architecture, the threat model, the verification model and
+the evaluation protocol, and made the release and scope decisions.
+Implementation, test runs and first drafts of the reports were produced with
+heavy use of AI coding agents, under that design and review. The validation
+reports, errata and failures are published with their results unedited,
+including results that did not support a release.
 
 ## Contributing
 

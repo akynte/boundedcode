@@ -140,7 +140,8 @@ on an idle machine:
 ```
 
 The result is a branch `agent/<id>` in each repository, verified by the
-deterministic pipeline. Nothing is pushed or merged automatically. Review it
+deterministic pipeline (see [Verification](verification.md) for what
+`tests_green` and `TASK_VERIFIED` mean). Nothing is pushed or merged automatically. Review it
 like any pull request, or bring it into your checkout:
 
 ```bash
