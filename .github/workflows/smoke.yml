@@ -1,0 +1,75 @@
+name: smoke
+# Installer and first-run smoke tests (scripts/smoke/). The installer jobs
+# install a binary built from this commit, served as a local release, so
+# they need no published release; the first-task job builds the sandbox
+# image (about 5 GB) and runs a task against a scripted model server.
+on:
+  pull_request:
+    paths: ["scripts/install.sh", "scripts/install.ps1", "scripts/smoke/**", "internal/cli/**", "cmd/**", ".github/workflows/smoke.yml"]
+  push:
+    branches: [main]
+    paths: ["scripts/install.sh", "scripts/install.ps1", "scripts/smoke/**", "internal/cli/**", "cmd/**", ".github/workflows/smoke.yml"]
+  schedule:
+    - cron: "17 5 * * 1" # weekly: also catches changes in the published release and pinned downloads
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  installer-unix:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: installer smoke (local release, pinned tool downloads)
+        env:
+          SMOKE_TOOLS: "1"
+        run: scripts/smoke/install.sh
+      - name: installer smoke (newest published release)
+        env:
+          SMOKE_PUBLISHED: "1"
+        run: scripts/smoke/install.sh
+  installer-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: build a local release
+        shell: pwsh
+        run: |
+          $rel = Join-Path $env:RUNNER_TEMP 'release'
+          $dir = New-Item -ItemType Directory -Force (Join-Path $rel 'v0.0.0-smoke')
+          $exe = Join-Path $dir 'boundedcode-windows-amd64.exe'
+          $env:CGO_ENABLED = '0'
+          go build -trimpath -o $exe ./cmd/boundedcode
+          "$((Get-FileHash $exe).Hash.ToLower())  boundedcode-windows-amd64.exe" | Set-Content -NoNewline (Join-Path $dir 'SHA256SUMS')
+          "RELEASE=$rel" | Out-File -Append $env:GITHUB_ENV
+      - name: installer smoke (PowerShell 7)
+        shell: pwsh
+        run: ./scripts/smoke/install.ps1 -Release $env:RELEASE
+  first-task:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: build
+        run: make build
+      - name: sandbox image
+        env:
+          BOUNDEDCODE_HOME: ${{ runner.temp }}/bc-image-home
+        run: |
+          bin/boundedcode setup --only config --yes
+          bin/boundedcode setup --only sandbox --yes
+      - name: first-task smoke (scripted model, Docker sandbox)
+        run: scripts/smoke/first-task.sh "$PWD/bin/boundedcode"

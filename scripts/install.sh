@@ -14,12 +14,22 @@
 #      BC_BIN_DIR   install directory (default: ~/.local/bin)
 #      BC_REPO      GitHub repository (default: akynte/boundedcode)
 #      BC_GIT_URL   git URL to build from (default: the GitHub repository)
+#      BC_DOWNLOAD_BASE  where release assets are fetched from, as
+#                   BASE/TAG/ASSET (default: the GitHub releases; a mirror
+#                   or a file:// directory works too). SHA256SUMS comes from
+#                   the same place, so use only a mirror you trust.
+#      BC_FORCE=1   replace a `boundedcode` or `bcode` in BC_BIN_DIR that is
+#                   not BoundedCode (refused by default)
+#
+# Re-running it upgrades in place. It never needs root and writes only to
+# BC_BIN_DIR and a temporary directory it removes on exit.
 set -euo pipefail
 
 REPO="${BC_REPO:-akynte/boundedcode}"
 GIT_URL="${BC_GIT_URL:-https://github.com/$REPO.git}"
 BIN_DIR="${BC_BIN_DIR:-$HOME/.local/bin}"
 VERSION="${BC_VERSION:-}"
+DOWNLOAD_BASE="${BC_DOWNLOAD_BASE:-https://github.com/$REPO/releases/download}"
 
 say() { printf '\033[1;35m◆\033[0m %s\n' "$*"; }
 die() { printf '\033[1;31m✘\033[0m %s\n' "$*" >&2; exit 1; }
@@ -47,8 +57,9 @@ trap 'rm -rf "$tmp"' EXIT
 # try_release TAG: download and verify the release binary; fails quietly
 # when the release has none.
 try_release() {
-  local base="https://github.com/$REPO/releases/download/$1"
+  local base="$DOWNLOAD_BASE/$1"
   curl -fsSL -o "$tmp/$ASSET" "$base/$ASSET" 2>/dev/null || return 1
+  say "fetched $base/$ASSET"
   curl -fsSL -o "$tmp/SHA256SUMS" "$base/SHA256SUMS" 2>/dev/null || die "release $1 has no SHA256SUMS; refusing an unverified binary"
   line="$(grep " $ASSET\$" "$tmp/SHA256SUMS" || true)"
   [ -n "$line" ] || die "release $1 lists no checksum for $ASSET"
@@ -77,6 +88,12 @@ else
   # Newest release (pre-releases included) that ships a binary, else main.
   tags="$(curl -fsSL "https://api.github.com/repos/$REPO/releases?per_page=10" 2>/dev/null \
     | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' || true)"
+  if [ -z "$tags" ]; then
+    # The API allows 60 unauthenticated requests an hour; the feed is not
+    # rate-limited the same way.
+    tags="$(curl -fsSL "https://github.com/$REPO/releases.atom" 2>/dev/null \
+      | sed -n 's#.*/releases/tag/\([^"<]*\)".*#\1#p' || true)"
+  fi
   installed=""
   for t in $tags; do
     if try_release "$t"; then installed=1; break; fi
@@ -85,13 +102,37 @@ else
 fi
 
 mkdir -p "$BIN_DIR"
-install -m 0755 "$tmp/$ASSET" "$BIN_DIR/boundedcode"
-ln -sf boundedcode "$BIN_DIR/bcode"
+# Never replace someone else's program of the same name.
+if [ -z "${BC_FORCE:-}" ]; then
+  # Recognised by the module path in the binary; the file is not run.
+  if [ -e "$BIN_DIR/boundedcode" ] && ! LC_ALL=C grep -qa 'github.com/akynte/boundedcode' "$BIN_DIR/boundedcode"; then
+    die "$BIN_DIR/boundedcode exists and is not BoundedCode; move it, or set BC_FORCE=1 to replace it."
+  fi
+  if [ -e "$BIN_DIR/bcode" ] || [ -L "$BIN_DIR/bcode" ]; then
+    [ "$(readlink "$BIN_DIR/bcode" 2>/dev/null || true)" = boundedcode ] \
+      || die "$BIN_DIR/bcode exists and is not a link to BoundedCode; move it, or set BC_FORCE=1 to replace it."
+  fi
+fi
+# Copy next to the target, then rename: an interrupted install never leaves
+# a half-written binary.
+install -m 0755 "$tmp/$ASSET" "$BIN_DIR/.boundedcode.new"
+mv -f "$BIN_DIR/.boundedcode.new" "$BIN_DIR/boundedcode"
+ln -sfn boundedcode "$BIN_DIR/bcode"
 say "installed $("$BIN_DIR/boundedcode" version) to $BIN_DIR (boundedcode, bcode)"
 
 case ":$PATH:" in
-  *":$BIN_DIR:"*) ;;
-  *) printf '\n  %s is not on your PATH. Add it, e.g.:\n    echo '"'"'export PATH="%s:$PATH"'"'"' >> ~/.bashrc && source ~/.bashrc\n' "$BIN_DIR" "$BIN_DIR" ;;
+  *":$BIN_DIR:"*)
+    found="$(command -v bcode 2>/dev/null || true)"
+    if [ -n "$found" ] && [ "$found" != "$BIN_DIR/bcode" ]; then
+      printf '\n  Warning: `bcode` on your PATH is %s, not %s.\n  Use %s/bcode, or put %s earlier on your PATH.\n' "$found" "$BIN_DIR/bcode" "$BIN_DIR" "$BIN_DIR"
+    fi ;;
+  *)
+    case "${SHELL:-}" in
+      */zsh) rc='~/.zshrc'; line="export PATH=\"$BIN_DIR:\$PATH\"" ;;
+      */fish) rc='~/.config/fish/config.fish'; line="fish_add_path $BIN_DIR" ;;
+      *) rc='~/.bashrc'; line="export PATH=\"$BIN_DIR:\$PATH\"" ;;
+    esac
+    printf '\n  %s is not on your PATH. Add this line to %s and open a new terminal:\n    %s\n' "$BIN_DIR" "$rc" "$line" ;;
 esac
 
 cat <<'EOF'
@@ -100,9 +141,17 @@ cat <<'EOF'
 
     bcode
 
-  The first run checks what is missing (inference server, model, tools,
-  Docker sandbox) and sets it up with your permission. `bcode setup --check`
-  shows the same from the shell.
+  The first run shows what is missing and sets it up with your permission
+  (/setup). From the shell, pick where the model runs:
+
+    local model (llama.cpp; the validated path; the default model is ~22 GB):
+      bcode setup
+    cloud model API (no GPU needed; your code is sent to the provider):
+      bcode provider use NAME --model MODEL   # openai, anthropic, gemini, openai-compatible
+      bcode provider key set NAME
+      bcode setup
+
+  `bcode setup --check` lists what is still missing.
 
 EOF
 printf '  Uninstall: rm %s/{boundedcode,bcode}\n' "$BIN_DIR"

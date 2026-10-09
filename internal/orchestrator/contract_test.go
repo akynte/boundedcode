@@ -2,6 +2,7 @@ package orchestrator
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -9,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/akynte/boundedcode/internal/agent/scripted"
+	"github.com/akynte/boundedcode/internal/inference"
 	"github.com/akynte/boundedcode/internal/task"
 )
 
@@ -436,5 +438,30 @@ func TestIncompleteGroundingKeepsAmbiguityMaterial(t *testing.T) {
 				t.Fatalf("incomplete answer recorded as a result: %+v", c)
 			}
 		})
+	}
+}
+
+// fakeUpstream is a cloud provider's upstream that answers every call with
+// one chat message.
+type fakeUpstream struct{ reply string }
+
+func (f fakeUpstream) Complete(context.Context, map[string]any) (int, []byte, error) {
+	b, _ := json.Marshal(map[string]any{"choices": []any{map[string]any{"message": map[string]any{"role": "assistant", "content": f.reply}}}})
+	return 200, b, nil
+}
+
+func (fakeUpstream) Provider() string { return "openai-compatible" }
+
+// TestContractUsesCloudUpstream: with a cloud provider the gateway has an
+// upstream and no local client; the request-reading calls must use it (they
+// used to fail with "no model client", silently skipping the contract and
+// its ambiguity check).
+func TestContractUsesCloudUpstream(t *testing.T) {
+	r := &Runner{NewGateway: func(string, int) *inference.Gateway {
+		return &inference.Gateway{Model: "m", Upstream: fakeUpstream{reply: `{"required":["x"]}`}}
+	}}
+	got, err := r.chatReader(context.Background(), &task.Task{ID: "t"}, ContractCall{Purpose: ContractCallDerive}, 100, 0)
+	if err != nil || got != `{"required":["x"]}` {
+		t.Fatalf("chatReader = %q, %v", got, err)
 	}
 }

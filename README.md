@@ -116,59 +116,78 @@ final diff (`bcode task diff`) shows the fix (`count > 10` becomes
 
 ## Quick start
 
+**1. Install** the `bcode` command (a checksum-verified release binary; no
+root needed).
+
 Linux and macOS:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/akynte/boundedcode/main/scripts/install.sh | bash
-cd ~/src/my-service     # any git repository
-bcode
 ```
 
 Windows (PowerShell):
 
 ```powershell
 irm https://raw.githubusercontent.com/akynte/boundedcode/main/scripts/install.ps1 | iex
-cd $HOME\src\my-service
-bcode
 ```
 
-The installers download a checksum-verified release binary:
+Each installer puts the binary in one place:
+- `install.sh` puts `boundedcode` and `bcode` in `~/.local/bin`. It builds
+  from source with Go when no release has a binary for your platform.
+- `install.ps1` uses `%LOCALAPPDATA%\Programs\BoundedCode\bin` and adds
+  that folder to your PATH.
 
-- `install.sh` installs `boundedcode` and its short name `bcode` into
-  `~/.local/bin`. It builds from source with Go when no release has a
-  binary for your platform.
-- `install.ps1` installs into `%LOCALAPPDATA%\Programs\BoundedCode\bin` and
-  adds that folder to your PATH.
+Re-running either installer upgrades in place.
 
-On the first run, `bcode` checks the prerequisites and offers to install
-what is missing: tools, llama.cpp, model weights and the sandbox image. It
-asks before every download or build. After that, describe a change in the
-chat and it runs as a task. `bcode setup --check` lists what is missing from
-the shell.
+**2. Choose where the model runs.** Pick one of two paths.
 
-**What you need:**
-- git and a container engine: Docker, Podman, or Docker Desktop on macOS
-  and Windows.
-- For the default local model, a machine like the reference one: an NVIDIA
-  GPU with 8 GB and 32–64 GB of RAM. `bcode model recommend` suggests a
-  model that fits yours.
-- Or a cloud model API instead.
-- The project's dependencies installed, in the checkout or in the package
-  caches: verification runs offline.
+| | Local model (validated) | Cloud model API (experimental) |
+|---|---|---|
+| Commands | `bcode setup` | `bcode provider use NAME --model MODEL`, then `bcode provider key set NAME`, then `bcode setup` |
+| What it downloads | llama.cpp (pinned), the default model (about 22 GB), tools, the sandbox image (about 5 GB) | tools and the sandbox image only |
+| Hardware | the reference machine has an 8 GB NVIDIA GPU and 64 GB of RAM; `bcode model recommend` suggests a model for yours | no GPU needed |
+| Your code | stays on this machine | is sent to the provider |
 
-| Platform | Status |
+`NAME` is `openai`, `anthropic`, `gemini` or `openai-compatible`.
+`bcode setup` asks before every download or build, and steps already done
+are skipped. `bcode setup --check` lists what is still missing.
+
+You also need:
+- git;
+- a container engine: Docker, Podman, or Docker Desktop on macOS and
+  Windows;
+- the project's dependencies installed (`node_modules`, `.venv`, or the Go
+  module cache), because verification runs offline.
+
+**3. Run a first task** in a git repository whose tests pass. The easiest
+way is the chat: run `bcode` there and describe the change. From the plain
+CLI:
+
+```bash
+cd ~/src/my-service
+bcode workspace create my-service && bcode workspace add . && bcode index   # once per repository
+bcode task create "Return 404 instead of 500 for unknown users" -c "go test ./... passes" --run
+bcode task diff <id>        # review the agent/<id> branch; nothing is merged for you
+```
+
+The run ends with one of three results:
+- `verification=task_verified`;
+- `verification=tests_green`: no test demonstrates the change, so review
+  it first;
+- blocked, which `bcode task resume <id>` continues.
+
+[Getting started](docs/usage/getting-started.md#your-first-task) has a
+complete small example with its expected result, plus:
+- the manual install;
+- workspaces and multi-repository tasks;
+- what to do when a step fails.
+
+| Platform | Status ([evidence](docs/public-launch/onboarding-validation.md#platform-compatibility-matrix)) |
 |---|---|
-| Linux (x86-64) | Validated on the reference machine |
-| Linux (arm64) | Builds; not run |
-| macOS (Apple Silicon, Intel) | Experimental: release binaries exist, but the full flow has not been run on a Mac |
-| Windows (x64) | Experimental: release binaries exist, but the full flow has not been run on Windows |
-
-More:
-- [Getting started](docs/usage/getting-started.md): the manual install,
-  workspaces, multi-repository tasks and the plain CLI.
-- [Terminal interface](docs/usage/tui.md): the chat and its views.
-- The manual Linux path was tested from a clean clone with an empty home
-  directory ([record](benchmarks/reports/publication-20261005/fresh-clone-test.md)).
+| Linux x86-64 | **Validated** on the reference machine. The installer and first-run checks also pass in clean Debian 13, Ubuntu 24.04 and Fedora 42 containers. |
+| Linux arm64 | The installer and first-run checks pass under emulation. No task has been run. |
+| macOS (Apple Silicon, Intel) | **Experimental.** Release binaries exist. The installer smoke test is in CI, but the full flow has not been run on a Mac. |
+| Windows (x64) | **Experimental.** Release binaries exist. The installer smoke test is in CI, but the full flow has not been run on Windows. |
 
 ## Results
 

@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -12,6 +11,9 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/akynte/boundedcode/internal/buildinfo"
+	"github.com/akynte/boundedcode/internal/gitops"
+	"github.com/akynte/boundedcode/internal/pathutil"
 	"github.com/akynte/boundedcode/internal/repointel/cbm"
 	"github.com/akynte/boundedcode/internal/store"
 	"github.com/akynte/boundedcode/internal/workspace"
@@ -52,7 +54,31 @@ func (a *App) resolveWorkspace(ctx context.Context, flag string) (workspace.Work
 	if len(all) == 1 {
 		return all[0], nil
 	}
-	return workspace.Workspace{}, errors.New("no workspace selected: pass --workspace or run `workspace use NAME`")
+	// The workspace that holds the repository this command runs in.
+	root := ""
+	if wd, err := os.Getwd(); err == nil {
+		root, _ = gitops.Run(ctx, wd, "rev-parse", "--show-toplevel")
+	}
+	if root != "" {
+		for _, w := range all {
+			repos, err := ws.AllRepos(ctx, w.ID)
+			if err != nil {
+				return workspace.Workspace{}, err
+			}
+			for _, r := range repos {
+				if pathutil.Equal(r.Path, filepath.Clean(root)) {
+					return w, nil
+				}
+			}
+		}
+	}
+	cmd := buildinfo.Command()
+	if len(all) == 0 {
+		return workspace.Workspace{}, fmt.Errorf("no workspace yet. In your repository, run `%s` (the chat sets one up), or: "+
+			"`%s workspace create NAME && %s workspace add . && %s index`", cmd, cmd, cmd, cmd)
+	}
+	return workspace.Workspace{}, fmt.Errorf("no workspace selected: pass --workspace, run `%s workspace use NAME` "+
+		"(`%s workspace list` shows them), or run this in a repository that belongs to one", cmd, cmd)
 }
 
 func (a *App) intel() *cbm.Client {

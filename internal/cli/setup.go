@@ -129,7 +129,8 @@ func setupSteps() []setupStep {
 			Name: "inference", Title: "Local inference server (llama.cpp)",
 			Ask: func(a *App) string {
 				return llamaPlan() + " into " + a.llamaPrefix() +
-					"? (To use a server you already run, set inference.mode: external and inference.external_url in " + a.configFile() + " instead, or choose a cloud provider with /setup.)"
+					"? (To use a server you already run, set inference.mode: external and inference.external_url in " + a.configFile() +
+					" instead. To use a cloud model API instead of a local model, answer no and run `" + buildinfo.Command() + " provider use NAME`; this step and the model download are then skipped.)"
 			},
 			check: func(ctx context.Context, a *App) (bool, string) {
 				c := a.Config.Inference
@@ -145,7 +146,7 @@ func setupSteps() []setupStep {
 				}
 				v, err := llamacpp.Version(ctx, c.ServerBinary)
 				if err != nil {
-					return false, "llama-server not found (" + c.ServerBinary + ")"
+					return false, "llama-server not found (" + c.ServerBinary + "); or use a cloud model API: `" + buildinfo.Command() + " provider use NAME`"
 				}
 				return true, v
 			},
@@ -196,7 +197,7 @@ func setupSteps() []setupStep {
 				path := p.ResolveFile(a.modelsDir())
 				fi, err := os.Stat(path)
 				if err != nil {
-					return false, p.Name + " not downloaded"
+					return false, fmt.Sprintf("%s not downloaded (%s); or use a cloud model API: `%s provider use NAME`", p.Name, formatGB(p.Source.SizeBytes), buildinfo.Command())
 				}
 				return true, fmt.Sprintf("%s (%.1f GiB)", p.Name, float64(fi.Size())/(1<<30))
 			},
@@ -442,15 +443,29 @@ installed under your user directories.`,
 			}
 			if check {
 				st := app.checkSetup(ctx)
-				if app.jsonOut {
-					return app.printJSON(st)
-				}
+				todo := 0
 				for _, s := range st {
-					mark := "ok  "
 					if !s.OK {
-						mark = "todo"
+						todo++
 					}
-					app.printf("[%s] %-48s %s\n", mark, s.Title, s.Detail)
+				}
+				if app.jsonOut {
+					if err := app.printJSON(st); err != nil {
+						return err
+					}
+				} else {
+					for _, s := range st {
+						mark := "ok  "
+						if !s.OK {
+							mark = "todo"
+						}
+						app.printf("[%s] %-48s %s\n", mark, s.Title, s.Detail)
+					}
+				}
+				// A non-zero exit lets scripts and CI tell a complete set-up
+				// from an incomplete one.
+				if todo > 0 {
+					return fmt.Errorf("%d setup step(s) to do: run `%s setup`", todo, buildinfo.Command())
 				}
 				return nil
 			}

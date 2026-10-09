@@ -4,43 +4,71 @@
 
 ## Fast path
 
+**1. Install.**
+
 Linux and macOS:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/akynte/boundedcode/main/scripts/install.sh | bash
-cd ~/src/payment-service     # any git repository
-bcode
 ```
 
 Windows (PowerShell; needs Git for Windows and Docker Desktop):
 
 ```powershell
 irm https://raw.githubusercontent.com/akynte/boundedcode/main/scripts/install.ps1 | iex
-cd $HOME\src\payment-service
-bcode
 ```
 
-macOS and Windows support is new and **has not yet been run on those
-systems**; see [Platforms](#platforms) below.
+Where the installer puts the binary:
+- `install.sh` puts `boundedcode` and `bcode` in `~/.local/bin`. It uses a
+  checksum-verified release binary, or builds with Go when no release has
+  one.
+- `install.ps1` uses `%LOCALAPPDATA%\Programs\BoundedCode\bin` and adds that
+  folder to your user PATH.
 
-The installer puts `boundedcode` and `bcode` in `~/.local/bin`
-(`%LOCALAPPDATA%\Programs\BoundedCode\bin` on Windows), from a
-checksum-verified release binary; `install.sh` builds with Go when no release
-has one.
-On the first run, `bcode` shows what is missing and `/setup` installs it,
-asking before every download or build. It covers what sections 2 and 3 do by
-hand: the configuration, the pinned tools, llama.cpp, the model weights and
-the sandbox image. Run `bcode setup --check` to see the same list from the
-shell. Then describe a change in the chat; see
-[the terminal interface](tui.md). The rest of this page is the manual path,
-and the reference for what setup does.
+Both installers have these properties:
+- They never need administrator rights.
+- They refuse a binary whose checksum does not match the release's
+  `SHA256SUMS`.
+- They replace the program atomically, so re-running one upgrades in place.
+- `install.sh` refuses to overwrite an unrelated `bcode` or `boundedcode` in
+  its target directory (`BC_FORCE=1` overrides).
+
+**2. Choose where the model runs.**
+
+```bash
+# Local model (llama.cpp; the validated path; the default model is about 22 GB):
+bcode setup
+
+# Or a cloud model API (no GPU needed; your code is sent to the provider):
+bcode provider use anthropic --model MODEL   # or openai, gemini, openai-compatible
+bcode provider key set anthropic             # stored in the OS credential store
+bcode provider test                          # one short request
+bcode setup                                  # tools and the sandbox image only
+```
+
+`bcode setup` installs the configuration, the pinned tools, llama.cpp, the
+model weights and the sandbox image. Each item is skipped when it is already
+done or not needed: with a cloud provider, llama.cpp and the model are not
+needed. It asks before every download or build.
+
+`bcode setup --check` lists what is still missing. On `main` (after
+v0.1.0-alpha.4) it also exits non-zero until everything is in place.
+
+The chat (`bcode` in a repository) offers the same set-up through `/setup`;
+see [the terminal interface](tui.md). The rest of this page is the manual
+path, and the reference for what setup does.
+
+**3. Run a first task.** See [Your first task](#your-first-task).
 
 ## Platforms
 
+Observed evidence for each platform is in the
+[platform compatibility matrix](../public-launch/onboarding-validation.md#platform-compatibility-matrix).
+
 | | Linux (x86-64, arm64) | macOS (Apple Silicon, Intel) | Windows (x64) |
 |---|---|---|---|
-| Status | validated on the reference machine (x86-64) | experimental, not yet run on a Mac | experimental, not yet run on Windows |
-| Local inference | llama.cpp built from source (CUDA), or the prebuilt release | prebuilt llama.cpp, Metal on Apple Silicon | prebuilt llama.cpp, CUDA 12.4 with an NVIDIA GPU, else CPU |
+| Status | validated on the reference machine (x86-64); installer and first-run checks pass in clean Debian, Ubuntu and Fedora containers, and for arm64 under emulation | experimental: installer smoke test in CI; the full flow has not been run on a Mac | experimental: installer smoke test in CI; the full flow has not been run on Windows |
+| Local inference | llama.cpp built from source (with CUDA when the CUDA toolkit is installed), else the prebuilt release (CUDA 12.8 with an NVIDIA GPU, else CPU) | prebuilt llama.cpp, Metal on Apple Silicon | prebuilt llama.cpp, CUDA 12.4 with an NVIDIA GPU, else CPU |
 | Sandbox | Docker or Podman | Docker Desktop or Podman machine | Docker Desktop (WSL 2 backend) |
 | Cloud providers | yes | yes | yes |
 | Serena (optional) | yes | yes (an interrupted run can leave language servers running) | not supported yet |
@@ -55,6 +83,97 @@ paths enabled. Configuration, credentials and task data folders get an
 access list for your user only. JavaScript projects whose `node_modules` were
 installed on Windows need Linux dependencies for verification (the stage
 explains how).
+
+## Your first task
+
+This small example uses the bug from the README demo. With a model it takes a
+minute or two, and it needs only Go, which the sandbox image has. Git must
+know who you are (`git config --global user.name "Your Name"` and
+`user.email`) for the first commit.
+
+```bash
+mkdir shop && cd shop && git init -q -b main
+cat > go.mod <<'EOF'
+module example.com/shop
+
+go 1.22
+EOF
+cat > cart.go <<'EOF'
+package shop
+
+// Item is one line of a cart.
+type Item struct {
+	PriceCents int
+	Qty        int
+}
+
+// Total returns the cart total in cents. Orders of 10 or more items get a
+// 10% bulk discount.
+func Total(items []Item) int {
+	sum, count := 0, 0
+	for _, it := range items {
+		sum += it.PriceCents * it.Qty
+		count += it.Qty
+	}
+	if count > 10 {
+		sum = sum * 90 / 100
+	}
+	return sum
+}
+EOF
+cat > cart_test.go <<'EOF'
+package shop
+
+import "testing"
+
+func TestTotalSmallCart(t *testing.T) {
+	if got := Total([]Item{{PriceCents: 100, Qty: 5}}); got != 500 {
+		t.Fatalf("Total = %d, want 500", got)
+	}
+}
+EOF
+git add -A && git commit -qm "shop"
+
+bcode workspace create shop && bcode workspace add . && bcode index
+bcode task create "Orders of exactly 10 items do not get the 10% bulk discount: Total([]Item{{PriceCents: 100, Qty: 10}}) returns 1000 but should be 900." \
+    -c "go test ./... passes" --run
+```
+
+**Expected result.** `go test ./...` already passes on the buggy code. The
+task should end with a line like this:
+
+```text
+task t…: status=completed phase=review verification=task_verified attempts=… tokens=… escalations=0 (…)
+```
+
+`bcode task diff <id>` then shows `count > 10` changed to `count >= 10`,
+plus a new test for 10 items.
+
+If the agent changes the code but adds no test, BoundedCode asks for one
+once. Without a test, the task ends `verification=tests_green`
+(UNVERIFIED).
+
+The result depends on the model, and a model can fail this task. The README
+demo shows the local Qwen3.6-35B-A3B succeeding in 1m43s. The same flow runs
+without a model, with a scripted stand-in, in `scripts/smoke/first-task.sh`.
+
+## When a step fails
+
+| Symptom | Cause and fix |
+|---|---|
+| `bcode: command not found` after installing | `~/.local/bin` is not on your PATH. The installer prints the line to add for your shell. Open a new terminal afterwards. |
+| `install.sh` says an existing `bcode` "is not a link to BoundedCode" | Another program named `bcode` is in the target directory. Move it, or install elsewhere with `BC_BIN_DIR=DIR`. |
+| `checksum mismatch` | The download was corrupted or altered, so nothing was installed. Re-run the installer; if it persists, report it. |
+| `docker is installed but not usable` | Start Docker (Docker Desktop, or `sudo systemctl start docker`). On Linux, also add your user to the `docker` group and log in again. Then run `bcode setup --only sandbox`. |
+| `sandbox image … is not built`, or "needs a rebuild" | Run `bcode setup --only sandbox`. It builds the image locally (about 5 GB) and never pushes it. |
+| `llama-server not found` | Run `bcode setup --only inference`, or use a cloud provider (`bcode provider use NAME`). |
+| llama.cpp built without CUDA despite an NVIDIA GPU | Install the CUDA toolkit, then run `bcode setup --only inference --force`. Without the toolkit, set-up on `main` uses the prebuilt CUDA build. |
+| `no workspace selected` (on `main`: `no workspace yet`) | Run `bcode` in the repository (the chat sets one up), or `bcode workspace create NAME && bcode workspace add . && bcode index`. |
+| `rejected the API key` | Run `bcode provider key set NAME` again; `bcode provider test` checks it. |
+| A task ends `blocked` | It ran out of attempts, tokens or time. `bcode task status <id>` says why; `bcode task resume <id>` continues it. |
+
+`bcode doctor` checks everything at once and prints the fix for each
+failure.
 
 ## 1. Prerequisites
 

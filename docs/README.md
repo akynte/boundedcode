@@ -39,5 +39,6 @@
 | [Release notes](releases/) and [CHANGELOG](../CHANGELOG.md) | What changed, per release |
 | [Implementation status](development/status.md) | What is implemented, experimental or planned |
 | [Readiness audit (2026-10)](public-launch/readiness-audit.md) · [README review](public-launch/readme-review.md) | Evidence-checked findings, fixes and open risks; first-visitor review of the README |
+| [Onboarding validation](public-launch/onboarding-validation.md) | Installation and first-task tests: environments, commands, results, platform matrix |
 | [Licensing](licensing/upstream-license-matrix.md) | Upstream license matrix |
 | [Security policy](../SECURITY.md) · [Contributing](../CONTRIBUTING.md) | Reporting vulnerabilities, development setup |

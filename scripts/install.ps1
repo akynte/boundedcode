@@ -14,12 +14,16 @@
 #                  Windows binary)
 #      BC_BIN_DIR  install folder
 #      BC_REPO     GitHub repository (default: akynte/boundedcode)
+#      BC_DOWNLOAD_BASE  where release assets are fetched from, as
+#                  BASE/TAG/ASSET (default: the GitHub releases). SHA256SUMS
+#                  comes from the same place, so use only a mirror you trust.
 # The script block keeps the strict settings below out of the user's session.
 & {
     $ErrorActionPreference = 'Stop'
     Set-StrictMode -Version Latest
 
     $Repo = if ($env:BC_REPO) { $env:BC_REPO } else { 'akynte/boundedcode' }
+    $DownloadBase = if ($env:BC_DOWNLOAD_BASE) { $env:BC_DOWNLOAD_BASE.TrimEnd('/') } else { "https://github.com/$Repo/releases/download" }
     $BinDir = if ($env:BC_BIN_DIR) { $env:BC_BIN_DIR } else { Join-Path $env:LOCALAPPDATA 'Programs\BoundedCode\bin' }
 
     function Say($msg) { Write-Host "◆ $msg" -ForegroundColor Magenta }
@@ -45,7 +49,7 @@
         # TryRelease downloads and verifies the binary of a release; $false when
         # the release has none.
         function TryRelease($tag) {
-            $base = "https://github.com/$Repo/releases/download/$tag"
+            $base = "$DownloadBase/$tag"
             $exe = Join-Path $tmp $Asset
             try { Invoke-WebRequest -UseBasicParsing -Uri "$base/$Asset" -OutFile $exe } catch { return $false }
             $sums = Join-Path $tmp 'SHA256SUMS'
@@ -64,16 +68,29 @@
             $ok = TryRelease $env:BC_VERSION
             if (-not $ok) { Die "release $($env:BC_VERSION) has no $Asset" }
         } else {
-            $releases = Invoke-RestMethod -UseBasicParsing -Uri "https://api.github.com/repos/$Repo/releases?per_page=10"
-            foreach ($r in $releases) {
-                if (TryRelease $r.tag_name) { $ok = $true; break }
+            $tags = @()
+            try {
+                $tags = @(Invoke-RestMethod -UseBasicParsing -Uri "https://api.github.com/repos/$Repo/releases?per_page=10" | ForEach-Object { $_.tag_name })
+            } catch {
+                # The API allows 60 unauthenticated requests an hour; the
+                # releases feed is not rate-limited the same way.
+                $feed = (Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/$Repo/releases.atom").Content
+                $tags = @([regex]::Matches($feed, '/releases/tag/([^"<]+)"') | ForEach-Object { $_.Groups[1].Value })
+            }
+            foreach ($t in $tags) {
+                if (TryRelease $t) { $ok = $true; break }
             }
             if (-not $ok) { Die "no release ships a Windows binary yet; build from source with Go: git clone https://github.com/$Repo && cd boundedcode && go build -o bcode.exe ./cmd/boundedcode" }
         }
 
         New-Item -ItemType Directory -Force -Path $BinDir | Out-Null
-        Copy-Item -Force (Join-Path $tmp $Asset) (Join-Path $BinDir 'boundedcode.exe')
-        Copy-Item -Force (Join-Path $tmp $Asset) (Join-Path $BinDir 'bcode.exe')
+        # Copy next to the target, then rename: an interrupted install never
+        # leaves a half-written program.
+        foreach ($name in 'boundedcode.exe', 'bcode.exe') {
+            $staged = Join-Path $BinDir ".$name.new"
+            Copy-Item -Force (Join-Path $tmp $Asset) $staged
+            Move-Item -Force $staged (Join-Path $BinDir $name)
+        }
         $version = & (Join-Path $BinDir 'boundedcode.exe') version
         Say "installed $version to $BinDir (boundedcode.exe, bcode.exe)"
 
@@ -82,12 +99,25 @@
             [Environment]::SetEnvironmentVariable('Path', ($(if ($userPath) { "$userPath;" } else { '' }) + $BinDir), 'User')
             Say "added $BinDir to your user PATH (open a new terminal to use it)"
         }
+        $other = Get-Command bcode -All -ErrorAction SilentlyContinue | Where-Object { $_.Source -and ((Split-Path $_.Source) -ne $BinDir) } | Select-Object -First 1
+        if ($other) {
+            Write-Host "  Warning: another bcode is on your PATH ($($other.Source)); BoundedCode's is $BinDir\bcode.exe." -ForegroundColor Yellow
+        }
         Write-Host ''
         Write-Host '  Next: cd into a git repository and run'
         Write-Host ''
         Write-Host '    bcode'
         Write-Host ''
-        Write-Host '  The first run checks what is missing and sets it up with your permission.'
+        Write-Host '  The first run shows what is missing and sets it up with your permission'
+        Write-Host '  (/setup). From the shell, pick where the model runs:'
+        Write-Host ''
+        Write-Host '    local model (llama.cpp; the default model is ~22 GB):  bcode setup'
+        Write-Host '    cloud model API (no GPU needed; your code is sent to the provider):'
+        Write-Host '      bcode provider use NAME --model MODEL   # openai, anthropic, gemini, openai-compatible'
+        Write-Host '      bcode provider key set NAME'
+        Write-Host '      bcode setup'
+        Write-Host ''
+        Write-Host '  bcode setup --check lists what is still missing. Windows support is experimental.'
         Write-Host "  Uninstall: delete $BinDir and remove it from your user PATH; data is under"
         Write-Host '  %USERPROFILE%\.config, .local\share, .local\state and .cache in boundedcode folders,'
         Write-Host '  and the sandbox image (docker rmi boundedcode-openhands:local).'

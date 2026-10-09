@@ -101,11 +101,12 @@ what is already done:
    gitleaks for this OS and CPU, installed into
    `~/.local/share/boundedcode/bin`.
 3. **Inference server:** the pinned llama.cpp. On Linux with git, cmake and a
-   C++ compiler it is built from source (with CUDA when an NVIDIA GPU is
-   present), which is the validated build; otherwise, and on macOS and
-   Windows, the official prebuilt release of the same commit is downloaded
-   and checked against its pinned sha256 (Metal on Apple Silicon, CUDA 12.4
-   on Windows with an NVIDIA GPU, else CPU). To use a server you already
+   C++ compiler it is built from source (with CUDA when an NVIDIA GPU and
+   the CUDA toolkit are present), which is the validated build; otherwise,
+   and on macOS and Windows, the official prebuilt release of the same
+   commit is downloaded and checked against its pinned sha256 (CUDA 12.8 on
+   Linux with an NVIDIA GPU but no CUDA toolkit, Metal on Apple Silicon,
+   CUDA 12.4 on Windows with an NVIDIA GPU, else CPU). To use a server you already
    run, set `inference.mode: external` instead. Not needed with a cloud
    provider.
 4. **Model weights:** the default profile's GGUF at a pinned revision,
@@ -118,7 +119,8 @@ what is already done:
    the frontier container in place of this machine's own codex.
 
 Every step that downloads or builds asks first, and declining leaves it for
-later. `bcode setup --check` reports the state; `bcode setup --yes` runs
+later. `bcode setup --check` reports the state and exits non-zero while
+anything is missing; `bcode setup --yes` runs
 everything without asking. `--only` names steps (`config`, `tools`,
 `inference`, `model`, `sandbox`, `frontier`), and `--only STEP --force` runs a step that
 already looks complete, for example `bcode setup --only inference --force`

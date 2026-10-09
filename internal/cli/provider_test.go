@@ -11,6 +11,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -198,5 +200,78 @@ func TestModelCommands(t *testing.T) {
 	}
 	if out, err = runCLI(t, "", "model", "remove", "tiny", "--yes"); err != nil || !strings.Contains(out, "deleted") {
 		t.Fatalf("remove: %v\n%s", err, out)
+	}
+}
+
+// TestSetupCheckLocalAndCloud: `setup --check` fails while steps are left,
+// names the cloud alternative for the local-model steps, and skips those
+// steps once a cloud provider is chosen.
+func TestSetupCheckLocalAndCloud(t *testing.T) {
+	t.Setenv("BOUNDEDCODE_HOME", t.TempDir())
+	t.Setenv("BOUNDEDCODE_SECRETS", "file")
+	t.Setenv("PATH", t.TempDir()) // no llama-server, docker or tools
+	out, err := runCLI(t, "", "setup", "--check")
+	if err == nil || !strings.Contains(err.Error(), "setup step(s) to do") {
+		t.Fatalf("incomplete set-up must fail: %v\n%s", err, out)
+	}
+	if !strings.Contains(out, "[todo] Configuration") {
+		t.Fatalf("out:\n%s", out)
+	}
+	if _, err := runCLI(t, "", "setup", "--only", "config"); err != nil {
+		t.Fatal(err)
+	}
+	out, _ = runCLI(t, "", "setup", "--check")
+	for _, want := range []string{"llama-server not found", "not downloaded", "provider use NAME"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("local path: missing %q in\n%s", want, out)
+		}
+	}
+	if _, err := runCLI(t, "", "provider", "use", "openai-compatible", "--base-url", "http://127.0.0.1:9/v1", "--model", "m", "--context-window", "32768"); err != nil {
+		t.Fatal(err)
+	}
+	out, _ = runCLI(t, "", "setup", "--check")
+	if strings.Count(out, "not needed: using") != 2 || strings.Contains(out, "llama-server not found") {
+		t.Fatalf("cloud path: inference and model steps must be skipped:\n%s", out)
+	}
+}
+
+// TestWorkspaceFromCurrentRepository: with several workspaces and none
+// selected, a command run inside a registered repository uses its
+// workspace; elsewhere the error names the commands that fix it.
+func TestWorkspaceFromCurrentRepository(t *testing.T) {
+	app := testApp(t)
+	ctx := context.Background()
+	if _, err := app.resolveWorkspace(ctx, ""); err == nil || !strings.Contains(err.Error(), "no workspace yet") || !strings.Contains(err.Error(), "workspace add .") {
+		t.Fatalf("no workspaces: %v", err)
+	}
+	ws, err := app.workspaces(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	repos := map[string]string{}
+	for _, n := range []string{"a", "b"} {
+		dir := filepath.Join(t.TempDir(), n)
+		for _, args := range [][]string{{"init", "-q", dir}, {"-C", dir, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "i"}} {
+			if out, err := exec.Command("git", args...).CombinedOutput(); err != nil {
+				t.Fatalf("git %v: %v %s", args, err, out)
+			}
+		}
+		repos[n] = dir
+		w, err := ws.Create(ctx, n)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := ws.AddRepo(ctx, w, dir, ""); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Chdir(repos["b"])
+	w, err := app.resolveWorkspace(ctx, "")
+	if err != nil || w.Name != "b" {
+		t.Fatalf("inside repository b: %+v, %v", w, err)
+	}
+	t.Chdir(t.TempDir())
+	if _, err := app.resolveWorkspace(ctx, ""); err == nil || !strings.Contains(err.Error(), "workspace use NAME") {
+		t.Fatalf("outside any repository: %v", err)
 	}
 }

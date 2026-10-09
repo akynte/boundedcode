@@ -75,8 +75,8 @@ Reply with one JSON object and nothing else:
 Request:
 `
 
-// chatReader sends one request-reading call to the local model, or to the
-// ContractModel test hook when set.
+// chatReader sends one request-reading call to the task's model (local, or
+// the cloud provider's upstream), or to the ContractModel test hook when set.
 func (r *Runner) chatReader(ctx context.Context, t *task.Task, call ContractCall, maxTokens int, temperature float64) (string, error) {
 	if r.ContractModel != nil {
 		return r.ContractModel(ctx, call)
@@ -85,7 +85,7 @@ func (r *Runner) chatReader(ctx context.Context, t *task.Task, call ContractCall
 		return "", errors.New("no model gateway")
 	}
 	gw := r.NewGateway(t.ID, 0)
-	if gw == nil || gw.Client == nil {
+	if gw == nil || (gw.Client == nil && gw.Upstream == nil) {
 		return "", errors.New("no model client")
 	}
 	gw.Source = "planner"

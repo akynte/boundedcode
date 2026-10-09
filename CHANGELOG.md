@@ -23,7 +23,44 @@ Fixes from the public-launch readiness audit
   and requires it to pass. A test that failed on the base but was skipped,
   failed or did not run on the change counted as evidence.
 
-### Installation and diagnostics
+### Installation and first run
+
+- `bcode setup --check` exits non-zero while any step is missing, so
+  scripts and CI can tell a complete set-up from an incomplete one.
+- On Linux with an NVIDIA GPU but no CUDA toolkit, set-up downloads the
+  pinned prebuilt CUDA build of llama.cpp instead of starting a source build
+  that stopped at "nvcc not found".
+- The llama.cpp and model steps name the cloud alternative
+  (`bcode provider use NAME`) when they are missing.
+- With a cloud provider, the task contract (and its ambiguity check) now
+  uses the provider; it was silently skipped ("no model client").
+- A command run inside a repository that belongs to a workspace uses that
+  workspace when none is selected. The "no workspace" errors name the
+  commands that fix them.
+- `install.sh`:
+  - refuses to replace an unrelated `bcode` or `boundedcode` in its target
+    directory (`BC_FORCE=1` overrides);
+  - replaces the binary atomically;
+  - warns when another `bcode` comes first on PATH;
+  - gives the PATH line for bash, zsh or fish;
+  - falls back to the releases feed when the GitHub API rate limit is hit;
+  - prints the URLs it downloads.
+- `install.ps1`:
+  - stages files before replacing them;
+  - falls back to the releases feed;
+  - warns about a shadowing `bcode`.
+- Both installers:
+  - accept `BC_DOWNLOAD_BASE` (a mirror, or a local release for tests);
+  - name the local-model and cloud-provider paths in their next steps.
+- New smoke tests in `scripts/smoke/`:
+  - installer and first run on Linux and macOS (`install.sh`), in clean
+    distribution containers (`install-containers.sh`) and on Windows
+    (`install.ps1`);
+  - a first task end to end with a scripted model server
+    (`first-task.sh`).
+  - CI runs them in `.github/workflows/smoke.yml`.
+
+### Installer and diagnostic fixes from the audit
 
 - `install.ps1` no longer closes the user's PowerShell window when it fails
   under `irm | iex`, and no longer leaves `$ErrorActionPreference = 'Stop'`

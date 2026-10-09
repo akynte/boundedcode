@@ -79,14 +79,29 @@ func llamaBuildTools() []string {
 }
 
 // useLlamaSourceBuild reports whether set-up compiles llama.cpp (the
-// validated path on Linux) rather than downloading a prebuilt release.
+// validated path on Linux) rather than downloading a prebuilt release. With
+// an NVIDIA GPU the source build needs the CUDA toolkit (nvcc); without it,
+// the prebuilt CUDA build is used instead of a build that would fail.
 func useLlamaSourceBuild() bool {
-	return runtime.GOOS == "linux" && len(llamaBuildTools()) == 0
+	return runtime.GOOS == "linux" && len(llamaBuildTools()) == 0 && (!hasNVIDIA() || hasNVCC())
 }
 
 func hasNVIDIA() bool {
 	_, err := exec.LookPath("nvidia-smi")
 	return err == nil
+}
+
+// cudaNVCC is where scripts/build-llama-cpp.sh also looks for nvcc.
+var cudaNVCC = "/usr/local/cuda/bin/nvcc"
+
+// hasNVCC reports whether the CUDA compiler is available where
+// scripts/build-llama-cpp.sh looks for it (PATH or /usr/local/cuda/bin).
+func hasNVCC() bool {
+	if _, err := exec.LookPath("nvcc"); err == nil {
+		return true
+	}
+	fi, err := os.Stat(cudaNVCC)
+	return err == nil && !fi.IsDir()
 }
 
 // llamaPlan describes what the inference step will install.
