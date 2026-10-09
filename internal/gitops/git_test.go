@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -245,5 +246,98 @@ func TestRelativeGitdir(t *testing.T) {
 	}
 	if err := CheckWorktree(wt, common); err == nil {
 		t.Fatal("a relative pointer outside the admin dir was accepted")
+	}
+}
+
+// TestNestedRepositoryConfigNotExecuted plants, inside the agent-writable
+// worktree, a git repository of its own whose config defines a clean filter.
+// Once host git records it as a gitlink, status and diff would run git inside
+// it with that config; the hardening flags must keep them out.
+func TestNestedRepositoryConfigNotExecuted(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the filter command is a POSIX shell command")
+	}
+	ctx := context.Background()
+	repo := initRepo(t)
+	wt := filepath.Join(t.TempDir(), "wt")
+	if err := EnsureWorktree(ctx, repo, wt, "agent/t1", "HEAD"); err != nil {
+		t.Fatal(err)
+	}
+	canary := filepath.Join(t.TempDir(), "pwned")
+	sub := filepath.Join(wt, "sub")
+	if err := os.MkdirAll(sub, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	_ = os.WriteFile(filepath.Join(sub, ".gitattributes"), []byte("* filter=evil\n"), 0o644)
+	_ = os.WriteFile(filepath.Join(sub, "f"), []byte("one\n"), 0o644)
+	for _, args := range [][]string{{"init", "-q"}, {"add", "-A"}, {"-c", "user.email=a@b", "-c", "user.name=a", "commit", "-qm", "x"},
+		{"config", "filter.evil.clean", "touch " + canary + "; cat"}} {
+		cmd := exec.Command("git", args...)
+		cmd.Dir = sub
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v: %s", args, err, out)
+		}
+	}
+	// A new nested repository is refused before host git stages it.
+	if _, err := CommitAll(ctx, wt, "checkpoint"); err == nil || !strings.Contains(err.Error(), "nested git repository") {
+		t.Fatalf("CommitAll with a nested repository: %v", err)
+	}
+	// The agent can stage the gitlink itself from inside the sandbox; with
+	// the nested repository dirty, plain `git status` or `git add` would
+	// now run its filter.
+	stage := exec.Command("git", "add", "-A")
+	stage.Dir = wt
+	if out, err := stage.CombinedOutput(); err != nil {
+		t.Fatalf("git add: %v: %s", err, out)
+	}
+	_ = os.WriteFile(filepath.Join(sub, "f"), []byte("two\n"), 0o644)
+	if _, err := CommitAll(ctx, wt, "checkpoint"); err == nil || !strings.Contains(err.Error(), "nested git repository") {
+		t.Fatalf("CommitAll with a staged nested repository: %v", err)
+	}
+	if _, err := ChangedFiles(ctx, wt, "main"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Diff(ctx, wt, "main", false); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Run(ctx, wt, "status", "--porcelain"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(canary); err == nil {
+		t.Fatal("a nested repository's filter executed on the host")
+	}
+}
+
+// TestChangedFilesUnquoted: names git would quote reach callers verbatim, so
+// path policies (protected paths, secrets, test files) match them.
+func TestChangedFilesUnquoted(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip(`'"' is not a valid file name character on Windows`)
+	}
+	ctx := context.Background()
+	repo := initRepo(t)
+	names := []string{".github/workflows/cié.yml", `.boundedcode/verification"x.yaml`, "tab\there.txt"}
+	for i, n := range names {
+		p := filepath.Join(repo, filepath.FromSlash(n))
+		_ = os.MkdirAll(filepath.Dir(p), 0o755)
+		_ = os.WriteFile(p, []byte("x\n"), 0o644)
+		if i == 0 { // one committed, the others untracked
+			if _, err := Run(ctx, repo, "add", "-A"); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := Run(ctx, repo, "commit", "-qm", "c"); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	got, err := ChangedFiles(ctx, repo, "HEAD~1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	slices.Sort(got)
+	want := slices.Clone(names)
+	slices.Sort(want)
+	if !slices.Equal(got, want) {
+		t.Fatalf("got %q, want %q", got, want)
 	}
 }

@@ -23,12 +23,22 @@ import (
 // host must never run hooks, fsmonitor daemons or external diff/pager
 // programs on their behalf. (External diff drivers and textconv are disabled
 // per command with --no-ext-diff/--no-textconv.)
+//
+// A git repository the agent creates inside its worktree is recorded as a
+// gitlink; status and diff would then run git inside it, with that nested
+// repository's own config (filter drivers and the like), which the -c
+// flags do not override. Submodules are therefore never inspected, and
+// file names are never quoted, so path policies see the real names.
 var hardening = []string{
 	"-c", "core.hooksPath=/dev/null",
 	"-c", "core.fsmonitor=false",
 	"-c", "core.pager=cat",
 	"-c", "protocol.ext.allow=never",
 	"-c", "uploadpack.packObjectsHook=",
+	"-c", "diff.ignoreSubmodules=all",
+	"-c", "submodule.recurse=false",
+	"-c", "status.submoduleSummary=false",
+	"-c", "core.quotePath=false",
 }
 
 // windowsFlags keep worktrees byte-identical to the repository (no CRLF
@@ -163,25 +173,26 @@ func RemoveWorktree(ctx context.Context, repo, path string) error {
 }
 
 // ChangedFiles lists files changed relative to base, including uncommitted
-// and untracked files.
+// and untracked files. Names are read NUL-separated, so a name git would
+// quote (non-ASCII, quotes, control characters) reaches the path policies
+// exactly as it is on disk.
 func ChangedFiles(ctx context.Context, worktree, base string) ([]string, error) {
 	seen := map[string]bool{}
 	var out []string
-	add := func(s string) {
-		for l := range strings.SplitSeq(s, "\n") {
-			l = strings.TrimSpace(l)
-			if l != "" && !seen[l] {
+	add := func(names []string) {
+		for _, l := range names {
+			if !seen[l] {
 				seen[l] = true
 				out = append(out, l)
 			}
 		}
 	}
-	d, err := Run(ctx, worktree, "diff", "--name-only", base)
+	d, err := Run(ctx, worktree, "diff", "--name-only", "-z", base)
 	if err != nil {
 		return nil, err
 	}
-	add(d)
-	u, err := Run(ctx, worktree, "ls-files", "--others", "--exclude-standard")
+	add(splitNUL(d))
+	u, err := untrackedFiles(ctx, worktree)
 	if err != nil {
 		return nil, err
 	}
@@ -189,10 +200,30 @@ func ChangedFiles(ctx context.Context, worktree, base string) ([]string, error) 
 	return out, nil
 }
 
+// untrackedFiles lists untracked, not ignored files, unquoted.
+func untrackedFiles(ctx context.Context, worktree string) ([]string, error) {
+	u, err := Run(ctx, worktree, "ls-files", "-z", "--others", "--exclude-standard")
+	if err != nil {
+		return nil, err
+	}
+	return splitNUL(u), nil
+}
+
+// splitNUL splits git's -z output, dropping empty entries.
+func splitNUL(s string) []string {
+	var out []string
+	for f := range strings.SplitSeq(s, "\x00") {
+		if f != "" {
+			out = append(out, f)
+		}
+	}
+	return out
+}
+
 // Diff returns the patch of the working tree relative to base, including
 // untracked files (via intent-to-add on a temporary index).
 func Diff(ctx context.Context, worktree, base string, stat bool) (string, error) {
-	untracked, err := Run(ctx, worktree, "ls-files", "--others", "--exclude-standard")
+	untracked, err := untrackedFiles(ctx, worktree)
 	if err != nil {
 		return "", err
 	}
@@ -205,15 +236,12 @@ func Diff(ctx context.Context, worktree, base string, stat bool) (string, error)
 	if err != nil {
 		return "", err
 	}
-	if untracked == "" {
+	if len(untracked) == 0 {
 		return d, nil
 	}
 	var b strings.Builder
 	b.WriteString(d)
-	for f := range strings.SplitSeq(untracked, "\n") {
-		if f == "" {
-			continue
-		}
+	for _, f := range untracked {
 		if stat {
 			fmt.Fprintf(&b, "\n %s (new, untracked)", f)
 			continue
@@ -248,6 +276,9 @@ func CommitAll(ctx context.Context, worktree, message string) (string, error) {
 	if !strings.HasPrefix(br, "agent/") {
 		return "", fmt.Errorf("refusing to commit on non-agent branch %q", br)
 	}
+	if err := checkNoNestedRepos(ctx, worktree); err != nil {
+		return "", err
+	}
 	if _, err := Run(ctx, worktree, "add", "-A"); err != nil {
 		return "", err
 	}
@@ -259,6 +290,39 @@ func CommitAll(ctx context.Context, worktree, message string) (string, error) {
 		return "", err
 	}
 	return Run(ctx, worktree, "rev-parse", "HEAD")
+}
+
+// checkNoNestedRepos refuses a worktree holding a git repository of its own
+// (a directory with a .git), new or behind a recorded gitlink: `git add`
+// runs git inside such a repository with its own config, which the
+// hardening flags cannot override, so host git must not stage it. Neither
+// listing below enters a nested repository.
+func checkNoNestedRepos(ctx context.Context, worktree string) error {
+	untracked, err := untrackedFiles(ctx, worktree)
+	if err != nil {
+		return err
+	}
+	for _, f := range untracked {
+		// Without --directory, git lists a directory only when it is a
+		// nested repository.
+		if strings.HasSuffix(f, "/") {
+			return fmt.Errorf("worktree %s: nested git repository %s; refusing to run host git on it (tampered?)", worktree, f)
+		}
+	}
+	staged, err := Run(ctx, worktree, "ls-files", "-z", "-s")
+	if err != nil {
+		return err
+	}
+	for _, e := range splitNUL(staged) {
+		meta, path, ok := strings.Cut(e, "\t")
+		if !ok || !strings.HasPrefix(meta, "160000 ") {
+			continue
+		}
+		if _, err := os.Lstat(filepath.Join(worktree, filepath.FromSlash(path), ".git")); err == nil {
+			return fmt.Errorf("worktree %s: nested git repository %s/; refusing to run host git on it (tampered?)", worktree, path)
+		}
+	}
+	return nil
 }
 
 // AdminDir returns the worktree's private git directory
@@ -375,14 +439,11 @@ func ChangedSymbols(ctx context.Context, worktree, base string) ([]string, error
 	if err != nil {
 		return nil, err
 	}
-	untracked, err := Run(ctx, worktree, "ls-files", "--others", "--exclude-standard")
+	untracked, err := untrackedFiles(ctx, worktree)
 	if err != nil {
 		return nil, err
 	}
-	for f := range strings.SplitSeq(untracked, "\n") {
-		if f == "" {
-			continue
-		}
+	for _, f := range untracked {
 		nd, err := runAllowExit1(ctx, worktree, "diff", "-U0", "--no-color", "--no-ext-diff", "--no-textconv", "--no-index", "/dev/null", f)
 		if err != nil {
 			return nil, err

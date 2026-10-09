@@ -86,4 +86,9 @@ func TestBlockedEscalationIsRecorded(t *testing.T) {
 	if st, err := os.Stat(path); err != nil || st.Mode().Perm() != 0o600 {
 		t.Fatalf("blocked packet not kept privately: %v %v", st, err)
 	}
+	// The frontier directory is mounted into the provider's networked
+	// container; a refused packet must not be readable there.
+	if filepath.Base(filepath.Dir(path)) == "frontier" {
+		t.Fatalf("blocked packet %s is in the directory the frontier container mounts", path)
+	}
 }

@@ -47,8 +47,11 @@ func (r *Runner) escalate(ctx context.Context, t *task.Task, wts []task.Worktree
 	n := r.escalationCount(ctx, t.ID) + 1
 	if err := checkPacket(packet, home); err != nil {
 		// Fail closed, but visibly: keep the refused packet on this host for
-		// diagnosis and record the escalation as blocked.
-		blocked := filepath.Join(dir, fmt.Sprintf("%03d-%s-blocked-packet.md", n, tr.Code))
+		// diagnosis and record the escalation as blocked. It is kept outside
+		// dir, which the frontier provider's container mounts.
+		blockedDir := filepath.Join(r.Paths.TaskDir(t.ID), "frontier-blocked")
+		_ = os.MkdirAll(blockedDir, 0o700)
+		blocked := filepath.Join(blockedDir, fmt.Sprintf("%03d-%s-blocked-packet.md", n, tr.Code))
 		_ = config.WriteFileAtomic(blocked, []byte(packet), 0o600)
 		r.recordEscalation(ctx, t.ID, tr, r.Frontier.Name(), "blocked", blocked, contextplan.EstimateTokens(packet), "", "")
 		r.Rec.Emit(ctx, t.ID, "frontier.blocked", map[string]any{"code": tr.Code, "error": trunc(err.Error(), 400), "packet": blocked})
