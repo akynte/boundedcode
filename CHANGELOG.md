@@ -1,5 +1,37 @@
 # Changelog
 
+## Unreleased
+
+Fixes from the public-launch readiness audit
+([docs/public-launch/readiness-audit.md](docs/public-launch/readiness-audit.md)).
+
+### Security
+
+- Host git no longer runs commands configured inside a git repository the
+  agent creates in its worktree. Once recorded as a gitlink, such a
+  repository's own filter drivers ran on the host during checkpoint
+  commits (`git add`, `git status`). Host git now ignores submodules, and a
+  checkpoint refuses a worktree holding a nested repository.
+- Changed-file lists are read NUL-separated and unquoted. Names git quoted
+  (non-ASCII, `"`, control characters) did not match the protected-path,
+  secret-path and deny-path policies, so, for example, a new
+  `.github/workflows/cié.yml` passed the diff-scope check.
+
+### Verification
+
+- Go behavioural evidence now also runs each attributed test on the change
+  and requires it to pass. A test that failed on the base but was skipped,
+  failed or did not run on the change counted as evidence.
+
+### Installation and diagnostics
+
+- `install.ps1` no longer closes the user's PowerShell window when it fails
+  under `irm | iex`, and no longer leaves `$ErrorActionPreference = 'Stop'`
+  and strict mode set in the user's session.
+- The container-engine check recognises Docker 29's "failed to connect to
+  the docker API" message instead of reporting the first line of the client
+  details.
+
 ## v0.1.0-alpha.4 (2026-10-08): do the repositories still work together?
 
 Release notes: [docs/releases/v0.1.0-alpha.4.md](docs/releases/v0.1.0-alpha.4.md).

@@ -56,7 +56,7 @@ BoundedCode is built around the opposite defaults:
 | Principle | What it means |
 |---|---|
 | **Bounded context** | The model starts from a small task-specific pack drawn from repository intelligence and reads further code through tools as needed, instead of receiving the whole repository. |
-| **Local by default** | Inference runs on your machine through llama.cpp unless you choose a cloud model API (OpenAI, Anthropic, Gemini or an OpenAI-compatible service; unvalidated, see [Cloud models](#cloud-models)). A frontier model is an optional, policy-triggered exception: enabled but not triggered in the second validation; in the first validation 4 frontier calls were sent and no task was accepted. |
+| **Local by default** | Inference runs on your machine through llama.cpp unless you choose a cloud model API (OpenAI, Anthropic, Gemini or an OpenAI-compatible service; unvalidated, see [Cloud models](#cloud-models)). A frontier model is an optional, policy-triggered exception: enabled but not triggered in the second validation; in the first validation 4 frontier calls were sent and none of the tasks that made them was accepted. |
 | **Evidence, not just green tests** | A task is `TASK_VERIFIED` only when a test it adds fails on the base commit and passes with the change (fail-before/pass-after evidence, not proof of correctness). In a multi-repository task, every gRPC, protobuf or OpenAPI link that the change affects must also be shown compatible by the repositories' own checks (experimental). |
 | **Durable tasks** | A persistent ledger lets long tasks resume after Ctrl-C, a crash or a reboot. |
 | **Contained agent** | The agent runs in a network-less container on its own git worktree. Nothing is pushed or merged for you. |
@@ -111,7 +111,8 @@ The official score stays **5 of 6**; 6 of 6 hidden acceptance tests passed.
 A verifier that withholds `TASK_VERIFIED` when it cannot show fail-before/
 pass-after evidence is behaving as intended. After this validation, the
 checker was changed to attribute changed test data to the Go package whose
-tests read it (unreleased; covered by unit tests, not yet re-validated).
+tests read it (released in v0.1.0-alpha.3; covered by unit tests, not yet
+re-validated on real tasks).
 
 </details>
 
@@ -263,8 +264,8 @@ It uses a checksum-verified release binary when the release ships one, and
 otherwise builds from source with Go. `install.ps1` installs the
 checksum-verified release binary into
 `%LOCALAPPDATA%\Programs\BoundedCode\bin` and adds it to your user PATH.
-Release binaries for macOS and Windows ship from the next release on; until
-then, build from source there. `bcode` opens a chat for the repository
+Releases ship binaries for Linux, macOS and Windows (amd64 and arm64); the
+macOS and Windows binaries have not yet been run on those systems. `bcode` opens a chat for the repository
 you are in. On the first run it checks the prerequisites and offers to install
 what is missing: tools, llama.cpp, the model weights and the Docker sandbox.
 It asks before every download or build. After that, describe a change and it
@@ -414,7 +415,8 @@ risk or a high-risk review.
   unless pre-approved.
 
 Escalation was enabled but not triggered in the second validation. In the
-first validation, 4 frontier calls were sent and no task was accepted
+first validation, 4 frontier calls were sent and none of the tasks that made
+them was accepted
 ([report](docs/benchmarks/small-real-world-validation-2026-10.md#answers)).
 See [ADR-0009](docs/architecture/adr/0009-frontier-escalation.md).
 
@@ -424,7 +426,7 @@ See [ADR-0009](docs/architecture/adr/0009-frontier-escalation.md).
 |---|---|
 | **builds** | It compiles and lints. |
 | **`tests_green`** | The repository's checks pass. Not enough on its own: in the initial validation, patches that changed nothing passed existing tests. |
-| **`TASK_VERIFIED`** | Checks pass **and** there is behavioural evidence: a test the change adds or modifies (test code or test data) **fails on the base commit with the changed tests, does not fail there without them, and passes with the change**. In a multi-repository task, every gRPC, protobuf or OpenAPI link that the change affects must also be `compatible` (see below). |
+| **`TASK_VERIFIED`** | Checks pass **and** there is behavioural evidence: a test the change adds or modifies (test code or test data) **fails on the base commit with the changed tests, does not fail there without them, and passes with the change** (for Go, each such test is also run on the change and must pass rather than skip, unreleased as of v0.1.0-alpha.4; for other languages, the whole test stage must pass). In a multi-repository task, every gRPC, protobuf or OpenAPI link that the change affects must also be `compatible` (see below). |
 
 - **Missing evidence:** the agent is asked once for a reproduction test.
   Without one, the task ends `tests_green` (UNVERIFIED) and is never presented
@@ -444,16 +446,30 @@ See [ADR-0009](docs/architecture/adr/0009-frontier-escalation.md).
   build scripts in its worktree; only review catches an adversarial change
   there (see the sandbox's [residual risks](docs/design/sandbox.md#residual-risks-known-accepted-for-now)).
 
-A changed test that does not compile or load on the base (it calls code the
+A changed Go test that does not compile on the base (it calls code the
 change adds) shows that the API exists, not that it behaves as asked, so it is
-not evidence; nor is a stage that times out on the base.
+not evidence; nor is a stage that times out on the base. For other languages
+this is only detected when the whole stage fails to load: a Python or
+JavaScript test that fails on the base only because a function or module the
+change adds is missing (`AttributeError`, `ModuleNotFoundError`,
+`TypeError: … is not a function`) currently counts as evidence.
 
 This is not formal verification. Known limits:
-- Go failures are compared per test function; other languages per stage
-  (the stage must fail with the changed tests and pass without them);
+- Go failures are compared per test function; other languages per test
+  where the runner names its failures (pytest, unittest, cargo, Maven,
+  Gradle, RSpec, minitest, PHPUnit, CTest, Meson), otherwise per stage (the
+  stage must fail with the changed tests and pass without them; JavaScript
+  is always per stage);
+- each run happens once: a flaky test that happens to fail on the base can
+  count as evidence;
 - a change that only adds new API needs a test that also runs on the
-  original code, or it ends `tests_green`;
-- a test can only demonstrate the reading of a request that the agent chose.
+  original code, or it ends `tests_green` (Go; see above for other
+  languages);
+- a custom Go stage in `.boundedcode/verification.yaml` is treated as a
+  non-Go stage unless its first `requires` entry is `go.mod`;
+- a test can only demonstrate the reading of a request that the agent chose,
+  and a deliberately adversarial test (one that detects where it runs) is
+  caught only by review.
 
 ## Security
 
@@ -462,10 +478,10 @@ example by prompt injection in repository content.
 
 | Control | Mechanism |
 |---|---|
-| Sandbox | Agent tools run in a container with no network. Only the task worktree is writable; there is no host home, SSH agent or credentials. |
-| Secrets | `.env*`, keys, cloud credentials and kubeconfigs are masked in the sandbox and denied by path policy. |
-| Protected paths | Changes to `.boundedcode/`, CI workflows or CODEOWNERS fail verification. |
-| Git integrity | Worktree pointers, admin dirs and `HEAD` are verified before host git touches them. Nothing is pushed. |
+| Sandbox | Agent tools run in a container with no network (unless you set `sandbox.network: bridge`). The host paths it can write are the task worktree and BoundedCode's per-task state for it (git admin dir, caches); there is no host home, SSH agent or credentials. |
+| Secrets | `.env*`, keys, cloud credentials and kubeconfigs in the worktree are masked in the sandbox and denied by path policy. The repository's git object store and `.git/config` are mounted read-only, so a secret **committed to git history**, or a credential embedded in a remote URL, is still readable by the agent. |
+| Protected paths | Changes to `.boundedcode/`, `.github/workflows/`, `.gitlab-ci.yml`, `.gitmodules` or CODEOWNERS fail verification (other CI systems' files are not protected). |
+| Git integrity | Worktree pointers, admin dirs and `HEAD` are verified before host git touches them, and a nested git repository in the worktree is refused (unreleased). Nothing is pushed. |
 | Command policy | A deterministic policy blocks push, destructive and deploy commands in verification. |
 | Host reads | Context building never follows symlinks out of a worktree. |
 | Frontier | Packets are sanitized, and the gate fails closed. |
@@ -479,7 +495,16 @@ example by prompt injection in repository content.
 ## Known limitations
 
 1. **Small validation sample.** 8 + 6 public tasks, each run once. The second
-   set was screened for issue-derivable tests; real requests are not.
+   set was screened for issue-derivable tests; real requests are not. The
+   screen rejects the failure classes seen in development (tests needing
+   names only the reference fix introduces, issues allowing several
+   outcomes). The held-out tasks are new tasks, but from the same six
+   repositories as the development corpus, and they are public issues
+   whose fixes may be in the model's training data. The candidate list and
+   screening first appear in git together with the frozen build, so the
+   order "selection rule before screening" is stated, not provable from
+   history. 5 of 6 is uncertain: its exact (Clopper-Pearson)
+   95% interval is about 36–99.6%.
 2. **Ambiguity detection is imperfect.** The task contract is derived by the
    local model. It has flagged a clear request as ambiguous and misnamed real
    alternatives. The second validation ran with `task.ambiguity: proceed`,
@@ -496,16 +521,18 @@ example by prompt injection in repository content.
    model profiles and the cloud providers work but their quality on
    BoundedCode tasks is unknown, and model fit is a rule of thumb. macOS and
    Windows build and vet in CI, but their unit tests do not pass there yet
-   (at a8fce66: 5 of 31 test packages fail on macOS, 14 of 31 on Windows),
+   (CI at fa36de7: 5 of 32 test packages fail on macOS, 14 of 32 on
+   Windows; the failures sampled in the readiness audit are mostly test
+   assumptions about paths and Docker, but they are not fully triaged),
    and the full flow has not been run on a Mac or a Windows machine.
 4. **Recent evidence-check changes are not yet validated.** Data-driven
    test files are now attributed to the Go package that reads them, and
-   tests that only fail to compile on the base no longer count. Both changes are unreleased
-   and covered by unit tests only; non-Go stages are compared per stage, not
-   per test.
+   Go tests that only fail to compile on the base no longer count. Both
+   changes shipped in v0.1.0-alpha.3 and are covered by unit tests only;
+   non-Go stages are compared per stage unless the runner names its failures.
 5. **Frontier escalation is unproven.** It was enabled but not triggered in
-   the second validation; in the first, 4 frontier calls were sent and no
-   task was accepted.
+   the second validation; in the first, 4 frontier calls were sent and none
+   of the tasks that made them was accepted.
 6. **The strategy governor** bounded runaway generation in development runs,
    but did not trigger during the held-out validation.
 7. **Cross-repository compatibility covers a narrow set of cases.** The gate
@@ -560,7 +587,7 @@ including results that did not support a release.
 | OS | Debian 13 |
 | Model | Qwen3.6-35B-A3B, UD-Q4_K_M, 131 K context, MoE experts partly on CPU |
 
-During validation the model server used up to 29.3 GiB of RAM, and
+During validation the model server used up to 28.6 GiB (29,310 MiB) of RAM, and
 BoundedCode itself under 70 MiB. No minimum requirement has been measured.
 Smaller machines may work with smaller models or contexts, but this is
 untested.

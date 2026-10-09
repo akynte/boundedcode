@@ -27,7 +27,7 @@ part of this boundary.
 | 5 | Secret masking: `.env*`, `secrets/`, keys, kubeconfigs, tfstate/tfvars and service-account JSON inside worktrees are hidden behind empty read-only mounts (tmpfs for directories, an empty bind for files) | `policy.FindSecretPaths`, `sandbox` |
 | 6 | Environment: containers get only the variables we set. Host-side runners scrub credential-like variables (`*_TOKEN`, `*SECRET*`, `AWS_*`, `OPENAI_*`, `SSH_AUTH_SOCK`, `KUBECONFIG`, `LMNR_*`, `OTEL_*`, …). | `sandbox.ScrubbedEnv` |
 | 7 | Deterministic command policy blocks push/force-push, hard resets, protected-branch merges, `terraform apply/destroy`, mutating `kubectl`/`helm`/cloud CLIs, publishing, and `curl … \| sh`. Command lines are normalized first (global flags such as `git -C`, `kubectl --context`, `terraform -chdir`; env assignments; wrappers; `sh -c` bodies). It applies to verification commands. The agent's own commands are not filtered: inside the container they cannot reach a remote, credentials or the host. | `policy.CheckCommand` |
-| 8 | Host-side git hardening: hooks disabled (`core.hooksPath=/dev/null`), `core.fsmonitor=false`, `--no-ext-diff --no-textconv`, no commit signing. Before any host git runs in a worktree (run, resume, `task verify`, `task diff`, checkpoints) the control plane verifies the `.git` pointer, that the agent-writable admin dir's `commondir` still points at the real (read-only) common dir, that there is no `config.worktree`, and that `HEAD` is the task branch. A redirected `commondir` would otherwise let host `git add` run an agent-defined filter (reproduced in `TestAdminDirTamperingDetected`). | `gitops.CheckTaskWorktree` |
+| 8 | Host-side git hardening: hooks disabled (`core.hooksPath=/dev/null`), `core.fsmonitor=false`, `--no-ext-diff --no-textconv`, no commit signing. Before any host git runs in a worktree (run, resume, `task verify`, `task diff`, checkpoints) the control plane verifies the `.git` pointer, that the agent-writable admin dir's `commondir` still points at the real (read-only) common dir, that there is no `config.worktree`, and that `HEAD` is the task branch. A redirected `commondir` would otherwise let host `git add` run an agent-defined filter (reproduced in `TestAdminDirTamperingDetected`). Host git also ignores submodules (`diff.ignoreSubmodules=all`, `submodule.recurse=false`), and a checkpoint refuses a worktree that holds a git repository of its own (new, or behind a gitlink the agent staged): `git add` and `git status` would otherwise run git inside it with that repository's config, filter drivers included (unreleased; `TestNestedRepositoryConfigNotExecuted`). File names are read NUL-separated, so quoted names cannot slip past the path policies. | `gitops.CheckTaskWorktree`, `gitops.CommitAll` |
 | 9 | Commits happen host-side on `agent/<task-id>` only. `CommitAll` refuses other branches. There are no pushes. | `gitops.CommitAll` |
 | 10 | Verification runs in the same image with the worktree mounted and the git dirs read-only. The module cache is mounted read-only, with `GOPROXY=off`; a module without `vendor/modules.txt` resolves from it (`-mod=mod`), and a vendored module builds from its tracked `vendor/` (the agent can edit vendored code like any other source, which only review catches). Installed `node_modules` directories of the repository's own checkout (path from the task ledger, never from the worktree) are mounted read-only at the same paths in the worktree, for verification and the agent; they shadow anything the agent put there, and a symlink or file at a mount point fails the stage (or refuses the session). Tool caches inside them (`.cache`, `.vite`, `.vitest`) get a per-run writable tmpfs (512 MiB each, counted against the container memory limit); a missing cache directory is created empty in the checkout, because a mount point cannot be made inside a read-only mount. A JavaScript project that declares a `test`/`lint`/`build` script but has no installed dependencies fails that stage instead of skipping it. The checkout's Python virtual environments (`.venv`/`venv` with a `pyvenv.cfg`), Composer and Bundler `vendor/` directories (with `autoload.php` or `bundle/`; a Go `vendor/` is tracked source and never mounted) and `.bundle/` are mounted the same way; a venv's interpreter is mounted read-only only when it is a self-contained installation outside system directories on a Linux host. The host's Cargo registry, Maven repository and Gradle caches are mounted read-only (never `~/.cargo`, `~/.m2` or `~/.gradle` themselves, which hold credentials; those files are refused as mount sources); tool homes (`CARGO_HOME`, the writable Maven repository in front of the read-only tail, `GRADLE_USER_HOME`), build outputs and copied Gradle wrapper distributions are in a per-task directory, separate for verification and the agent. The agent's sandbox gets the same read-only Go module cache and offline Go settings (`GOPROXY=off`), with a build cache of its own: never verification's, since Go caches test results and an agent-written cache could forge a pass. Verification does not change the candidate: it snapshots the worktree before its stages and afterwards restores tracked files they changed and removes untracked files they created (ignored files are left alone), reporting what it undid as a `side-effects` stage; if it cannot undo them, verification fails. Each task has its own Go build cache. Its config and language presets come from the task's **base commit**, never from the agent-writable worktree; deleting a stage's required file (e.g. `go.mod`) fails the stage. | `verify.LoadConfig`, `verify.Engine.spec`, `sandbox.DependencyMounts`, `sandbox.PackageCaches` |
 | 11 | Diff-scope gate: changes touching secret paths, protected paths (`.boundedcode/`, CI workflows, CODEOWNERS, `.gitmodules`), or more than N files fail verification. gitleaks scans the task diff; without gitleaks the full gate fails. | `verify`, `policy.IsProtectedPath` |
@@ -35,7 +35,7 @@ part of this boundary.
 | 15 | More secret paths than can be masked (500) refuses to start the agent instead of masking only some. | `policy.FindSecretPaths` |
 | 16 | Containers are named and removed on cancellation or timeout (killing `docker run` alone leaves the container running); a stale adapter container is removed before reuse. | `sandbox.Container.Command` |
 | 17 | The cross-repository compatibility gate runs each repository's test stage from its **base-commit** config, in the same sandbox, mounts, masks and command policy as verification, on trees exported from the recorded commits (never read from the worktree), with the secret paths of every repository in the tree masked. It sets `GOWORK` itself, so a `go.work`, `replace` directive or vendored copy in a repository cannot redirect the provider's module, and `go list -m` confirms where it resolves (`TestGateBypassAttempts`). Its results are stored host-side in SQLite, out of the agent's reach. Residual risk as for verification: agent-written test code runs inside the check and could, for example, overwrite its coverage profile. | `compat.Gate`, `verify.Engine.RunComposed` |
-| 12 | Frontier: packets are redacted, and host paths are rewritten: the work dir, worktrees and checkouts to workspace-relative names, task state, BoundedCode's directories and the Go caches to placeholders, and anything else under the home directory to `$HOME` (plain, JSON-escaped and URL-encoded spellings, symlink-resolved forms, at path boundaries only). A packet that still contains the home directory is not sent: it is kept on the host (0600) and recorded as a `blocked` escalation, which `stats` reports. `codex exec` runs **in a container** with only an empty workdir and the Codex credential dir mounted. Codex's own `read-only` sandbox restricts writes, not reads, so containment is required. API-key auth is refused. | `frontier.Codex`, `frontier.Sanitize`, `frontier.CheckPacket` |
+| 12 | Frontier: packets are redacted, and host paths are rewritten: the work dir, worktrees and checkouts to workspace-relative names, task state, BoundedCode's directories and the Go caches to placeholders, and anything else under the home directory to `$HOME` (plain, JSON-escaped and URL-encoded spellings, symlink-resolved forms, at path boundaries only). A packet that still contains the home directory is not sent: it is kept on the host (0600) and recorded as a `blocked` escalation, which `stats` reports; it is kept outside the directory the frontier container mounts. `codex exec` runs **in a container** with only the task's frontier directory (the packets sent and answers received so far) and the Codex home directory (`~/.codex`: credentials, and Codex's own session history) mounted. Codex's own `read-only` sandbox restricts writes, not reads, so containment is required. API-key auth is refused. | `frontier.Codex`, `frontier.Sanitize`, `frontier.CheckPacket` |
 | 13 | Audit events are redacted (`telemetry.Redact`), and prompts and source are not logged by default. | `telemetry` |
 
 ## Adversarial tests (all must fail to escape)
@@ -56,7 +56,7 @@ part of this boundary.
 | prompt-injected agent rewrites `.boundedcode/verification.yaml`, plants `leak.go -> ~/.ssh/id_ed25519` and a failing test naming `leak.go:2` | config ignored (base commit), attempt rejected for the protected path, key never in a pack (`TestPromptInjectedAgentIsContained`) |
 | `git -C . push`, `kubectl --context=prod apply`, `terraform -chdir=x apply`, `rm -r -f /` in a verification stage | denied (`TestCheckCommandBypasses`) |
 | cancel a long verification stage | container removed (`TestContainerCancelRemovesContainer`) |
-| containerized codex: list host repos / `$HOME` | not visible (only the empty workdir) |
+| containerized codex: list host repos / `$HOME` | not visible (only the task's frontier directory and `~/.codex`) |
 
 ## Residual risks (known, accepted for now)
 
@@ -96,8 +96,9 @@ part of this boundary.
 7. **`sandbox.kind: none`** disables all of the above. It is refused for
    autonomous tasks unless `--unsafe-no-sandbox` is passed.
 8. **The frontier container has network access** (it must reach OpenAI) and
-   holds the Codex credentials. Only the packet and an empty workdir are
-   inside it.
+   holds the Codex credentials. Besides the packet, it can read the task's
+   earlier sent packets and answers and the rest of `~/.codex` (Codex's
+   session history), which is mounted read-write.
 9. **Host-side tools read agent-written worktrees.** codebase-memory-mcp
    (worktree indexing for impact), Serena and its language servers
    (ADR-0008; `gopls` runs `go list`), ripgrep and gitleaks run on the
@@ -115,3 +116,22 @@ part of this boundary.
    Secret masking and redaction apply as with a local model; repository code
    does not stay on the machine. The provider's API key is held by the host
    gateway only (ADR-0010).
+12. **Git history and repository config are readable.** Each repository's
+   git common dir is mounted read-only so git works in the sandbox. Masks
+   cover worktree paths only, so a secret file that is *committed* (on any
+   branch, in the stash or in history) is readable with `git show`, and
+   `.git/config` is readable, including any credential embedded in a remote
+   URL (`https://user:token@…`). With a cloud model provider this content
+   can leave the machine. Mitigation: keep secrets out of git history and
+   use a credential helper rather than tokens in remote URLs.
+13. **Check-then-use window for host git.** The agent's container keeps
+   running while the control plane checks the worktree's git pointers and
+   then runs host git there. A process left running in the container could
+   change the admin dir between the check and the use. This is reasoned
+   from the code, not reproduced; stopping or pausing the container around
+   host git would close it.
+14. **`sandbox.network: bridge`** gives agent and verification containers
+   network access. It is off by default and meant for development only.
+15. **Secret-name matching is case-sensitive and skips dependency
+   directories.** `.ENV` or `ID_RSA` are neither masked nor denied, and a
+   `.env` under `vendor/`, `node_modules/` or `.venv/` is not masked.

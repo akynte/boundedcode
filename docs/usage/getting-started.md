@@ -23,8 +23,10 @@ bcode
 macOS and Windows support is new and **has not yet been run on those
 systems**; see [Platforms](#platforms) below.
 
-The installer puts `boundedcode` and `bcode` in `~/.local/bin`, from a
-checksum-verified release binary, or built with Go when the release has none.
+The installer puts `boundedcode` and `bcode` in `~/.local/bin`
+(`%LOCALAPPDATA%\Programs\BoundedCode\bin` on Windows), from a
+checksum-verified release binary; `install.sh` builds with Go when no release
+has one.
 On the first run, `bcode` shows what is missing and `/setup` installs it,
 asking before every download or build. It covers what sections 2 and 3 do by
 hand: the configuration, the pinned tools, llama.cpp, the model weights and
