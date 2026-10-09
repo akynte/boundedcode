@@ -1,0 +1,38 @@
+# BoundedCode configuration for the comparative evaluation (protocol.md).
+# run.sh copies it into an isolated BOUNDEDCODE_HOME; both systems use it
+# (the baseline uses only inference, agent and sandbox).
+version: 1
+default_model: qwen3.6-35b-a3b
+inference:
+    # The llama.cpp server is started once, outside the runs, with the
+    # arguments recorded in environment.json; both systems call it.
+    mode: external
+    external_url: http://127.0.0.1:8765
+    request_timeout: 10m0s
+agent:
+    runtime: openhands
+    image: boundedcode-openhands:local
+    max_iterations: 150
+    condenser_max_events: 80
+repointel:
+    provider: codebase-memory-mcp
+    binary: codebase-memory-mcp
+    serena:
+        enabled: false
+frontier:
+    enabled: false
+sandbox:
+    kind: docker
+    engine: docker
+    network: none
+    memory: 8g
+    cpus: "8"
+task:
+    # No human answers clarification questions during an evaluation.
+    ambiguity: proceed
+budgets:
+    max_attempts: 6
+    max_wall_clock: 4h0m0s
+    max_local_tokens: 4000000
+    max_escalations: 0
+    context_pack_tokens: 24000

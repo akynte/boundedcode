@@ -1,0 +1,194 @@
+{
+ "seed": "boundedcode-comparative-2026-10-09:",
+ "dataset_revision": "846e647b9f33c0b51b739d005d13d85493c9af09",
+ "tasks": [
+  {
+   "id": "gin-gonic__gin-3820",
+   "slot": "go-dev",
+   "stratum": "development",
+   "repo": "gin-gonic/gin",
+   "base": "9f598a31aafb92d675f38f1c8371e4ac76f858bf",
+   "acceptance": "go test -v ./binding -run \"^TestMapping\"",
+   "task_spec_sha256": "77b075aa0185bfcfc2db36d7bd4ef1ee46f486d206985ebb6325edccf26b2333",
+   "reference_patch_sha256": "59c6b7ae646de1e7015fb2e5cf3c75bc0511c3a1cbacc08a0a61ae1338584ff5"
+  },
+  {
+   "id": "gin-gonic__gin-4003",
+   "slot": "go-dev",
+   "stratum": "development",
+   "repo": "gin-gonic/gin",
+   "base": "9c081de9cdd1948f521d47d170d18cbc2981c33a",
+   "acceptance": "go test . -v -run \"TestMethodNotAllowedNoRoute\"",
+   "task_spec_sha256": "3da84358e6e39ac4d7ed1922e878ff0532b77c3d696bf3b5e089d73b647abae5",
+   "reference_patch_sha256": "cf7300f525bfd5dd6e153cd69cf28d75fc8ae5fd3faca118a78648d8b2ba80f6"
+  },
+  {
+   "id": "immutable-js__immutable-js-2006",
+   "slot": "jsts",
+   "stratum": "unseen",
+   "repo": "immutable-js/immutable-js",
+   "base": "493afba6ec17d9c999dc5a15ac80c71c6bdba1c3",
+   "acceptance": "npx jest __tests__/Range.ts --verbose",
+   "task_spec_sha256": "b76e7382df3a8f48152a4113eb4e552f7539d8d29479e8c2d646867fd99f3229",
+   "reference_patch_sha256": "731c25ddabfc2a005c9019171b1245621233bf1b683214fc369ccdb95b65c5c7"
+  },
+  {
+   "id": "sharkdp__bat-2393",
+   "slot": "rust",
+   "stratum": "unseen",
+   "repo": "sharkdp/bat",
+   "base": "7c847d84b0c3c97df6badfbb39d153ad93aec74e",
+   "acceptance": "RUSTFLAGS=-Awarnings cargo test --package bat --test integration_tests cache_",
+   "task_spec_sha256": "e507f32841e2f3bf19317861cc103c5257b04ed70859fd945ba012fc0ded9ff3",
+   "reference_patch_sha256": "fb526311da65160ec5afbd0266f3c092d5964ee28dd4d6ee779f51af08eb37cb"
+  },
+  {
+   "id": "tokio-rs__axum-691",
+   "slot": "rust",
+   "stratum": "unseen",
+   "repo": "tokio-rs/axum",
+   "base": "d6ce99190b2d53e5858678264027e656197f0efa",
+   "acceptance": "RUSTFLAGS=-Awarnings cargo test --package axum --lib -- routing::tests::nest::nesting_router_at_root --exact",
+   "task_spec_sha256": "ff16eb4b081ae70aa6dcfc2c0e17b4c92ccdcef8068cd003bab1293add47a0aa",
+   "reference_patch_sha256": "33b3a9098731aef0c34373c37c365f570bd0db17a02320d672b825c1a656838e"
+  },
+  {
+   "id": "phpoffice__phpspreadsheet-3463",
+   "slot": "php",
+   "stratum": "unseen",
+   "repo": "phpoffice/phpspreadsheet",
+   "base": "99a7de3812c9033b80eddbf759efd298cd50c3c5",
+   "acceptance": "./vendor/bin/phpunit --testdox --colors=never tests/PhpSpreadsheetTests/Writer/Xlsx/FunctionPrefixTest.php",
+   "task_spec_sha256": "a70c0661780e668dda87ff26880b8ce91e7cea62bf5fd54db7b54fd222ad6cad",
+   "reference_patch_sha256": "4235fd0af46d8fe4c6e3202b0907cf4abd3c0f269031edf6ec8b6d5e8517269d"
+  },
+  {
+   "id": "briannesbitt__carbon-3103",
+   "slot": "php",
+   "stratum": "unseen",
+   "repo": "briannesbitt/carbon",
+   "base": "d481d8d69a94dc00e5c1b147ec1f7e7492626b12",
+   "acceptance": "vendor/bin/phpunit --testdox --colors=never tests/CarbonImmutable/SettersTest.php",
+   "task_spec_sha256": "e50cbd6a821e95462cb8cb705592605172d779387825bee9b0a01c386473f610",
+   "reference_patch_sha256": "ded5609d4240b06692ac065f5928fccc6d3053df0eb643e5f9c27781be2cfb96"
+  },
+  {
+   "id": "fluent__fluentd-3616",
+   "slot": "ruby",
+   "stratum": "unseen",
+   "repo": "fluent/fluentd",
+   "base": "26c62cddbf236361b797eac498301c7d4a77d010",
+   "acceptance": "bundle exec ruby test/plugin/test_in_http.rb -v -n '/test_application/'",
+   "task_spec_sha256": "d80ead46e4951ebcd333315095d888bb8aa164d957b0ef6ec6731c1c1e7c778c",
+   "reference_patch_sha256": "8d90a1d85d4db29bc2a39a20b10730a18e4365816cc2045ef6c5323d0ab8eb84"
+  }
+ ],
+ "slots": {
+  "go-dev": {
+   "screened": [
+    "gin-gonic__gin-3820",
+    "gin-gonic__gin-4003",
+    "prometheus__prometheus-14861",
+    "gin-gonic__gin-3741",
+    "prometheus__prometheus-9248"
+   ],
+   "valid": [
+    "gin-gonic__gin-3820",
+    "gin-gonic__gin-4003",
+    "prometheus__prometheus-14861",
+    "gin-gonic__gin-3741",
+    "prometheus__prometheus-9248"
+   ],
+   "picked": [
+    "gin-gonic__gin-3820",
+    "gin-gonic__gin-4003"
+   ]
+  },
+  "jsts": {
+   "screened": [
+    "babel__babel-16130",
+    "babel__babel-15649",
+    "facebook__docusaurus-8927",
+    "immutable-js__immutable-js-2005",
+    "facebook__docusaurus-10309",
+    "immutable-js__immutable-js-2006"
+   ],
+   "valid": [
+    "immutable-js__immutable-js-2006"
+   ],
+   "picked": [
+    "immutable-js__immutable-js-2006"
+   ]
+  },
+  "rust": {
+   "screened": [
+    "sharkdp__bat-2393",
+    "tokio-rs__axum-691",
+    "burntsushi__ripgrep-2209",
+    "burntsushi__ripgrep-2576",
+    "sharkdp__bat-3108",
+    "tokio-rs__axum-734"
+   ],
+   "valid": [
+    "sharkdp__bat-2393",
+    "tokio-rs__axum-691",
+    "burntsushi__ripgrep-2209",
+    "burntsushi__ripgrep-2576",
+    "sharkdp__bat-3108",
+    "tokio-rs__axum-734"
+   ],
+   "picked": [
+    "sharkdp__bat-2393",
+    "tokio-rs__axum-691"
+   ]
+  },
+  "php": {
+   "screened": [
+    "phpoffice__phpspreadsheet-3463",
+    "phpoffice__phpspreadsheet-3659",
+    "briannesbitt__carbon-3041",
+    "briannesbitt__carbon-3103",
+    "phpoffice__phpspreadsheet-4313",
+    "briannesbitt__carbon-2762"
+   ],
+   "valid": [
+    "phpoffice__phpspreadsheet-3463",
+    "briannesbitt__carbon-3103",
+    "phpoffice__phpspreadsheet-4313",
+    "briannesbitt__carbon-2762"
+   ],
+   "picked": [
+    "phpoffice__phpspreadsheet-3463",
+    "briannesbitt__carbon-3103"
+   ]
+  },
+  "ruby": {
+   "screened": [
+    "jekyll__jekyll-9141",
+    "fluent__fluentd-4598",
+    "fluent__fluentd-3328",
+    "fluent__fluentd-3616",
+    "fluent__fluentd-3466",
+    "fluent__fluentd-3917"
+   ],
+   "valid": [
+    "fluent__fluentd-3616"
+   ],
+   "picked": [
+    "fluent__fluentd-3616"
+   ]
+  },
+  "java": {
+   "screened": [
+    "google__gson-2158",
+    "google__gson-2311",
+    "google__gson-2061",
+    "google__gson-2024",
+    "google__gson-2134",
+    "google__gson-1014"
+   ],
+   "valid": [],
+   "picked": []
+  }
+ }
+}

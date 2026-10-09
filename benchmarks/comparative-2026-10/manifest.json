@@ -1,0 +1,159 @@
+{
+ "name": "comparative-2026-10",
+ "purpose": "Paired comparison of BoundedCode against a plain OpenHands agent with the same model, sandbox and per-task wall-clock limit, on public tasks not used in any earlier BoundedCode work. See protocol.md.",
+ "seed": "boundedcode-comparative-2026-10-09:",
+ "dataset": {
+  "hf": "SWE-bench/SWE-bench_Multilingual",
+  "revision": "846e647b9f33c0b51b739d005d13d85493c9af09",
+  "file": "data/test-00000-of-00001.parquet",
+  "file_sha256": "92abca7cb527b41a9f66d03a26ce441ff7319e3a49f985998fd56be4bb9b08b2",
+  "license": "MIT"
+ },
+ "slots": [
+  {
+   "name": "go-dev",
+   "stratum": "development",
+   "repos": [
+    "caddyserver/caddy",
+    "gin-gonic/gin",
+    "prometheus/prometheus"
+   ]
+  },
+  {
+   "name": "jsts",
+   "stratum": "unseen",
+   "repos": [
+    "babel/babel",
+    "facebook/docusaurus",
+    "immutable-js/immutable-js",
+    "mrdoob/three.js"
+   ]
+  },
+  {
+   "name": "rust",
+   "stratum": "unseen",
+   "repos": [
+    "sharkdp/bat",
+    "burntsushi/ripgrep",
+    "tokio-rs/axum"
+   ]
+  },
+  {
+   "name": "php",
+   "stratum": "unseen",
+   "repos": [
+    "briannesbitt/carbon",
+    "phpoffice/phpspreadsheet"
+   ]
+  },
+  {
+   "name": "ruby",
+   "stratum": "unseen",
+   "repos": [
+    "fluent/fluentd",
+    "jekyll/jekyll",
+    "faker-ruby/faker"
+   ]
+  },
+  {
+   "name": "java",
+   "stratum": "unseen",
+   "repos": [
+    "google/gson"
+   ]
+  }
+ ],
+ "tasks_per_slot": 2,
+ "screen_per_slot": 6,
+ "exclude_instances": [],
+ "gold_must_not_touch": "(^|/)(go\\.mod|go\\.sum|package\\.json|package-lock\\.json|pnpm-lock\\.yaml|yarn\\.lock|Cargo\\.toml|Cargo\\.lock|composer\\.json|composer\\.lock|Gemfile|Gemfile\\.lock|[^/]*\\.gemspec|pom\\.xml|build\\.gradle(\\.kts)?)$",
+ "dependencies": {
+  "caddyserver/caddy": [
+   "go mod download && go list -deps -test ./... >/dev/null"
+  ],
+  "gin-gonic/gin": [
+   "go mod download && go list -deps -test ./... >/dev/null"
+  ],
+  "prometheus/prometheus": [
+   "go mod download && go list -deps -test ./... >/dev/null"
+  ],
+  "sharkdp/bat": [
+   "cargo fetch && cargo test --no-run --quiet"
+  ],
+  "burntsushi/ripgrep": [
+   "cargo fetch && cargo test --no-run --quiet"
+  ],
+  "tokio-rs/axum": [
+   "cargo fetch && cargo test --no-run --quiet"
+  ],
+  "briannesbitt/carbon": [
+   "composer install --no-interaction --no-progress --prefer-dist --ignore-platform-req=php"
+  ],
+  "phpoffice/phpspreadsheet": [
+   "composer install --no-interaction --no-progress --prefer-dist --ignore-platform-req=php"
+  ],
+  "fluent/fluentd": [
+   "bundle config set --local path vendor/bundle && bundle install"
+  ],
+  "jekyll/jekyll": [
+   "bundle config set --local path vendor/bundle && bundle install"
+  ],
+  "faker-ruby/faker": [
+   "bundle config set --local path vendor/bundle && bundle install"
+  ],
+  "google/gson": [
+   "mvn -B -q -Dtest=NoSuchTest -Dsurefire.failIfNoSpecifiedTests=false test"
+  ],
+  "babel/babel": [
+   "if [ -f yarn.lock ]; then pm=\"$(node -p \"require('./package.json').packageManager||'yarn@1.22.22'\")\"; case \"$pm\" in yarn@1*) npx -y \"${pm%%+*}\" install --frozen-lockfile --ignore-scripts ;; *) node /usr/local/lib/node_modules/corepack/dist/corepack.js \"${pm%%+*}\" install --immutable --mode=skip-build ;; esac; elif [ -f package-lock.json ]; then npm ci --ignore-scripts --no-audit --no-fund; else npm install --ignore-scripts --no-audit --no-fund; fi"
+  ],
+  "facebook/docusaurus": [
+   "if [ -f yarn.lock ]; then pm=\"$(node -p \"require('./package.json').packageManager||'yarn@1.22.22'\")\"; case \"$pm\" in yarn@1*) npx -y \"${pm%%+*}\" install --frozen-lockfile --ignore-scripts ;; *) node /usr/local/lib/node_modules/corepack/dist/corepack.js \"${pm%%+*}\" install --immutable --mode=skip-build ;; esac; elif [ -f package-lock.json ]; then npm ci --ignore-scripts --no-audit --no-fund; else npm install --ignore-scripts --no-audit --no-fund; fi"
+  ],
+  "immutable-js/immutable-js": [
+   "if [ -f yarn.lock ]; then pm=\"$(node -p \"require('./package.json').packageManager||'yarn@1.22.22'\")\"; case \"$pm\" in yarn@1*) npx -y \"${pm%%+*}\" install --frozen-lockfile --ignore-scripts ;; *) node /usr/local/lib/node_modules/corepack/dist/corepack.js \"${pm%%+*}\" install --immutable --mode=skip-build ;; esac; elif [ -f package-lock.json ]; then npm ci --ignore-scripts --no-audit --no-fund; else npm install --ignore-scripts --no-audit --no-fund; fi"
+  ],
+  "mrdoob/three.js": [
+   "if [ -f yarn.lock ]; then pm=\"$(node -p \"require('./package.json').packageManager||'yarn@1.22.22'\")\"; case \"$pm\" in yarn@1*) npx -y \"${pm%%+*}\" install --frozen-lockfile --ignore-scripts ;; *) node /usr/local/lib/node_modules/corepack/dist/corepack.js \"${pm%%+*}\" install --immutable --mode=skip-build ;; esac; elif [ -f package-lock.json ]; then npm ci --ignore-scripts --no-audit --no-fund; else npm install --ignore-scripts --no-audit --no-fund; fi"
+  ]
+ },
+ "budgets": {
+  "task_timeout": "60m",
+  "agent_max_iterations": 150,
+  "boundedcode_max_attempts": 6
+ },
+ "runs_per_system": 1,
+ "command_adaptations": [
+  {
+   "from": "^mvnd ",
+   "to": "mvn ",
+   "why": "the Maven daemon is not in the sandbox image; plain Maven runs the same goals"
+  },
+  {
+   "from": " && mvnd ",
+   "to": " && mvn ",
+   "why": "the same, for every later command in the chain"
+  },
+  {
+   "from": "^yarn jest ",
+   "to": "node_modules/.bin/jest ",
+   "why": "yarn is not in the sandbox image; the same jest binary"
+  },
+  {
+   "from": "^yarn test ",
+   "to": "node_modules/.bin/jest ",
+   "why": "the repository's test script runs jest; the same binary without yarn"
+  }
+ ],
+ "slot_changes_before_screening": [
+  "jsts-dev (axios, vuejs/core) had no eligible instance: every one was used in earlier BoundedCode work. Replaced, before any screening or run, by jsts with JavaScript/TypeScript repositories never used in BoundedCode work.",
+  "java (google/gson): every candidate targets Java 7, which the sandbox's default JDK 21 cannot compile, and BoundedCode's verification presets cannot select another JDK per project. Adapting only the acceptance command would put the two systems in different environments, so the slot is left empty (decided before any screening or run)."
+ ],
+ "preparation_fixes_before_screening": [
+  "Go recipes ran with the image's GOPROXY=off; preparation now sets the public Go proxy.",
+  "Yarn 2+ (babel) is not on npm as 'yarn'; preparation runs it through Node's bundled corepack.",
+  "Rust recipes ran with the image's CARGO_NET_OFFLINE=true; preparation now allows network.",
+  "Composer lock files cap PHP below the image's 8.4; dependencies are installed with --ignore-platform-req=php (environment adaptation; gate 1 decides whether the acceptance still runs).",
+  "Gate 1 first failed every Rust candidate because the harness's acceptance check mounted the Go module cache but not the Cargo registry. The acceptance check now mounts the same package caches as the agent and verification (internal/benchmark checkSpec), and the six Rust candidates were screened again."
+ ]
+}

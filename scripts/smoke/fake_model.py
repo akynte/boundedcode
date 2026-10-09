@@ -13,8 +13,9 @@ cloud account. It is not a model: replies are fixed.
   after the command's result it calls the finish tool. The file holds one
   command, or several separated by lines containing only "---": the first
   for the task, the next for the first retry, and so on (the last one
-  repeats). Tool names and required arguments are read from the request's
-  tool schemas.
+  repeats). Within one entry, lines containing only "+++" separate commands
+  run one after another in the same turn. Tool names and required
+  arguments are read from the request's tool schemas.
 
 Every request is appended, summarised, to --log. The server listens on
 127.0.0.1 only and prints the port it bound on stdout.
@@ -27,13 +28,14 @@ import sys
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+# A neutral task contract: the stand-in does not read the request.
 CONTRACT = {
-    "required": ["Total applies the 10% bulk discount to orders of exactly 10 items"],
+    "required": ["the behaviour the request describes"],
     "acceptable_alternatives": [],
     "constraints": [],
     "explicitly_not_required": [],
     "unknown_or_ambiguous": [],
-    "acceptance_evidence": ["a test that Total of 10 items at 100 cents is 900"],
+    "acceptance_evidence": ["a test that demonstrates the requested behaviour"],
 }
 
 
@@ -79,18 +81,21 @@ class Handler(BaseHTTPRequestHandler):
         body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))) or b"{}")
         tools = body.get("tools") or []
         msgs = body.get("messages") or []
-        last = msgs[-1].get("role") if msgs else ""
         turn = sum(1 for m in msgs if m.get("role") == "user") - 1
+        # Commands already run in this turn: tool results after the last
+        # instruction.
+        last_user = max((i for i, m in enumerate(msgs) if m.get("role") == "user"), default=-1)
+        done = sum(1 for m in msgs[last_user + 1:] if m.get("role") == "tool")
         if not tools:
             kind, message = "control", {"role": "assistant", "content": json.dumps(CONTRACT)}
             finish = "stop"
         else:
             term, fin = pick(tools, "terminal", "bash", "execute"), pick(tools, "finish")
-            if last != "tool" and term:
-                cmds = [c.strip() for c in open(self.server.command_file).read().split("\n---\n")]
-                cmd = cmds[min(max(turn, 0), len(cmds) - 1)]
-                call = (term["name"], fill_required(term.get("parameters"), {"command": cmd}))
-                kind = "agent:command %d" % turn
+            turns = [c.strip() for c in open(self.server.command_file).read().split("\n---\n")]
+            steps = [c.strip() for c in turns[min(max(turn, 0), len(turns) - 1)].split("\n+++\n")]
+            if done < len(steps) and term:
+                call = (term["name"], fill_required(term.get("parameters"), {"command": steps[done]}))
+                kind = "agent:command %d.%d" % (turn, done)
             else:
                 call = (fin["name"], fill_required(fin.get("parameters"), {"message": "Done."}))
                 kind = "agent:finish"

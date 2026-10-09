@@ -123,6 +123,10 @@ type TaskResult struct {
 	Interrupted     bool     `json:"interrupted,omitempty"` // a controlled interruption and resume happened
 	// StateDir holds the task's state database and agent persistence.
 	StateDir string `json:"state_dir,omitempty"`
+	// AgentPatch is the agent's final change against the base commit
+	// (git diff, untracked files included), saved before the hidden
+	// acceptance files are applied.
+	AgentPatch string `json:"agent_patch,omitempty"`
 	// Intel summarizes repository intelligence and agent tool use, from the
 	// task's audit events.
 	Intel IntelMetrics `json:"intel"`
@@ -324,6 +328,11 @@ func (s *SuiteRunner) runOne(ctx context.Context, model string, spec TaskSpec) (
 	for _, wt := range wts {
 		byRepo[wt.RepoName] = wt
 	}
+	for _, name := range spec.Repos {
+		if wt, ok := byRepo[name]; ok {
+			res.AgentPatch = saveAgentPatch(ctx, dir, name, wt.Path, wt.BaseCommit)
+		}
+	}
 	// Hidden acceptance: write files, run checks in the sandbox.
 	for _, h := range spec.Hidden {
 		wt := byRepo[h.Repo]
@@ -514,6 +523,15 @@ func checkSpec(ctx context.Context, spec TaskSpec, dir string, run []string) san
 		mounts = append(mounts, sandbox.Mount{Host: mc, Target: mc, ReadOnly: true})
 		env["GOMODCACHE"], env["GOFLAGS"], env["GOPROXY"] = mc, "-buildvcs=false -mod=mod", "off"
 	}
+	// The other languages' package caches (Cargo, Maven, Gradle), as the
+	// agent and verification get them, with a private writable layer.
+	if len(spec.Sources) > 0 {
+		if work, err := os.MkdirTemp(filepath.Dir(dir), "acceptance-packages-"); err == nil {
+			if pm, err := sandbox.HostPackageCaches().Apply(work, env); err == nil {
+				mounts = append(mounts, pm...)
+			}
+		}
+	}
 	return sandbox.Spec{Argv: run, Workdir: dir, Mounts: mounts, Env: env}
 }
 
@@ -610,7 +628,11 @@ func tailStr(s string, n int) string {
 // SourcesDir caches "git:" sources (under $HOME so the container engine can
 // see them). Dependencies a dataset's evaluation environment provides (Go
 // modules, node_modules) are installed there once by the preparation script.
+// BC_BENCH_SOURCES overrides it (an evaluation with its own sources).
 func SourcesDir() string {
+	if d := os.Getenv("BC_BENCH_SOURCES"); d != "" {
+		return d
+	}
 	home, _ := os.UserHomeDir()
 	return filepath.Join(home, ".cache", "boundedcode", "bench-sources")
 }
@@ -658,6 +680,20 @@ func gitSourceDir(ctx context.Context, spec string) (string, error) {
 // applyHiddenPatch resets the files a patch touches to the base commit and
 // applies it, so the acceptance tests are exactly the dataset's, whatever
 // the agent did to those files.
+// saveAgentPatch writes the agent's change in worktree against base to
+// dir/agent-<repo>.patch and returns its path ("" when it cannot).
+func saveAgentPatch(ctx context.Context, dir, repo, worktree, base string) string {
+	d, err := gitops.Diff(ctx, worktree, base, false)
+	if err != nil {
+		return ""
+	}
+	p := filepath.Join(dir, "agent-"+repo+".patch")
+	if err := os.WriteFile(p, []byte(d), 0o644); err != nil {
+		return ""
+	}
+	return p
+}
+
 func applyHiddenPatch(ctx context.Context, dir, base, patch string) error {
 	f, err := os.CreateTemp("", "bc-hidden-*.patch")
 	if err != nil {

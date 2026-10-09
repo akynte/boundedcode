@@ -94,6 +94,7 @@ func (s *SuiteRunner) RunBaseline(ctx context.Context, model string, spec TaskSp
 		res.Error = err.Error()
 	}
 	res.LocalTokens, res.GeneratedTokens, res.CachedTokens = gw.Stats()
+	res.AgentPatch = saveAgentPatch(ctx, dir, name, wt, base)
 	for _, h := range spec.Hidden {
 		if h.Patch == "" {
 			res.Error = "baseline supports patch acceptance only"

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/akynte/boundedcode/internal/contextplan"
+	"github.com/akynte/boundedcode/internal/gitops"
 	"github.com/akynte/boundedcode/internal/sandbox"
 	"github.com/akynte/boundedcode/internal/store"
 	"github.com/akynte/boundedcode/internal/telemetry"
@@ -122,5 +123,32 @@ func TestCollectIntel(t *testing.T) {
 	m := collectIntel(ctx, st.DB, "t1")
 	if m.Packs != 1 || m.CodeTokens != 400 || m.NavCalls != 6 || m.NavSymbols != 2 || m.GraphCalls != 1 || m.AgentToolCalls != 1 {
 		t.Fatalf("%+v", m)
+	}
+}
+
+// TestSaveAgentPatch: the agent's change, untracked files included, is
+// kept before the hidden acceptance files touch the worktree.
+func TestSaveAgentPatch(t *testing.T) {
+	ctx := context.Background()
+	repo := t.TempDir()
+	run := func(args ...string) string {
+		out, err := gitops.Run(ctx, repo, args...)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return out
+	}
+	_ = os.WriteFile(filepath.Join(repo, "a.go"), []byte("package a\n"), 0o644)
+	run("init", "-q")
+	run("add", "-A")
+	run("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "base")
+	base := run("rev-parse", "HEAD")
+	_ = os.WriteFile(filepath.Join(repo, "a.go"), []byte("package a\n\nvar X = 1\n"), 0o644)
+	_ = os.WriteFile(filepath.Join(repo, "a_test.go"), []byte("package a\n"), 0o644)
+	dir := t.TempDir()
+	p := saveAgentPatch(ctx, dir, "r", repo, base)
+	b, err := os.ReadFile(p)
+	if err != nil || !strings.Contains(string(b), "+var X = 1") || !strings.Contains(string(b), "a_test.go") {
+		t.Fatalf("patch %q: %v\n%s", p, err, b)
 	}
 }
