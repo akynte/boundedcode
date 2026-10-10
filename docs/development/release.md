@@ -84,11 +84,23 @@ cd dist && sha256sum -c /path/to/downloaded/SHA256SUMS
 ```
 
 `make dist` builds with `-trimpath` and without cgo. It packs the licenses
-archive with the commit time and neutral ownership. Since this change, it
-also gives the SBOMs the commit time (`SOURCE_DATE_EPOCH`).
+archive with the commit time, neutral ownership and fixed permission bits.
+The SBOMs also get the commit time (`SOURCE_DATE_EPOCH`).
 
-**Measured on 2026-10-10.** v0.1.0-alpha.4 was rebuilt from its tag with
-Go 1.27.1:
+**v0.1.0-alpha.5.** At that tag, the licenses archive still took its
+permission bits from the checkout, so they depended on your umask. Rebuild
+that tag after `umask 022`, as the release workflow's runner uses. Later
+tags normalise the bits.
+
+**Measured on 2026-10-10.**
+- **v0.1.0-alpha.5** was built and attested by the release workflow. A
+  local rebuild of its tag with Go 1.27.2 gave identical binaries and
+  SBOMs (12 of 12). The licenses archive also matched (13 of 13) when
+  rebuilt with `umask 022`. It differed with the machine's `umask 002`,
+  only in permission bits; that is fixed for later releases.
+  `gh attestation verify` passed for all 14 assets.
+
+v0.1.0-alpha.4 was rebuilt from its tag with Go 1.27.1:
 - All six binaries and the licenses archive matched the published
   checksums.
 - The six SBOMs did not. They differed only in their creation time and

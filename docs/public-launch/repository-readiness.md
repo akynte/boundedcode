@@ -202,9 +202,11 @@ when this audit was written. They are listed in suggested order.
 - item 10: decided as option A, the release workflow with build
   attestation (`.github/workflows/release.yml`).
 
+- item 11: v0.1.0-alpha.5, released on 2026-10-10 by the release workflow,
+  with attestations and reproducible SBOMs.
+
 Still open:
-- item 2: check the issue forms in a browser;
-- item 11: the next release.
+- item 2: check the issue forms in a browser.
 
 | # | Action | Why | How |
 |---|---|---|---|

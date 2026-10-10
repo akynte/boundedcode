@@ -1,7 +1,8 @@
 GO ?= go
 BIN := bin/boundedcode
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
-# Release archives use the commit time, so they are reproducible.
+# Release archives use the commit time and fixed permission bits (not the
+# builder's umask), so they are reproducible.
 SOURCE_DATE_EPOCH ?= $(shell git log -1 --format=%ct 2>/dev/null || echo 0)
 # The SBOM generator reads it from the environment for its creation time.
 export SOURCE_DATE_EPOCH
@@ -57,7 +58,7 @@ dist: licenses
 		$(GO) run ./scripts/sbom -version $(VERSION) -goos $$os -goarch $$arch -binary $$bin -o dist/SBOM-$$os-$$arch.spdx.json; \
 	done
 	cp -r LICENSE NOTICE THIRD_PARTY_NOTICES.md LICENSES dist/
-	tar --sort=name --owner=0 --group=0 --numeric-owner --mtime=@$(SOURCE_DATE_EPOCH) \
+	tar --sort=name --owner=0 --group=0 --numeric-owner --mode='u+rwX,go+rX,go-w' --mtime=@$(SOURCE_DATE_EPOCH) \
 		-czf dist/$(LICENSES_TGZ) LICENSE NOTICE THIRD_PARTY_NOTICES.md LICENSES
 	cd dist && sha256sum boundedcode-linux-* boundedcode-darwin-* boundedcode-windows-* SBOM-*.spdx.json $(LICENSES_TGZ) > SHA256SUMS
 
