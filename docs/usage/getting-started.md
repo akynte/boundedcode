@@ -187,7 +187,7 @@ Linux path, and `bcode setup` installs the same pieces on every platform.
 | Need | Version | Why | Check |
 |---|---|---|---|
 | A machine for local inference | default model (Qwen3.6-35B-A3B): NVIDIA GPU (8 GB+) and 32–64 GB RAM, as validated; smaller profiles fit smaller machines | local inference (MoE expert offload for the default); not needed with a cloud model API | `bcode model recommend` |
-| Go | 1.27.1+ (`go.mod`) | build the CLI (not needed with a release binary) | `go version` |
+| Go | 1.27.2+ (`go.mod`) | build the CLI (not needed with a release binary) | `go version` |
 | Docker (or Podman) | tested: Docker 29.8; Podman is configurable but not tested on the reference machine; Docker Desktop on macOS and Windows | agent sandbox, contained Codex | `docker version` |
 | CUDA toolkit | tested: 13.4 (`nvcc` in `/usr/local/cuda/bin`) | only to build llama.cpp with CUDA on Linux (the prebuilt Windows CUDA build ships its runtime) | `nvcc --version` |
 | uv | 0.12.18 (the version the sandbox image and CI use) | adapter development without containers, Serena setup | `uv --version` |

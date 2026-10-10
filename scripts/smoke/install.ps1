@@ -89,3 +89,6 @@ try {
     [Environment]::SetEnvironmentVariable('Path', $savedPath, 'User')
     Remove-Item -Recurse -Force $work -ErrorAction SilentlyContinue
 }
+# The last native command (setup --check) exits non-zero by design; the
+# runner would report its exit code as the script's.
+exit 0

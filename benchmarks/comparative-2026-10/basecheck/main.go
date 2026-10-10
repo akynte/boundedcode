@@ -53,7 +53,7 @@ func main() {
 			ids = append(ids, strings.TrimSuffix(e.Name(), ".yaml"))
 		}
 	}
-	gomod, _ := exec.Command("go", "env", "GOMODCACHE").Output()
+	gomod, _ := exec.CommandContext(ctx, "go", "env", "GOMODCACHE").Output()
 	e := &verify.Engine{
 		Sandbox: &sandbox.Container{Engine: "docker", Image: *image, Network: "none", Memory: "8g", CPUs: "8",
 			PIDs: 4096, UID: os.Getuid(), GID: os.Getgid()},
@@ -83,7 +83,7 @@ func main() {
 			dir := filepath.Join(*eval, "basecheck", id)
 			_ = os.RemoveAll(dir)
 			_ = os.MkdirAll(filepath.Dir(dir), 0o755)
-			if out, err := exec.Command("cp", "-a", src, dir).CombinedOutput(); err != nil {
+			if out, err := exec.CommandContext(ctx, "cp", "-a", src, dir).CombinedOutput(); err != nil {
 				o.Error = fmt.Sprintf("copy: %v %s", err, out)
 				return
 			}

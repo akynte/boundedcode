@@ -7,6 +7,9 @@ Fixes from the public-launch readiness audit
 
 ### Security
 
+- Builds now require Go 1.27.2, which fixes eight standard-library
+  vulnerabilities reachable from BoundedCode (net/http, its HTTP/2
+  transport, crypto/tls and mime/multipart; GO-2026-6603 to GO-2026-6617).
 - Host git no longer runs commands configured inside a git repository the
   agent creates in its worktree. Once recorded as a gitlink, such a
   repository's own filter drivers ran on the host during checkpoint
