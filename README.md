@@ -481,10 +481,17 @@ including results that did not support a release.
 
 ## Contributing
 
-Bug reports, model compatibility reports and pull requests are welcome.
+Bug reports, platform and model compatibility reports, reports of wrong
+verification results, evaluation results and pull requests are welcome.
+The [issue forms](https://github.com/akynte/boundedcode/issues/new/choose)
+ask for what a fix needs.
 
-- [CONTRIBUTING.md](CONTRIBUTING.md): development setup, tests, and the
-  DCO sign-off on every commit (`git commit -s`).
+- [Contributor onboarding](docs/development/onboarding.md): from a fresh
+  clone to a pull request, with first-contribution opportunities.
+- [CONTRIBUTING.md](CONTRIBUTING.md): development setup, tool versions,
+  what CI checks, and the DCO sign-off on every commit (`git commit -s`).
+- [Submitting an evaluation result](benchmarks/submitting-results.md):
+  how to report a benchmark run so others can reproduce it.
 - [SECURITY.md](SECURITY.md): report vulnerabilities privately, not in issues.
 - [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) and [GOVERNANCE.md](GOVERNANCE.md).
 

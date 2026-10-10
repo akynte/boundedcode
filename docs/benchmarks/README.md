@@ -135,6 +135,12 @@ without BoundedCode's control plane.
 denied the baseline's agent its build environment. That baseline arm was
 re-run, and both arms are published.
 
+## External results
+
+Results from other machines, models and task sets can be submitted; see
+[Submitting an evaluation result](../../benchmarks/submitting-results.md).
+None have been submitted yet.
+
 ## Other measurements
 
 - Earlier development benchmarks and their raw JSON and Markdown records

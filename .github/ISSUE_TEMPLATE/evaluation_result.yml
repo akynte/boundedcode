@@ -1,0 +1,66 @@
+name: Evaluation result
+description: Submit a reproducible benchmark or evaluation result, favourable or not.
+labels: [evaluation-result]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Read [Submitting an evaluation result](https://github.com/akynte/boundedcode/blob/main/benchmarks/submitting-results.md) first. A pull request with the raw files is preferred; use this form if you cannot open one.
+        Report **every** run, including failures. Attach the raw `bench tasks --out` JSON and Markdown.
+  - type: textarea
+    id: tasks
+    attributes:
+      label: Task set and selection rule
+      description: Dataset and revision, task IDs, and the rule that chose them, fixed before any run. Any screening you applied.
+    validations:
+      required: true
+  - type: textarea
+    id: results
+    attributes:
+      label: Results, every run
+      description: One line per run, with its outcome (hidden acceptance pass or fail) and BoundedCode's verification result. Include failed, timed-out and broken runs, with the reason.
+    validations:
+      required: true
+  - type: textarea
+    id: baseline
+    attributes:
+      label: Baseline, if any
+      description: What you compared against (for example `bench tasks --baseline`), with its runs.
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: |
+        `boundedcode version`; the model (repository, file and revision, or the cloud model ID); `llama-server --version`; the hardware; the OS and container engine; your config.yaml with credentials removed.
+    validations:
+      required: true
+  - type: textarea
+    id: hidden
+    attributes:
+      label: Hidden acceptance
+      description: How the agent was kept from seeing the acceptance tests and reference patches. "bench tasks hidden section" if you used it unchanged.
+    validations:
+      required: true
+  - type: textarea
+    id: deviations
+    attributes:
+      label: Deviations
+      description: Anything changed after the first run, and why. "None" if nothing was.
+    validations:
+      required: true
+  - type: textarea
+    id: files
+    attributes:
+      label: Raw files
+      description: Attach or link the JSON and Markdown reports and any logs.
+    validations:
+      required: true
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: Confirmation
+      options:
+        - label: This reports every run I made on this task set, including failures.
+          required: true
+        - label: The files contain no credentials, private source code or model weights.
+          required: true

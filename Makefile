@@ -3,6 +3,8 @@ BIN := bin/boundedcode
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 # Release archives use the commit time, so they are reproducible.
 SOURCE_DATE_EPOCH ?= $(shell git log -1 --format=%ct 2>/dev/null || echo 0)
+# The SBOM generator reads it from the environment for its creation time.
+export SOURCE_DATE_EPOCH
 LICENSES_TGZ := boundedcode-$(VERSION)-licenses.tar.gz
 LDFLAGS := -s -w -X github.com/akynte/boundedcode/internal/buildinfo.Version=$(VERSION)
 

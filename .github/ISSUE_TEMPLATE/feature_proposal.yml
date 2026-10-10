@@ -1,0 +1,41 @@
+name: Feature proposal
+description: Propose a change or a new capability.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Proposals are judged by the problem they solve. Changes to architecture need an ADR before code (`docs/architecture/adr/`).
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What you are trying to do and what gets in the way. A concrete repository or workflow helps.
+    validations:
+      required: true
+  - type: textarea
+    id: current
+    attributes:
+      label: Why current behaviour is not enough
+      description: What you tried with the existing commands or configuration.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behaviour
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: Effect on safety and verification
+      description: Does this touch the sandbox, command policy, git handling or the verification gate? How would it be tested?
+  - type: dropdown
+    id: contribute
+    attributes:
+      label: Would you implement it?
+      options:
+        - "Yes, with guidance"
+        - "Maybe"
+        - "No"

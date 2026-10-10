@@ -71,6 +71,11 @@ jobs:
         run: |
           bin/boundedcode setup --only config --yes
           bin/boundedcode setup --only sandbox --yes
+      - name: sandbox integration tests (skipped in the ci workflow, which has no image)
+        shell: bash
+        env:
+          BC_TEST_DOCKER_IMAGE: boundedcode-openhands:local
+        run: go test -count=1 -json ./internal/sandbox/ ./internal/agent/openhands/ ./internal/benchmark/ ./internal/frontier/ ./internal/verify/ | go run ./scripts/gotestsummary
       - name: first-task smoke (scripted model, Docker sandbox)
         run: scripts/smoke/first-task.sh "$PWD/bin/boundedcode"
       - name: evidence demo, scripted (demo/evidence)

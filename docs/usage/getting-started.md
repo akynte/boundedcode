@@ -72,6 +72,7 @@ Observed evidence for each platform is in the
 | Sandbox | Docker or Podman | Docker Desktop or Podman machine | Docker Desktop (WSL 2 backend) |
 | Cloud providers | yes | yes | yes |
 | Serena (optional) | yes | yes (an interrupted run can leave language servers running) | not supported yet |
+| Unit tests in CI | pass | 5 packages fail (report only; [details](../development/onboarding.md#first-contribution-opportunities)) | 14 packages fail (report only) |
 
 **Windows notes.** The agent's sandbox is a Linux container; BoundedCode
 mounts your repositories at `/host/<drive>/...` inside it and translates

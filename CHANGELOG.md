@@ -63,6 +63,27 @@ Fixes from the public-launch readiness audit
     (`first-task.sh`).
   - CI runs them in `.github/workflows/smoke.yml`.
 
+### Contributing and releases
+
+- Issue forms for bug reports, installation problems, platform
+  compatibility, wrong verification results, feature proposals, model
+  compatibility and evaluation results. Blank issues are off, and security
+  reports are pointed to private reporting.
+- [Contributor onboarding](docs/development/onboarding.md), with
+  first-contribution opportunities taken from observed CI failures.
+- CONTRIBUTING.md states the tool versions and what CI checks, including
+  what is report-only, skipped or weekly.
+- [Submitting an evaluation result](benchmarks/submitting-results.md).
+- CI lists skipped tests and their reasons in the job summary. The macOS
+  and Windows test step, still non-blocking, now marks itself failed and
+  raises a warning when tests fail. The weekly `first-task` job also runs
+  the sandbox integration tests against the built image.
+- SBOMs are reproducible: their creation time comes from
+  `SOURCE_DATE_EPOCH` (the commit time in `make dist`), and each target's
+  SBOM has its own document namespace. "Verifying a release" in
+  `docs/development/release.md` describes the checksum check and the
+  rebuild.
+
 ### Comparative evaluation
 
 - [benchmarks/comparative-2026-10](benchmarks/comparative-2026-10/report.md):

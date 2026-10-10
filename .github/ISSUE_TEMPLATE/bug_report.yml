@@ -1,0 +1,76 @@
+name: Bug report
+description: Something does not work as documented.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use a more specific form if one fits: installation, platform compatibility, or a verification result that was wrong.
+        **Security problems** (sandbox escape, secret exposure, verification bypass): do not open an issue; see [SECURITY.md](https://github.com/akynte/boundedcode/blob/main/SECURITY.md).
+        Review everything you paste: remove secrets, tokens, private paths and proprietary code.
+  - type: input
+    id: version
+    attributes:
+      label: BoundedCode version
+      description: Output of `boundedcode version`.
+      placeholder: boundedcode v0.1.0-alpha.4 618ed508
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Linux
+        - macOS
+        - Windows
+        - Other
+    validations:
+      required: true
+  - type: dropdown
+    id: provider
+    attributes:
+      label: Model provider
+      options:
+        - Local model (llama.cpp)
+        - Cloud API (OpenAI, Anthropic, Gemini)
+        - OpenAI-compatible server
+        - Not relevant
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: The exact commands, from a state someone else can recreate. A small public repository or a script is ideal.
+      placeholder: |
+        1. bcode task create --run "..."
+        2. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+      description: What you expected, and where it is documented if it is.
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour
+      description: Include the error message verbatim.
+    validations:
+      required: true
+  - type: textarea
+    id: doctor
+    attributes:
+      label: Environment
+      description: Output of `boundedcode doctor --json`.
+      render: json
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: For a task, `boundedcode task events TASK` (the relevant part). The terminal interface logs to `<state dir>/tui.log`.
+      render: text

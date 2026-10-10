@@ -25,16 +25,27 @@ are among the most useful contributions.
 
 ## Development setup
 
-Requirements:
-- Go (see `go.mod`) and Git;
-- for the integration paths: Docker, `uv` and llama.cpp.
+New here? [Contributor onboarding](docs/development/onboarding.md) walks
+from a fresh clone to a pull request and lists first-contribution
+opportunities. The [development guide](docs/development/guide.md) describes
+the code layout and the test commands.
 
-See [docs/development/guide.md](docs/development/guide.md) and
-[docs/usage/getting-started.md](docs/usage/getting-started.md).
+### Tool versions
+
+| Tool | Version | Needed for |
+|---|---|---|
+| Go | the `go` line in `go.mod` | everything |
+| Git | any recent | everything |
+| C compiler (cgo) | any | `go test -race`, part of `make check` |
+| golangci-lint | v2.14.0, as in CI (`.github/workflows/ci.yml`); older versions fail on the current Go | `make check` (skipped with a message if not installed; required in CI) |
+| uv | 0.12.18, as in CI | the Python adapter tests and license checks |
+| gitleaks | the pinned version: `scripts/install-gitleaks.sh DIR` | the secret scan |
+| Docker or Podman | any recent | sandbox integration tests and real tasks |
 
 ```bash
 make build     # ./bin/boundedcode
-make check     # gofmt, go vet, go test, go test -race, golangci-lint, LICENSES/go
+make check     # gofmt, go vet, go test, go test -race, golangci-lint, LICENSES/go (about 6 minutes)
+go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.14.0
 ```
 
 The same gates as CI:
@@ -56,6 +67,35 @@ BC_TEST_DOCKER_IMAGE=boundedcode-openhands:local go test -count=1 ./...
 
 Tests that need a GPU, a model, a live Codex account or experimental
 infrastructure are skipped by default (environment variables or build tags).
+
+## What CI checks
+
+Every pull request and push to `main` runs these. None of them may be
+weakened to get a change through.
+
+| Workflow | Job | Checks | Blocking |
+|---|---|---|---|
+| `ci` | `go` | gofmt, vet, tests, race tests, license policy, `LICENSES/go` up to date, Serena pin, govulncheck, build, SBOM | yes |
+| `ci` | `lint` | golangci-lint (pinned) | yes |
+| `ci` | `cross-build` | vet and build for all six release targets | yes |
+| `ci` | `adapter` | Python adapter tests, Python license inventories | yes |
+| `ci` | `native` (macOS, Windows) | build and vet (blocking); unit tests **report only** | build: yes; tests: no |
+| `dco` | `signoff` | `Signed-off-by` on every commit | yes |
+| `secret-scan` | `gitleaks` | the full history | yes |
+| `smoke` | installer jobs | install, re-install, tampered release, first run (Linux, macOS, Windows); when installer or CLI files change, and weekly | yes |
+| `smoke` | `first-task` | sandbox integration tests, a task end to end in the Docker sandbox, the evidence demo; weekly and on demand | weekly |
+
+**What is not visible from the check marks:**
+- **macOS and Windows unit tests do not pass yet.** The `native` test step
+  is non-blocking. When it fails, the step is marked failed, a warning
+  annotation names the platform, and the failing tests are listed in the
+  job summary.
+- **Skips are listed.** The `go` job lists every skipped test, with its
+  reason, in its job summary.
+- **The sandbox integration tests need the sandbox image.** They run in
+  the weekly `first-task` job, not on pull requests. A change to
+  `internal/sandbox`, `internal/agent/openhands` or `internal/verify`
+  should be tested locally with `BC_TEST_DOCKER_IMAGE`, as shown above.
 
 ## Security-sensitive changes
 
@@ -94,6 +134,9 @@ commit weights. Reports of how a model behaves on your hardware are welcome
 as issues ("Model compatibility").
 
 ## Benchmarks and validation
+
+External results are welcome; see
+[Submitting an evaluation result](benchmarks/submitting-results.md).
 
 - **Keep history.** Historical results (including failures) are never
   rewritten or deleted.

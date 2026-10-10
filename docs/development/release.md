@@ -52,6 +52,43 @@ irreversible.
    (`SECURITY.md`, `CODE_OF_CONDUCT.md`, private vulnerability reporting)
    and the repository are already set up.
 
+## Verifying a release
+
+Anyone can check a downloaded binary, and rebuild a release to compare:
+
+```bash
+# Checksum of a download (the installers do this automatically):
+sha256sum -c --ignore-missing SHA256SUMS
+
+# Rebuild from the tag with the Go version in that tag's go.mod:
+git clone https://github.com/akynte/boundedcode.git && cd boundedcode
+git checkout vX.Y.Z
+GOTOOLCHAIN=go$(sed -n 's/^go //p' go.mod) VERSION=vX.Y.Z make dist
+cd dist && sha256sum -c /path/to/downloaded/SHA256SUMS
+```
+
+`make dist` builds with `-trimpath` and without cgo. It packs the licenses
+archive with the commit time and neutral ownership. Since this change, it
+also gives the SBOMs the commit time (`SOURCE_DATE_EPOCH`).
+
+**Measured on 2026-10-10.** v0.1.0-alpha.4 was rebuilt from its tag with
+Go 1.27.1:
+- All six binaries and the licenses archive matched the published
+  checksums.
+- The six SBOMs did not. They differed only in their creation time and
+  document namespace, which the generator then took from the clock. Later
+  releases take both from the commit, so they reproduce too.
+
+**Limits.**
+- `SHA256SUMS` is published in the same release as the binaries, so it
+  detects corrupted or altered downloads, but not a release replaced by
+  someone with access to the repository.
+- Releases are not yet signed and have no build attestation.
+- The SBOMs list the modules compiled into each binary. Pinned external
+  components (llama.cpp, the OpenHands SDK, codebase-memory-mcp, gitleaks,
+  Serena) are listed as runtime or optional dependencies, not as contents
+  of the binary.
+
 ## Versioning
 
 Semantic versioning. Releases before 1.0 may break the CLI and config. Each

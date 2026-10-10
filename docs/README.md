@@ -33,6 +33,7 @@
 | [Initial validation](benchmarks/small-real-world-validation-2026-10.md) | 8 public tasks, 0/8 then 1/8, with the failures |
 | [Failure-driven engineering](benchmarks/failure-driven-engineering-2026-10.md) and [targeted pass](benchmarks/targeted-engineering-pass-2026-10.md) | Development evidence, including false verification passes |
 | [Raw reports](../benchmarks/reports/) | Per-run JSON, logs and manifests |
+| [Submitting an evaluation result](../benchmarks/submitting-results.md) | How an external result must be run, reported and submitted |
 
 ## Project
 
@@ -43,4 +44,6 @@
 | [Readiness audit (2026-10)](public-launch/readiness-audit.md) · [README review](public-launch/readme-review.md) | Evidence-checked findings, fixes and open risks; first-visitor review of the README |
 | [Onboarding validation](public-launch/onboarding-validation.md) | Installation and first-task tests: environments, commands, results, platform matrix |
 | [Licensing](licensing/upstream-license-matrix.md) | Upstream license matrix |
-| [Security policy](../SECURITY.md) · [Contributing](../CONTRIBUTING.md) | Reporting vulnerabilities, development setup |
+| [Security policy](../SECURITY.md) · [Contributing](../CONTRIBUTING.md) | Reporting vulnerabilities, development setup, tool versions, what CI checks |
+| [Contributor onboarding](development/onboarding.md) | From a fresh clone to a pull request; first-contribution opportunities |
+| [Repository readiness (2026-10)](public-launch/repository-readiness.md) | GitHub configuration audit, metadata recommendations, changes that need the maintainer |

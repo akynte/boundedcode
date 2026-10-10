@@ -20,7 +20,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -196,10 +198,15 @@ func main() {
 			rels = append(rels, rel{id, env.rel, root.SPDXID})
 		}
 	}
+	created := creationTime()
+	target := runtime.GOOS + "-" + runtime.GOARCH
+	if *goos != "" || *goarch != "" {
+		target = strings.Join([]string{orDefault(*goos, runtime.GOOS), orDefault(*goarch, runtime.GOARCH)}, "-")
+	}
 	doc := map[string]any{
 		"spdxVersion": "SPDX-2.3", "dataLicense": "CC0-1.0", "SPDXID": "SPDXRef-DOCUMENT",
-		"name": "boundedcode-" + *version, "documentNamespace": "https://spdx.org/spdxdocs/boundedcode-" + *version + "-" + time.Now().UTC().Format("20060102T150405Z"),
-		"creationInfo": map[string]any{"created": time.Now().UTC().Format(time.RFC3339), "creators": []string{"Tool: boundedcode-scripts-sbom"}},
+		"name": "boundedcode-" + *version, "documentNamespace": "https://spdx.org/spdxdocs/boundedcode-" + *version + "-" + target + "-" + created.Format("20060102T150405Z"),
+		"creationInfo": map[string]any{"created": created.Format(time.RFC3339), "creators": []string{"Tool: boundedcode-scripts-sbom"}},
 		"packages":     pkgs, "relationships": rels,
 	}
 	b, _ := json.MarshalIndent(doc, "", "  ")
@@ -207,6 +214,26 @@ func main() {
 		fatal(err)
 	}
 	fmt.Printf("wrote %s (%d packages)\n", *out, len(pkgs))
+}
+
+// creationTime is SOURCE_DATE_EPOCH when set (release builds set it to the
+// commit time, so a rebuild from the tag reproduces the SBOM), else now.
+func creationTime() time.Time {
+	if v := os.Getenv("SOURCE_DATE_EPOCH"); v != "" {
+		sec, err := strconv.ParseInt(v, 10, 64)
+		if err != nil {
+			fatal(fmt.Errorf("SOURCE_DATE_EPOCH: %w", err))
+		}
+		return time.Unix(sec, 0).UTC()
+	}
+	return time.Now().UTC()
+}
+
+func orDefault(v, def string) string {
+	if v == "" {
+		return def
+	}
+	return v
 }
 
 func classify(dir string) string {

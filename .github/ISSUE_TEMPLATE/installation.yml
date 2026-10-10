@@ -1,0 +1,59 @@
+name: Installation or setup problem
+description: The installer, `boundedcode setup`, a build from source or the sandbox image fails.
+labels: [installation]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        First run `boundedcode setup --check`: it lists each missing piece with the command that fixes it.
+        [When a step fails](https://github.com/akynte/boundedcode/blob/main/docs/usage/getting-started.md#when-a-step-fails) covers the common causes.
+        Review what you paste: remove tokens and private paths.
+  - type: dropdown
+    id: method
+    attributes:
+      label: Installation method
+      options:
+        - install.sh (Linux, macOS)
+        - install.ps1 (Windows)
+        - Build from source (make build / make install)
+        - boundedcode setup (llama.cpp, model, sandbox image, Serena)
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The release you installed (for example v0.1.0-alpha.4) or the commit you built. `boundedcode version` if the binary runs.
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: Platform
+      description: OS and version, CPU architecture, and shell.
+      placeholder: Ubuntu 24.04, x86-64, bash 5.2
+    validations:
+      required: true
+  - type: input
+    id: engine
+    attributes:
+      label: Container engine
+      description: "`docker version` or `podman version` (client and server), if the sandbox step is involved."
+  - type: textarea
+    id: command
+    attributes:
+      label: Command and full output
+      description: The exact command you ran and everything it printed.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: check
+    attributes:
+      label: setup --check output
+      description: Output of `boundedcode setup --check`, if the binary runs.
+      render: text
+  - type: textarea
+    id: tried
+    attributes:
+      label: What you tried

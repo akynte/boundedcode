@@ -17,8 +17,9 @@ jobs:
         run: make fmt
       - name: vet
         run: go vet ./...
-      - name: test
-        run: go test ./...
+      - name: test (skipped and failed tests are listed in the job summary)
+        shell: bash
+        run: go test -json ./... | go run ./scripts/gotestsummary
       - name: race
         run: go test -race ./...
       - name: license policy and notices
@@ -59,7 +60,9 @@ jobs:
   native:
     # Builds and tests on macOS and Windows hosts. The test step reports
     # only (continue-on-error) until the suite is green there: macOS and
-    # Windows support is new and was developed on Linux.
+    # Windows support is new and was developed on Linux. Failures still show:
+    # the step is marked failed, a warning annotation is raised and the
+    # failing tests are listed in the job summary.
     strategy:
       fail-fast: false
       matrix:
@@ -83,7 +86,8 @@ jobs:
           if ($errs) { $errs | ForEach-Object { Write-Error $_ }; exit 1 }
       - name: test (report only)
         continue-on-error: true
-        run: go test -short ./...
+        shell: bash
+        run: go test -short -json ./... | go run ./scripts/gotestsummary -report-only "${{ runner.os }} tests"
   lint:
     runs-on: ubuntu-latest
     steps:

@@ -1,0 +1,58 @@
+name: Platform compatibility report
+description: How BoundedCode behaved on an OS, architecture or container engine, including when everything worked.
+labels: [platform]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        macOS and Windows are **experimental**: the installer smoke tests run in CI, but the full flow has not been run there by the maintainer ([platform matrix](https://github.com/akynte/boundedcode/blob/main/docs/public-launch/onboarding-validation.md#platform-compatibility-matrix)).
+        A report that a step **worked** is as useful as one that it failed. Report only what you ran.
+  - type: input
+    id: version
+    attributes:
+      label: BoundedCode version
+      description: Output of `boundedcode version`.
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: Platform
+      description: OS and version, CPU architecture, RAM, GPU and VRAM.
+      placeholder: macOS 15.4, Apple M3, 36 GB
+    validations:
+      required: true
+  - type: input
+    id: engine
+    attributes:
+      label: Container engine
+      placeholder: Docker Desktop 4.40 (WSL 2 backend) / Podman 5.4 machine / none
+    validations:
+      required: true
+  - type: checkboxes
+    id: steps
+    attributes:
+      label: Steps that completed
+      description: Tick only steps you ran and that succeeded. Describe failures below.
+      options:
+        - label: Installer (`install.sh` or `install.ps1`) or build from source
+        - label: "`boundedcode setup --check` reports nothing missing"
+        - label: Sandbox image built (`boundedcode setup --only sandbox`)
+        - label: Local model served (llama.cpp)
+        - label: Cloud provider configured (`boundedcode provider use ...`)
+        - label: A task ran to a result (any result)
+        - label: "`go test ./...` in a clone"
+  - type: textarea
+    id: results
+    attributes:
+      label: What happened
+      description: For each step that failed or behaved unexpectedly, the command and its output. For a task, its final status line.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: doctor
+    attributes:
+      label: Environment
+      description: Output of `boundedcode doctor --json`.
+      render: json

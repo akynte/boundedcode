@@ -1,0 +1,58 @@
+name: Model compatibility report
+description: How a local model behaved with BoundedCode on your hardware.
+labels: [model-compatibility]
+body:
+  - type: markdown
+    attributes:
+      value: Do not attach model weights. Remove private paths and proprietary code from logs.
+  - type: input
+    id: model
+    attributes:
+      label: Model
+      description: Upstream repository, file (quantization) and revision.
+    validations:
+      required: true
+  - type: input
+    id: llama
+    attributes:
+      label: llama.cpp version
+      description: Output of `llama-server --version`.
+    validations:
+      required: true
+  - type: input
+    id: hardware
+    attributes:
+      label: Hardware
+      description: CPU, GPU and VRAM, RAM.
+    validations:
+      required: true
+  - type: textarea
+    id: settings
+    attributes:
+      label: Context size and server settings
+      description: Or the profile YAML.
+      render: yaml
+  - type: textarea
+    id: speed
+    attributes:
+      label: Speed
+      description: Decode tokens/s at short and long context; `boundedcode bench infra` output if available.
+  - type: textarea
+    id: tools
+    attributes:
+      label: Tool-call reliability
+      description: Malformed tool calls, loops, runaway thinking.
+  - type: textarea
+    id: outcomes
+    attributes:
+      label: Tasks tried and outcomes
+      description: For each task, the result (TASK_VERIFIED, tests_green, UNVERIFIED, blocked or failed).
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: BoundedCode version
+      description: Output of `boundedcode version`.
+    validations:
+      required: true
