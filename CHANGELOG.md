@@ -60,6 +60,18 @@ Fixes from the public-launch readiness audit
     (`first-task.sh`).
   - CI runs them in `.github/workflows/smoke.yml`.
 
+### Comparative evaluation
+
+- [benchmarks/comparative-2026-10](benchmarks/comparative-2026-10/report.md):
+  BoundedCode vs. the same OpenHands agent, model and sandbox without it,
+  on 8 pre-registered SWE-bench Multilingual tasks. Hidden tests passed:
+  7 of 8 vs. 6 of 8; no success difference shown, at about twice the time
+  and tokens. Protocol, scripts, raw results, deviations and negative
+  results are published.
+- The `bench tasks --baseline` agent now gets the same toolchain,
+  dependency mounts and masks as BoundedCode's agent (it had none), and
+  saved agent patches end with a newline.
+
 ### Evidence demo
 
 - `demo/evidence/` is a reproducible demonstration of behavioural

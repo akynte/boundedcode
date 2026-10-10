@@ -27,6 +27,7 @@
 | Page | What it covers |
 |---|---|
 | [Evaluation overview](benchmarks/README.md) | What was measured, how to read it, and its limits |
+| [Comparative evaluation (2026-10)](../benchmarks/comparative-2026-10/report.md) | BoundedCode vs. the same agent and model without it: protocol, results, deviations |
 | [Evidence demo](../demo/evidence/README.md) | The README demo: reproducible scenario, recordings, what it does and does not show |
 | [Second (held-out) validation](benchmarks/second-independent-validation-2026-10.md) | 6 screened public tasks, 5 of 6 `TASK_VERIFIED` |
 | [Initial validation](benchmarks/small-real-world-validation-2026-10.md) | 8 public tasks, 0/8 then 1/8, with the failures |

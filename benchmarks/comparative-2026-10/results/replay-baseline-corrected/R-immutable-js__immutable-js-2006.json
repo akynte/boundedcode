@@ -1,0 +1,62 @@
+{
+  "id": "suite-20261010T105247Z",
+  "model": "qwen3.6-35b-a3b",
+  "started": "2026-10-10T10:52:47.940835726Z",
+  "finished": "2026-10-10T11:33:38.172105215Z",
+  "results": [
+    {
+      "id": "immutable-js__immutable-js-2006",
+      "category": "jsts",
+      "model": "qwen3.6-35b-a3b",
+      "success": false,
+      "task_status": "blocked",
+      "self_verified": false,
+      "tests_green": false,
+      "attempts": 2,
+      "local_tokens": 720,
+      "generated_tokens": 120,
+      "cached_prompt_tokens": 0,
+      "escalations": 0,
+      "local_only": false,
+      "condensations": 0,
+      "resumes": 0,
+      "wall_seconds": 2450.225249808,
+      "failed_checks": [
+        "immutable-js: sh -c npx jest __tests__/Range.ts --verbose: … 2041.8 (2044.3) MB, pooled: 0 MB, 248.03 / 0.01 ms  (+ 1.4 ms in 3 steps since start of marking, biggest step 1.4 ms, walltime since start of marking 252 ms) (average mu = 0.300, curren\nFATAL ERROR: Ineffective mark-compacts near heap limit Allocation failed - JavaScript heap out of memory\n----- Native stack trace -----\n\n 1: 0x931db0  [node]\n 2: 0x75968e node::OOMErrorHandler(char const*, v8::OOMDetails const\u0026) [node]\n 3: 0xc70d60  [node]\n 4: 0xc70e4f  [node]\n 5: 0xf14725  [node]\n 6: 0xf14752  [node]\n 7: 0xf14a4a  [node]\n 8: 0xf2574a  [node]\n 9: 0xf29af0  [node]\n10: 0x19c77d1  [node]\nAborted\n"
+      ],
+      "task_id": "t20261010-415e65",
+      "state_dir": "~/.cache/bc-comparative/home-replay/cache/bench-work/immutable-js__immutable-js-2006-1791629567940855568/state",
+      "agent_patch": "~/.cache/bc-comparative/home-replay/cache/bench-work/immutable-js__immutable-js-2006-1791629567940855568/agent-immutable-js.patch",
+      "intel": {
+        "context_packs": 2,
+        "pack_tokens": 2681,
+        "code_tokens": 0,
+        "serena_calls": 0,
+        "serena_errors": 0,
+        "serena_ms": 0,
+        "graph_calls": 0,
+        "graph_ms": 0,
+        "serena_symbols": 0,
+        "graph_symbols": 0,
+        "fallbacks": 0,
+        "agent_tool_calls": 6,
+        "agent_tools": {
+          "finish": 2,
+          "terminal": 4
+        }
+      }
+    }
+  ],
+  "summary": {
+    "tasks": 1,
+    "verified": 0,
+    "success_rate": 0,
+    "local_only_completion_rate": 0,
+    "frontier_escalation_rate": 0,
+    "verified_tasks_per_hour": 0,
+    "attempts_per_successful_task": 0,
+    "wall_seconds_per_task": 2450.225249808,
+    "local_tokens_per_task": 720,
+    "self_verified_but_hidden_failed": 0
+  }
+}

@@ -24,26 +24,26 @@
    }
   },
   "verification": {
-   "patches_gated": 10,
+   "patches_gated": 16,
    "task_verified": {
-    "selected": 5,
-    "hidden_pass": 4
+    "selected": 7,
+    "hidden_pass": 6
    },
    "checks_pass": {
-    "selected": 8,
-    "hidden_pass": 7
+    "selected": 12,
+    "hidden_pass": 11
    },
    "tests_green_only": {
-    "selected": 3,
-    "hidden_pass": 3
+    "selected": 5,
+    "hidden_pass": 5
    },
    "not_green": {
-    "selected": 2,
-    "hidden_pass": 1
+    "selected": 4,
+    "hidden_pass": 2
    },
    "baseline_patches_not_green": {
-    "selected": 2,
-    "hidden_pass": 1
+    "selected": 4,
+    "hidden_pass": 2
    },
    "false_passes_task_verified": [
     [
@@ -67,11 +67,29 @@
     [
      "O-replay",
      "gin-gonic__gin-4003"
+    ],
+    [
+     "O-replay",
+     "phpoffice__phpspreadsheet-3463"
+    ],
+    [
+     "O-replay",
+     "briannesbitt__carbon-3103"
+    ],
+    [
+     "O-replay",
+     "fluent__fluentd-3616"
     ]
    ],
    "replay_reproduced_baseline": [
     "gin-gonic__gin-3820",
-    "gin-gonic__gin-4003"
+    "gin-gonic__gin-4003",
+    "immutable-js__immutable-js-2006",
+    "sharkdp__bat-2393",
+    "tokio-rs__axum-691",
+    "phpoffice__phpspreadsheet-3463",
+    "briannesbitt__carbon-3103",
+    "fluent__fluentd-3616"
    ],
    "replay_mismatch": []
   },

@@ -9,7 +9,7 @@
 | [`frozen-tasks.json`](frozen-tasks.json) | The task set: ids, base commits, sha256 of each task spec and reference patch |
 | [`config.yaml`](config.yaml) | BoundedCode's configuration for the runs |
 | [`deviations.md`](deviations.md) | Every change after the freeze |
-| `results/` | Machine-readable results (the home directory is written as `~` in stored records; nothing else is changed): `runs/` (harness reports, logs, memory samples), `replay/`, `run-log.jsonl`, `results.json`, `summary.json`, `failure-analysis.json` |
+| `results/` | Machine-readable results (the home directory is written as `~` in stored records; nothing else is changed): `runs/` (harness reports, logs, memory samples), `replay/`, `runs-baseline-corrected/` and `replay-baseline-corrected/` (deviation D3), `run-log.jsonl`, `results.json`, `summary.json`, `failure-analysis.json` |
 | [`report.md`](report.md) | The comparative report |
 
 ## Reproduce
@@ -42,6 +42,9 @@ python3 screen_freeze.py screen             # 3. gate 1, offline
 python3 screen_freeze.py freeze             #    first two valid per slot -> frozen-tasks.json
 python3 run.py                              # 4. both systems, frozen order (hours)
 python3 gate_replay.py                      # 5. BoundedCode's gate on the baseline's patches
+# Deviation D3: the corrected baseline arm and its replay
+python3 run.py --systems O --outdir runs-baseline-corrected
+python3 gate_replay.py --runs runs-baseline-corrected --outdir replay-baseline-corrected
 python3 analyze.py                          # 6. results.json, summary.json, report tables
 ```
 

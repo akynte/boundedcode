@@ -106,6 +106,35 @@ system improvement. Each result stands on its own, with its own scope.
   machine was evaluated. Cloud providers, other model profiles, macOS and
   Windows were not.
 
+## Comparative evaluation (2026-10)
+
+The [comparative evaluation](../../benchmarks/comparative-2026-10/report.md)
+compares BoundedCode with the same OpenHands agent, model and sandbox
+without BoundedCode's control plane.
+
+**Method.**
+- It ran on 8 SWE-bench Multilingual tasks, never used in BoundedCode work
+  and not screened for clarity: 2 from a development repository (gin), 6
+  from repositories never used (JavaScript, Rust, PHP, Ruby).
+- The protocol was frozen before the runs.
+
+**Results.**
+- **Hidden tests:** BoundedCode passed 7 of 8 and the plain agent 6 of 8.
+  The one discordant task changed between two runs of the baseline, so no
+  success difference is shown.
+- **Cost:** BoundedCode used about 2.3× the time and 2.1× the tokens.
+- **The gate on the plain agent's patches:** replayed on all 16, it
+  rejected the 4 that fail the hidden tests (a compile error, a broken
+  existing test, an out-of-memory test run, formatting) and 4 that pass.
+  It found no defect that the hidden tests missed.
+- **The gate on its own runs:** one false verification (the issue and the
+  hidden test disagree about which layer to fix) and three missed
+  verifications.
+
+**Deviations.** The report lists three, including a harness defect that had
+denied the baseline's agent its build environment. That baseline arm was
+re-run, and both arms are published.
+
 ## Other measurements
 
 - Earlier development benchmarks and their raw JSON and Markdown records

@@ -11,22 +11,26 @@
 - **What the numbers do show:**
   - BoundedCode used about **2.3× the wall-clock time** and **2.1× the
     processed tokens**.
-  - Its verification gate caught **real defects that the hidden tests
-    missed** (a regression in an existing test) or that the plain agent left
-    in (a compile error).
-  - The gate also produced **one false verification**, **three missed
-    verifications** of correct changes, and rejections of correct but
-    unformatted patches.
+  - Replayed on the plain agent's 16 patches (both baseline arms),
+    BoundedCode's verification gate **rejected all 4 that fail the hidden
+    tests**, including one with a compile error and one that breaks an
+    existing test. It **accepted only patches that pass**.
+  - But **half its rejections (4 of 8) were patches that pass the hidden
+    tests**: two for formatting and two for breaking an existing test that
+    the dataset's own reference fix also breaks. It found **no defect that
+    the hidden tests missed**.
+  - On BoundedCode's own runs, the gate produced **one false verification**
+    and **three missed verifications** of correct changes.
 
 This report follows the frozen [protocol](protocol.md). Every change after the
 freeze is listed in [deviations.md](deviations.md) (D1–D3). All numbers come
 from `results/` (`summary.json`, `results.json`), produced by `analyze.py`
 from the recorded runs.
 
-> **Pending.** The gate replay of the **corrected** baseline arm's patches
-> was interrupted by a machine restart after 2 of 8 tasks (the interrupted
-> third record is kept as `*.interrupted.*`). The other 6 replays are
-> pending, and the tables mark them so. Every other measurement is complete.
+All planned measurements are complete. One gate replay (corrected arm,
+immutable-js-2006) was interrupted by a machine restart and run again from
+the start. The interrupted record is kept as `*.interrupted.*` next to the
+completed one.
 
 ## 1. What was compared
 
@@ -58,14 +62,14 @@ planned. The full ranking and screening are in `candidates.json` and
 
 | Task | Stratum | B: hidden | B: verification | B: attempts | B: time | B: tokens | O: hidden | O: time | O: tokens | Gate replay of O's patch |
 |---|---|---|---|---|---|---|---|---|---|---|
-| gin-3820 | dev | fail | task_verified | 3 | 40m54s | 327k | fail | 8m10s | 56k | rejected: gofmt (hidden fail) |
-| gin-4003 | dev | **pass** | task_verified | 2 | 7m34s | 61k | **pass** | 5m09s | 40k | rejected: gofmt (hidden pass) |
-| immutable-js-2006 | unseen | **pass** | task_verified | 3 | 16m19s | 127k | fail | 5m40s | 47k | pending |
-| bat-2393 | unseen | **pass** | task_verified | 1 | 17m53s | 63k | **pass** | 6m28s | 54k | pending |
-| axum-691 | unseen | **pass** | task_verified | 1 | 11m12s | 63k | **pass** | 6m13s | 61k | pending |
-| phpspreadsheet-3463 | unseen | **pass** | tests_green | 2 | 6m10s | 46k | **pass** | 8m25s | 52k | pending |
-| carbon-3103 | unseen | **pass** | tests_green | 2 | 17m56s | 118k | **pass** | 4m36s | 31k | pending |
-| fluentd-3616 | unseen | **pass** | tests_green | 2 | 8m30s | 58k | **pass** | 11m05s | 71k | pending |
+| gin-3820 | dev | fail | task_verified | 3 | 40m54s | 327k | fail | 8m10s | 56k | rejected: gofmt |
+| gin-4003 | dev | **pass** | task_verified | 2 | 7m34s | 61k | **pass** | 5m09s | 40k | rejected: gofmt |
+| immutable-js-2006 | unseen | **pass** | task_verified | 3 | 16m19s | 127k | fail | 5m40s | 47k | rejected: tests run out of memory |
+| bat-2393 | unseen | **pass** | task_verified | 1 | 17m53s | 63k | **pass** | 6m28s | 54k | `task_verified` |
+| axum-691 | unseen | **pass** | task_verified | 1 | 11m12s | 63k | **pass** | 6m13s | 61k | `task_verified` |
+| phpspreadsheet-3463 | unseen | **pass** | tests_green | 2 | 6m10s | 46k | **pass** | 8m25s | 52k | `tests_green` (no test stage) |
+| carbon-3103 | unseen | **pass** | tests_green | 2 | 17m56s | 118k | **pass** | 4m36s | 31k | rejected: breaks `testSetTestNow` |
+| fluentd-3616 | unseen | **pass** | tests_green | 2 | 8m30s | 58k | **pass** | 11m05s | 71k | `tests_green` (no test stage) |
 
 **Paired outcomes.**
 
@@ -161,39 +165,64 @@ own hidden outcome.
 
 | Original baseline arm | Gate verdict | Hidden | What the gate saw |
 |---|---|---|---|
-| gin-3820 | rejected | fail | The patch breaks the existing test `TestBindingFormFilesMultipartFail` |
+| gin-3820 | rejected | fail | Breaks the existing test `TestBindingFormFilesMultipartFail`, which passes on the base, with the reference fix and with BoundedCode's patch |
 | gin-4003 | `task_verified` | pass | |
 | immutable-js-2006 | rejected | pass | The project's formatting check (prettier) fails |
 | bat-2393 | `tests_green` | pass | No test added |
 | axum-691 | rejected | fail | **Compile error** (`Arc<str>` vs `String`) |
 | phpspreadsheet-3463 | `tests_green` | pass | No test stage (D1) |
-| carbon-3103 | rejected | pass | **Regression:** `TestingAidsTest::testSetTestNow` passes on the base and fails with the patch (confirmed with `basediag.sh`). The hidden test does not cover it. |
+| carbon-3103 | rejected | pass | Breaks the existing test `TestingAidsTest::testSetTestNow`, which passes on the base. The dataset's reference fix breaks it too; BoundedCode's own patch does not. |
 | fluentd-3616 | `tests_green` | pass | No test stage (D1) |
 
 | Corrected baseline arm | Gate verdict | Hidden | What the gate saw |
 |---|---|---|---|
 | gin-3820 | rejected | fail | gofmt |
 | gin-4003 | rejected | pass | gofmt |
-| the other 6 | pending | | |
+| immutable-js-2006 | rejected | fail | The test suite runs out of JavaScript heap |
+| bat-2393 | `task_verified` | pass | The agent's own test fails on the base and passes with the patch |
+| axum-691 | `task_verified` | pass | The same |
+| phpspreadsheet-3463 | `tests_green` | pass | No test stage (D1) |
+| carbon-3103 | rejected | pass | Breaks `testSetTestNow`, as in the original arm |
+| fluentd-3616 | `tests_green` | pass | No test stage (D1) |
+
+Each replay's hidden result equalled the baseline run's own, in all 16.
+The gate stops at its first failing check, so a patch rejected for
+formatting was not tested further.
+
+**Gate verdict vs. hidden result, all 16 baseline patches:**
+
+| Gate verdict | Hidden pass | Hidden fail |
+|---|---|---|
+| Accepted (`task_verified` or `tests_green`) | 8 | 0 |
+| Rejected | 4 | 4 |
 
 **Reading.**
-- **Real defects caught.** The gate caught two real defects in the plain
-  agent's output: a compile error the hidden test also caught, and a
-  regression in an existing test that the hidden test missed.
-- **The cost of being strict.** It rejected three hidden-passing patches for
-  formatting, two of them in the corrected arm. Whether that is value or
-  noise depends on whether the project's formatting rules count. They are
-  the projects' own checks.
-- **Evidence is rarely reached on correct output.** `task_verified` is
-  reached on correct output only when a test that fails on the base exists.
-  Across all completed gated patches (BoundedCode's 8 runs plus the 10
-  completed replays), it selected 6 patches, 5 of which pass the hidden
-  tests. "Checks pass" selected 12, of which 11 pass. On this sample,
-  evidence is not a better predictor than green checks.
-- **The value is in correctness checks.** The measurable value in this run
-  is the correctness checks (build, existing tests) that the plain agent
-  did not run or did not finish. Behavioural evidence as a filter shows no
-  measurable value on this sample.
+- **It caught every failing baseline patch.** All 4 patches that fail the
+  hidden tests were rejected, each for a concrete reason: a compile error
+  (axum, original arm), a broken existing test (gin-3820, original), the
+  test suite running out of memory (immutable-js, corrected) and formatting
+  (gin-3820, corrected). For three of them, the reason the gate gave is a
+  real defect of the patch. A user of BoundedCode would have seen the
+  defect before merging. The hidden tests also caught all 4.
+- **It found no defect that the hidden tests missed.** The earlier draft of
+  this report claimed one (carbon-3103). It was wrong: the dataset's
+  reference fix breaks the same existing test.
+- **Half its rejections were correct patches** (by the hidden tests):
+  - two formatting failures (prettier on immutable-js in the original arm,
+    gofmt on gin-4003 in the corrected arm);
+  - two carbon patches that break `testSetTestNow`, as the reference fix
+    does. BoundedCode's own patch passes both that test and the hidden one,
+    so the stricter bar was reachable. Whether it should be required is a
+    judgement the dataset does not make.
+- **Evidence adds little as a filter here.** `task_verified` selected 7
+  patches in the corrected arm (BoundedCode's 5 plus 2 replays), 6 of which
+  pass the hidden tests. "Checks pass" selected 12, of which 11 pass. The
+  one exception in both is the same gin-3820 false pass. On this sample,
+  behavioural evidence is not a better predictor than green checks.
+- **Where the gate shows value** is the correctness checks (build, existing
+  tests, the test suite) on output that the plain agent did not check
+  itself. In this sample, that value overlaps with what the hidden tests
+  already detect.
 
 ## 4. Where each system succeeded or failed
 
@@ -233,8 +262,8 @@ task per arm.
 
 **Conclusion.** No difference in success can be attributed to BoundedCode's
 architecture on this sample. The cost difference can. So can the gate's
-detection of defects in the plain agent's output: shown by replay, not by
-outcome.
+rejection of every failing baseline patch, shown by replay rather than by
+outcome, at the price of rejecting as many correct ones.
 
 ## 6. What remains unproven
 
@@ -251,7 +280,6 @@ outcome.
 - **Comparison to other products.** The baseline is the same agent loop
   without BoundedCode. Other agents (SWE-agent, Aider, OpenHands' full
   application, commercial agents) were not compared.
-- **Six corrected-arm gate replays:** pending (see above).
 
 ## 7. Integrity notes
 
@@ -264,7 +292,9 @@ outcome.
   verification: the agent edited unrelated, environment-broken tests to skip.
 - **No cherry-picking.** No run was repeated or dropped. The original
   baseline arm is published next to the corrected one. The interrupted
-  replay record is kept.
+  replay record is kept. A claim in an earlier draft (a carbon regression
+  missed by the hidden tests) was withdrawn after checking it against the
+  reference fix.
 - **Hidden tests and reference patches** were never visible to either agent:
   they live outside every sandbox mount and are applied only after a run.
 - **Remaining asymmetries:**

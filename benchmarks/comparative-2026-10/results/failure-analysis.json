@@ -22,9 +22,12 @@
   "why": "The patch adds an early-return condition in src/Operations.js (`originalSize === undefined && resolvedEnd === undefined`). With it, the hidden Range test exhausts the JavaScript heap ('Ineffective mark-compacts near heap limit'): a slice of an infinite range is no longer bounded. The right file, the wrong behaviour."
  },
  "_observations_not_failures": {
-  "O-original-briannesbitt__carbon-3103": "Passes the hidden test, but the patch breaks the existing test TestingAidsTest::testSetTestNow: it passes on the base and fails with the patch (checked with basediag.sh; the gate replay blocked the patch for this). The hidden acceptance test does not cover it.",
+  "O-original-briannesbitt__carbon-3103": "Passes the hidden test. The gate replay blocks it because it breaks the existing test TestingAidsTest::testSetTestNow, which passes on the base (checked with basediag.sh). The dataset's reference fix breaks the same test, so this is not a defect missed by the hidden tests; BoundedCode's own patch passes both.",
   "O-original-immutable-js__immutable-js-2006": "Passes the hidden test. The gate replay blocks it because the project's formatting check (prettier, npm-lint) fails on the patch.",
   "B-briannesbitt__carbon-3103": "Passes the hidden test. BoundedCode asked for a test, and the agent added one that also passes on the base, so the gate correctly did not count it as evidence (tests_green).",
-  "B-phpoffice__phpspreadsheet-3463, B-fluent__fluentd-3616": "Pass the hidden test. tests_green because the environment-only configs (D1) left these repositories without a test stage, so no evidence was possible."
+  "B-phpoffice__phpspreadsheet-3463, B-fluent__fluentd-3616": "Pass the hidden test. tests_green because the environment-only configs (D1) left these repositories without a test stage, so no evidence was possible.",
+  "O-corrected-briannesbitt__carbon-3103": "The same as the original arm: passes the hidden test, breaks testSetTestNow like the reference fix; blocked by the gate replay.",
+  "O-corrected-gin-gonic__gin-4003": "Passes the hidden test. The gate replay blocks it for gofmt.",
+  "O-original-gin-gonic__gin-3820 (existing test)": "TestBindingFormFilesMultipartFail passes on the base, with the reference fix and with BoundedCode's patch, and fails with this patch."
  }
 }

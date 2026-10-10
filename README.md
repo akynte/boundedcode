@@ -191,6 +191,7 @@ complete small example with its expected result, plus:
 | Initial validation: 8 public tasks, screened for environment validity only; frozen build | **0/8**, then **1/8** after fixing four BoundedCode defects | [report](docs/benchmarks/small-real-world-validation-2026-10.md) |
 | Engineering on those failures (development evidence, not a validation) | fixes to verification, agent tooling, resource handling, retrieval and execution control | [failure-driven](docs/benchmarks/failure-driven-engineering-2026-10.md) · [targeted](docs/benchmarks/targeted-engineering-pass-2026-10.md) |
 | **Second validation (held out):** 6 tasks not used during development and never shown to the agent, screened for issue-derivable acceptance tests; each run once | **5 of 6** `TASK_VERIFIED` and passing the datasets' hidden acceptance tests · **6 of 6** hidden tests pass · all 5 successes local-only, with no frontier calls · **0** false verification passes among the 5 | [report](docs/benchmarks/second-independent-validation-2026-10.md) |
+| **Comparative evaluation:** BoundedCode vs. the same OpenHands agent, model and sandbox without BoundedCode; 8 unscreened public tasks, 6 of them from repositories never used in development; pre-registered protocol; one run each | hidden tests passed: BoundedCode **7 of 8**, plain agent **6 of 8**; **no success difference shown** (one discordant task, a different one in a second baseline run) · BoundedCode took **2.3×** the time and **2.1×** the tokens · replayed on the plain agent's 16 patches, its gate rejected all 4 that fail the hidden tests, and 4 that pass; on its own runs, 1 false and 3 missed verifications | [report](benchmarks/comparative-2026-10/report.md) |
 
 The held-out tasks come from SWE-bench Multilingual and Multi-SWE-bench.
 They cover Go, JavaScript, TypeScript, an infrastructure tool and a
@@ -216,7 +217,8 @@ How to read these numbers:
   false ambiguity flag.
 - **No baseline advantage has been shown.** On a two-task baseline in the
   first validation, BoundedCode did not improve the same local model's
-  result and was slower.
+  result and was slower. The 8-task comparative evaluation found no
+  success difference either, at about twice the cost.
 - **False passes still occur.** In development runs with the current gate
   design, 5 tasks were `TASK_VERIFIED` yet failed hidden tests. In most of
   them the issue allowed another reading, or the hidden test required

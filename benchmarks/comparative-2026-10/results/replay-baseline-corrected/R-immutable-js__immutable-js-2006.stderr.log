@@ -1,0 +1,15 @@
+10:52:47 task immutable-js__immutable-js-2006 (jsts)
+using openai-compatible model replay (working context 131072 tokens)
+10:53:08 attempt 1/2: sending initial context pack (570 tokens)
+10:53:10 agent stopped: status=finished events=10 stuck=false
+11:13:16 verify targeted immutable-js: passed=false (20m5.885s)
+11:13:16 verification failed: immutable-js/npm-test: FATAL ERROR: Ineffective mark-compacts near heap limit Allocation failed - JavaScript heap out of memory
+11:13:18 attempt 2/2: sending retry context pack (2111 tokens)
+11:13:18 agent stopped: status=finished events=5 stuck=false
+11:33:23 verify targeted immutable-js: passed=false (20m5.377s)
+11:33:23 verification failed: immutable-js/npm-test: FATAL ERROR: Ineffective mark-compacts near heap limit Allocation failed - JavaScript heap out of memory
+11:33:23 escalation Z2 suggested (the same verification failure repeated across attempts) but frontier is disabled; continuing locally
+11:33:23 task t20261010-415e65 blocked: attempt budget exhausted (2) (work preserved on agent/t20261010-415e65; `task resume` to continue)
+11:33:38 task immutable-js__immutable-js-2006: success=false status=blocked attempts=2 tokens=720 escalations=0 2450s 
+verified 0/1 (0%), local-only 0%, escalation rate 0%, 0.0 verified/hour, 2450s/task
+report: ~/boundedcode/benchmarks/comparative-2026-10/results/replay-baseline-corrected/R-immutable-js__immutable-js-2006.md

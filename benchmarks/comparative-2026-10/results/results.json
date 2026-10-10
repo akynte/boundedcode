@@ -196,7 +196,11 @@
      "why": "The patch adds an early-return condition in src/Operations.js (`originalSize === undefined && resolvedEnd === undefined`). With it, the hidden Range test exhausts the JavaScript heap ('Ineffective mark-compacts near heap limit'): a slice of an infinite range is no longer bounded. The right file, the wrong behaviour."
     }
    },
-   "replay": null
+   "replay": {
+    "replayed": true,
+    "hidden_pass": false,
+    "verification": "not_green"
+   }
   },
   {
    "id": "sharkdp__bat-2393",
@@ -253,7 +257,11 @@
      "completion_tokens": 7302
     }
    },
-   "replay": null
+   "replay": {
+    "replayed": true,
+    "hidden_pass": true,
+    "verification": "task_verified"
+   }
   },
   {
    "id": "tokio-rs__axum-691",
@@ -310,7 +318,11 @@
      "completion_tokens": 6298
     }
    },
-   "replay": null
+   "replay": {
+    "replayed": true,
+    "hidden_pass": true,
+    "verification": "task_verified"
+   }
   },
   {
    "id": "phpoffice__phpspreadsheet-3463",
@@ -367,7 +379,11 @@
      "completion_tokens": 12631
     }
    },
-   "replay": null
+   "replay": {
+    "replayed": true,
+    "hidden_pass": true,
+    "verification": "tests_green"
+   }
   },
   {
    "id": "briannesbitt__carbon-3103",
@@ -424,7 +440,11 @@
      "completion_tokens": 6567
     }
    },
-   "replay": null
+   "replay": {
+    "replayed": true,
+    "hidden_pass": true,
+    "verification": "not_green"
+   }
   },
   {
    "id": "fluent__fluentd-3616",
@@ -481,7 +501,11 @@
      "completion_tokens": 13186
     }
    },
-   "replay": null
+   "replay": {
+    "replayed": true,
+    "hidden_pass": true,
+    "verification": "tests_green"
+   }
   }
  ],
  "original": [
