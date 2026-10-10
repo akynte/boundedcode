@@ -51,8 +51,8 @@ model weights and the sandbox image. Each item is skipped when it is already
 done or not needed: with a cloud provider, llama.cpp and the model are not
 needed. It asks before every download or build.
 
-`bcode setup --check` lists what is still missing. On `main` (after
-v0.1.0-alpha.4) it also exits non-zero until everything is in place.
+`bcode setup --check` lists what is still missing. Since v0.1.0-alpha.5 it
+also exits non-zero until everything is in place.
 
 The chat (`bcode` in a repository) offers the same set-up through `/setup`;
 see [the terminal interface](tui.md). The rest of this page is the manual

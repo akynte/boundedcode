@@ -446,10 +446,14 @@ See [ADR-0009](docs/architecture/adr/0009-frontier-escalation.md).
    - Every other shape is reported `untested`, which withholds
      `TASK_VERIFIED`.
    - It is tested on fixtures only.
-8. **No baseline advantage shown.** BoundedCode did not improve the same
-   model's result on a two-task baseline, and no baseline was run on the
-   held-out set
-   ([baseline comparison](benchmarks/reports/small-real-world-validation-20261004/baseline-comparison.md)).
+8. **No baseline advantage shown.**
+   - BoundedCode did not improve the same model's result on a two-task
+     baseline
+     ([baseline comparison](benchmarks/reports/small-real-world-validation-20261004/baseline-comparison.md)).
+   - The 8-task
+     [comparative evaluation](benchmarks/comparative-2026-10/report.md)
+     found no success difference, at about twice the time and tokens.
+   - No baseline was run on the held-out set.
 9. **Terminal only.** There is the CLI and the full-screen `bcode`
    interface, but no daemon or GUI.
 
