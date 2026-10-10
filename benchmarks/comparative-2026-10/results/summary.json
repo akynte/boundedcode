@@ -1,0 +1,210 @@
+{
+ "corrected": {
+  "arm": "corrected",
+  "baseline_runs": "runs-baseline-corrected",
+  "tasks_frozen": 8,
+  "tasks_with_both_runs": 8,
+  "paired": {
+   "both": 6,
+   "B_only": 1,
+   "O_only": 0,
+   "neither": 1
+  },
+  "mcnemar_exact_p_two_sided": 1.0,
+  "strata": {
+   "development": {
+    "tasks": 2,
+    "B_pass": 1,
+    "O_pass": 1
+   },
+   "unseen": {
+    "tasks": 6,
+    "B_pass": 6,
+    "O_pass": 5
+   }
+  },
+  "verification": {
+   "patches_gated": 10,
+   "task_verified": {
+    "selected": 5,
+    "hidden_pass": 4
+   },
+   "checks_pass": {
+    "selected": 8,
+    "hidden_pass": 7
+   },
+   "tests_green_only": {
+    "selected": 3,
+    "hidden_pass": 3
+   },
+   "not_green": {
+    "selected": 2,
+    "hidden_pass": 1
+   },
+   "baseline_patches_not_green": {
+    "selected": 2,
+    "hidden_pass": 1
+   },
+   "false_passes_task_verified": [
+    [
+     "B",
+     "gin-gonic__gin-3820"
+    ]
+   ],
+   "missed_passes": [
+    [
+     "B",
+     "phpoffice__phpspreadsheet-3463"
+    ],
+    [
+     "B",
+     "briannesbitt__carbon-3103"
+    ],
+    [
+     "B",
+     "fluent__fluentd-3616"
+    ],
+    [
+     "O-replay",
+     "gin-gonic__gin-4003"
+    ]
+   ],
+   "replay_reproduced_baseline": [
+    "gin-gonic__gin-3820",
+    "gin-gonic__gin-4003"
+   ],
+   "replay_mismatch": []
+  },
+  "totals": {
+   "B": {
+    "hidden_pass": 7,
+    "wall_seconds": 7588,
+    "processed_tokens": 862221,
+    "generated_tokens": 145452
+   },
+   "O": {
+    "hidden_pass": 6,
+    "wall_seconds": 3346,
+    "processed_tokens": 412684,
+    "generated_tokens": 70960
+   }
+  },
+  "api_cost_usd": 0,
+  "api_cost_note": "local model; no API cost. Energy was not measured."
+ },
+ "original": {
+  "arm": "original",
+  "baseline_runs": "runs",
+  "tasks_frozen": 8,
+  "tasks_with_both_runs": 8,
+  "paired": {
+   "both": 6,
+   "B_only": 1,
+   "O_only": 0,
+   "neither": 1
+  },
+  "mcnemar_exact_p_two_sided": 1.0,
+  "strata": {
+   "development": {
+    "tasks": 2,
+    "B_pass": 1,
+    "O_pass": 1
+   },
+   "unseen": {
+    "tasks": 6,
+    "B_pass": 6,
+    "O_pass": 5
+   }
+  },
+  "verification": {
+   "patches_gated": 16,
+   "task_verified": {
+    "selected": 6,
+    "hidden_pass": 5
+   },
+   "checks_pass": {
+    "selected": 12,
+    "hidden_pass": 11
+   },
+   "tests_green_only": {
+    "selected": 6,
+    "hidden_pass": 6
+   },
+   "not_green": {
+    "selected": 4,
+    "hidden_pass": 2
+   },
+   "baseline_patches_not_green": {
+    "selected": 4,
+    "hidden_pass": 2
+   },
+   "false_passes_task_verified": [
+    [
+     "B",
+     "gin-gonic__gin-3820"
+    ]
+   ],
+   "missed_passes": [
+    [
+     "B",
+     "phpoffice__phpspreadsheet-3463"
+    ],
+    [
+     "B",
+     "briannesbitt__carbon-3103"
+    ],
+    [
+     "B",
+     "fluent__fluentd-3616"
+    ],
+    [
+     "O-replay",
+     "immutable-js__immutable-js-2006"
+    ],
+    [
+     "O-replay",
+     "sharkdp__bat-2393"
+    ],
+    [
+     "O-replay",
+     "phpoffice__phpspreadsheet-3463"
+    ],
+    [
+     "O-replay",
+     "briannesbitt__carbon-3103"
+    ],
+    [
+     "O-replay",
+     "fluent__fluentd-3616"
+    ]
+   ],
+   "replay_reproduced_baseline": [
+    "gin-gonic__gin-3820",
+    "gin-gonic__gin-4003",
+    "immutable-js__immutable-js-2006",
+    "sharkdp__bat-2393",
+    "tokio-rs__axum-691",
+    "phpoffice__phpspreadsheet-3463",
+    "briannesbitt__carbon-3103",
+    "fluent__fluentd-3616"
+   ],
+   "replay_mismatch": []
+  },
+  "totals": {
+   "B": {
+    "hidden_pass": 7,
+    "wall_seconds": 7588,
+    "processed_tokens": 862221,
+    "generated_tokens": 145452
+   },
+   "O": {
+    "hidden_pass": 6,
+    "wall_seconds": 5244,
+    "processed_tokens": 693740,
+    "generated_tokens": 125433
+   }
+  },
+  "api_cost_usd": 0,
+  "api_cost_note": "local model; no API cost. Energy was not measured."
+ }
+}

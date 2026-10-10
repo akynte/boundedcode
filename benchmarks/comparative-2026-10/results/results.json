@@ -1,0 +1,996 @@
+{
+ "corrected": [
+  {
+   "id": "gin-gonic__gin-3820",
+   "slot": "go-dev",
+   "stratum": "development",
+   "B": {
+    "hidden_pass": false,
+    "status": "completed",
+    "attempts": 3,
+    "wall_seconds": 2454,
+    "processed_tokens": 326657,
+    "generated_tokens": 58686,
+    "cached_prompt_tokens": 4155505,
+    "error": "",
+    "failed_checks": [
+     "gin: sh -c go test -v ./binding -run \"^TestMapping\": \u2026tMappingTime\n--- PASS: TestMappingTime (0.00s)\n=== RUN   TestMappingTimeDuration\n--- PASS: TestMappingTimeDuration (0.00s)\n=== RUN   TestMappingSlice\n--- PASS: TestMappingSlice (0.00s)\n=== RUN   TestMappingArray\n--- PASS: TestMappingArray (0.00s)"
+    ],
+    "patch_bytes": 5926,
+    "memory_peak_mib": {
+     "mem_avail_min": 33995,
+     "boundedcode": 34,
+     "llama": 27232,
+     "docker_vm": 14734,
+     "containers": 577,
+     "cbm": 30
+    },
+    "model": {
+     "calls": 96,
+     "prompt_tokens": 4425806,
+     "completion_tokens": 58956
+    },
+    "verification": "task_verified",
+    "failure": {
+     "category": "SPEC_GAP",
+     "why": "The patch makes multipart binding skip an absent optional *multipart.FileHeader (binding/multipart_form_mapping.go). That fixes the issue's own reproduction: analysis/gin3820_issue_repro_test.go.txt fails on the base with 'unexpected end of JSON input' and passes with this patch. The hidden test instead adds a case for *multipart.FileHeader to the generic form-mapping table (TestMappingBaseTypes), which only a fix in setWithProperType (form_mapping.go, where the reference fix is) satisfies. The issue names neither layer.",
+     "verification": "task_verified: the agent's own regression test (TestFormMultipartBindingOptionalFileWithEmptyFilename) fails on the base and passes with the change. It verifies the issue's scenario, not the hidden test's."
+    }
+   },
+   "O": {
+    "hidden_pass": false,
+    "status": "finished",
+    "attempts": 1,
+    "wall_seconds": 490,
+    "processed_tokens": 56487,
+    "generated_tokens": 11517,
+    "cached_prompt_tokens": 846715,
+    "error": "",
+    "failed_checks": [
+     "gin: \u2026tMappingTime\n--- PASS: TestMappingTime (0.00s)\n=== RUN   TestMappingTimeDuration\n--- PASS: TestMappingTimeDuration (0.00s)\n=== RUN   TestMappingSlice\n--- PASS: TestMappingSlice (0.00s)\n=== RUN   TestMappingArray\n--- PASS: TestMappingArray (0.00s)\n=== RUN   TestMappingStructField\n--- PASS: Test"
+    ],
+    "patch_bytes": 3164,
+    "memory_peak_mib": {
+     "mem_avail_min": 31944,
+     "boundedcode": 29,
+     "llama": 28311,
+     "docker_vm": 14288,
+     "containers": 786,
+     "cbm": 27
+    },
+    "model": {
+     "calls": 28,
+     "prompt_tokens": 891685,
+     "completion_tokens": 11517
+    },
+    "failure": {
+     "category": "SPEC_GAP",
+     "why": "Again a fix in multipart_form_mapping.go (skip FileHeader targets when no file is uploaded), with its own test of the issue's scenario. The hidden test checks the generic form-mapping layer, as above."
+    }
+   },
+   "replay": {
+    "replayed": true,
+    "hidden_pass": false,
+    "verification": "not_green"
+   }
+  },
+  {
+   "id": "gin-gonic__gin-4003",
+   "slot": "go-dev",
+   "stratum": "development",
+   "B": {
+    "hidden_pass": true,
+    "status": "completed",
+    "attempts": 2,
+    "wall_seconds": 454,
+    "processed_tokens": 60900,
+    "generated_tokens": 8139,
+    "cached_prompt_tokens": 1284359,
+    "error": "",
+    "failed_checks": [],
+    "patch_bytes": 977,
+    "memory_peak_mib": {
+     "mem_avail_min": 33795,
+     "boundedcode": 32,
+     "llama": 27400,
+     "docker_vm": 14753,
+     "containers": 767,
+     "cbm": 29
+    },
+    "model": {
+     "calls": 36,
+     "prompt_tokens": 1337920,
+     "completion_tokens": 8271
+    },
+    "verification": "task_verified"
+   },
+   "O": {
+    "hidden_pass": true,
+    "status": "finished",
+    "attempts": 1,
+    "wall_seconds": 309,
+    "processed_tokens": 40463,
+    "generated_tokens": 5756,
+    "cached_prompt_tokens": 708835,
+    "error": "",
+    "failed_checks": [],
+    "patch_bytes": 1057,
+    "memory_peak_mib": {
+     "mem_avail_min": 32180,
+     "boundedcode": 27,
+     "llama": 28311,
+     "docker_vm": 14284,
+     "containers": 578,
+     "cbm": 27
+    },
+    "model": {
+     "calls": 28,
+     "prompt_tokens": 743542,
+     "completion_tokens": 5756
+    }
+   },
+   "replay": {
+    "replayed": true,
+    "hidden_pass": true,
+    "verification": "not_green"
+   }
+  },
+  {
+   "id": "immutable-js__immutable-js-2006",
+   "slot": "jsts",
+   "stratum": "unseen",
+   "B": {
+    "hidden_pass": true,
+    "status": "completed",
+    "attempts": 3,
+    "wall_seconds": 979,
+    "processed_tokens": 126596,
+    "generated_tokens": 18432,
+    "cached_prompt_tokens": 1898119,
+    "error": "",
+    "failed_checks": [],
+    "patch_bytes": 1337,
+    "memory_peak_mib": {
+     "mem_avail_min": 33587,
+     "boundedcode": 33,
+     "llama": 27622,
+     "docker_vm": 14971,
+     "containers": 3065,
+     "cbm": 42
+    },
+    "model": {
+     "calls": 44,
+     "prompt_tokens": 2006844,
+     "completion_tokens": 18583
+    },
+    "verification": "task_verified"
+   },
+   "O": {
+    "hidden_pass": false,
+    "status": "finished",
+    "attempts": 1,
+    "wall_seconds": 340,
+    "processed_tokens": 47184,
+    "generated_tokens": 7703,
+    "cached_prompt_tokens": 516551,
+    "error": "",
+    "failed_checks": [
+     "immutable-js: \u2026 2041.6 (2044.3) MB, pooled: 0 MB, 256.52 / 0.00 ms  (+ 1.4 ms in 3 steps since start of marking, biggest step 1.4 ms, walltime since start of marking 261 ms) (average mu = 0.298, curren\nFATAL ERROR: Ineffective mark-compacts near heap limit Allocation failed - JavaScript heap out of "
+    ],
+    "patch_bytes": 737,
+    "memory_peak_mib": {
+     "mem_avail_min": 32949,
+     "boundedcode": 28,
+     "llama": 27471,
+     "docker_vm": 14334,
+     "containers": 1757,
+     "cbm": 27
+    },
+    "model": {
+     "calls": 18,
+     "prompt_tokens": 556032,
+     "completion_tokens": 7703
+    },
+    "failure": {
+     "category": "WRONG_BEHAVIOUR",
+     "why": "The patch adds an early-return condition in src/Operations.js (`originalSize === undefined && resolvedEnd === undefined`). With it, the hidden Range test exhausts the JavaScript heap ('Ineffective mark-compacts near heap limit'): a slice of an infinite range is no longer bounded. The right file, the wrong behaviour."
+    }
+   },
+   "replay": null
+  },
+  {
+   "id": "sharkdp__bat-2393",
+   "slot": "rust",
+   "stratum": "unseen",
+   "B": {
+    "hidden_pass": true,
+    "status": "completed",
+    "attempts": 1,
+    "wall_seconds": 1073,
+    "processed_tokens": 63284,
+    "generated_tokens": 6151,
+    "cached_prompt_tokens": 925532,
+    "error": "",
+    "failed_checks": [],
+    "patch_bytes": 3537,
+    "memory_peak_mib": {
+     "mem_avail_min": 32073,
+     "boundedcode": 32,
+     "llama": 29102,
+     "docker_vm": 15011,
+     "containers": 837,
+     "cbm": 153
+    },
+    "model": {
+     "calls": 31,
+     "prompt_tokens": 983270,
+     "completion_tokens": 6291
+    },
+    "verification": "task_verified"
+   },
+   "O": {
+    "hidden_pass": true,
+    "status": "finished",
+    "attempts": 1,
+    "wall_seconds": 388,
+    "processed_tokens": 53518,
+    "generated_tokens": 7302,
+    "cached_prompt_tokens": 961436,
+    "error": "",
+    "failed_checks": [],
+    "patch_bytes": 3343,
+    "memory_peak_mib": {
+     "mem_avail_min": 32814,
+     "boundedcode": 30,
+     "llama": 27470,
+     "docker_vm": 14336,
+     "containers": 749,
+     "cbm": 27
+    },
+    "model": {
+     "calls": 40,
+     "prompt_tokens": 1007652,
+     "completion_tokens": 7302
+    }
+   },
+   "replay": null
+  },
+  {
+   "id": "tokio-rs__axum-691",
+   "slot": "rust",
+   "stratum": "unseen",
+   "B": {
+    "hidden_pass": true,
+    "status": "completed",
+    "attempts": 1,
+    "wall_seconds": 672,
+    "processed_tokens": 62673,
+    "generated_tokens": 10952,
+    "cached_prompt_tokens": 842608,
+    "error": "",
+    "failed_checks": [],
+    "patch_bytes": 2509,
+    "memory_peak_mib": {
+     "mem_avail_min": 35294,
+     "boundedcode": 32,
+     "llama": 28329,
+     "docker_vm": 13384,
+     "containers": 2278,
+     "cbm": 30
+    },
+    "model": {
+     "calls": 29,
+     "prompt_tokens": 895172,
+     "completion_tokens": 11255
+    },
+    "verification": "task_verified"
+   },
+   "O": {
+    "hidden_pass": true,
+    "status": "finished",
+    "attempts": 1,
+    "wall_seconds": 373,
+    "processed_tokens": 61011,
+    "generated_tokens": 6298,
+    "cached_prompt_tokens": 523230,
+    "error": "",
+    "failed_checks": [],
+    "patch_bytes": 2600,
+    "memory_peak_mib": {
+     "mem_avail_min": 33395,
+     "boundedcode": 29,
+     "llama": 26956,
+     "docker_vm": 14327,
+     "containers": 1402,
+     "cbm": 27
+    },
+    "model": {
+     "calls": 17,
+     "prompt_tokens": 577943,
+     "completion_tokens": 6298
+    }
+   },
+   "replay": null
+  },
+  {
+   "id": "phpoffice__phpspreadsheet-3463",
+   "slot": "php",
+   "stratum": "unseen",
+   "B": {
+    "hidden_pass": true,
+    "status": "completed",
+    "attempts": 2,
+    "wall_seconds": 370,
+    "processed_tokens": 46017,
+    "generated_tokens": 8317,
+    "cached_prompt_tokens": 479039,
+    "error": "",
+    "failed_checks": [],
+    "patch_bytes": 1546,
+    "memory_peak_mib": {
+     "mem_avail_min": 34634,
+     "boundedcode": 32,
+     "llama": 28434,
+     "docker_vm": 13512,
+     "containers": 476,
+     "cbm": 218
+    },
+    "model": {
+     "calls": 22,
+     "prompt_tokens": 518282,
+     "completion_tokens": 8692
+    },
+    "verification": "tests_green"
+   },
+   "O": {
+    "hidden_pass": true,
+    "status": "finished",
+    "attempts": 1,
+    "wall_seconds": 505,
+    "processed_tokens": 51721,
+    "generated_tokens": 12631,
+    "cached_prompt_tokens": 816827,
+    "error": "",
+    "failed_checks": [],
+    "patch_bytes": 1721,
+    "memory_peak_mib": {
+     "mem_avail_min": 32692,
+     "boundedcode": 28,
+     "llama": 26417,
+     "docker_vm": 14303,
+     "containers": 404,
+     "cbm": 20
+    },
+    "model": {
+     "calls": 29,
+     "prompt_tokens": 855917,
+     "completion_tokens": 12631
+    }
+   },
+   "replay": null
+  },
+  {
+   "id": "briannesbitt__carbon-3103",
+   "slot": "php",
+   "stratum": "unseen",
+   "B": {
+    "hidden_pass": true,
+    "status": "completed",
+    "attempts": 2,
+    "wall_seconds": 1076,
+    "processed_tokens": 117683,
+    "generated_tokens": 25130,
+    "cached_prompt_tokens": 1316632,
+    "error": "",
+    "failed_checks": [],
+    "patch_bytes": 2916,
+    "memory_peak_mib": {
+     "mem_avail_min": 34595,
+     "boundedcode": 32,
+     "llama": 28287,
+     "docker_vm": 13567,
+     "containers": 580,
+     "cbm": 89
+    },
+    "model": {
+     "calls": 46,
+     "prompt_tokens": 1409842,
+     "completion_tokens": 25287
+    },
+    "verification": "tests_green"
+   },
+   "O": {
+    "hidden_pass": true,
+    "status": "finished",
+    "attempts": 1,
+    "wall_seconds": 276,
+    "processed_tokens": 30968,
+    "generated_tokens": 6567,
+    "cached_prompt_tokens": 328024,
+    "error": "",
+    "failed_checks": [],
+    "patch_bytes": 480,
+    "memory_peak_mib": {
+     "mem_avail_min": 33020,
+     "boundedcode": 27,
+     "llama": 26415,
+     "docker_vm": 14314,
+     "containers": 406,
+     "cbm": 24
+    },
+    "model": {
+     "calls": 20,
+     "prompt_tokens": 352425,
+     "completion_tokens": 6567
+    }
+   },
+   "replay": null
+  },
+  {
+   "id": "fluent__fluentd-3616",
+   "slot": "ruby",
+   "stratum": "unseen",
+   "B": {
+    "hidden_pass": true,
+    "status": "completed",
+    "attempts": 2,
+    "wall_seconds": 510,
+    "processed_tokens": 58411,
+    "generated_tokens": 9645,
+    "cached_prompt_tokens": 847270,
+    "error": "",
+    "failed_checks": [],
+    "patch_bytes": 3306,
+    "memory_peak_mib": {
+     "mem_avail_min": 31734,
+     "boundedcode": 31,
+     "llama": 28922,
+     "docker_vm": 13616,
+     "containers": 471,
+     "cbm": 42
+    },
+    "model": {
+     "calls": 34,
+     "prompt_tokens": 897045,
+     "completion_tokens": 9902
+    },
+    "verification": "tests_green"
+   },
+   "O": {
+    "hidden_pass": true,
+    "status": "finished",
+    "attempts": 1,
+    "wall_seconds": 665,
+    "processed_tokens": 71332,
+    "generated_tokens": 13186,
+    "cached_prompt_tokens": 1211413,
+    "error": "",
+    "failed_checks": [],
+    "patch_bytes": 10425,
+    "memory_peak_mib": {
+     "mem_avail_min": 32684,
+     "boundedcode": 30,
+     "llama": 26412,
+     "docker_vm": 14330,
+     "containers": 470,
+     "cbm": 24
+    },
+    "model": {
+     "calls": 32,
+     "prompt_tokens": 1269559,
+     "completion_tokens": 13186
+    }
+   },
+   "replay": null
+  }
+ ],
+ "original": [
+  {
+   "id": "gin-gonic__gin-3820",
+   "slot": "go-dev",
+   "stratum": "development",
+   "B": {
+    "hidden_pass": false,
+    "status": "completed",
+    "attempts": 3,
+    "wall_seconds": 2454,
+    "processed_tokens": 326657,
+    "generated_tokens": 58686,
+    "cached_prompt_tokens": 4155505,
+    "error": "",
+    "failed_checks": [
+     "gin: sh -c go test -v ./binding -run \"^TestMapping\": \u2026tMappingTime\n--- PASS: TestMappingTime (0.00s)\n=== RUN   TestMappingTimeDuration\n--- PASS: TestMappingTimeDuration (0.00s)\n=== RUN   TestMappingSlice\n--- PASS: TestMappingSlice (0.00s)\n=== RUN   TestMappingArray\n--- PASS: TestMappingArray (0.00s)"
+    ],
+    "patch_bytes": 5926,
+    "memory_peak_mib": {
+     "mem_avail_min": 33995,
+     "boundedcode": 34,
+     "llama": 27232,
+     "docker_vm": 14734,
+     "containers": 577,
+     "cbm": 30
+    },
+    "model": {
+     "calls": 96,
+     "prompt_tokens": 4425806,
+     "completion_tokens": 58956
+    },
+    "verification": "task_verified",
+    "failure": {
+     "category": "SPEC_GAP",
+     "why": "The patch makes multipart binding skip an absent optional *multipart.FileHeader (binding/multipart_form_mapping.go). That fixes the issue's own reproduction: analysis/gin3820_issue_repro_test.go.txt fails on the base with 'unexpected end of JSON input' and passes with this patch. The hidden test instead adds a case for *multipart.FileHeader to the generic form-mapping table (TestMappingBaseTypes), which only a fix in setWithProperType (form_mapping.go, where the reference fix is) satisfies. The issue names neither layer.",
+     "verification": "task_verified: the agent's own regression test (TestFormMultipartBindingOptionalFileWithEmptyFilename) fails on the base and passes with the change. It verifies the issue's scenario, not the hidden test's."
+    }
+   },
+   "O": {
+    "hidden_pass": false,
+    "status": "finished",
+    "attempts": 1,
+    "wall_seconds": 821,
+    "processed_tokens": 108723,
+    "generated_tokens": 20624,
+    "cached_prompt_tokens": 1544638,
+    "error": "",
+    "failed_checks": [
+     "gin: \u2026tMappingTime\n--- PASS: TestMappingTime (0.00s)\n=== RUN   TestMappingTimeDuration\n--- PASS: TestMappingTimeDuration (0.00s)\n=== RUN   TestMappingSlice\n--- PASS: TestMappingSlice (0.00s)\n=== RUN   TestMappingArray\n--- PASS: TestMappingArray (0.00s)\n=== RUN   TestMappingStructField\n--- PASS: Test"
+    ],
+    "patch_bytes": 4522,
+    "memory_peak_mib": {
+     "mem_avail_min": 32815,
+     "boundedcode": 30,
+     "llama": 28422,
+     "docker_vm": 14737,
+     "containers": 643,
+     "cbm": 27
+    },
+    "model": {
+     "calls": 51,
+     "prompt_tokens": 1632737,
+     "completion_tokens": 20624
+    },
+    "failure": {
+     "category": "SPEC_GAP",
+     "why": "The same reading and layer as BoundedCode's (multipart_form_mapping.go). It fixes the issue's reproduction, but the hidden test checks generic form mapping. The gate replay also shows that this patch breaks the existing test TestBindingFormFilesMultipartFail. The agent could not run the tests because of the environment defect (D3)."
+    }
+   },
+   "replay": {
+    "replayed": true,
+    "hidden_pass": false,
+    "verification": "not_green"
+   }
+  },
+  {
+   "id": "gin-gonic__gin-4003",
+   "slot": "go-dev",
+   "stratum": "development",
+   "B": {
+    "hidden_pass": true,
+    "status": "completed",
+    "attempts": 2,
+    "wall_seconds": 454,
+    "processed_tokens": 60900,
+    "generated_tokens": 8139,
+    "cached_prompt_tokens": 1284359,
+    "error": "",
+    "failed_checks": [],
+    "patch_bytes": 977,
+    "memory_peak_mib": {
+     "mem_avail_min": 33795,
+     "boundedcode": 32,
+     "llama": 27400,
+     "docker_vm": 14753,
+     "containers": 767,
+     "cbm": 29
+    },
+    "model": {
+     "calls": 36,
+     "prompt_tokens": 1337920,
+     "completion_tokens": 8271
+    },
+    "verification": "task_verified"
+   },
+   "O": {
+    "hidden_pass": true,
+    "status": "finished",
+    "attempts": 1,
+    "wall_seconds": 684,
+    "processed_tokens": 121595,
+    "generated_tokens": 15212,
+    "cached_prompt_tokens": 1769321,
+    "error": "",
+    "failed_checks": [],
+    "patch_bytes": 1304,
+    "memory_peak_mib": {
+     "mem_avail_min": 33134,
+     "boundedcode": 30,
+     "llama": 28145,
+     "docker_vm": 14755,
+     "containers": 413,
+     "cbm": 27
+    },
+    "model": {
+     "calls": 65,
+     "prompt_tokens": 1875704,
+     "completion_tokens": 15212
+    }
+   },
+   "replay": {
+    "replayed": true,
+    "hidden_pass": true,
+    "verification": "task_verified"
+   }
+  },
+  {
+   "id": "immutable-js__immutable-js-2006",
+   "slot": "jsts",
+   "stratum": "unseen",
+   "B": {
+    "hidden_pass": true,
+    "status": "completed",
+    "attempts": 3,
+    "wall_seconds": 979,
+    "processed_tokens": 126596,
+    "generated_tokens": 18432,
+    "cached_prompt_tokens": 1898119,
+    "error": "",
+    "failed_checks": [],
+    "patch_bytes": 1337,
+    "memory_peak_mib": {
+     "mem_avail_min": 33587,
+     "boundedcode": 33,
+     "llama": 27622,
+     "docker_vm": 14971,
+     "containers": 3065,
+     "cbm": 42
+    },
+    "model": {
+     "calls": 44,
+     "prompt_tokens": 2006844,
+     "completion_tokens": 18583
+    },
+    "verification": "task_verified"
+   },
+   "O": {
+    "hidden_pass": true,
+    "status": "finished",
+    "attempts": 1,
+    "wall_seconds": 1095,
+    "processed_tokens": 113964,
+    "generated_tokens": 27429,
+    "cached_prompt_tokens": 1391541,
+    "error": "",
+    "failed_checks": [],
+    "patch_bytes": 1265,
+    "memory_peak_mib": {
+     "mem_avail_min": 32150,
+     "boundedcode": 29,
+     "llama": 28993,
+     "docker_vm": 14976,
+     "containers": 654,
+     "cbm": 27
+    },
+    "model": {
+     "calls": 39,
+     "prompt_tokens": 1478076,
+     "completion_tokens": 27429
+    }
+   },
+   "replay": {
+    "replayed": true,
+    "hidden_pass": true,
+    "verification": "not_green"
+   }
+  },
+  {
+   "id": "sharkdp__bat-2393",
+   "slot": "rust",
+   "stratum": "unseen",
+   "B": {
+    "hidden_pass": true,
+    "status": "completed",
+    "attempts": 1,
+    "wall_seconds": 1073,
+    "processed_tokens": 63284,
+    "generated_tokens": 6151,
+    "cached_prompt_tokens": 925532,
+    "error": "",
+    "failed_checks": [],
+    "patch_bytes": 3537,
+    "memory_peak_mib": {
+     "mem_avail_min": 32073,
+     "boundedcode": 32,
+     "llama": 29102,
+     "docker_vm": 15011,
+     "containers": 837,
+     "cbm": 153
+    },
+    "model": {
+     "calls": 31,
+     "prompt_tokens": 983270,
+     "completion_tokens": 6291
+    },
+    "verification": "task_verified"
+   },
+   "O": {
+    "hidden_pass": true,
+    "status": "finished",
+    "attempts": 1,
+    "wall_seconds": 491,
+    "processed_tokens": 82611,
+    "generated_tokens": 10501,
+    "cached_prompt_tokens": 1330622,
+    "error": "",
+    "failed_checks": [],
+    "patch_bytes": 3029,
+    "memory_peak_mib": {
+     "mem_avail_min": 32373,
+     "boundedcode": 29,
+     "llama": 29089,
+     "docker_vm": 15012,
+     "containers": 944,
+     "cbm": 27
+    },
+    "model": {
+     "calls": 43,
+     "prompt_tokens": 1402732,
+     "completion_tokens": 10501
+    }
+   },
+   "replay": {
+    "replayed": true,
+    "hidden_pass": true,
+    "verification": "tests_green"
+   }
+  },
+  {
+   "id": "tokio-rs__axum-691",
+   "slot": "rust",
+   "stratum": "unseen",
+   "B": {
+    "hidden_pass": true,
+    "status": "completed",
+    "attempts": 1,
+    "wall_seconds": 672,
+    "processed_tokens": 62673,
+    "generated_tokens": 10952,
+    "cached_prompt_tokens": 842608,
+    "error": "",
+    "failed_checks": [],
+    "patch_bytes": 2509,
+    "memory_peak_mib": {
+     "mem_avail_min": 35294,
+     "boundedcode": 32,
+     "llama": 28329,
+     "docker_vm": 13384,
+     "containers": 2278,
+     "cbm": 30
+    },
+    "model": {
+     "calls": 29,
+     "prompt_tokens": 895172,
+     "completion_tokens": 11255
+    },
+    "verification": "task_verified"
+   },
+   "O": {
+    "hidden_pass": false,
+    "status": "finished",
+    "attempts": 1,
+    "wall_seconds": 446,
+    "processed_tokens": 60571,
+    "generated_tokens": 8692,
+    "cached_prompt_tokens": 1248025,
+    "error": "",
+    "failed_checks": [
+     "axum: \u2026             ---------------------- expected because of this\n210 | |                     } else {\n211 | |                         format!(\"{}{}\", path, nested_path)\n    | |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Arc<str>`, found `String`\n212 | |                  "
+    ],
+    "patch_bytes": 2523,
+    "memory_peak_mib": {
+     "mem_avail_min": 35448,
+     "boundedcode": 29,
+     "llama": 28331,
+     "docker_vm": 14853,
+     "containers": 1080,
+     "cbm": 27
+    },
+    "model": {
+     "calls": 34,
+     "prompt_tokens": 1299904,
+     "completion_tokens": 8692
+    },
+    "failure": {
+     "category": "WRONG_BEHAVIOUR",
+     "why": "The right location and logic (an extra branch for nesting at '/'), but `nested_path.to_owned()` yields Arc<str> where the other branches produce String, so the crate does not compile. The agent's cargo commands all failed with 'no matching package named async-trait' because of the environment defect (D3), so it could not see the error. In the replay, BoundedCode's build stage catches it."
+    }
+   },
+   "replay": {
+    "replayed": true,
+    "hidden_pass": false,
+    "verification": "not_green"
+   }
+  },
+  {
+   "id": "phpoffice__phpspreadsheet-3463",
+   "slot": "php",
+   "stratum": "unseen",
+   "B": {
+    "hidden_pass": true,
+    "status": "completed",
+    "attempts": 2,
+    "wall_seconds": 370,
+    "processed_tokens": 46017,
+    "generated_tokens": 8317,
+    "cached_prompt_tokens": 479039,
+    "error": "",
+    "failed_checks": [],
+    "patch_bytes": 1546,
+    "memory_peak_mib": {
+     "mem_avail_min": 34634,
+     "boundedcode": 32,
+     "llama": 28434,
+     "docker_vm": 13512,
+     "containers": 476,
+     "cbm": 218
+    },
+    "model": {
+     "calls": 22,
+     "prompt_tokens": 518282,
+     "completion_tokens": 8692
+    },
+    "verification": "tests_green"
+   },
+   "O": {
+    "hidden_pass": true,
+    "status": "finished",
+    "attempts": 1,
+    "wall_seconds": 419,
+    "processed_tokens": 47855,
+    "generated_tokens": 11039,
+    "cached_prompt_tokens": 556882,
+    "error": "",
+    "failed_checks": [],
+    "patch_bytes": 1608,
+    "memory_peak_mib": {
+     "mem_avail_min": 35697,
+     "boundedcode": 28,
+     "llama": 27126,
+     "docker_vm": 13416,
+     "containers": 407,
+     "cbm": 27
+    },
+    "model": {
+     "calls": 24,
+     "prompt_tokens": 593698,
+     "completion_tokens": 11039
+    }
+   },
+   "replay": {
+    "replayed": true,
+    "hidden_pass": true,
+    "verification": "tests_green"
+   }
+  },
+  {
+   "id": "briannesbitt__carbon-3103",
+   "slot": "php",
+   "stratum": "unseen",
+   "B": {
+    "hidden_pass": true,
+    "status": "completed",
+    "attempts": 2,
+    "wall_seconds": 1076,
+    "processed_tokens": 117683,
+    "generated_tokens": 25130,
+    "cached_prompt_tokens": 1316632,
+    "error": "",
+    "failed_checks": [],
+    "patch_bytes": 2916,
+    "memory_peak_mib": {
+     "mem_avail_min": 34595,
+     "boundedcode": 32,
+     "llama": 28287,
+     "docker_vm": 13567,
+     "containers": 580,
+     "cbm": 89
+    },
+    "model": {
+     "calls": 46,
+     "prompt_tokens": 1409842,
+     "completion_tokens": 25287
+    },
+    "verification": "tests_green"
+   },
+   "O": {
+    "hidden_pass": true,
+    "status": "finished",
+    "attempts": 1,
+    "wall_seconds": 432,
+    "processed_tokens": 37399,
+    "generated_tokens": 12371,
+    "cached_prompt_tokens": 452620,
+    "error": "",
+    "failed_checks": [],
+    "patch_bytes": 692,
+    "memory_peak_mib": {
+     "mem_avail_min": 34600,
+     "boundedcode": 29,
+     "llama": 28434,
+     "docker_vm": 13528,
+     "containers": 410,
+     "cbm": 27
+    },
+    "model": {
+     "calls": 27,
+     "prompt_tokens": 477648,
+     "completion_tokens": 12371
+    }
+   },
+   "replay": {
+    "replayed": true,
+    "hidden_pass": true,
+    "verification": "not_green"
+   }
+  },
+  {
+   "id": "fluent__fluentd-3616",
+   "slot": "ruby",
+   "stratum": "unseen",
+   "B": {
+    "hidden_pass": true,
+    "status": "completed",
+    "attempts": 2,
+    "wall_seconds": 510,
+    "processed_tokens": 58411,
+    "generated_tokens": 9645,
+    "cached_prompt_tokens": 847270,
+    "error": "",
+    "failed_checks": [],
+    "patch_bytes": 3306,
+    "memory_peak_mib": {
+     "mem_avail_min": 31734,
+     "boundedcode": 31,
+     "llama": 28922,
+     "docker_vm": 13616,
+     "containers": 471,
+     "cbm": 42
+    },
+    "model": {
+     "calls": 34,
+     "prompt_tokens": 897045,
+     "completion_tokens": 9902
+    },
+    "verification": "tests_green"
+   },
+   "O": {
+    "hidden_pass": true,
+    "status": "finished",
+    "attempts": 1,
+    "wall_seconds": 856,
+    "processed_tokens": 121022,
+    "generated_tokens": 19565,
+    "cached_prompt_tokens": 1766268,
+    "error": "",
+    "failed_checks": [],
+    "patch_bytes": 4390,
+    "memory_peak_mib": {
+     "mem_avail_min": 34107,
+     "boundedcode": 29,
+     "llama": 27347,
+     "docker_vm": 13589,
+     "containers": 432,
+     "cbm": 27
+    },
+    "model": {
+     "calls": 44,
+     "prompt_tokens": 1867725,
+     "completion_tokens": 19565
+    }
+   },
+   "replay": {
+    "replayed": true,
+    "hidden_pass": true,
+    "verification": "tests_green"
+   }
+  }
+ ]
+}

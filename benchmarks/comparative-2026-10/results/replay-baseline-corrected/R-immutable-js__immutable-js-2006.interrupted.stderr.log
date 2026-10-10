@@ -1,0 +1,13 @@
+23:14:56 task immutable-js__immutable-js-2006 (jsts)
+using openai-compatible model replay (working context 131072 tokens)
+23:15:11 attempt 1/2: sending initial context pack (570 tokens)
+23:15:14 agent stopped: status=finished events=10 stuck=false
+23:35:19 verify targeted immutable-js: passed=false (20m5.783s)
+23:35:19 verification failed: immutable-js/npm-test: FATAL ERROR: Ineffective mark-compacts near heap limit Allocation failed - JavaScript heap out of memory
+23:35:22 attempt 2/2: sending retry context pack (2111 tokens)
+23:35:22 agent stopped: status=finished events=5 stuck=false
+time=2026-10-09T23:43:18.378Z level=ERROR msg="telemetry emit failed" kind=verify.side_effects err="context canceled"
+23:43:18 task immutable-js__immutable-js-2006: success=false status=active attempts=2 tokens=720 escalations=0 1703s context canceled
+verified 0/1 (0%), local-only 0%, escalation rate 0%, 0.0 verified/hour, 1703s/task
+report: ~/boundedcode/benchmarks/comparative-2026-10/results/replay-baseline-corrected/R-immutable-js__immutable-js-2006.md
+error: context canceled

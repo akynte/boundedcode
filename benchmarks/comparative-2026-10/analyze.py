@@ -58,8 +58,8 @@ def model_calls(state_dir, task_id):
         return None
 
 
-def run(sysname, tid):
-    rep = load(os.path.join(RES, "runs", "%s-%s.json" % (sysname, tid)))
+def run(sysname, tid, runs="runs"):
+    rep = load(os.path.join(RES, runs, "%s-%s.json" % (sysname, tid)))
     if not rep or not rep.get("results"):
         return None
     r = rep["results"][0]
@@ -69,7 +69,7 @@ def run(sysname, tid):
         "generated_tokens": r.get("generated_tokens", 0), "cached_prompt_tokens": r.get("cached_prompt_tokens", 0),
         "error": r.get("error", ""), "failed_checks": [c[:300] for c in r.get("failed_checks") or []],
         "patch_bytes": os.path.getsize(os.path.expanduser(r["agent_patch"])) if r.get("agent_patch") and os.path.exists(os.path.expanduser(r["agent_patch"])) else 0,
-        "memory_peak_mib": peaks(os.path.join(RES, "runs", "%s-%s.mem.log" % (sysname, tid))),
+        "memory_peak_mib": peaks(os.path.join(RES, runs, "%s-%s.mem.log" % (sysname, tid))),
         "model": model_calls(r.get("state_dir"), r.get("task_id")),
     }
     if sysname == "B":
@@ -77,8 +77,8 @@ def run(sysname, tid):
     return out
 
 
-def replay(tid):
-    r = load(os.path.join(RES, "replay", "R-%s.json" % tid))
+def replay(tid, replays="replay"):
+    r = load(os.path.join(RES, replays, "R-%s.json" % tid))
     if not r:
         return None
     if "results" not in r:
@@ -96,18 +96,22 @@ def mcnemar(b, c):
     return min(1.0, 2 * sum(math.comb(n, i) for i in range(k + 1)) / 2 ** n)
 
 
-def main():
-    frozen = load(os.path.join(HERE, "frozen-tasks.json"))
-    cats = load(os.path.join(RES, "failure-analysis.json")) or {}
+ARMS = [
+    # (name, baseline runs, replays of its patches): the corrected arm is the
+    # primary comparison (deviations.md D3); the original arm is kept.
+    ("corrected", "runs-baseline-corrected", "replay-baseline-corrected"),
+    ("original", "runs", "replay"),
+]
+
+
+def analyse(arm, oruns, replays, frozen, cats):
     rows = []
     for t in frozen["tasks"]:
-        b, o, rp = run("B", t["id"]), run("O", t["id"]), replay(t["id"])
+        b, o, rp = run("B", t["id"]), run("O", t["id"], oruns), replay(t["id"], replays)
         for k, v in (("B", b), ("O", o)):
             if v and not v["hidden_pass"]:
-                v["failure"] = cats.get("%s-%s" % (k, t["id"]))
+                v["failure"] = cats.get("%s-%s" % (k if k == "B" else "O-" + arm, t["id"]))
         rows.append({"id": t["id"], "slot": t["slot"], "stratum": t["stratum"], "B": b, "O": o, "replay": rp})
-    json.dump(rows, open(os.path.join(RES, "results.json"), "w"), indent=1)
-
     done = [r for r in rows if r["B"] and r["O"]]
     pair = {"both": 0, "B_only": 0, "O_only": 0, "neither": 0}
     for r in done:
@@ -115,17 +119,17 @@ def main():
         pair["both" if bp and op else "B_only" if bp else "O_only" if op else "neither"] += 1
     strata = {}
     for r in done:
-        s = strata.setdefault(r["stratum"], {"tasks": 0, "B_pass": 0, "O_pass": 0})
-        s["tasks"] += 1
-        s["B_pass"] += r["B"]["hidden_pass"]
-        s["O_pass"] += r["O"]["hidden_pass"]
+        st = strata.setdefault(r["stratum"], {"tasks": 0, "B_pass": 0, "O_pass": 0})
+        st["tasks"] += 1
+        st["B_pass"] += r["B"]["hidden_pass"]
+        st["O_pass"] += r["O"]["hidden_pass"]
     # Verification agreement over every gated patch: B's runs and the
     # replays of O's patches.
     gated = [("B", r["id"], r["B"]["verification"], r["B"]["hidden_pass"]) for r in rows if r["B"]]
     gated += [("O-replay", r["id"], r["replay"]["verification"], r["replay"]["hidden_pass"]) for r in rows if r["replay"] and r["replay"].get("replayed")]
 
-    def agree(pred):
-        sel = [g for g in gated if pred(g[2])]
+    def agree(pred, src=None):
+        sel = [g for g in gated if pred(g[2]) and (src is None or g[0] == src)]
         return {"selected": len(sel), "hidden_pass": sum(g[3] for g in sel)}
     verif = {
         "patches_gated": len(gated),
@@ -133,6 +137,7 @@ def main():
         "checks_pass": agree(lambda v: v in ("task_verified", "tests_green")),
         "tests_green_only": agree(lambda v: v == "tests_green"),
         "not_green": agree(lambda v: v == "not_green"),
+        "baseline_patches_not_green": agree(lambda v: v == "not_green", "O-replay"),
         "false_passes_task_verified": [g[:2] for g in gated if g[2] == "task_verified" and not g[3]],
         "missed_passes": [g[:2] for g in gated if g[2] != "task_verified" and g[3]],
         "replay_reproduced_baseline": [r["id"] for r in rows if r["replay"] and r["replay"].get("replayed") and r["O"] and r["replay"]["hidden_pass"] == r["O"]["hidden_pass"]],
@@ -140,29 +145,42 @@ def main():
     }
 
     def tot(k, f):
-        return sum(r[k][f] for r in done)
+        return sum((r[k][f] or 0) for r in done)
     summary = {
-        "tasks_frozen": len(rows), "tasks_with_both_runs": len(done), "paired": pair,
+        "arm": arm, "baseline_runs": oruns, "tasks_frozen": len(rows), "tasks_with_both_runs": len(done), "paired": pair,
         "mcnemar_exact_p_two_sided": round(mcnemar(pair["B_only"], pair["O_only"]), 4), "strata": strata,
         "verification": verif,
-        "totals": {s: {"hidden_pass": tot(s, "hidden_pass"), "wall_seconds": tot(s, "wall_seconds"),
-                       "processed_tokens": tot(s, "processed_tokens"), "generated_tokens": tot(s, "generated_tokens")} for s in ("B", "O")},
+        "totals": {sn: {"hidden_pass": tot(sn, "hidden_pass"), "wall_seconds": tot(sn, "wall_seconds"),
+                        "processed_tokens": tot(sn, "processed_tokens"), "generated_tokens": tot(sn, "generated_tokens")} for sn in ("B", "O")},
         "api_cost_usd": 0, "api_cost_note": "local model; no API cost. Energy was not measured.",
     }
-    json.dump(summary, open(os.path.join(RES, "summary.json"), "w"), indent=1)
+    return rows, summary
 
-    print("| Task | Stratum | BoundedCode: hidden | B: verification | B: attempts | B: time | B: tokens | Baseline: hidden | O: time | O: tokens | Gate replay of O's patch |")
-    print("|---|---|---|---|---|---|---|---|---|---|---|")
-    yn = {True: "**pass**", False: "fail", None: "–"}
-    for r in rows:
-        b, o, rp = r["B"] or {}, r["O"] or {}, r["replay"] or {}
-        rps = ("%s (hidden %s)" % (rp["verification"], "pass" if rp["hidden_pass"] else "fail")) if rp.get("replayed") else (rp.get("why") or "–")
-        print("| %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |" % (
-            r["id"], r["stratum"], yn[b.get("hidden_pass")], b.get("verification", "–"), b.get("attempts", "–"),
-            fmt_t(b.get("wall_seconds")), fmt_k(b.get("processed_tokens")), yn[o.get("hidden_pass")],
-            fmt_t(o.get("wall_seconds")), fmt_k(o.get("processed_tokens")), rps))
-    print()
-    print(json.dumps(summary, indent=1))
+
+def main():
+    frozen = load(os.path.join(HERE, "frozen-tasks.json"))
+    cats = load(os.path.join(RES, "failure-analysis.json")) or {}
+    out_rows, out_sum = {}, {}
+    for arm, oruns, replays in ARMS:
+        rows, summary = analyse(arm, oruns, replays, frozen, cats)
+        out_rows[arm], out_sum[arm] = rows, summary
+        print("## Baseline arm: %s" % arm)
+        print()
+        print("| Task | Stratum | BoundedCode: hidden | B: verification | B: attempts | B: time | B: tokens | Baseline: hidden | O: time | O: tokens | Gate replay of O's patch |")
+        print("|---|---|---|---|---|---|---|---|---|---|---|")
+        yn = {True: "**pass**", False: "fail", None: "–"}
+        for r in rows:
+            b, o, rp = r["B"] or {}, r["O"] or {}, r["replay"] or {}
+            rps = ("%s (hidden %s)" % (rp["verification"], "pass" if rp["hidden_pass"] else "fail")) if rp.get("replayed") else (rp.get("why") or "–")
+            print("| %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |" % (
+                r["id"], r["stratum"], yn[b.get("hidden_pass")], b.get("verification", "–"), b.get("attempts", "–"),
+                fmt_t(b.get("wall_seconds")), fmt_k(b.get("processed_tokens")), yn[o.get("hidden_pass")],
+                fmt_t(o.get("wall_seconds")), fmt_k(o.get("processed_tokens")), rps))
+        print()
+        print(json.dumps(summary, indent=1))
+        print()
+    json.dump(out_rows, open(os.path.join(RES, "results.json"), "w"), indent=1)
+    json.dump(out_sum, open(os.path.join(RES, "summary.json"), "w"), indent=1)
 
 
 def fmt_t(s):

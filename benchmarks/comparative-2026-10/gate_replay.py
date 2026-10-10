@@ -51,9 +51,11 @@ def main():
     ap.add_argument("--eval", default=os.path.expanduser("~/.cache/bc-comparative"))
     ap.add_argument("--binary", default=os.path.join(ROOT, "bin", "boundedcode"))
     ap.add_argument("--only", nargs="*")
+    ap.add_argument("--runs", default="runs", help="results/ subdirectory with the baseline's runs")
+    ap.add_argument("--outdir", default="replay", help="results/ subdirectory for the replays")
     a = ap.parse_args()
     frozen = json.load(open(os.path.join(HERE, "frozen-tasks.json")))
-    out = os.path.join(HERE, "results", "replay")
+    out = os.path.join(HERE, "results", a.outdir)
     os.makedirs(out, exist_ok=True)
     env = env_for(a.eval)
     env["BOUNDEDCODE_HOME"] = os.path.join(a.eval, "home-replay")
@@ -69,7 +71,7 @@ def main():
         tid = t["id"]
         if a.only and tid not in a.only:
             continue
-        res_path = os.path.join(HERE, "results", "runs", "O-%s.json" % tid)
+        res_path = os.path.join(HERE, "results", a.runs, "O-%s.json" % tid)
         stem = os.path.join(out, "R-%s" % tid)
         if not os.path.exists(res_path) or os.path.exists(stem + ".json"):
             continue

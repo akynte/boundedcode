@@ -1,0 +1,30 @@
+{
+ "_note": "Analyst judgements (protocol.md section 6.4), from the logs, the agent's patch, the issue and the reference patch. Keys: B-<task> (BoundedCode), O-corrected-<task> and O-original-<task> (baseline arms, deviations.md D3).",
+ "B-gin-gonic__gin-3820": {
+  "category": "SPEC_GAP",
+  "why": "The patch makes multipart binding skip an absent optional *multipart.FileHeader (binding/multipart_form_mapping.go). That fixes the issue's own reproduction: analysis/gin3820_issue_repro_test.go.txt fails on the base with 'unexpected end of JSON input' and passes with this patch. The hidden test instead adds a case for *multipart.FileHeader to the generic form-mapping table (TestMappingBaseTypes), which only a fix in setWithProperType (form_mapping.go, where the reference fix is) satisfies. The issue names neither layer.",
+  "verification": "task_verified: the agent's own regression test (TestFormMultipartBindingOptionalFileWithEmptyFilename) fails on the base and passes with the change. It verifies the issue's scenario, not the hidden test's."
+ },
+ "O-original-gin-gonic__gin-3820": {
+  "category": "SPEC_GAP",
+  "why": "The same reading and layer as BoundedCode's (multipart_form_mapping.go). It fixes the issue's reproduction, but the hidden test checks generic form mapping. The gate replay also shows that this patch breaks the existing test TestBindingFormFilesMultipartFail. The agent could not run the tests because of the environment defect (D3)."
+ },
+ "O-original-tokio-rs__axum-691": {
+  "category": "WRONG_BEHAVIOUR",
+  "why": "The right location and logic (an extra branch for nesting at '/'), but `nested_path.to_owned()` yields Arc<str> where the other branches produce String, so the crate does not compile. The agent's cargo commands all failed with 'no matching package named async-trait' because of the environment defect (D3), so it could not see the error. In the replay, BoundedCode's build stage catches it."
+ },
+ "O-corrected-gin-gonic__gin-3820": {
+  "category": "SPEC_GAP",
+  "why": "Again a fix in multipart_form_mapping.go (skip FileHeader targets when no file is uploaded), with its own test of the issue's scenario. The hidden test checks the generic form-mapping layer, as above."
+ },
+ "O-corrected-immutable-js__immutable-js-2006": {
+  "category": "WRONG_BEHAVIOUR",
+  "why": "The patch adds an early-return condition in src/Operations.js (`originalSize === undefined && resolvedEnd === undefined`). With it, the hidden Range test exhausts the JavaScript heap ('Ineffective mark-compacts near heap limit'): a slice of an infinite range is no longer bounded. The right file, the wrong behaviour."
+ },
+ "_observations_not_failures": {
+  "O-original-briannesbitt__carbon-3103": "Passes the hidden test, but the patch breaks the existing test TestingAidsTest::testSetTestNow: it passes on the base and fails with the patch (checked with basediag.sh; the gate replay blocked the patch for this). The hidden acceptance test does not cover it.",
+  "O-original-immutable-js__immutable-js-2006": "Passes the hidden test. The gate replay blocks it because the project's formatting check (prettier, npm-lint) fails on the patch.",
+  "B-briannesbitt__carbon-3103": "Passes the hidden test. BoundedCode asked for a test, and the agent added one that also passes on the base, so the gate correctly did not count it as evidence (tests_green).",
+  "B-phpoffice__phpspreadsheet-3463, B-fluent__fluentd-3616": "Pass the hidden test. tests_green because the environment-only configs (D1) left these repositories without a test stage, so no evidence was possible."
+ }
+}
