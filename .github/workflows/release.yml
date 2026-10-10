@@ -1,0 +1,68 @@
+name: release
+# Builds a release from a pushed v* tag with `make dist`, attests every
+# released file (SLSA build provenance, signed through Sigstore) and creates
+# a DRAFT GitHub release. Nothing is published: the maintainer reviews the
+# draft and publishes it (docs/development/release.md).
+on:
+  push:
+    tags: ["v*"]
+permissions:
+  contents: read
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # create the draft release
+      id-token: write # Sigstore signing certificate for the attestation
+      attestations: write # store the attestation
+      artifact-metadata: write # artifact storage record
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # git describe, the commit time and the main branch
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: check the tag
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main || { echo "::error::$TAG is not on main"; exit 1; }
+          test -f "docs/releases/$TAG.md" || { echo "::error::docs/releases/$TAG.md is missing (the release notes)"; exit 1; }
+      - name: test
+        run: go test ./...
+      - name: build (binaries, SBOMs, licenses archive, checksums)
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: |
+          make dist
+          git add -N LICENSES
+          git diff --exit-code --stat || { echo "::error::make dist changed the tree (LICENSES/go out of date?); fix it on main and tag again"; exit 1; }
+          (cd dist && sha256sum -c SHA256SUMS)
+      - name: attest build provenance
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: |
+            dist/boundedcode-*
+            dist/SBOM-*.spdx.json
+            dist/SHA256SUMS
+      - name: create the draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          # Release notes use repository-relative links; on the release page
+          # they must point into the tagged tree.
+          python3 - "$TAG" > "$RUNNER_TEMP/notes.md" <<'PY'
+          import re, sys
+          tag = sys.argv[1]
+          base = "https://github.com/%s/blob/%s/docs/releases/" % ("akynte/boundedcode", tag)
+          text = open("docs/releases/%s.md" % tag).read()
+          print(re.sub(r"\]\((?!https?://|#|mailto:)([^)\s]+)\)", lambda m: "](%s%s)" % (base, m.group(1)), text), end="")
+          PY
+          pre=""
+          case "$TAG" in *-*) pre="--prerelease" ;; esac
+          gh release create "$TAG" --draft $pre --verify-tag --title "BoundedCode $TAG" \
+            --notes-file "$RUNNER_TEMP/notes.md" \
+            dist/boundedcode-* dist/SBOM-*.spdx.json dist/SHA256SUMS

@@ -78,6 +78,11 @@ Fixes from the public-launch readiness audit
   and Windows test step, still non-blocking, now marks itself failed and
   raises a warning when tests fail. The weekly `first-task` job also runs
   the sandbox integration tests against the built image.
+- Releases are built by a `release` workflow when a `v*` tag is pushed:
+  tests, `make dist`, a build-provenance attestation for every file
+  (`gh attestation verify`), and a **draft** release that the maintainer
+  publishes. Two local builds of `main` gave identical files, SBOMs
+  included.
 - SBOMs are reproducible: their creation time comes from
   `SOURCE_DATE_EPOCH` (the commit time in `make dist`), and each target's
   SBOM has its own document namespace. "Verifying a release" in

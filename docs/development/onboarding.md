@@ -69,6 +69,8 @@ failing tests.
 
 ### 1. Sandbox-engine tests assume the Linux hint (macOS)
 
+Issue [#1](https://github.com/akynte/boundedcode/issues/1).
+
 When the Docker daemon is unreachable, `EngineError.Hint()` correctly
 advises starting Docker Desktop on macOS and Windows, and joining the
 `docker` group on Linux (`internal/sandbox/engine.go`). But four tests
@@ -86,6 +88,8 @@ four no longer appear in the macOS job summary.
 
 ### 2. Git tests compare unresolved temporary paths (macOS)
 
+Issue [#2](https://github.com/akynte/boundedcode/issues/2).
+
 On macOS, `t.TempDir()` is under `/var`, which is a symlink to
 `/private/var`. In `TestWorktreeLifecycle` (`internal/gitops/git_test.go:74`),
 `CommonDir` returns the resolved `/private/var/.../repo/.git`, while the
@@ -96,6 +100,8 @@ test expects the unresolved path.
 also fails on macOS; check whether it has the same cause before fixing it.
 
 ### 3. A verification test depends on the installed golangci-lint (any OS)
+
+Issue [#3](https://github.com/akynte/boundedcode/issues/3).
 
 `TestEngineGoRepo` (`internal/verify/verify_test.go:44`) runs the Go
 verification preset on the host, so the preset's golangci-lint stage uses
@@ -109,6 +115,8 @@ For example, it could put a stub `golangci-lint` on `PATH`, as
 `fakeDocker` does in `internal/sandbox/engine_test.go`.
 
 ### 4. An unpack test checks the Unix executable bit (Windows)
+
+Issue [#4](https://github.com/akynte/boundedcode/issues/4).
 
 `TestFetchAndUnpackTarGz` (`internal/install/install_test.go:64`) fails on
 Windows with "server not executable": Windows has no executable bit.

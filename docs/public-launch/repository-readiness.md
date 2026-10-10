@@ -124,7 +124,9 @@ default branch (see the checklist).
 - **Defects for the maintainer.** It lists three more, separately, because
   they touch security-sensitive code: Windows secret-path separators,
   Windows file-permission tests, and macOS frontier-packet path redaction.
-  None of the seven has been filed as an issue.
+  The four first-contribution items were filed as issues
+  [#1](https://github.com/akynte/boundedcode/issues/1)–[#4](https://github.com/akynte/boundedcode/issues/4)
+  on 2026-10-10. The three others are not filed.
 
 ### External evaluation results
 
@@ -190,8 +192,19 @@ it. It would duplicate `docs/`. Turn it off.
 
 ## Maintainer checklist
 
-These need repository settings or public actions, so they were not done.
-They are listed in suggested order.
+These need repository settings or public actions, so they were not done
+when this audit was written. They are listed in suggested order.
+
+**Status on 2026-10-10.** Done by the maintainer:
+- items 1 and 3–9: the labels, the `main` ruleset, web sign-off,
+  Dependabot alerts, the description and topics, the wiki turned off,
+  head-branch deletion, and issues #1–#4;
+- item 10: decided as option A, the release workflow with build
+  attestation (`.github/workflows/release.yml`).
+
+Still open:
+- item 2: check the issue forms in a browser;
+- item 11: the next release.
 
 | # | Action | Why | How |
 |---|---|---|---|

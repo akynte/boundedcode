@@ -20,7 +20,9 @@ irreversible.
    only from those reports.
 4. Update `docs/development/status.md` and the release notes in
    `CHANGELOG.md`.
-5. Build artifacts from the tagged commit, with a clean tree:
+5. Write `docs/releases/vX.Y.Z.md` (the release notes; relative links are
+   fine, the release workflow points them at the tag) and check the build
+   locally from a clean tree:
    ```bash
    VERSION=vX.Y.Z make dist   # binaries + SBOMs + licenses archive + checksums
    ```
@@ -41,16 +43,25 @@ irreversible.
    * `LICENSE`, `NOTICE`, `THIRD_PARTY_NOTICES.md`, `LICENSES/` (unpacked
      copies, not uploaded)
 
-   Upload the six binaries, the six SBOMs, the licenses archive and
-   `SHA256SUMS`, with `docs/releases/VERSION.md` as the notes (absolute
-   links), as a pre-release while the version has a pre-release suffix.
+   The release itself is built in CI, not from this local `dist/` (step 8).
 6. Secret-scan the full history: `gitleaks git --redact .`
 7. Check DCO sign-off on every commit, including the root commit:
    `scripts/check-dco.sh --root HEAD`
-8. **Maintainer:** tag the release and draft the GitHub release from the
-   `dist/` artifacts. The name (`renaming.md`), the security contact
-   (`SECURITY.md`, `CODE_OF_CONDUCT.md`, private vulnerability reporting)
-   and the repository are already set up.
+8. **Maintainer:** tag the commit on `main` and push the tag:
+   ```bash
+   git tag -a vX.Y.Z -m "BoundedCode vX.Y.Z" && git push origin vX.Y.Z
+   ```
+   The `release` workflow (`.github/workflows/release.yml`) then:
+   * checks that the tag is on `main` and has release notes;
+   * runs the tests and `make dist`, and fails if the build changes the tree;
+   * attests every file (SLSA build provenance, signed through Sigstore);
+   * creates a **draft** release with the six binaries, the six SBOMs, the
+     licenses archive and `SHA256SUMS`, marked pre-release when the version
+     has a suffix.
+9. **Maintainer:** review the draft (assets, notes, the workflow run) and
+   publish it. Nothing is public until then. Optionally confirm that the
+   CI build matches your local one: `diff dist/SHA256SUMS <(gh release
+   download vX.Y.Z -p SHA256SUMS -O -)`.
 
 ## Verifying a release
 
@@ -59,6 +70,11 @@ Anyone can check a downloaded binary, and rebuild a release to compare:
 ```bash
 # Checksum of a download (the installers do this automatically):
 sha256sum -c --ignore-missing SHA256SUMS
+
+# Build provenance (releases built by the release workflow, from
+# v0.1.0-alpha.5): proves the file was built by this repository's workflow
+# from the tagged commit.
+gh attestation verify boundedcode-linux-amd64 -R akynte/boundedcode
 
 # Rebuild from the tag with the Go version in that tag's go.mod:
 git clone https://github.com/akynte/boundedcode.git && cd boundedcode
@@ -83,7 +99,10 @@ Go 1.27.1:
 - `SHA256SUMS` is published in the same release as the binaries, so it
   detects corrupted or altered downloads, but not a release replaced by
   someone with access to the repository.
-- Releases are not yet signed and have no build attestation.
+- Releases up to v0.1.0-alpha.4 were built locally and have no attestation.
+  Later releases are built and attested by the release workflow; an
+  attestation shows which workflow and commit built a file, so a release
+  replaced by hand fails `gh attestation verify`.
 - The SBOMs list the modules compiled into each binary. Pinned external
   components (llama.cpp, the OpenHands SDK, codebase-memory-mcp, gitleaks,
   Serena) are listed as runtime or optional dependencies, not as contents
