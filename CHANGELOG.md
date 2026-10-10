@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## v0.1.0-alpha.5 (2026-10-10): security fixes and verifiable releases
+
+Release notes: [docs/releases/v0.1.0-alpha.5.md](docs/releases/v0.1.0-alpha.5.md).
 
 Fixes from the public-launch readiness audit
 ([docs/public-launch/readiness-audit.md](docs/public-launch/readiness-audit.md)).
