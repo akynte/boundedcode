@@ -71,6 +71,13 @@ jobs:
         run: |
           bin/boundedcode setup --only config --yes
           bin/boundedcode setup --only sandbox --yes
+      - name: benchmark sources in the module cache
+        # go-large-iface-method copies the Temporal Go SDK from the module
+        # cache and builds it offline, so the SDK and its dependencies must
+        # be downloaded first (benchmarks/tasks/go-large-iface-method.yaml).
+        run: |
+          go mod download go.temporal.io/sdk@v1.49.0
+          cd "$(go env GOMODCACHE)/go.temporal.io/sdk@v1.49.0" && go mod download
       - name: sandbox integration tests (skipped in the ci workflow, which has no image)
         shell: bash
         env:
