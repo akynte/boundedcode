@@ -58,12 +58,13 @@ func TestAgentCanBuildWithDependenciesOffline(t *testing.T) {
 	if err := os.MkdirAll(ws, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	gomod := "module example.com/x\n\ngo 1.22\n\nrequire github.com/spf13/cobra v1.10.2\n"
+	gomod := "module example.com/x\n\ngo 1.22\n\nrequire github.com/spf13/cobra v1.10.2\n\nrequire (\n\tgithub.com/inconshreveable/mousetrap v1.1.0 // indirect\n\tgithub.com/spf13/pflag v1.0.9 // indirect\n)\n"
 	main := "package main\n\nimport \"github.com/spf13/cobra\"\n\nfunc main() { _ = (&cobra.Command{}).Execute() }\n"
-	// A real repository ships its go.sum. Without one, the offline build
-	// would need the checksum database, and passes only on machines whose
-	// module cache happens to hold its lookups. This repository's go.sum
-	// covers cobra and its dependencies.
+	// A real repository is tidy and ships its go.sum. Without the indirect
+	// requirements and go.sum, the offline build would need modules outside
+	// the build (go-md2man, via cobra's go.mod) or the checksum database,
+	// and pass only on machines whose module cache happens to hold them.
+	// This repository's go.sum covers cobra and its dependencies.
 	gosum, err := os.ReadFile("../../../go.sum")
 	if err != nil {
 		t.Fatal(err)
