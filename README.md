@@ -349,7 +349,7 @@ example by prompt injection in repository content.
 | Sandbox | Agent tools run in a container with no network, unless you set `sandbox.network: bridge`. The host paths it can write are the task worktree and BoundedCode's per-task state for it (git admin dir, caches). There is no host home, SSH agent or credentials. |
 | Secrets | `.env*`, keys, cloud credentials and kubeconfigs in the worktree are masked in the sandbox and denied by path policy. The repository's git object store and `.git/config` are mounted read-only. A secret **committed to git history** is still readable by the agent, and so is a credential embedded in a remote URL. |
 | Protected paths | Changes to `.boundedcode/`, `.github/workflows/`, `.gitlab-ci.yml`, `.gitmodules` or CODEOWNERS fail verification. Other CI systems' files are not protected. |
-| Git integrity | Worktree pointers, admin dirs and `HEAD` are verified before host git touches them. A nested git repository in the worktree is refused (unreleased). Nothing is pushed. |
+| Git integrity | Worktree pointers, admin dirs and `HEAD` are verified before host git touches them. A nested git repository in the worktree is refused (since v0.1.0-alpha.5). Nothing is pushed. |
 | Command policy | A deterministic policy blocks push, destructive and deploy commands in verification. |
 | Host reads | Context building never follows symlinks out of a worktree. |
 | Frontier | Packets are sanitized, and the gate fails closed. |

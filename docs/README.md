@@ -46,4 +46,5 @@
 | [Licensing](licensing/upstream-license-matrix.md) | Upstream license matrix |
 | [Security policy](../SECURITY.md) · [Contributing](../CONTRIBUTING.md) | Reporting vulnerabilities, development setup, tool versions, what CI checks |
 | [Contributor onboarding](development/onboarding.md) | From a fresh clone to a pull request; first-contribution opportunities |
+| [Engineering case study](public-launch/engineering-case-study.md) · [portfolio version](public-launch/portfolio/README.md) | The problem, architecture, trade-offs, evaluation results and limitations, with references to code and evidence |
 | [Repository readiness (2026-10)](public-launch/repository-readiness.md) | GitHub configuration audit, metadata recommendations, changes that need the maintainer |

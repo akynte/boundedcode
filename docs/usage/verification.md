@@ -25,8 +25,8 @@ A test that the change adds or modifies (test code or test data) must:
 2. **not fail on the base commit without them** (a control run, so a test
    that was already failing does not count), and
 3. **pass with the change.** For Go, each such test is run on the change
-   and must report PASS rather than fail or skip (on `main`, unreleased as
-   of v0.1.0-alpha.4). For other languages, the whole test stage must pass
+   and must report PASS rather than fail or skip (since v0.1.0-alpha.5).
+   For other languages, the whole test stage must pass
    on the change.
 
 Go failures are compared per test function. For other languages,

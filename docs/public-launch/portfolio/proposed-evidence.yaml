@@ -1,0 +1,116 @@
+# Proposed additions to the portfolio's curated evidence manifest
+# (aliakbari.dev: content/sources/boundedcode/evidence.yaml), for use
+# after content/sources.lock.json is moved to v0.1.0-alpha.5 (commit
+# 5e1bea487b3352aeb381b9616fa89080e5a12e02).
+#
+# This file is a complete evidence-v1 manifest, so it validates on its
+# own; append its items to the existing manifest. Every path and test
+# name below exists at that commit. Each claim is worded to match what
+# the named tests and documents show, and no more.
+schema: https://aliakbari.dev/schemas/evidence-v1.json
+repo: akynte/boundedcode
+items:
+  - id: boundedcode-comparative-evaluation
+    capability: verification
+    title: Pre-registered comparison against the same agent without the control plane
+    claim: >-
+      On 8 SWE-bench Multilingual tasks, selected by a fixed hash ranking with no screening for
+      difficulty or clarity, BoundedCode passed the hidden acceptance tests on 7. The same
+      OpenHands agent, model and sandbox without BoundedCode passed 6. No success difference is
+      shown, and BoundedCode used 2.3x the wall-clock time and 2.1x the tokens. Replayed through
+      BoundedCode's gate, the plain agent's 16 patches were accepted only when they passed the
+      hidden tests (8 of 8). All 4 failing patches were rejected, and so were 4 passing ones.
+    verification: measured
+    environment: lab
+    context: personal-lab
+    since: v0.1.0-alpha.5
+    implementation:
+      - benchmarks/comparative-2026-10/run.py
+      - benchmarks/comparative-2026-10/gate_replay.py
+      - benchmarks/comparative-2026-10/analyze.py
+      - internal/benchmark/baseline.go
+    benchmarks:
+      - benchmarks/comparative-2026-10/results/summary.json
+      - benchmarks/comparative-2026-10/results/results.json
+    documents:
+      - benchmarks/comparative-2026-10/report.md
+      - benchmarks/comparative-2026-10/protocol.md
+      - benchmarks/comparative-2026-10/deviations.md
+    environment_details:
+      model: Qwen3.6-35B-A3B UD-Q4_K_M on llama.cpp v0.5.0
+      agent: OpenHands Software Agent SDK 1.51.0
+      gpu: RTX 4060 Laptop 8 GB
+      runs_per_task: 1
+    limitations:
+      - Eight tasks with one run per system; the exact McNemar p-value is 1.0, and the single discordant task changed between two runs of the baseline.
+      - One machine and one local model. Two of the eight repositories had no usable test stage offline.
+      - The gate's replay found no defect that the hidden tests missed. Half of its rejections were patches that pass the hidden tests.
+      - Three deviations from the frozen protocol are documented. One, a harness defect that denied the baseline its build environment, led to a re-run of that arm; both arms are published.
+    boundary:
+      - "Any success-rate advantage over the baseline: NOT CLAIMED. The evaluation shows none."
+    resume: { eligible: true }
+    related: [boundedcode-fail-before-pass-after]
+
+  - id: boundedcode-nested-repository-escape-fix
+    capability: security
+    title: Host git refuses agent-created nested repositories
+    claim: >-
+      Host git ignores submodules and refuses to checkpoint a worktree that holds a git
+      repository of its own. Without that, a clean filter in a nested repository's config ran on
+      the host through git status and git add. Changed-file names are read NUL-separated and
+      unquoted, so git-quoted names no longer slip past the protected-path and secret-path
+      policies.
+    verification: tested
+    environment: lab
+    context: personal-lab
+    since: v0.1.0-alpha.5
+    implementation:
+      - internal/gitops/git.go
+    tests:
+      - path: internal/gitops/git_test.go
+        names: [TestNestedRepositoryConfigNotExecuted, TestChangedFilesUnquoted]
+    documents:
+      - docs/public-launch/readiness-audit.md
+      - docs/design/sandbox.md
+    ci_workflow: ci.yml
+    environment_details:
+      git: 2.47.3 (reproduction)
+      ci_runner: GitHub-hosted ubuntu
+    limitations:
+      - Found by a security review, not by the existing adversarial tests. It was reproduced with git 2.47.3.
+      - A window between the worktree integrity check and host git use remains. It is reasoned from the code, not reproduced.
+    boundary:
+      - "Protection against a container or VM escape: NOT CLAIMED; out of scope for the sandbox design."
+    resume: { eligible: true }
+    related: [boundedcode-task-isolation, boundedcode-prompt-injection-containment]
+
+  - id: boundedcode-release-provenance
+    capability: ci-cd
+    title: Releases built and attested in CI, reproducible from the tag
+    claim: >-
+      A tag push builds the release in GitHub Actions with make dist. Every released file gets a
+      SLSA build-provenance attestation signed through Sigstore, and the workflow creates a draft
+      that the maintainer publishes. SBOMs take their creation time from the commit. An
+      independent local rebuild of v0.1.0-alpha.5 reproduced all six binaries and all six SBOMs
+      byte for byte, and gh attestation verify passed for all 14 assets.
+    verification: measured
+    environment: lab
+    context: personal-lab
+    since: v0.1.0-alpha.5
+    implementation:
+      - .github/workflows/release.yml
+      - scripts/sbom/main.go
+      - Makefile
+    tests:
+      - path: scripts/sbom/main_test.go
+        names: [TestCreationTimeFromSourceDateEpoch]
+    documents:
+      - docs/development/release.md
+      - docs/releases/v0.1.0-alpha.5.md
+    ci_workflow: release.yml
+    limitations:
+      - At v0.1.0-alpha.5 the licenses archive matches only when rebuilt under umask 022. Permission bits are normalised from the next release.
+      - SHA256SUMS is published next to the binaries, so checksums alone do not detect a replaced release. The attestation does.
+      - Earlier releases (alpha.1 to alpha.4) were built locally and have no attestation.
+      - The measured rebuild is recorded in docs/development/release.md on main (commit 8f5d77a), after the pinned tag.
+    resume: { eligible: true }
