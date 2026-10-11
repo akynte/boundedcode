@@ -48,3 +48,4 @@
 | [Contributor onboarding](development/onboarding.md) | From a fresh clone to a pull request; first-contribution opportunities |
 | [Engineering case study](public-launch/engineering-case-study.md) · [portfolio version](public-launch/portfolio/README.md) | The problem, architecture, trade-offs, evaluation results and limitations, with references to code and evidence |
 | [Repository readiness (2026-10)](public-launch/repository-readiness.md) | GitHub configuration audit, metadata recommendations, changes that need the maintainer |
+| [Adoption metrics](public-launch/adoption-metrics.md) · [feedback process](public-launch/feedback-process.md) · [14-day launch checklist](public-launch/launch-evaluation-checklist.md) | What counts as external adoption and where it is measured (no telemetry); how reports are reproduced, prioritized and turned into work |

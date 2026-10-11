@@ -490,6 +490,13 @@ verification results, evaluation results and pull requests are welcome.
 The [issue forms](https://github.com/akynte/boundedcode/issues/new/choose)
 ask for what a fix needs.
 
+**Tried it?** A [first-run report](https://github.com/akynte/boundedcode/issues/new?template=first_run.yml)
+is the most useful feedback right now, including when everything worked.
+BoundedCode has no telemetry, so reports are the only way the project
+learns how it does on other machines. The
+[feedback process](docs/public-launch/feedback-process.md) says how reports
+are reproduced, prioritized and acted on.
+
 - [Contributor onboarding](docs/development/onboarding.md): from a fresh
   clone to a pull request, with first-contribution opportunities.
 - [CONTRIBUTING.md](CONTRIBUTING.md): development setup, tool versions,

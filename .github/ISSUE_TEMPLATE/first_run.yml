@@ -1,0 +1,141 @@
+name: First-run report
+description: How your first installation and task went, whether it worked or not.
+labels: [first-run]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This form is how the project learns whether BoundedCode works for someone other than its maintainer. BoundedCode has no telemetry, so reports like this are the only signal. **A report that everything worked is as useful as one that it did not.** Report only what you ran.
+        If something broke and you can reproduce it, the [bug report](https://github.com/akynte/boundedcode/issues/new?template=bug_report.yml) or [installation](https://github.com/akynte/boundedcode/issues/new?template=installation.yml) form asks for more detail. You can file both.
+        This issue is public. Remove secrets, tokens, private paths and proprietary code from anything you paste. **Security problems** go to [SECURITY.md](https://github.com/akynte/boundedcode/blob/main/SECURITY.md), never here.
+  - type: input
+    id: version
+    attributes:
+      label: BoundedCode version
+      description: Output of `boundedcode version`, or the release you tried to install.
+      placeholder: boundedcode v0.1.0-alpha.5 c2a3ace
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: Platform
+      description: OS and version, CPU architecture, RAM, GPU and VRAM if any, container engine.
+      placeholder: Ubuntu 24.04, x86-64, 32 GB, no GPU, Docker 28.1
+    validations:
+      required: true
+  - type: dropdown
+    id: provider
+    attributes:
+      label: Model provider
+      options:
+        - Local model (llama.cpp)
+        - Cloud API (OpenAI, Anthropic, Gemini)
+        - OpenAI-compatible server
+        - Did not get as far as a model
+    validations:
+      required: true
+  - type: dropdown
+    id: furthest
+    attributes:
+      label: Furthest step reached
+      description: The last step that succeeded.
+      options:
+        - Nothing worked (the installer or build failed)
+        - Installed, but `boundedcode setup --check` still reports problems
+        - "`setup --check` clean, but no task started"
+        - A task started but ended without a result (crash, hang, timeout)
+        - A task ended with a result
+    validations:
+      required: true
+  - type: dropdown
+    id: result
+    attributes:
+      label: Result of your first task
+      description: The final status line. See [what the results mean](https://github.com/akynte/boundedcode/blob/main/docs/usage/verification.md#result-states).
+      options:
+        - TASK_VERIFIED
+        - tests_green, reported as UNVERIFIED
+        - blocked
+        - failed
+        - No task ran
+    validations:
+      required: true
+  - type: dropdown
+    id: correct
+    attributes:
+      label: Was the change correct?
+      description: Your own judgement after reading the diff. This is how wrong verification results are found.
+      options:
+        - I read the diff and it was correct
+        - I read the diff and it was wrong or incomplete
+        - I did not read the diff
+        - No change was produced
+    validations:
+      required: true
+  - type: textarea
+    id: task
+    attributes:
+      label: What you asked it to do
+      description: The task, and the repository if it is public. A description is enough for a private repository.
+  - type: dropdown
+    id: time
+    attributes:
+      label: Time from starting the install to the first task result
+      description: A rough figure, wall-clock.
+      options:
+        - Under 15 minutes
+        - 15 to 60 minutes
+        - 1 to 3 hours
+        - More than 3 hours
+        - Did not reach a result
+  - type: textarea
+    id: stuck
+    attributes:
+      label: Where you got stuck or confused
+      description: Steps, messages or documentation that were unclear, missing or wrong, even if you worked around them. Quote the exact text if you can.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected BoundedCode to be
+      description: In a sentence, what you thought it did before trying it, and whether that turned out to be right.
+  - type: dropdown
+    id: again
+    attributes:
+      label: Would you use it again on real work?
+      options:
+        - "Yes"
+        - Maybe
+        - "No"
+        - Too early to say
+  - type: textarea
+    id: why
+    attributes:
+      label: Why
+      description: What would have to change for you to use it (again), or what made it worth it.
+  - type: textarea
+    id: doctor
+    attributes:
+      label: Environment
+      description: Output of `boundedcode doctor --json`, if the binary runs. It includes local paths, so review it first.
+      render: json
+  - type: dropdown
+    id: quote
+    attributes:
+      label: May this report be quoted?
+      description: In project documentation or an engineering case study. The issue itself stays public either way.
+      options:
+        - Yes, with my GitHub handle
+        - Yes, without my handle
+        - "No"
+    validations:
+      required: true
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: Confirmation
+      options:
+        - label: This report contains no credentials, private source code or model weights.
+          required: true
