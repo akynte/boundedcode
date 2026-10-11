@@ -11,7 +11,7 @@ Case study written 2026-10-10. Source:
 
 ---
 
-## Executive summary (for technical recruiters)
+## Summary
 
 BoundedCode is an open-source control plane in Go for AI coding agents. It
 runs an existing agent, the OpenHands SDK, against a local or cloud model,
@@ -32,13 +32,6 @@ verification gate:
 | Comparison result | No success difference shown (7 of 8 vs 6 of 8), at about twice the time and tokens. Published as a negative result. |
 | Security audit | Found a critical sandbox escape (host code execution through a nested git repository). It was fixed with a regression test and released [R33]. |
 | Releases | Built and attested in CI (SLSA provenance), and rebuilt byte for byte from their tag [R36]. |
-
-**What this demonstrates:**
-- system design under hard constraints (one laptop with an 8 GB GPU,
-  untrusted agent code);
-- security engineering for agent sandboxes;
-- careful empirical evaluation, including publishing results that do not
-  flatter the project.
 
 ---
 
@@ -751,40 +744,6 @@ parts can change without touching the verification gate.
 - **CI checks:**
   - govulncheck, license checks and gitleaks over the full history;
   - a DCO sign-off on every commit.
-
----
-
-## Résumé bullets
-
-These are factual and each is backed by the linked evidence. The README
-discloses that implementation used AI coding agents under the author's
-design and review [R1]. For applications that ask about AI assistance,
-phrase the first bullet as "designed and led".
-
-- **Designed and built BoundedCode**, an open-source Go control plane for
-  AI coding agents (about 43 K lines of Go, 377 test functions). It runs
-  the OpenHands agent against a local llama.cpp model inside a
-  network-less Docker sandbox, with a crash-safe SQLite task ledger and
-  budgeted context packs. [R3, R6, R13]
-- **Built a behavioural verification gate.** An agent's change counts as
-  verified only when a test it adds fails on the base commit (in a
-  control-checked rebuilt tree) and passes with the change. The gate came
-  out of an evaluation where 4 of 8 "verified" results were false. [R19,
-  R27]
-- **Ran a pre-registered comparative evaluation** against the same agent
-  and model without the control plane, on 8 public SWE-bench Multilingual
-  tasks. Published the negative result: no success difference (7 of 8 vs
-  6 of 8) at 2.3× the time. Also published that the gate rejected every
-  failing baseline patch. [R31]
-- **Found and fixed a critical sandbox escape** in a security audit: host
-  code execution through a nested git repository in the agent's worktree.
-  Also fixed a policy bypass through git-quoted file names. Both have
-  regression tests and shipped in a release. [R11, R33]
-- **Tested crash recovery with a real SIGKILL:** lease takeover, recovery
-  of the orphaned attempt, and resumption from the ledger. [R14]
-- **Made releases verifiable.** They are built and attested in CI (SLSA
-  provenance), with reproducible binaries and SBOMs, confirmed by an
-  independent rebuild. [R36]
 
 ---
 

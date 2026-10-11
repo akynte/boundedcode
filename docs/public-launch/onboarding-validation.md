@@ -88,7 +88,7 @@ The host runs are isolated:
 ### 2. Build from source: `install.sh` fallback
 
 ```bash
-HOME=$W/home BC_BIN_DIR=$W/bin BC_VERSION=main BC_GIT_URL=file:///home/ali/boundedcode bash scripts/install.sh
+HOME=$W/home BC_BIN_DIR=$W/bin BC_VERSION=main BC_GIT_URL="file://$PWD" bash scripts/install.sh
 ```
 
 **Result:** `main` has no release binary, so the installer cloned and built
