@@ -1,5 +1,40 @@
 # Changelog
 
+## v0.1.0-alpha.6 (2026-10-13): a recorded crash test and a reproducible licenses archive
+
+Release notes: [docs/releases/v0.1.0-alpha.6.md](docs/releases/v0.1.0-alpha.6.md).
+
+No product code changed; the binaries differ from v0.1.0-alpha.5 only in
+their version string.
+
+### Verification
+
+- `TestSIGKILLResume` records every value it checks during a SIGKILL and
+  resume, and compares the sequence with
+  `internal/orchestrator/testdata/crash-replay.json`; any difference fails
+  the test. Task ids and times are normalised; `-update-replay` rewrites
+  the file.
+
+### Build
+
+- `make dist` sets the licenses archive's permission bits instead of taking
+  them from the builder's umask, so local and CI builds of a tag produce the
+  same archive.
+
+### Tests and CI
+
+- The first-task smoke tests no longer depend on a warm Go module cache: the
+  offline-build test module ships a `go.sum` and its indirect requirements,
+  and the workflow downloads the Temporal Go SDK before the task that
+  builds it.
+
+### Documentation
+
+- Engineering case study (`docs/public-launch/engineering-case-study.md`).
+- Adoption metrics, a first-run issue form, feedback templates and a triage
+  process (`docs/public-launch/`).
+- Corrected two stale statements in the getting-started path.
+
 ## v0.1.0-alpha.5 (2026-10-10): security fixes and verifiable releases
 
 Release notes: [docs/releases/v0.1.0-alpha.5.md](docs/releases/v0.1.0-alpha.5.md).
