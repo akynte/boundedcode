@@ -1,0 +1,61 @@
+{
+  "test": "TestSIGKILLResume",
+  "about": "A runner process is killed with SIGKILL in the middle of an agent turn; a second runner is refused, a third takes over the stale lease and finishes the task. Each step is what the test observed.",
+  "steps": [
+    {
+      "actor": "test",
+      "action": "creates the task",
+      "observed": "status active, phase setup"
+    },
+    {
+      "actor": "runner A",
+      "action": "runs as a separate process (lease owner \"child\"); its agent writes a file and stays mid-turn",
+      "observed": "ledger-service/internal/consumer/balance_test.go in the worktree: true"
+    },
+    {
+      "actor": "test",
+      "action": "kills runner A with SIGKILL: no signal handler, no cleanup",
+      "observed": "signal: killed"
+    },
+    {
+      "actor": "ledger",
+      "action": "what the dead runner left behind",
+      "observed": "lease held by \"child\"; task active in phase implementing; attempt 1 active"
+    },
+    {
+      "actor": "runner B",
+      "action": "tries to run the task while the lease is fresh",
+      "observed": "refused: task is being run by another process (child, last heartbeat \u003ctime\u003e)"
+    },
+    {
+      "actor": "test",
+      "action": "waits for the lease to go stale",
+      "observed": "no heartbeat for longer than 50ms (2m0s in production, shortened for the test)"
+    },
+    {
+      "actor": "runner C",
+      "action": "takes over the stale lease; its agent is told",
+      "observed": "You are resuming a task after a context reset. The state below was rebuilt from the task ledger, git and verification results; trust it over memory."
+    },
+    {
+      "actor": "runner C",
+      "action": "its agent looks for the killed attempt's file",
+      "observed": "ledger-service/internal/consumer/balance_test.go still in the worktree: true"
+    },
+    {
+      "actor": "ledger",
+      "action": "reconciles the orphaned attempt",
+      "observed": "attempt 1 rejected: interrupted: the previous run stopped without finishing this attempt"
+    },
+    {
+      "actor": "ledger",
+      "action": "the task's event log, in order",
+      "observed": "task.created → agent.session → task.contract_failed → attempt.started → context.pack → task.recovered → agent.session → task.contract_failed → attempt.started → context.pack → agent.turn → verify.result → verify.result → frontier.triggered → verify.evidence → verify.evidence_requested → attempt.started → context.pack → agent.turn → verify.result → verify.result → verify.evidence → task.completed"
+    },
+    {
+      "actor": "runner C",
+      "action": "finishes the task",
+      "observed": "status completed; lease released; worktree clean"
+    }
+  ]
+}
