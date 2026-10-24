@@ -52,6 +52,8 @@ type fakeBackend struct {
 	chatErr    error
 	chatWait   chan struct{}
 	sessions   []direct.SessionInfo
+	routed     []string
+	route      func(text string) direct.Decision
 }
 
 func (f *fakeBackend) Chat(ctx context.Context, req ChatRequest, sink func(direct.Event)) (ChatResult, error) {
@@ -85,6 +87,16 @@ func (f *fakeBackend) Chat(ctx context.Context, req ChatRequest, sink func(direc
 
 func (f *fakeBackend) Sessions(context.Context, string) ([]direct.SessionInfo, error) {
 	return f.sessions, nil
+}
+
+func (f *fakeBackend) Route(_ context.Context, _, text string) (direct.Decision, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.routed = append(f.routed, text)
+	if f.route != nil {
+		return f.route(text), nil
+	}
+	return direct.Route(text, direct.RiskRules{Keywords: []string{"payment"}}, direct.Capabilities{BoundedAvailable: true}), nil
 }
 
 func (f *fakeBackend) lastChat() ChatRequest {
@@ -838,7 +850,7 @@ func (hn *harness) execs() []string {
 func TestChatMessageCreatesAndRunsTask(t *testing.T) {
 	hn := newChatHarness(t, 140, 40, nil)
 	hn.say("/mode bounded")
-	hn.mustSee("coding agent", "/src/orders ⎇ main", "Bounded mode")
+	hn.mustSee("coding agent", "/src/orders ⎇ main", "Verify mode")
 	hn.say("add retries to the client")
 	if len(hn.be.created) != 1 || hn.be.created[0].Workspace != "payments" || hn.be.created[0].FromTask != "" {
 		t.Fatalf("created = %+v", hn.be.created)
@@ -955,7 +967,7 @@ func TestChatSlashCommands(t *testing.T) {
 		t.Fatalf("exec = %q", got)
 	}
 	hn.say("/help")
-	hn.mustSee("Talk to BoundedCode", "/git-init")
+	hn.mustSee("/git-init", "Keys: enter sends")
 	hn.say("/nope")
 	hn.mustSee("Unknown command /nope")
 }
@@ -1120,13 +1132,14 @@ func directBackend() *fakeBackend {
 func TestChatDirectModeIsTheDefault(t *testing.T) {
 	be := directBackend()
 	hn := newChatHarness(t, 140, 40, be)
-	hn.mustSee("Ask about the code", "/task REQUEST")
+	hn.mustSee("Ask about the code", "automatically")
 	hn.say("how are retries configured?")
 	hn.drain()
 	req := be.lastChat()
-	if req.Message != "how are retries configured?" || req.Dir != "/src/orders" || req.SessionID != "" {
+	if req.Message != "how are retries configured?" || req.Dir != "/src/orders" || req.SessionID != "" || req.Mode != direct.ModeChat {
 		t.Fatalf("chat request = %+v", req)
 	}
+	hn.mustSee("◇ chat · a question")
 	if len(be.created) != 0 || len(hn.execs()) != 0 {
 		t.Fatal("direct mode created a task or ran a command")
 	}
@@ -1184,15 +1197,15 @@ func TestChatTaskCommandRunsBoundedFromDirectMode(t *testing.T) {
 		t.Fatalf("exec = %q", got)
 	}
 	hn.mustSee("Task t-0009")
-	if hn.m.chat.mode != modeDirect {
+	if hn.m.chat.mode != modeAuto {
 		t.Fatal("/task changed the mode")
 	}
 	hn.say("/mode")
-	hn.mustSee("Mode: direct")
-	hn.say("/mode bounded")
-	hn.mustSee("Bounded mode:", "bounded orders")
+	hn.mustSee("Mode: auto")
+	hn.say("/mode verify")
+	hn.mustSee("Verify mode:", "verify orders")
 	hn.say("/mode sideways")
-	hn.mustSee("Mode must be direct or bounded")
+	hn.mustSee("Mode must be auto, chat, code or verify")
 }
 
 func TestChatDirectApprovalGoesThroughThePrompter(t *testing.T) {
@@ -1280,5 +1293,79 @@ func TestChatDirectWorksOutsideGit(t *testing.T) {
 	hn.drain()
 	if req := be.lastChat(); req.Dir != "/src/orders" || req.Message != "hello" {
 		t.Fatalf("request = %+v", req)
+	}
+}
+
+func TestChatAutoRoutesCodeAndVerify(t *testing.T) {
+	be := directBackend()
+	hn := newChatHarness(t, 140, 40, be)
+	hn.say("fix the typo in client.go")
+	hn.drain()
+	hn.mustSee("◇ code · a request for a change")
+	if req := be.lastChat(); req.Mode != direct.ModeCode || req.Message != "fix the typo in client.go" {
+		t.Fatalf("code request = %+v", req)
+	}
+	hn.say("add retries to the payment client")
+	hn.drain()
+	hn.mustSee("◇ verify · the change concerns payment", "Task t-0009")
+	if len(be.created) != 1 || be.created[0].Request != "add retries to the payment client" {
+		t.Fatalf("created = %+v", be.created)
+	}
+	if len(be.chats) != 1 {
+		t.Fatal("a verify-routed message went to direct mode")
+	}
+	// Verification unavailable: routed to code with AllowRisky.
+	be.route = func(string) direct.Decision {
+		return direct.Route("add retries to the payment client", direct.RiskRules{Keywords: []string{"payment"}}, direct.Capabilities{BoundedReason: "no sandbox"})
+	}
+	hn.be.setStatus("t-0009", task.StatusCompleted)
+	hn.run(hn.m.chat.loadTask(hn.m, "t-0009"))
+	hn.say("add retries to the payment client")
+	hn.drain()
+	hn.mustSee("verification unavailable")
+	if req := be.lastChat(); !req.AllowRisky || req.Mode != direct.ModeCode {
+		t.Fatalf("fallback request = %+v", req)
+	}
+}
+
+func TestChatHandsOffToVerificationMidTurn(t *testing.T) {
+	be := directBackend()
+	be.chatEvents = []direct.Event{
+		{Kind: direct.EventToolStart, Tool: "edit", Summary: "edit ok.go"},
+		{Kind: direct.EventToolEnd, Tool: "edit", Summary: "edit ok.go"},
+		{Kind: direct.EventMode, Text: direct.ModeVerify, Summary: "the change touches a security- or money-related code auth/login.go: handing off to verification"},
+	}
+	be.chatErr = &direct.Handoff{Reason: "security- or money-related code auth/login.go", Path: "auth/login.go", Changed: []string{"ok.go"}}
+	hn := newChatHarness(t, 140, 40, be)
+	hn.say("change the login flow")
+	hn.drain()
+	hn.mustSee("◇ verify · the change touches", "Handing off to verification", "Earlier changes", "ok.go", "Task t-0009")
+	if len(be.created) != 1 || be.created[0].Request != "change the login flow" {
+		t.Fatalf("created = %+v", be.created)
+	}
+}
+
+func TestChatForcedModes(t *testing.T) {
+	be := directBackend()
+	hn := newChatHarness(t, 140, 40, be)
+	hn.say("/mode chat")
+	hn.say("fix the typo")
+	hn.drain()
+	if req := be.lastChat(); req.Mode != direct.ModeChat {
+		t.Fatalf("forced chat: %+v", req)
+	}
+	if len(be.routed) != 0 {
+		t.Fatal("a forced mode consulted the router")
+	}
+	hn.say("/code add a flag")
+	hn.drain()
+	if req := be.lastChat(); req.Mode != direct.ModeCode || req.Message != "add a flag" {
+		t.Fatalf("/code: %+v", req)
+	}
+	hn.say("/mode auto")
+	hn.say("what is this?")
+	hn.drain()
+	if len(be.routed) != 1 {
+		t.Fatalf("auto did not route: %v", be.routed)
 	}
 }

@@ -60,6 +60,13 @@ type DirectConfig struct {
 	// Instructions lists project instruction files, tried in order at the
 	// project root; the first that exists is included in the system prompt.
 	Instructions []string `yaml:"instructions,omitempty"`
+	// Mode: "auto" (default) routes each message to chat, code or verify
+	// from its intent, its risk and what the environment can run; "chat",
+	// "code" or "verify" forces one.
+	Mode string `yaml:"mode"`
+	// MaxFiles: a change that names more files than this is routed to
+	// verification.
+	MaxFiles int `yaml:"max_files"`
 }
 
 // TaskConfig configures how requests are read before implementation.
@@ -275,7 +282,7 @@ func Defaults() Config {
 			IdleSleep: Duration(30 * time.Minute),
 		},
 		Task: TaskConfig{Contract: true, Ambiguity: "ask"},
-		Direct: DirectConfig{Approval: "edits", MaxTurns: 80, CommandTimeout: Duration(3 * time.Minute),
+		Direct: DirectConfig{Approval: "edits", MaxTurns: 80, CommandTimeout: Duration(3 * time.Minute), Mode: "auto", MaxFiles: 8,
 			Instructions: []string{"AGENTS.md", "BOUNDEDCODE.md", "CLAUDE.md", ".boundedcode/instructions.md"}},
 		Agent: AgentConfig{
 			Runtime: "openhands", Image: "boundedcode-openhands:local",
@@ -385,6 +392,11 @@ func (c Config) Validate() error {
 	}
 	if c.Direct.MaxTurns <= 0 {
 		errs = append(errs, errors.New("direct.max_turns: must be positive"))
+	}
+	switch c.Direct.Mode {
+	case "auto", "chat", "code", "verify":
+	default:
+		errs = append(errs, fmt.Errorf("direct.mode: %q is not auto|chat|code|verify", c.Direct.Mode))
 	}
 	if c.Agent.MaxOutputTokens < 512 {
 		errs = append(errs, errors.New("agent.max_output_tokens: must be >= 512"))

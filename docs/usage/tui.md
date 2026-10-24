@@ -6,10 +6,24 @@ Code, Codex or OpenCode. The rest of the CLI is in the other views. Use it
 instead of the CLI or alongside it: both read and write the same state
 database, so a task started from one shows up in the other.
 
-The chat has two modes. **Direct mode** (the default) is the everyday
-coding agent: it works in your checkout. **Bounded mode** (`/task`) runs a
-request as a task in an isolated worktree and sandbox, with verification
-and behavioural evidence.
+Every message is routed automatically to one of three modes
+([ADR-0012](../architecture/adr/0012-automatic-mode-routing.md)):
+
+| Mode | What happens | Chosen when |
+|---|---|---|
+| **chat** | the agent reads and searches the code and answers; no file changes | a question, an explanation, a review, "run the tests" |
+| **code** | the change is made directly in your checkout (direct mode) | a request for a change that is small and low-risk |
+| **verify** | the request runs as a task in an isolated worktree and sandbox, with verification and behavioural evidence (bounded mode) | the change concerns authentication, payments, migrations, shared contracts or infrastructure; asks for tests or proof; spans several services; or names many files |
+
+The decision is shown with each message (`◇ code · a request for a
+change`). Two switches happen on their own during a turn: a chat answer
+that needs an edit becomes code at the first edit, and a code turn that is
+about to change a risky path stops before the edit and hands the request
+to a verified task (earlier edits of that turn are kept and listed). When
+a verified task cannot run here (no git commit, set-up incomplete, no
+sandbox image) the request is made directly and the reason is shown.
+`/mode chat|code|verify` forces a mode and `/mode auto` restores routing;
+`/task`, `/code` and `/chat` force one message.
 
 ```bash
 cd ~/src/my-service
@@ -21,7 +35,7 @@ bcode tui --task <id>                 # open a task directly
 It needs an interactive terminal of at least 60×16 cells. Scripts should keep
 using the CLI.
 
-## Direct mode
+## Direct mode (chat and code)
 
 Direct mode (experimental, [ADR-0011](../architecture/adr/0011-direct-mode.md))
 is a native agent loop in the `bcode` binary. Ask about the code or describe
@@ -75,10 +89,10 @@ From a script, `bcode chat -p "…"` (or `bcode -p "…"`) sends one message
 and prints the answer; piped input is appended as context; `--continue`
 and `--resume ID` continue a session; `--events` prints JSON events.
 
-## Bounded mode
+## Bounded mode (verify)
 
-`/task REQUEST` runs a request in bounded mode, and `/mode bounded` makes
-every message a task. On first use in a repository, the chat registers it
+Requests routed to verify, `/task REQUEST`, and every message under
+`/mode verify`, run in bounded mode. On first use in a repository, the chat registers it
 as a workspace named after the directory, then indexes it in the
 background. Then you describe what you want:
 
@@ -115,8 +129,9 @@ Commands (type `/` for suggestions; `tab` completes):
 
 | Command | |
 |---|---|
-| `/task REQUEST` | run the request in bounded mode |
-| `/mode [direct\|bounded]` | what a plain message does |
+| `/task REQUEST` | run the request as a verified task now |
+| `/code MESSAGE`, `/chat MESSAGE` | force one message into code or chat |
+| `/mode [auto\|chat\|code\|verify]` | automatic routing (default), or a forced mode |
 | `/approval [ask\|edits\|auto]` | what needs your consent in direct mode |
 | `/compact` | summarise the conversation to free context |
 | `/sessions`, `/resume [ID]` | list and continue direct-mode sessions |

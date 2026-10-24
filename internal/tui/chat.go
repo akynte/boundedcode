@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -55,26 +56,32 @@ type chatEntry struct {
 	run    *directRun
 }
 
-// Modes of the chat.
+// Modes of the chat: auto routes each message (the default); the others
+// force one of direct.ModeChat, direct.ModeCode or direct.ModeVerify.
 const (
+	modeAuto = "auto"
+	// aliases kept for people used to the earlier names
 	modeDirect  = "direct"
 	modeBounded = "bounded"
 )
 
 // directRun is one direct-mode turn: its activity, answer and outcome.
 type directRun struct {
-	id       int
-	activity []directActivity
-	text     string
-	notes    []string
-	done     bool
-	err      error
-	cancel   context.CancelFunc
-	start    time.Time
-	end      time.Time
-	usage    *direct.Usage
-	changed  []string
-	inGit    bool
+	id         int
+	activity   []directActivity
+	text       string
+	notes      []string
+	done       bool
+	err        error
+	cancel     context.CancelFunc
+	allowRisky bool
+	start      time.Time
+	end        time.Time
+	usage      *direct.Usage
+	changed    []string
+	inGit      bool
+	mode       string // the mode the turn runs in (chat or code)
+	request    string
 	// render cache
 	cacheW, cacheN int
 	cacheText      string
@@ -91,6 +98,13 @@ type directActivity struct {
 type directEventMsg struct {
 	id int
 	e  direct.Event
+}
+
+// routedMsg is the router's decision for a message about to be sent.
+type routedMsg struct {
+	text string
+	d    direct.Decision
+	err  error
 }
 
 type directDoneMsg struct {
@@ -118,8 +132,8 @@ type slashCmd struct {
 
 var slashCmds = []slashCmd{
 	{"/help", "", "show what you can do here"},
-	{"/task", "REQUEST", "run a request in bounded mode: isolated worktree, sandbox, verification"},
-	{"/mode", "[direct|bounded]", "what a plain message does (direct: in your checkout; bounded: a task)"},
+	{"/task", "REQUEST", "run a request as a verified task now (isolated worktree, sandbox, evidence)"},
+	{"/mode", "[auto|chat|code|verify]", "auto (default) picks the mode per message; the others force one"},
 	{"/diff", "", "show the current task's changes"},
 	{"/apply", "[--commit]", "bring the current task's changes into your checkout (staged, or committed)"},
 	{"/verify", "[--full]", "run verification on the current task"},
@@ -152,7 +166,7 @@ type chatView struct {
 	hpos    int
 
 	// Direct mode.
-	mode     string
+	mode     string // modeAuto, or a forced direct.Mode*
 	session  string // direct session id ("" = start one; "last" = the most recent)
 	approval string // "" = configured
 	direct   *directRun
@@ -218,7 +232,7 @@ func newChatView() *chatView {
 	ta.BlurredStyle.Text = sMuted
 	ta.KeyMap.InsertNewline.SetEnabled(false) // enter sends; alt+enter / ctrl+j add a line
 	v := &chatView{input: ta, tasks: map[string]*chatTask{}, scroll: scroller{follow: true}}
-	v.mode = modeDirect
+	v.mode = modeAuto
 	return v
 }
 
@@ -436,12 +450,31 @@ func (v *chatView) update(m *Model, msg tea.Msg) tea.Cmd {
 		}
 		r.apply(msg.e)
 		return nil
+	case routedMsg:
+		if msg.err != nil {
+			v.fail("Could not route the message: " + msg.err.Error())
+			return nil
+		}
+		return v.dispatch(m, msg.text, msg.d)
 	case directDoneMsg:
 		r := v.direct
 		if r == nil || r.id != msg.id {
 			return nil
 		}
 		r.done, r.end, r.err = true, time.Now(), msg.err
+		var h *direct.Handoff
+		if errors.As(msg.err, &h) {
+			r.err = nil
+			note := "Handing off to verification: " + h.Reason + "."
+			if len(h.Changed) > 0 {
+				note += " Earlier changes of this turn stay in your checkout: " + strings.Join(h.Changed, ", ") + "."
+			}
+			v.note(note)
+			if msg.res.SessionID != "" {
+				v.session = msg.res.SessionID
+			}
+			return v.sendBounded(m, r.request)
+		}
 		if msg.res.SessionID != "" {
 			v.session = msg.res.SessionID
 			v.resumed = false
@@ -632,14 +665,48 @@ func (v *chatView) send(m *Model, text string) tea.Cmd {
 		return v.slash(m, text)
 	}
 	v.entries = append(v.entries, chatEntry{kind: entryUser, text: text})
-	if v.mode == modeDirect {
-		return v.sendDirect(m, text)
+	switch v.mode {
+	case direct.ModeVerify, modeBounded:
+		return v.sendBounded(m, text)
+	case direct.ModeChat, direct.ModeCode, modeDirect:
+		mode := v.mode
+		if mode == modeDirect {
+			mode = direct.ModeCode
+		}
+		return v.sendDirect(m, text, mode)
 	}
-	return v.sendBounded(m, text)
+	if v.running(m) {
+		v.queue = append(v.queue, text)
+		v.note("Queued: it will be sent when the current run ends (esc interrupts the run).")
+		return nil
+	}
+	be, ctx, dir := m.be, m.ctx, v.projectDir(m)
+	return func() tea.Msg {
+		d, err := be.Route(ctx, dir, text)
+		return routedMsg{text, d, err}
+	}
 }
 
-// sendDirect sends a message to the native agent loop in this checkout.
-func (v *chatView) sendDirect(m *Model, text string) tea.Cmd {
+// dispatch acts on the router's decision.
+func (v *chatView) dispatch(m *Model, text string, d direct.Decision) tea.Cmd {
+	label := d.Mode
+	if d.Fallback != "" {
+		label += " (verification unavailable)"
+	}
+	v.entries = append(v.entries, chatEntry{kind: entryNote, text: "◇ " + label + " · " + d.Reason})
+	if d.Mode == direct.ModeVerify {
+		return v.sendBounded(m, text)
+	}
+	cmd := v.sendDirect(m, text, d.Mode)
+	if v.direct != nil {
+		v.direct.allowRisky = d.Fallback != ""
+	}
+	return cmd
+}
+
+// sendDirect sends a message to the native agent loop in this checkout,
+// in mode direct.ModeChat or direct.ModeCode.
+func (v *chatView) sendDirect(m *Model, text, mode string) tea.Cmd {
 	if ok, why := v.readyDirect(); !ok {
 		v.fail("Can't send: " + why)
 		return nil
@@ -651,14 +718,15 @@ func (v *chatView) sendDirect(m *Model, text string) tea.Cmd {
 	}
 	v.nextRun++
 	ctx, cancel := context.WithCancel(m.ctx)
-	r := &directRun{id: v.nextRun, cancel: cancel, start: time.Now()}
+	r := &directRun{id: v.nextRun, cancel: cancel, start: time.Now(), mode: mode, request: text}
 	v.direct = r
 	v.entries = append(v.entries, chatEntry{kind: entryDirect, run: r})
 	v.scroll.follow = true
-	req := ChatRequest{Dir: v.projectDir(m), SessionID: v.session, Message: text, Model: v.model, Approval: v.approval}
 	be, send := m.be, m.send
+	dir, session, model, approval := v.projectDir(m), v.session, v.model, v.approval
 	return tea.Batch(func() tea.Msg {
 		defer cancel()
+		req := ChatRequest{Dir: dir, SessionID: session, Message: text, Model: model, Approval: approval, Mode: mode, AllowRisky: r.allowRisky}
 		res, err := be.Chat(ctx, req, func(e direct.Event) { send(directEventMsg{r.id, e}) })
 		return directDoneMsg{r.id, res, err}
 	}, m.spinTick())
@@ -755,12 +823,14 @@ func (v *chatView) slash(m *Model, text string) tea.Cmd {
 	case "/help":
 		var ls []string
 		ls = append(ls, sSection.Render("Talk to BoundedCode"),
-			sText.Render("Direct mode (default): the agent works in this checkout with file, search and shell"),
-			sText.Render("tools, like other coding agents. Edits inside the project are applied; shell commands"),
-			sText.Render("other than builds, tests and read-only ones ask first (/approval changes that)."),
-			sText.Render("Bounded mode (/task REQUEST, or /mode bounded): the request runs as a task in an"),
-			sText.Render("isolated worktree on branch agent/<task>, inside a sandbox, and must be backed by a"),
-			sText.Render("test that fails without the change; your checkout is untouched until you /apply."),
+			sText.Render("Each message is routed automatically to one of three modes:"),
+			sText.Render("  chat    answers from the code without changing files;"),
+			sText.Render("  code    makes the change directly in this checkout (edits apply; shell commands"),
+			sText.Render("          other than builds, tests and read-only ones ask first; /approval changes that);"),
+			sText.Render("  verify  runs the request as a task in an isolated worktree and sandbox, backed by a"),
+			sText.Render("          test that fails without the change; your checkout is untouched until /apply."),
+			sText.Render("A chat turn that needs an edit becomes code; a code turn that reaches authentication,"),
+			sText.Render("payments, migrations, contracts or infrastructure hands off to verify before editing."),
 			sText.Render("While a run is going you can keep typing (messages are queued); esc interrupts."),
 			"", sSection.Render("Commands"))
 		for _, c := range slashCmds {
@@ -780,27 +850,38 @@ func (v *chatView) slash(m *Model, text string) tea.Cmd {
 			return nil
 		}
 		return v.sendBounded(m, strings.TrimSpace(strings.TrimPrefix(text, name)))
-	case "/direct":
+	case "/direct", "/code":
 		if len(rest) == 0 {
-			v.note("Usage: /direct MESSAGE — sends the message in direct mode.")
+			v.note("Usage: " + name + " MESSAGE — makes the change directly in your checkout, whatever the router would pick.")
 			return nil
 		}
-		return v.sendDirect(m, strings.TrimSpace(strings.TrimPrefix(text, name)))
+		return v.sendDirect(m, strings.TrimSpace(strings.TrimPrefix(text, name)), direct.ModeCode)
+	case "/chat":
+		if len(rest) == 0 {
+			v.note("Usage: /chat MESSAGE — answers without changing files.")
+			return nil
+		}
+		return v.sendDirect(m, strings.TrimSpace(strings.TrimPrefix(text, name)), direct.ModeChat)
 	case "/mode":
 		if len(rest) == 0 {
-			v.note("Mode: " + v.mode + ". /mode direct works in your checkout; /mode bounded runs each message as a verified task.")
+			v.note("Mode: " + v.mode + ". auto picks chat, code or verify per message from its intent and risk; /mode chat|code|verify forces one.")
 			return nil
 		}
 		switch rest[0] {
-		case modeDirect, modeBounded:
-			v.mode = rest[0]
-			if v.mode == modeDirect {
-				v.note("Direct mode: messages go to the agent working in " + v.projectDir(m) + ".")
-			} else {
-				v.note("Bounded mode: each message becomes a task in an isolated worktree and sandbox, with verification.")
-			}
+		case modeAuto:
+			v.mode = modeAuto
+			v.note("Automatic: each message is routed to chat, code or verify.")
+		case direct.ModeChat:
+			v.mode = direct.ModeChat
+			v.note("Chat mode: messages are answered without changing files (an edit the answer needs switches that turn to code).")
+		case direct.ModeCode, modeDirect:
+			v.mode = direct.ModeCode
+			v.note("Code mode: changes are made directly in " + v.projectDir(m) + " (risky paths still hand off to verification).")
+		case direct.ModeVerify, modeBounded:
+			v.mode = direct.ModeVerify
+			v.note("Verify mode: each message becomes a task in an isolated worktree and sandbox, with verification.")
 		default:
-			v.fail("Mode must be direct or bounded.")
+			v.fail("Mode must be auto, chat, code or verify.")
 		}
 	case "/approval":
 		if len(rest) == 0 {
@@ -848,7 +929,7 @@ func (v *chatView) slash(m *Model, text string) tea.Cmd {
 			return m.openTask(t.ID)
 		}
 	case "/status":
-		if v.mode == modeDirect && t == nil {
+		if v.mode != direct.ModeVerify && t == nil {
 			if v.direct == nil || v.direct.usage == nil {
 				v.note("No session yet. Mode: " + v.mode + ".")
 				return nil
@@ -1097,8 +1178,8 @@ func (v *chatView) statusLine(m *Model, w int) string {
 			right += sFaint.Render(" · task " + v.current)
 		}
 	}
-	if v.mode == modeBounded {
-		right = sWarn.Render("bounded ") + right
+	if v.mode != modeAuto {
+		right = sWarn.Render(v.mode+" ") + right
 	}
 	gap := w - lipgloss.Width(left) - lipgloss.Width(right) - 2
 	if gap < 1 {
@@ -1168,6 +1249,9 @@ func (r *directRun) apply(e direct.Event) {
 		r.text += e.Text
 	case direct.EventCompact, direct.EventNote:
 		r.notes = append(r.notes, e.Text)
+	case direct.EventMode:
+		r.mode = e.Text
+		r.notes = append(r.notes, "◇ "+e.Text+" · "+e.Summary)
 	case direct.EventDone:
 		if e.Usage != nil {
 			u := *e.Usage
@@ -1286,7 +1370,7 @@ func (v *chatView) welcome(m *Model, w int) []string {
 			for _, l := range strings.Split(wrap("Ask about the code or describe a change, e.g. \"add input validation to the signup handler, with tests\". The agent works in this checkout.", w-4), "\n") {
 				out = append(out, sMuted.Render("  "+l))
 			}
-			out = append(out, sMuted.Render("  For a sensitive change, ")+sKey.Render("/task REQUEST")+sMuted.Render(" runs it in an isolated worktree and sandbox, backed by a test. ")+sKey.Render("/help")+sMuted.Render(" lists commands."))
+			out = append(out, sMuted.Render("  Questions are answered, small changes are made here, and sensitive ones run as verified tasks, automatically. ")+sKey.Render("/help")+sMuted.Render(" explains."))
 		}
 	}
 	return out

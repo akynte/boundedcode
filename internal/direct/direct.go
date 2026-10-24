@@ -71,6 +71,7 @@ const (
 	EventCompact   EventKind = "compact"    // the history was summarised
 	EventNote      EventKind = "note"       // informational
 	EventDone      EventKind = "done"       // the turn ended
+	EventMode      EventKind = "mode"       // the mode changed during the turn (Text: new mode, Summary: why)
 )
 
 // Event is what a Sink receives while a message is processed.
@@ -145,6 +146,12 @@ type Options struct {
 	Env map[string]string
 	// Now returns the current time (tests).
 	Now func() time.Time
+	// Mode is how this message is handled (ModeChat, ModeCode; "" = code).
+	// In ModeChat the first file change switches the turn to ModeCode. A
+	// change to a risky path (RiskyPath) ends the turn with ErrHandoff so
+	// the request can run as a bounded task, unless AllowRisky is set.
+	Mode       string
+	AllowRisky bool
 }
 
 // Runner processes messages of one session.
@@ -156,6 +163,7 @@ type Runner struct {
 	Session  *Session
 	tools    []Tool
 	toolsErr error
+	handoff  *Handoff
 	mu       sync.Mutex
 	// extraSystem is appended to the system prompt (tests, hand-offs).
 	ExtraSystem string
@@ -164,6 +172,17 @@ type Runner struct {
 // ErrInterrupted is returned when ctx ended while a message was processed;
 // the work so far is kept in the session.
 var ErrInterrupted = errors.New("interrupted")
+
+// Handoff is returned by Send when the turn should continue as a bounded
+// task: the agent was about to change a risky path. No file was changed by
+// the refused call; earlier changes of the same turn are listed.
+type Handoff struct {
+	Reason  string
+	Path    string
+	Changed []string
+}
+
+func (h *Handoff) Error() string { return "hand-off to verification: " + h.Reason }
 
 func (r *Runner) emit(e Event) {
 	if r.Sink != nil {
@@ -251,6 +270,13 @@ func (r *Runner) Send(ctx context.Context, text string) (string, error) {
 		}
 		for _, call := range msg.ToolCalls {
 			result := r.runTool(ctx, call)
+			if r.handoff != nil {
+				h := r.handoff
+				r.handoff = nil
+				h.Changed = changedSince(before, r.gitState())
+				_ = r.Session.Append(Message{Role: "tool", ToolCallID: call.ID, Name: call.Function.Name, Content: result})
+				return final, h
+			}
 			key := call.Function.Name + "\x00" + call.Function.Arguments
 			if strings.HasPrefix(result, "error:") {
 				if key == lastFail {
@@ -527,4 +553,29 @@ func changedSince(before, after map[string]string) []string {
 	}
 	sort.Strings(out)
 	return out
+}
+
+// Mode returns the current mode of the runner ("" counts as code).
+func (r *Runner) Mode() string {
+	if r.Opts.Mode == "" {
+		return ModeCode
+	}
+	return r.Opts.Mode
+}
+
+// mutating is called before a file change (or a non-safe command). It
+// switches chat to code, and hands a risky path off to verification.
+func (r *Runner) mutating(tool, relRoot string) bool {
+	if r.Opts.Mode == ModeChat {
+		r.Opts.Mode = ModeCode
+		r.emit(Event{Kind: EventMode, Text: ModeCode, Summary: "the answer needs a change: switching from chat to code"})
+	}
+	if relRoot != "" && !r.Opts.AllowRisky {
+		if why, ok := RiskyPath(relRoot); ok {
+			r.handoff = &Handoff{Reason: why, Path: relRoot}
+			r.emit(Event{Kind: EventMode, Text: ModeVerify, Summary: "the change touches a " + why + ": handing off to verification"})
+			return false
+		}
+	}
+	return true
 }

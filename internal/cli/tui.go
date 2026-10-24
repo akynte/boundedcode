@@ -165,6 +165,10 @@ func (b *tuiBackend) Chat(ctx context.Context, req tui.ChatRequest, sink func(di
 		}
 	}
 	res := tui.ChatResult{SessionID: r.Session.ID, Model: r.Session.Model, Provider: r.Session.Provider}
+	if req.Mode != "" {
+		r.Opts.Mode = req.Mode
+	}
+	r.Opts.AllowRisky = req.AllowRisky
 	if req.Compact {
 		err = r.Compact(ctx)
 	} else {
@@ -173,6 +177,38 @@ func (b *tuiBackend) Chat(ctx context.Context, req tui.ChatRequest, sink func(di
 	}
 	res.Usage = r.Usage()
 	return res, err
+}
+
+// Route implements tui.Backend.
+func (b *tuiBackend) Route(ctx context.Context, dir, text string) (direct.Decision, error) {
+	a, err := b.fork(io.Discard)
+	if err != nil {
+		return direct.Decision{}, err
+	}
+	caps := a.capabilities(ctx, dir)
+	rules := a.riskRules()
+	if d := direct.Route(text, rules, caps); d.Confidence == "high" || a.Config.Direct.Mode != "auto" {
+		return a.forcedMode(d), nil
+	}
+	// Unsure: ask the model through the session's gateway when one is
+	// open, otherwise a fresh endpoint.
+	b.mu.Lock()
+	var gw *inference.Gateway
+	for _, r := range b.runners {
+		gw = r.Gateway
+		break
+	}
+	b.mu.Unlock()
+	if gw == nil {
+		ep, err := a.directEndpoint(ctx, "")
+		if err != nil {
+			return direct.Route(text, rules, caps), nil //nolint:nilerr // the rules' choice stands
+		}
+		gw = ep.newGateway("route")
+	}
+	rctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	return direct.RouteWithModel(rctx, gw, text, rules, caps), nil
 }
 
 // Sessions implements tui.Backend.
@@ -425,6 +461,14 @@ func (b *tuiBackend) CreateTask(ctx context.Context, req tui.CreateTaskRequest) 
 var nonName = regexp.MustCompile(`[^a-z0-9._-]+`)
 
 func (b *tuiBackend) Project(ctx context.Context, dir string) (tui.Project, error) {
+	a, err := b.fork(io.Discard)
+	if err != nil {
+		return tui.Project{Dir: dir}, err
+	}
+	return a.project(ctx, dir)
+}
+
+func (a *App) project(ctx context.Context, dir string) (tui.Project, error) {
 	p := tui.Project{Dir: dir}
 	if _, err := gitops.Run(ctx, dir, "rev-parse", "--show-toplevel"); err != nil {
 		return p, nil //nolint:nilerr // not inside a git work tree: the chat offers git init
@@ -434,7 +478,7 @@ func (b *tuiBackend) Project(ctx context.Context, dir string) (tui.Project, erro
 		return p, err
 	}
 	p.Root, p.Branch, p.Dirty = info.Root, info.Branch, info.Dirty
-	ws := workspace.Store{DB: b.base.st.DB}
+	ws := workspace.Store{DB: a.st.DB}
 	all, err := ws.List(ctx)
 	if err != nil {
 		return p, err
@@ -475,7 +519,7 @@ func (b *tuiBackend) Project(ctx context.Context, dir string) (tui.Project, erro
 	if err != nil {
 		return p, err
 	}
-	rec := telemetry.New(b.base.st.DB, b.log)
+	rec := telemetry.New(a.st.DB, a.Log)
 	rec.Emit(ctx, "", "workspace.created", w)
 	rec.Emit(ctx, "", "workspace.repo_added", map[string]any{"workspace": w.Name, "repo": r.Name, "path": r.Path})
 	p.Workspace, p.Repo, p.Created = w.Name, r.Name, true

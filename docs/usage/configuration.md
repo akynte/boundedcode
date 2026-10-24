@@ -135,6 +135,8 @@ and [ADR-0011](../architecture/adr/0011-direct-mode.md).
 | Key | Default | Meaning |
 |---|---|---|
 | `approval` | `edits` | What needs your consent. `ask`: every file change and every shell command. `edits`: file edits inside the project and known read-only, build and test commands (`git status`, `go test`, `npm test`, `pytest`, `cargo build`, …) run without asking; edits to protected paths (CI, verification and repository configuration) and other commands ask. `auto`: nothing asks. In every mode the command policy refuses pushes, protected-branch operations, infrastructure mutation and publishing, paths are confined to the project, and secret-looking paths are not readable. |
+| `mode` | `auto` | How a message is handled. `auto` routes each message to `chat` (answer without changing files), `code` (change the checkout directly) or `verify` (a bounded task: worktree, sandbox, verification, evidence) from its intent, its risk (the `escalation` keyword lists, risky paths such as authentication, payments, migrations, contracts, infrastructure, protected configuration) and whether a bounded task can run here. `chat`, `code` or `verify` forces one mode. See [ADR-0012](../architecture/adr/0012-automatic-mode-routing.md). |
+| `max_files` | `8` | A change that names more files than this is routed to `verify`. |
 | `max_turns` | `80` | Model calls one message may cause (each tool round trip is one). |
 | `command_timeout` | `3m` | A shell command is killed after this (the model may ask for a shorter one). |
 | `max_tokens` | `0` | Processed tokens per session (`0` = unlimited); the session stops with an error when spent. |

@@ -116,6 +116,22 @@ Explicitly not planned: a desktop app, chat channels, agent teams or a
 multi-model "arena". They are far from the mission and would not be
 measured.
 
+## 3a. Automatic mode selection (2026-10-24, ADR-0012)
+
+The maintainer asked that switching be fully automatic. The router
+(`internal/direct/router.go`) classifies each message into chat, code or
+verify from deterministic rules (intent verbs, question forms, the
+escalation keyword lists, risky file paths, "with tests", several
+services, many files) and asks the model only when the rules are unsure.
+Two switches happen during a turn: chat→code at the first edit, and
+code→verify before a risky edit lands (the request is then run as a
+bounded task; earlier edits of the turn are kept and listed). When a
+bounded task cannot run (no git commit, set-up incomplete, no sandbox),
+verify downgrades to code and the reason is shown. Overrides exist
+(`/mode`, `/task`, `/code`, `/chat`, `--mode`) but are not needed. Phase
+21's hand-off is partly done by this: what remains is carrying the direct
+session's summary into the task's context pack.
+
 ## 4. Phase 17 in detail
 
 ### What was built

@@ -96,6 +96,23 @@ func (r *Runner) runTool(ctx context.Context, call ToolCall) string {
 			return "error: " + err.Error()
 		}
 	}
+	if t.Mutates {
+		rel := ""
+		if t.Name != "bash" {
+			abs, _, err := r.resolve(str(args, "path"))
+			if err == nil {
+				rel = r.rootRel(abs)
+			}
+		} else if r.Opts.Mode != ModeChat || isSafeCommand(str(args, "command")) {
+			// a safe command is not a change; an unsafe one in chat mode is
+			goto consent
+		}
+		if !r.mutating(t.Name, rel) {
+			r.emit(Event{Kind: EventDenied, Tool: t.Name, CallID: call.ID, Summary: summary, Err: "handed off to verification"})
+			return "This change is being handed off to a verified task; stop here."
+		}
+	}
+consent:
 	if t.Consent != nil {
 		if detail, needed := t.Consent(r, args); needed {
 			if r.Approve == nil || !r.Approve(ctx, ApprovalRequest{Tool: t.Name, Summary: summary, Detail: detail}) {
@@ -1057,4 +1074,17 @@ func indentUnit(oldLines, fileLines []string) int {
 		}
 	}
 	return 4
+}
+
+// rootRel is abs relative to the project root (slash-separated).
+func (r *Runner) rootRel(abs string) string {
+	root, err := filepath.EvalSymlinks(r.Opts.Root)
+	if err != nil {
+		root = filepath.Clean(r.Opts.Root)
+	}
+	rel, err := filepath.Rel(root, abs)
+	if err != nil {
+		return ""
+	}
+	return filepath.ToSlash(rel)
 }

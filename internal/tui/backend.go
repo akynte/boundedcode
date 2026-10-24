@@ -84,6 +84,8 @@ type Backend interface {
 	// Sessions lists the stored direct-mode sessions of a project, newest
 	// first.
 	Sessions(ctx context.Context, dir string) ([]direct.SessionInfo, error)
+	// Route decides how a message is handled: chat, code or verify.
+	Route(ctx context.Context, dir, text string) (direct.Decision, error)
 }
 
 // ChatRequest is one direct-mode message.
@@ -95,6 +97,10 @@ type ChatRequest struct {
 	Approval  string // "" = configured
 	// Compact summarises the history instead of sending a message.
 	Compact bool
+	// Mode is direct.ModeChat or direct.ModeCode ("" = code); AllowRisky
+	// lets risky paths be edited (verification unavailable).
+	Mode       string
+	AllowRisky bool
 }
 
 // ChatResult is what a direct-mode turn produced.

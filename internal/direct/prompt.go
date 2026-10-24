@@ -30,6 +30,12 @@ How to work:
 - When a request is genuinely ambiguous in a way that changes the work, ask one precise question instead of guessing.
 - When a change is risky (authentication, payments, migrations, shared contracts, large multi-file changes) suggest that the user run it in bounded mode (the /task command), where it runs in an isolated worktree and sandbox and must be backed by a test that fails without the change.
 `)
+	switch r.Opts.Mode {
+	case ModeChat:
+		b.WriteString("\nThis message was classified as a question or discussion: answer it from the code. Do not change files unless the user clearly asked for a change; if they did, go ahead (the mode switches automatically).\n")
+	case ModeCode:
+		b.WriteString("\nThis message was classified as a request for a direct change in the checkout. Changes to authentication, payments, migrations, shared contracts or infrastructure are handed off automatically to a verified task; do not work around that.\n")
+	}
 	env := r.environment()
 	b.WriteString("\nEnvironment:\n")
 	keys := make([]string, 0, len(env))

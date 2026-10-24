@@ -19,6 +19,7 @@ import (
 	"github.com/akynte/boundedcode/internal/direct"
 	"github.com/akynte/boundedcode/internal/gitops"
 	"github.com/akynte/boundedcode/internal/inference"
+	"github.com/akynte/boundedcode/internal/orchestrator"
 	"github.com/akynte/boundedcode/internal/telemetry"
 )
 
@@ -141,6 +142,47 @@ func (a *App) directRunner(ctx context.Context, dir, sessionID, modelOverride, a
 	return r, nil
 }
 
+// riskRules builds the router's risk rules from the escalation keyword
+// lists, so direct mode and frontier escalation agree on what is risky.
+func (a *App) riskRules() direct.RiskRules {
+	var kw []string
+	kw = append(kw, a.Config.Escalation.ArchitecturalRisk...)
+	kw = append(kw, a.Config.Escalation.HighRiskReview...)
+	return direct.RiskRules{Keywords: kw, MaxDirectFiles: a.Config.Direct.MaxFiles}
+}
+
+// capabilities reports whether a bounded task can run for dir: a git
+// repository with a committed HEAD, and every set-up step done (sandbox
+// image included).
+func (a *App) capabilities(ctx context.Context, dir string) direct.Capabilities {
+	if capabilitiesFn != nil {
+		return capabilitiesFn(ctx, a, dir)
+	}
+	if dir == "" {
+		dir = "."
+	}
+	if _, err := gitops.Run(ctx, dir, "rev-parse", "--verify", "HEAD"); err != nil {
+		return direct.Capabilities{BoundedReason: "not a git repository with a commit"}
+	}
+	for _, st := range setupSteps() {
+		if ok, detail := st.check(ctx, a); !ok {
+			return direct.Capabilities{BoundedReason: "set-up incomplete (" + st.Title + ": " + detail + ")"}
+		}
+	}
+	return direct.Capabilities{BoundedAvailable: true}
+}
+
+// capabilitiesFn replaces capabilities in tests.
+var capabilitiesFn func(ctx context.Context, a *App, dir string) direct.Capabilities
+
+// forcedMode applies direct.mode when it is not auto.
+func (a *App) forcedMode(d direct.Decision) direct.Decision {
+	if m := a.Config.Direct.Mode; m != "" && m != "auto" {
+		return direct.Decision{Mode: m, Reason: "direct.mode is " + m, Confidence: "high"}
+	}
+	return d
+}
+
 // projectRoot is the git top level containing dir, or dir itself.
 func projectRoot(dir string) (string, error) {
 	if dir == "" {
@@ -161,8 +203,8 @@ func projectRoot(dir string) (string, error) {
 
 func newChatCmd(app *App) *cobra.Command {
 	var f struct {
-		prompt, dir, resume, model, approval string
-		cont, jsonEvents                     bool
+		prompt, dir, resume, model, approval, mode string
+		cont, jsonEvents                           bool
 	}
 	cmd := &cobra.Command{
 		Use:   "chat",
@@ -183,7 +225,7 @@ Examples:
   git diff | ` + buildinfo.Command() + ` chat -p "review this diff"`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return app.runChat(cmd.Context(), chatOptions{prompt: f.prompt, dir: f.dir, resume: f.resume, cont: f.cont, model: f.model, approval: f.approval, jsonEvents: f.jsonEvents, stdin: cmd.InOrStdin()})
+			return app.runChat(cmd.Context(), chatOptions{prompt: f.prompt, dir: f.dir, resume: f.resume, cont: f.cont, model: f.model, approval: f.approval, mode: f.mode, jsonEvents: f.jsonEvents, stdin: cmd.InOrStdin()})
 		},
 	}
 	cmd.Flags().StringVarP(&f.prompt, "prompt", "p", "", "the message (default: standard input)")
@@ -193,6 +235,7 @@ Examples:
 	cmd.Flags().StringVar(&f.model, "model", "", "model profile (local) or model name (cloud) for this session")
 	cmd.Flags().StringVar(&f.approval, "approval", "", "ask|edits|auto (default: direct.approval in the configuration)")
 	cmd.Flags().BoolVar(&f.jsonEvents, "events", false, "print every event as a JSON line instead of text")
+	cmd.Flags().StringVar(&f.mode, "mode", "", "auto|chat|code|verify (default: direct.mode; auto routes from the message's intent and risk)")
 	cmd.AddCommand(&cobra.Command{
 		Use: "sessions", Short: "List stored direct-mode sessions of this project", Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
@@ -221,9 +264,28 @@ Examples:
 }
 
 type chatOptions struct {
-	prompt, dir, resume, model, approval string
-	cont, jsonEvents                     bool
-	stdin                                io.Reader
+	prompt, dir, resume, model, approval, mode string
+	cont, jsonEvents                           bool
+	stdin                                      io.Reader
+}
+
+// runBounded runs a request as a bounded task for dir's repository and
+// reports like `task create --run`. Tests replace it.
+var runBounded = func(ctx context.Context, a *App, dir, request, model string) error {
+	p, err := a.project(ctx, dir)
+	if err != nil {
+		return err
+	}
+	if p.Workspace == "" {
+		return errors.New("not a git repository")
+	}
+	t, r, cleanup, err := a.createTask(ctx, p.Workspace, request, nil, nil, "", runFlags{model: model}, true)
+	if err != nil {
+		return err
+	}
+	defer cleanup()
+	fmt.Fprintf(a.Err, "· verification: task %s on branch %s\n", t.ID, gitops.TaskBranch(t.ID))
+	return runAndReport(ctx, a, r, t.ID, orchestrator.RunOptions{})
 }
 
 // runChat is the headless (print) form of direct mode.
@@ -254,9 +316,46 @@ func (a *App) runChat(ctx context.Context, o chatOptions) error {
 	case o.cont:
 		session = "last"
 	}
+	// Route the message: chat, code or verify.
+	mode := o.mode
+	if mode == "" {
+		mode = a.Config.Direct.Mode
+	}
+	caps := a.capabilities(ctx, o.dir)
+	var d direct.Decision
+	switch mode {
+	case "", "auto":
+		d = direct.Route(prompt, a.riskRules(), caps)
+	case direct.ModeChat, direct.ModeCode, direct.ModeVerify:
+		d = direct.Decision{Mode: mode, Reason: "requested", Confidence: "high"}
+		if mode == direct.ModeVerify && !caps.BoundedAvailable {
+			return errors.New("verification is not available here: " + caps.BoundedReason)
+		}
+	default:
+		return fmt.Errorf("mode %q is not auto|chat|code|verify", mode)
+	}
+	if d.Mode == direct.ModeVerify {
+		if !o.jsonEvents {
+			fmt.Fprintf(a.Err, "· mode: verify (%s)\n", d.Reason)
+		}
+		return runBounded(ctx, a, o.dir, prompt, o.model)
+	}
 	r, err := a.directRunner(ctx, o.dir, session, o.model, o.approval)
 	if err != nil {
 		return err
+	}
+	if d.Confidence == "low" && (mode == "" || mode == "auto") {
+		d = direct.RouteWithModel(ctx, r.Gateway, prompt, a.riskRules(), caps)
+		if d.Mode == direct.ModeVerify {
+			if !o.jsonEvents {
+				fmt.Fprintf(a.Err, "· mode: verify (%s)\n", d.Reason)
+			}
+			return runBounded(ctx, a, o.dir, prompt, o.model)
+		}
+	}
+	r.Opts.Mode, r.Opts.AllowRisky = d.Mode, !caps.BoundedAvailable
+	if !o.jsonEvents {
+		fmt.Fprintf(a.Err, "· mode: %s (%s)\n", d.Mode, d.Reason)
 	}
 	interactive := false
 	if f, ok := o.stdin.(*os.File); ok && term.IsTerminal(int(f.Fd())) && !o.jsonEvents {
@@ -293,6 +392,8 @@ func (a *App) runChat(ctx context.Context, o chatOptions) error {
 			fmt.Fprintf(a.Err, "✘ %s: %s\n", e.Summary, e.Err)
 		case direct.EventCompact, direct.EventNote:
 			fmt.Fprintf(a.Err, "· %s\n", e.Text)
+		case direct.EventMode:
+			fmt.Fprintf(a.Err, "· mode: %s (%s)\n", e.Text, e.Summary)
 		case direct.EventText:
 			fmt.Fprintln(a.Out, e.Text)
 		case direct.EventDone:
@@ -309,6 +410,13 @@ func (a *App) runChat(ctx context.Context, o chatOptions) error {
 		}
 	}
 	_, err = r.Send(ctx, prompt)
+	var h *direct.Handoff
+	if errors.As(err, &h) {
+		if len(h.Changed) > 0 {
+			fmt.Fprintf(a.Err, "· earlier changes of this turn are kept in your checkout: %s\n", strings.Join(h.Changed, ", "))
+		}
+		return runBounded(ctx, a, o.dir, prompt, o.model)
+	}
 	return err
 }
 

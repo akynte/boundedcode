@@ -5,14 +5,30 @@
 Experimental (ADR-0011, [design](docs/design/everyday-agent.md)). Not yet
 used on real work or measured.
 
+### Automatic modes: chat, code, verify (ADR-0012)
+
+- Every message is routed automatically: **chat** answers without changing
+  files; **code** changes the checkout directly; **verify** runs the
+  request as a bounded task. The rules read the request's intent and risk
+  (the escalation keyword lists, risky paths, "with tests", several
+  services, many files) and what the environment can run; when unsure,
+  the model is asked for a one-word classification. The decision is shown
+  with each message.
+- During a turn: a chat answer that needs an edit becomes code; a code
+  turn that is about to change a risky path (authentication, payments,
+  migrations, contracts, infrastructure, protected configuration) stops
+  before editing and the request is handed off to a verified task.
+- `direct.mode: auto|chat|code|verify`, `direct.max_files`; `/mode`,
+  `/task`, `/code`, `/chat` and `bcode chat --mode` override the router.
+
 ### Direct mode
 
-- `bcode` chat now defaults to **direct mode**: a native agent loop that
-  works in the checkout with `read`, `write`, `edit`, `bash`, `grep`,
-  `glob` and `ls`, through the configured model provider (local or cloud),
-  like other coding agents. `/task REQUEST` runs a request in **bounded
-  mode** (the previous behaviour: worktree, sandbox, verification,
-  evidence); `/mode bounded` makes every message a task.
+- `bcode` chat now runs on **direct mode** for chat and code: a native
+  agent loop that works in the checkout with `read`, `write`, `edit`,
+  `bash`, `grep`, `glob` and `ls`, through the configured model provider
+  (local or cloud), like other coding agents. **Bounded mode** (the
+  previous behaviour: worktree, sandbox, verification, evidence) is the
+  verify mode.
 - Approval modes `ask`, `edits` (default) and `auto` (`direct.approval`,
   `/approval`). File edits inside the project and known read-only, build
   and test commands run without asking in `edits`; protected paths and

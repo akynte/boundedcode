@@ -50,17 +50,22 @@ that the change did anything.
 
 ## What BoundedCode does
 
-BoundedCode has two modes.
+BoundedCode routes every request to one of three modes, automatically
+(experimental, [ADR-0012](docs/architecture/adr/0012-automatic-mode-routing.md)):
 
-**Direct mode** (experimental, the chat's default) is an everyday coding
-agent: it works in your checkout with file, search and shell tools through
-the model you configured, like other coding agents. Edits land in your
-files; shell commands other than builds, tests and read-only ones ask
-first. See [direct mode](docs/usage/tui.md#direct-mode) and
-[ADR-0011](docs/architecture/adr/0011-direct-mode.md).
+- **chat**: a question is answered from the code, nothing is changed;
+- **code**: a small, low-risk change is made directly in your checkout,
+  like other coding agents do, with file, search and shell tools through
+  the model you configured ([direct mode](docs/usage/tui.md#direct-mode-chat-and-code),
+  [ADR-0011](docs/architecture/adr/0011-direct-mode.md));
+- **verify**: a change that touches authentication, payments, migrations,
+  shared contracts or infrastructure, spans several services, or asks for
+  proof runs as a bounded task.
 
-**Bounded mode** (`/task`, or `bcode task create`) is for changes that must
-be trusted. It does not implement a new agent loop. It wraps an existing
+A code turn that reaches a risky file hands off to verify before editing.
+
+**Bounded mode** (verify; also `/task` or `bcode task create`) is for
+changes that must be trusted. It does not implement a new agent loop. It wraps an existing
 one (the [OpenHands Software Agent SDK](https://github.com/OpenHands/software-agent-sdk))
 in a control plane, written in Go, that decides what the agent sees, where
 it runs, and when its work counts as done.
@@ -329,8 +334,9 @@ What it adds sits around that loop:
 - **Context that does not grow with the repository.** The agent starts from
   a bounded pack instead of a repository dump.
 
-Direct mode is the general-purpose agent, for the rest of the day; bounded
-mode is one `/task` away when a change deserves the evidence.
+Direct mode (chat and code) is the general-purpose agent, for the rest of
+the day; the router sends a change to bounded mode when it deserves the
+evidence, and `/task` does so on demand.
 
 ## Verification
 
