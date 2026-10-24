@@ -15,6 +15,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/akynte/boundedcode/internal/compat"
+	"github.com/akynte/boundedcode/internal/direct"
 	"github.com/akynte/boundedcode/internal/inference"
 	"github.com/akynte/boundedcode/internal/stats"
 	"github.com/akynte/boundedcode/internal/task"
@@ -44,6 +45,55 @@ type fakeBackend struct {
 	pmodels   []ProviderModel
 	keys      map[string]string
 	testErr   error
+	// Direct mode: requests seen, the scripted events and answer.
+	chats      []ChatRequest
+	chatEvents []direct.Event
+	chatText   string
+	chatErr    error
+	chatWait   chan struct{}
+	sessions   []direct.SessionInfo
+}
+
+func (f *fakeBackend) Chat(ctx context.Context, req ChatRequest, sink func(direct.Event)) (ChatResult, error) {
+	f.mu.Lock()
+	f.chats = append(f.chats, req)
+	events, text, err, wait := f.chatEvents, f.chatText, f.chatErr, f.chatWait
+	f.mu.Unlock()
+	for _, e := range events {
+		sink(e)
+	}
+	if wait != nil {
+		select {
+		case <-wait:
+		case <-ctx.Done():
+			return ChatResult{SessionID: "s-1"}, direct.ErrInterrupted
+		}
+	}
+	if err != nil {
+		return ChatResult{}, err
+	}
+	if text != "" {
+		sink(direct.Event{Kind: direct.EventText, Text: text})
+	}
+	sink(direct.Event{Kind: direct.EventDone, Usage: &direct.Usage{Processed: 1234, Generated: 100}})
+	id := req.SessionID
+	if id == "" || id == "last" {
+		id = "s-1"
+	}
+	return ChatResult{SessionID: id, Text: text, Usage: direct.Usage{Processed: 1234, Generated: 100}}, nil
+}
+
+func (f *fakeBackend) Sessions(context.Context, string) ([]direct.SessionInfo, error) {
+	return f.sessions, nil
+}
+
+func (f *fakeBackend) lastChat() ChatRequest {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if len(f.chats) == 0 {
+		return ChatRequest{}
+	}
+	return f.chats[len(f.chats)-1]
 }
 
 func (f *fakeBackend) Hardware(context.Context) HardwareInfo { return f.hw }
@@ -787,7 +837,8 @@ func (hn *harness) execs() []string {
 
 func TestChatMessageCreatesAndRunsTask(t *testing.T) {
 	hn := newChatHarness(t, 140, 40, nil)
-	hn.mustSee("coding agent", "/src/orders ⎇ main", "Describe a change")
+	hn.say("/mode bounded")
+	hn.mustSee("coding agent", "/src/orders ⎇ main", "Bounded mode")
 	hn.say("add retries to the client")
 	if len(hn.be.created) != 1 || hn.be.created[0].Workspace != "payments" || hn.be.created[0].FromTask != "" {
 		t.Fatalf("created = %+v", hn.be.created)
@@ -800,6 +851,7 @@ func TestChatMessageCreatesAndRunsTask(t *testing.T) {
 
 func TestChatFollowUpStartsFromCompletedTask(t *testing.T) {
 	hn := newChatHarness(t, 140, 40, nil)
+	hn.say("/mode bounded")
 	hn.say("add retries")
 	hn.be.setStatus("t-0009", task.StatusCompleted)
 	hn.run(hn.m.chat.loadTask(hn.m, "t-0009"))
@@ -816,6 +868,7 @@ func TestChatFollowUpStartsFromCompletedTask(t *testing.T) {
 
 func TestChatAnswersAnAmbiguousTask(t *testing.T) {
 	hn := newChatHarness(t, 140, 40, nil)
+	hn.say("/mode bounded")
 	hn.say("rename the field")
 	hn.mustSee("The request is ambiguous", "which consumers?")
 	hn.say("only billing")
@@ -831,6 +884,7 @@ func TestChatQueuesWhileRunningAndEscInterrupts(t *testing.T) {
 	be := defaultBackend()
 	be.execWait = make(chan struct{})
 	hn := newChatHarness(t, 140, 40, be)
+	hn.say("/mode bounded")
 	hn.say("add retries")
 	hn.mustSee("Working", "esc to interrupt")
 	hn.say("and a test")
@@ -856,6 +910,7 @@ func TestChatRequiresSetupAndRunsIt(t *testing.T) {
 	be := defaultBackend()
 	be.setup = append(be.setup, SetupStep{Name: "model", Title: "Default model weights", Detail: "qwen not downloaded"})
 	hn := newChatHarness(t, 140, 40, be)
+	hn.say("/mode bounded")
 	hn.mustSee("Setup needed", "Default model weights", "/setup")
 	hn.say("do something")
 	hn.mustSee("setup is not complete")
@@ -870,6 +925,7 @@ func TestChatOutsideGitOffersInit(t *testing.T) {
 	be := defaultBackend()
 	be.project = Project{Dir: "/tmp/plain"}
 	hn := newChatHarness(t, 140, 40, be)
+	hn.say("/mode bounded")
 	hn.mustSee("not a git repository", "/git-init")
 	hn.say("hello")
 	hn.mustSee("Can't start a task")
@@ -889,7 +945,7 @@ func TestChatSlashCommands(t *testing.T) {
 	hn.keys("esc")
 	hn.say("/apply")
 	hn.mustSee("No task yet")
-	hn.say("add retries")
+	hn.say("/task add retries")
 	hn.say("/diff")
 	hn.mustSee("■ orders", "+    AmountCents int")
 	hn.say("/apply")
@@ -1043,5 +1099,186 @@ func TestRuntimeModelActions(t *testing.T) {
 	hn.keys("y")
 	if got := strings.Join(be.lastExec(), " "); got != "model remove qwen3.6 --yes" {
 		t.Fatalf("exec = %q", got)
+	}
+}
+
+// ---- direct mode
+
+func directBackend() *fakeBackend {
+	be := defaultBackend()
+	be.chatEvents = []direct.Event{
+		{Kind: direct.EventToolStart, Tool: "read", Summary: "read client.go"},
+		{Kind: direct.EventToolEnd, Tool: "read", Summary: "read client.go"},
+		{Kind: direct.EventToolStart, Tool: "bash", Summary: "$ go test ./..."},
+		{Kind: direct.EventToolEnd, Tool: "bash", Summary: "$ go test ./...", Err: "exit status 1"},
+		{Kind: direct.EventDenied, Tool: "bash", Summary: "$ git push", Err: "policy: command denied (pushing is never automatic)"},
+	}
+	be.chatText = "Retries are configured in client.go; the test fails because the timeout is 0."
+	return be
+}
+
+func TestChatDirectModeIsTheDefault(t *testing.T) {
+	be := directBackend()
+	hn := newChatHarness(t, 140, 40, be)
+	hn.mustSee("Ask about the code", "/task REQUEST")
+	hn.say("how are retries configured?")
+	hn.drain()
+	req := be.lastChat()
+	if req.Message != "how are retries configured?" || req.Dir != "/src/orders" || req.SessionID != "" {
+		t.Fatalf("chat request = %+v", req)
+	}
+	if len(be.created) != 0 || len(hn.execs()) != 0 {
+		t.Fatal("direct mode created a task or ran a command")
+	}
+	hn.mustSee("❯ how are retries configured?", "⚙ read client.go", "$ go test ./...", "exit status 1", "✘ $ git push", "pushing is never automatic",
+		"◆ Retries are configured in client.go", "1.2k tokens")
+	// The session continues with the next message.
+	hn.say("fix it")
+	hn.drain()
+	if req := be.lastChat(); req.SessionID != "s-1" || req.Message != "fix it" {
+		t.Fatalf("second request = %+v", req)
+	}
+	hn.say("/status")
+	hn.mustSee("Session s-1", "tokens processed")
+	hn.say("/new")
+	hn.say("another")
+	hn.drain()
+	if req := be.lastChat(); req.SessionID != "" {
+		t.Fatalf("/new did not start a session: %+v", req)
+	}
+}
+
+func TestChatDirectQueuesAndEscInterrupts(t *testing.T) {
+	be := directBackend()
+	be.chatWait = make(chan struct{})
+	hn := newChatHarness(t, 140, 40, be)
+	hn.say("explain the retry loop")
+	hn.mustSee("Working", "esc to interrupt", "⚙ read client.go")
+	hn.say("and the backoff")
+	hn.mustSee("Queued", "1 queued")
+	if n := len(be.chats); n != 1 {
+		t.Fatalf("chats = %d", n)
+	}
+	hn.keys("esc")
+	for range 20 {
+		if len(be.chats) == 2 {
+			break
+		}
+		hn.drain()
+		hn.screen()
+	}
+	hn.mustSee("Interrupting")
+	if n := len(be.chats); n != 2 || be.chats[1].Message != "and the backoff" {
+		t.Fatalf("chats = %+v", be.chats)
+	}
+	close(be.chatWait)
+}
+
+func TestChatTaskCommandRunsBoundedFromDirectMode(t *testing.T) {
+	hn := newChatHarness(t, 140, 40, nil)
+	hn.say("/task add retries to the client")
+	if len(hn.be.created) != 1 || hn.be.created[0].Request != "add retries to the client" {
+		t.Fatalf("created = %+v", hn.be.created)
+	}
+	if got := strings.Join(hn.be.lastExec(), " "); got != "task run t-0009" {
+		t.Fatalf("exec = %q", got)
+	}
+	hn.mustSee("Task t-0009")
+	if hn.m.chat.mode != modeDirect {
+		t.Fatal("/task changed the mode")
+	}
+	hn.say("/mode")
+	hn.mustSee("Mode: direct")
+	hn.say("/mode bounded")
+	hn.mustSee("Bounded mode:", "bounded orders")
+	hn.say("/mode sideways")
+	hn.mustSee("Mode must be direct or bounded")
+}
+
+func TestChatDirectApprovalGoesThroughThePrompter(t *testing.T) {
+	be := directBackend()
+	hn := newChatHarness(t, 140, 40, be)
+	res := make(chan bool, 1)
+	go func() {
+		res <- hn.be.prompter(context.Background(), "Allow: $ rm -rf build", "Run in /src/orders:\n\n  rm -rf build")
+	}()
+	for range 20 {
+		hn.drain()
+		if strings.Contains(hn.screen(), "Allow: $ rm -rf build") {
+			break
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	hn.mustSee("Allow: $ rm -rf build", "rm -rf build")
+	hn.keys("y")
+	select {
+	case ok := <-res:
+		if !ok {
+			t.Fatal("approval answered no")
+		}
+	case <-time.After(time.Second):
+		t.Fatal("prompt not answered")
+	}
+}
+
+func TestChatSessionsResumeApprovalCompact(t *testing.T) {
+	be := directBackend()
+	be.sessions = []direct.SessionInfo{{ID: "20261024-1", Title: "add retries", Messages: 3, Updated: time.Now()}, {ID: "20261023-1", Title: "fix tests", Messages: 1, Updated: time.Now().Add(-time.Hour)}}
+	hn := newChatHarness(t, 140, 40, be)
+	hn.say("/sessions")
+	hn.drain()
+	hn.mustSee("Sessions (newest first)", "20261024-1", "add retries", "fix tests")
+	hn.say("/resume 20261023-1")
+	hn.mustSee("continues session 20261023-1")
+	hn.say("go on")
+	hn.drain()
+	if req := be.lastChat(); req.SessionID != "20261023-1" {
+		t.Fatalf("resume request = %+v", req)
+	}
+	hn.say("/approval auto")
+	hn.mustSee("Approval mode for the next messages: auto")
+	hn.say("again")
+	hn.drain()
+	if req := be.lastChat(); req.Approval != "auto" {
+		t.Fatalf("approval request = %+v", req)
+	}
+	hn.say("/compact")
+	hn.drain()
+	if req := be.lastChat(); !req.Compact {
+		t.Fatalf("compact request = %+v", req)
+	}
+	hn.say("/approval sideways")
+	hn.mustSee("Approval must be ask, edits or auto")
+}
+
+func TestChatDirectNeedsOnlyModelSetup(t *testing.T) {
+	be := directBackend()
+	be.setup = append(be.setup, SetupStep{Name: "sandbox", Title: "Agent sandbox image (Docker)", Detail: "not built"})
+	hn := newChatHarness(t, 140, 40, be)
+	hn.say("what does main do?")
+	hn.drain()
+	if len(be.chats) != 1 {
+		t.Fatal("a missing sandbox blocked direct mode")
+	}
+	hn.say("/task do it properly")
+	hn.mustSee("setup is not complete")
+	be2 := directBackend()
+	be2.setup = append(be2.setup, SetupStep{Name: "model", Title: "Default model weights", Detail: "qwen not downloaded"})
+	hn2 := newChatHarness(t, 140, 40, be2)
+	hn2.say("hello")
+	hn2.mustSee("setup is not complete")
+	if len(be2.chats) != 0 {
+		t.Fatal("direct mode ran without a model")
+	}
+}
+
+func TestChatDirectWorksOutsideGit(t *testing.T) {
+	be := directBackend()
+	be.project = Project{Dir: "/tmp/plain"}
+	hn := newChatHarness(t, 140, 40, be)
+	hn.say("hello")
+	hn.drain()
+	if req := be.lastChat(); req.Dir != "/src/orders" || req.Message != "hello" {
+		t.Fatalf("request = %+v", req)
 	}
 }

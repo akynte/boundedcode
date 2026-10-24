@@ -31,6 +31,7 @@ func Execute(ctx context.Context, args []string) int {
 
 func newRoot(app *App) *cobra.Command {
 	var verbose bool
+	var prompt string
 	root := &cobra.Command{
 		Use:           buildinfo.Command(),
 		Short:         buildinfo.ProductName + ": control plane for AI-assisted software engineering, with a local model or a cloud API",
@@ -41,7 +42,15 @@ func newRoot(app *App) *cobra.Command {
 			app.Log = newLogger(app.Err, verbose)
 			return app.load()
 		},
+		// `bcode -p "..."` is the headless chat, as in other coding agents.
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if prompt == "" {
+				return cmd.Help()
+			}
+			return app.runChat(cmd.Context(), chatOptions{prompt: prompt, stdin: cmd.InOrStdin()})
+		},
 	}
+	root.Flags().StringVarP(&prompt, "prompt", "p", "", "send one message in direct mode and print the answer (see the chat command)")
 	root.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "debug logging to stderr")
 	root.PersistentFlags().BoolVar(&app.jsonOut, "json", false, "machine-readable JSON output where supported")
 	root.AddCommand(
@@ -63,6 +72,7 @@ func newRoot(app *App) *cobra.Command {
 		newTUICmd(app),
 		newSetupCmd(app),
 		newProviderCmd(app),
+		newChatCmd(app),
 	)
 	return root
 }

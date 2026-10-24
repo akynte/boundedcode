@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/akynte/boundedcode/internal/compat"
+	"github.com/akynte/boundedcode/internal/direct"
 	"github.com/akynte/boundedcode/internal/inference"
 	"github.com/akynte/boundedcode/internal/stats"
 	"github.com/akynte/boundedcode/internal/task"
@@ -76,6 +77,33 @@ type Backend interface {
 	// TestProvider sends one short request through the selected provider and
 	// returns a one-line result.
 	TestProvider(ctx context.Context) (string, error)
+	// Chat sends one message in direct mode (the native agent loop in the
+	// checkout) and streams events to sink until the turn ends. Approvals
+	// go through the Prompter. A SessionID of "" starts a session.
+	Chat(ctx context.Context, req ChatRequest, sink func(direct.Event)) (ChatResult, error)
+	// Sessions lists the stored direct-mode sessions of a project, newest
+	// first.
+	Sessions(ctx context.Context, dir string) ([]direct.SessionInfo, error)
+}
+
+// ChatRequest is one direct-mode message.
+type ChatRequest struct {
+	Dir       string
+	SessionID string // "" = new session; "last" = the most recent
+	Message   string
+	Model     string // override for the session's first message
+	Approval  string // "" = configured
+	// Compact summarises the history instead of sending a message.
+	Compact bool
+}
+
+// ChatResult is what a direct-mode turn produced.
+type ChatResult struct {
+	SessionID string
+	Text      string
+	Usage     direct.Usage // the session's totals
+	Model     string
+	Provider  string
 }
 
 // HardwareInfo is this machine's hardware and the local model it suits.

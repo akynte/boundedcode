@@ -36,6 +36,30 @@ type Config struct {
 	Budgets      Budgets          `yaml:"budgets"`
 	Escalation   EscalationConfig `yaml:"escalation"`
 	Task         TaskConfig       `yaml:"task"`
+	Direct       DirectConfig     `yaml:"direct"`
+}
+
+// DirectConfig configures direct mode: the native agent loop that works in
+// the user's checkout for everyday development (ADR-0011). Bounded mode
+// (tasks in a sandboxed worktree with verification) is configured by the
+// other sections.
+type DirectConfig struct {
+	// Approval: "ask" asks before every file change and command; "edits"
+	// (default) applies file changes inside the project and runs known
+	// build, test and read-only commands without asking, and asks for
+	// other commands; "auto" asks for nothing. The deterministic command
+	// policy (no pushes, no infrastructure mutation, ...) applies in every
+	// mode.
+	Approval string `yaml:"approval"`
+	// MaxTurns bounds the model calls one message may cause.
+	MaxTurns int `yaml:"max_turns"`
+	// CommandTimeout bounds one shell command.
+	CommandTimeout Duration `yaml:"command_timeout"`
+	// MaxTokens bounds processed tokens per session (0 = unlimited).
+	MaxTokens int `yaml:"max_tokens"`
+	// Instructions lists project instruction files, tried in order at the
+	// project root; the first that exists is included in the system prompt.
+	Instructions []string `yaml:"instructions,omitempty"`
 }
 
 // TaskConfig configures how requests are read before implementation.
@@ -251,6 +275,8 @@ func Defaults() Config {
 			IdleSleep: Duration(30 * time.Minute),
 		},
 		Task: TaskConfig{Contract: true, Ambiguity: "ask"},
+		Direct: DirectConfig{Approval: "edits", MaxTurns: 80, CommandTimeout: Duration(3 * time.Minute),
+			Instructions: []string{"AGENTS.md", "BOUNDEDCODE.md", "CLAUDE.md", ".boundedcode/instructions.md"}},
 		Agent: AgentConfig{
 			Runtime: "openhands", Image: "boundedcode-openhands:local",
 			MaxIterations: 150, CondenserMaxEvents: 80, MaxOutputTokens: 8192,
@@ -351,6 +377,14 @@ func (c Config) Validate() error {
 	}
 	if c.Task.Ambiguity != "ask" && c.Task.Ambiguity != "proceed" {
 		errs = append(errs, fmt.Errorf("task.ambiguity: %q is not ask|proceed", c.Task.Ambiguity))
+	}
+	switch c.Direct.Approval {
+	case "ask", "edits", "auto":
+	default:
+		errs = append(errs, fmt.Errorf("direct.approval: %q is not ask|edits|auto", c.Direct.Approval))
+	}
+	if c.Direct.MaxTurns <= 0 {
+		errs = append(errs, errors.New("direct.max_turns: must be positive"))
 	}
 	if c.Agent.MaxOutputTokens < 512 {
 		errs = append(errs, errors.New("agent.max_output_tokens: must be >= 512"))

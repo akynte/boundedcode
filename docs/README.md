@@ -5,7 +5,7 @@
 | Page | What it covers |
 |---|---|
 | [Getting started](usage/getting-started.md) | Installers, platforms, prerequisites, the manual path, first task, multi-repository tasks |
-| [Terminal interface](usage/tui.md) | `bcode` chat, first-run setup, views and keys |
+| [Terminal interface](usage/tui.md) | `bcode` chat (direct and bounded modes), first-run setup, views and keys |
 | [Verification](usage/verification.md) | Result states, behavioural evidence, cross-repository compatibility, known limits |
 | [Configuration](usage/configuration.md) | `config.yaml`, model providers, budgets, sandbox, repository verification presets |
 | [Serena](usage/serena.md) | Optional LSP-backed symbol navigation |
@@ -15,6 +15,7 @@
 | Page | What it covers |
 |---|---|
 | [System architecture](architecture/system-architecture.md) | Processes, interfaces, control loop, context planning, package map |
+| [Everyday development: direct mode](design/everyday-agent.md) | The two-mode product shape, the competitive gap, phases 17–23 and what phase 17 built |
 | [Sandbox design](design/sandbox.md) | Threat model, controls, adversarial tests, residual risks |
 | [Cross-repository compatibility](design/cross-repo-compatibility.md) | The experimental gRPC/protobuf/OpenAPI gate |
 | [Cross-service analysis](design/cross-service-analysis.md) | Contract detection across repositories |

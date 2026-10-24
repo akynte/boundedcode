@@ -126,6 +126,24 @@ change approach. Stopping does not by itself escalate to the frontier.
 | `contract` | `true` | Before the first attempt, derive a compact task contract from the request with the task's model (the local model, or the cloud provider when one is selected): what is required, alternatives the request explicitly allows, constraints, what is out of scope, open questions, and acceptance evidence. It is shown to the agent; the request stays authoritative. HTML comments (issue-template instructions) are removed from the request first, and a contract that names nothing required is asked for once more. |
 | `ambiguity` | `ask` | What a *material* ambiguity does (plausible readings that change behaviour, an API, data, security, compatibility, tests or output; implementation choices do not count). Before either policy applies, each material ambiguity is checked against the request text with one more local-model call: it is dropped, and the reason recorded as a task decision, when the request's own words settle it (for example an expected output) or when fewer than two of its readings are supported by a quote from the request. If that check fails, the ambiguity stays material. `ask`: the task blocks before implementation with the questions (SPEC_AMBIGUOUS); answer with `task run TASK --clarify "..."`. `proceed`: the ambiguity is recorded and the agent states and demonstrates the reading it chose (used by benchmarks). Explicitly allowed alternatives never block. |
 
+### `direct`
+
+Direct mode: the native agent loop that works in your checkout (the chat's
+default; `bcode chat -p`). See [the terminal interface](tui.md#direct-mode)
+and [ADR-0011](../architecture/adr/0011-direct-mode.md).
+
+| Key | Default | Meaning |
+|---|---|---|
+| `approval` | `edits` | What needs your consent. `ask`: every file change and every shell command. `edits`: file edits inside the project and known read-only, build and test commands (`git status`, `go test`, `npm test`, `pytest`, `cargo build`, …) run without asking; edits to protected paths (CI, verification and repository configuration) and other commands ask. `auto`: nothing asks. In every mode the command policy refuses pushes, protected-branch operations, infrastructure mutation and publishing, paths are confined to the project, and secret-looking paths are not readable. |
+| `max_turns` | `80` | Model calls one message may cause (each tool round trip is one). |
+| `command_timeout` | `3m` | A shell command is killed after this (the model may ask for a shorter one). |
+| `max_tokens` | `0` | Processed tokens per session (`0` = unlimited); the session stops with an error when spent. |
+| `instructions` | `AGENTS.md`, `BOUNDEDCODE.md`, `CLAUDE.md`, `.boundedcode/instructions.md` | Project instruction files tried at the project root, in order; the first that exists is part of the system prompt (up to 24 KB). Your own `<config>/AGENTS.md` is added after it. |
+
+The model is the configured provider (`inference`); `--model` or `/model`
+override it per session. `agent.max_output_tokens` caps one response here
+too. Sessions are stored under `<data>/sessions/<project>/`.
+
 ### `repointel`
 
 | Key | Default | Notes |

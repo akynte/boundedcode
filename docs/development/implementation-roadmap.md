@@ -18,3 +18,5 @@ updated docs/ADRs, and small local commits. Progress is tracked in
 | 9 | Cross-service intelligence | analyzers only for gaps proven by Phase 3/8 failures, each with fixtures, tests and a measured improvement |
 | 10 | OSS readiness | README, docs, benchmark report, install script, release process, DCO, license scan, secret scan, SBOM. **No publishing without maintainer approval.** |
 | 11–16 | Model choice, cloud providers, TUI set-up, macOS and native Windows | see [multiplatform-plan.md](multiplatform-plan.md) |
+| 17 | Direct mode: a native agent loop for everyday development in the checkout (ADR-0011) | **done (experimental)**: `internal/direct`, `bcode chat` / `bcode -p`, the chat defaults to direct mode with `/task` for bounded mode; unit, TUI and CLI tests; see [everyday-agent.md](../design/everyday-agent.md) |
+| 18–23 | Streaming and transcript; extensibility (commands, skills, MCP, hooks); repository intelligence in direct mode; session-to-task hand-off; editor integration; an everyday-development benchmark | see [everyday-agent.md](../design/everyday-agent.md#3-phases) |

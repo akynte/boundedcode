@@ -1,10 +1,15 @@
 # Terminal interface
 
-Run `bcode` (or `boundedcode`) with no arguments in a git repository. It opens
-a full-screen interface that starts in a **chat** for that repository, like
-Claude Code, Codex or OpenCode. The rest of the CLI is in the other views. Use
-it instead of the CLI or alongside it: both read and write the same state
+Run `bcode` (or `boundedcode`) with no arguments in a project. It opens a
+full-screen interface that starts in a **chat** for that folder, like Claude
+Code, Codex or OpenCode. The rest of the CLI is in the other views. Use it
+instead of the CLI or alongside it: both read and write the same state
 database, so a task started from one shows up in the other.
+
+The chat has two modes. **Direct mode** (the default) is the everyday
+coding agent: it works in your checkout. **Bounded mode** (`/task`) runs a
+request as a task in an isolated worktree and sandbox, with verification
+and behavioural evidence.
 
 ```bash
 cd ~/src/my-service
@@ -16,11 +21,66 @@ bcode tui --task <id>                 # open a task directly
 It needs an interactive terminal of at least 60×16 cells. Scripts should keep
 using the CLI.
 
-## Chat
+## Direct mode
 
-On first use in a repository, the chat registers it as a workspace named after
-the directory, then indexes it in the background. Then you describe what you
-want:
+Direct mode (experimental, [ADR-0011](../architecture/adr/0011-direct-mode.md))
+is a native agent loop in the `bcode` binary. Ask about the code or describe
+a change; the agent reads, searches, edits and runs commands in the folder
+you started in (the git root when there is one), and answers in the
+transcript:
+
+```
+❯ why does TestRetry flake?
+  ⚙ grep TestRetry in internal/client
+  ⚙ read internal/client/retry_test.go
+  ⚙ $ go test ./internal/client -run TestRetry -count=5
+◆ The test shares a package-level timer between cases; the second case
+  sees the first case's fired timer. Resetting it in each case fixes it.
+  · 14s · 9.2k tokens
+❯ fix it and run the test again
+```
+
+What happens to your files:
+- `read`, `grep`, `glob` and `ls` are confined to the project; paths that
+  look like secret stores (`.env*`, keys, cloud credentials, …) and `.git`
+  are not readable.
+- `edit` and `write` are applied to your checkout. In the default approval
+  mode (`edits`) they are not asked about, except for protected paths (CI,
+  verification and repository configuration). `/approval ask` asks for every
+  change with a preview; `/approval auto` asks for nothing.
+- `bash` runs commands in the project as you, with the network. Known
+  read-only, build and test commands (`git status`, `go test`, `npm test`,
+  `pytest`, `cargo build`, …) run without asking in `edits` mode; other
+  commands ask first, with the command shown. In every mode the policy
+  refuses `git push`, operations on protected branches, infrastructure
+  mutation (`terraform apply`, `kubectl apply`, …) and publishing.
+- Nothing is committed unless you ask for it.
+
+Each conversation is a **session**, stored per project. `/sessions` lists
+them, `/resume [ID]` continues one, `/new` starts another. When the
+conversation nears the model's context limit it is summarised automatically
+(`/compact` does it on request). `esc` interrupts a run; what was done so
+far is kept, and messages typed during a run are queued.
+
+The agent reads the project's instruction file (`AGENTS.md`,
+`BOUNDEDCODE.md`, `CLAUDE.md` or `.boundedcode/instructions.md`) and your
+own `<config>/AGENTS.md`.
+
+Direct mode needs only the configuration and the model: no Docker, no
+repository tools, and the folder need not be a git repository. When a
+change is sensitive (authentication, payments, migrations, shared
+contracts) or large, the agent suggests bounded mode.
+
+From a script, `bcode chat -p "…"` (or `bcode -p "…"`) sends one message
+and prints the answer; piped input is appended as context; `--continue`
+and `--resume ID` continue a session; `--events` prints JSON events.
+
+## Bounded mode
+
+`/task REQUEST` runs a request in bounded mode, and `/mode bounded` makes
+every message a task. On first use in a repository, the chat registers it
+as a workspace named after the directory, then indexes it in the
+background. Then you describe what you want:
 
 ```
 ❯ return 404 instead of 500 when the user does not exist, with a test
@@ -34,7 +94,8 @@ want:
   /diff review  ·  /apply bring into your checkout  ·  type to follow up
 ```
 
-What a message does depends on the conversation's current task:
+In bounded mode, what a message does depends on the conversation's current
+task:
 
 | Current task | Your message |
 |---|---|
@@ -54,14 +115,19 @@ Commands (type `/` for suggestions; `tab` completes):
 
 | Command | |
 |---|---|
+| `/task REQUEST` | run the request in bounded mode |
+| `/mode [direct\|bounded]` | what a plain message does |
+| `/approval [ask\|edits\|auto]` | what needs your consent in direct mode |
+| `/compact` | summarise the conversation to free context |
+| `/sessions`, `/resume [ID]` | list and continue direct-mode sessions |
 | `/diff` | the current task's changes, coloured |
 | `/apply [--commit]` | bring them into your checkout (asks first) |
 | `/verify [--full]` | re-run verification |
 | `/review` | frontier review of the current task (when frontier is enabled) |
 | `/cancel` | cancel the current task |
-| `/new` | the next message starts a new task from `HEAD` |
+| `/new` | a new session; the next task starts from `HEAD` |
 | `/open` | open the task's full view (activity, diff, verification, escalations) |
-| `/status` | status, attempts, tokens and time of the current task |
+| `/status` | the session's tokens, or the current task's status, attempts, tokens and time |
 | `/model NAME` | use another model profile for the next runs |
 | `/index` | re-index the repository |
 | `/setup` | install and configure what is missing |

@@ -12,6 +12,7 @@
 | [0008](0008-serena-symbol-navigation.md) | Serena v1.7.0 for LSP-backed symbol navigation (amends 0001 §7) | accepted |
 | [0009](0009-frontier-escalation.md) | Frontier escalation through the Codex CLI subscription | accepted |
 | [0010](0010-cloud-model-providers.md) | Cloud model providers as an alternative to the local model (amends 0001) | accepted |
+| [0011](0011-direct-mode.md) | Direct mode: a native agent loop for everyday development (amends 0001) | accepted |
 
 Template: context → decision → consequences → evidence. An ADR is superseded
 by a new ADR, never edited after acceptance except for typo fixes and status

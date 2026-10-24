@@ -71,15 +71,28 @@ translated in both directions (`sandbox.ContainerPath`), task worktrees use
 relative `.git` pointers, and process trees end with `taskkill /T`. Pinned
 tools come from per-platform release assets (`internal/install`).
 
+### Direct mode **[exp]**
+
+`internal/direct` is a native agent loop for everyday development
+(ADR-0011): `read`, `write`, `edit`, `bash`, `grep`, `glob` and `ls` in the
+user's checkout, through `inference.Gateway` (so every provider, metering
+and budgets are shared with bounded mode), with `policy.CheckCommand` and
+the secret-path mask applied before approval, approval modes (`ask`,
+`edits`, `auto`), JSONL sessions and model-made compaction. It is reached
+from the chat (its default mode) and from `bcode chat -p` / `bcode -p`.
+It has no container; bounded mode (tasks) keeps the sandbox, the checks and
+the evidence gate.
+
 ### Interactive interface **[exp]**
 
 `bcode` with no arguments opens `internal/tui`, a client of the control plane
 with no logic of its own:
 
-* the **chat** maps each message to a task operation for the repository in the
-  current directory: `task create` (from `HEAD`, or with `--from` to start from
-  the previous task's branch), `task run --clarify` for a task waiting on an
-  answer, and `task apply` to bring a result into the checkout;
+* the **chat** sends each message to direct mode (`Backend.Chat`), or, with
+  `/task` or `/mode bounded`, maps it to a task operation for the repository
+  in the current directory: `task create` (from `HEAD`, or with `--from` to
+  start from the previous task's branch), `task run --clarify` for a task
+  waiting on an answer, and `task apply` to bring a result into the checkout;
 * the **views** read the ledger, audit log and status, and run the remaining
   commands;
 * **`setup`** checks and installs prerequisites with pinned installers and a
@@ -117,6 +130,7 @@ Interfaces exist only where replacement is plausible:
 | `inference.Upstream` **[exp]** | `internal/inference` | `OpenAIUpstream` (llama-server and OpenAI-compatible APIs), `AnthropicUpstream` (official Go SDK), `GeminiUpstream` (REST) |
 | `inference.ReplayStore` **[exp]** | `internal/inference` | file-backed store of provider reasoning blocks for verbatim replay |
 | `agent.Runtime` | `internal/agent` | `openhands` (adapter) and `scripted` (deterministic, for tests) |
+| — (concrete) **[exp]** | `internal/direct` | the direct-mode loop and its tools (ADR-0011); sessions as JSONL files |
 | `repointel.Intelligence` | `internal/repointel` | `cbm` (codebase-memory-mcp) |
 | — (concrete) | `internal/stats` | success metrics from the ledger (`boundedcode stats`) |
 | `repointel.Navigator` | `internal/repointel` | `serena` (Serena v1.7.0 over language servers; keyed by checkout root) |

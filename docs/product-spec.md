@@ -5,11 +5,14 @@ module and data directories use `boundedcode`.
 
 ## 1. Mission
 
-BoundedCode is a control plane for AI-assisted software engineering on
-large, long-running, multi-repository projects. It runs a local model on
-commodity hardware by default, or a cloud model API the user chooses
-(ADR-0010, 2026-10-07), and keeps dependence on paid frontier subscriptions
-low.
+BoundedCode is a coding agent for everyday software development with a
+control plane for the changes that must be trusted (ADR-0011, 2026-10-24).
+In **direct mode** it works in the user's checkout like other coding
+agents. In **bounded mode** it runs a task on large, long-running,
+multi-repository projects with isolation, resource management and
+test-backed evidence. It runs a local model on commodity hardware by
+default, or a cloud model API the user chooses (ADR-0010, 2026-10-07), and
+keeps dependence on paid frontier subscriptions low.
 
 > With a local model, local models handle the overwhelming majority of token
 > volume. Frontier models are used only where their marginal intelligence is
@@ -44,6 +47,7 @@ Hard rules:
 
 ### In scope (the product owns)
 
+* the direct-mode agent loop, its tools, approval modes and sessions
 * task lifecycle and canonical task ledger
 * workspace (multi-repo) lifecycle
 * model, routing, escalation, verification, safety and resource policy

@@ -1,5 +1,44 @@
 # Changelog
 
+## Unreleased: direct mode, an everyday coding agent in your checkout
+
+Experimental (ADR-0011, [design](docs/design/everyday-agent.md)). Not yet
+used on real work or measured.
+
+### Direct mode
+
+- `bcode` chat now defaults to **direct mode**: a native agent loop that
+  works in the checkout with `read`, `write`, `edit`, `bash`, `grep`,
+  `glob` and `ls`, through the configured model provider (local or cloud),
+  like other coding agents. `/task REQUEST` runs a request in **bounded
+  mode** (the previous behaviour: worktree, sandbox, verification,
+  evidence); `/mode bounded` makes every message a task.
+- Approval modes `ask`, `edits` (default) and `auto` (`direct.approval`,
+  `/approval`). File edits inside the project and known read-only, build
+  and test commands run without asking in `edits`; protected paths and
+  other commands ask. The command policy (no pushes, no infrastructure
+  mutation, …), path confinement to the project and the secret-path mask
+  apply in every mode.
+- Sessions are stored per project and continue with `/resume`,
+  `bcode chat --continue` or `--resume ID`; `/sessions` lists them. The
+  history is summarised automatically near the model's context limit, or
+  with `/compact`.
+- Project instruction files (`AGENTS.md`, `BOUNDEDCODE.md`, `CLAUDE.md`,
+  `.boundedcode/instructions.md`) and the user's `<config>/AGENTS.md` are
+  part of the system prompt.
+- Headless use: `bcode chat -p "…"` and `bcode -p "…"`; piped input is
+  appended as context; `--events` prints JSON events; `chat sessions`.
+- Direct mode works without Docker, without the repository tools, and in
+  folders that are not git repositories.
+- Metering: model calls are recorded with `source=direct`; tool starts,
+  denials and compactions are audit events without file contents.
+- Each turn ends with the files whose git status changed (or "no files
+  changed"), so a claimed fix that never touched a file is visible.
+- `edit` matches lines ignoring indentation differences (tabs vs spaces)
+  and re-indents the replacement like the file; a model that only
+  announces a plan is asked once to act; an identical failing tool call is
+  flagged after three repeats.
+
 ## v0.1.0-alpha.6 (2026-10-13): a recorded crash test and a reproducible licenses archive
 
 Release notes: [docs/releases/v0.1.0-alpha.6.md](docs/releases/v0.1.0-alpha.6.md).

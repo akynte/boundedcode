@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"slices"
@@ -11,12 +12,20 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/akynte/boundedcode/internal/direct"
 	"github.com/akynte/boundedcode/internal/task"
 	"github.com/akynte/boundedcode/internal/telemetry"
 )
 
-// The chat is the default view: each message becomes a task in the
-// repository the interface was started in, or steers the current one.
+// The chat is the default view. It has two modes:
+//
+// Direct mode (default) is the everyday coding agent: each message goes to
+// the native agent loop, which works in this checkout with file, search and
+// shell tools and answers in the transcript (ADR-0011).
+//
+// Bounded mode (/task, or /mode bounded) turns a message into a task in an
+// isolated worktree and sandbox, with verification and behavioural
+// evidence:
 //
 //   - no current task, or the last one failed or was cancelled: a new task
 //     from the checkout's HEAD;
@@ -34,7 +43,8 @@ const (
 	entryNote
 	entryError
 	entryTask
-	entryBlock // pre-rendered lines (diff, help)
+	entryBlock  // pre-rendered lines (diff, help)
+	entryDirect // one direct-mode turn
 )
 
 type chatEntry struct {
@@ -42,6 +52,51 @@ type chatEntry struct {
 	text   string
 	taskID string
 	lines  []string
+	run    *directRun
+}
+
+// Modes of the chat.
+const (
+	modeDirect  = "direct"
+	modeBounded = "bounded"
+)
+
+// directRun is one direct-mode turn: its activity, answer and outcome.
+type directRun struct {
+	id       int
+	activity []directActivity
+	text     string
+	notes    []string
+	done     bool
+	err      error
+	cancel   context.CancelFunc
+	start    time.Time
+	end      time.Time
+	usage    *direct.Usage
+	changed  []string
+	inGit    bool
+	// render cache
+	cacheW, cacheN int
+	cacheText      string
+	cache          []string
+}
+
+type directActivity struct {
+	summary string
+	err     string
+	denied  bool
+	running bool
+}
+
+type directEventMsg struct {
+	id int
+	e  direct.Event
+}
+
+type directDoneMsg struct {
+	id  int
+	res ChatResult
+	err error
 }
 
 // chatTask is what the transcript knows about one task.
@@ -63,14 +118,20 @@ type slashCmd struct {
 
 var slashCmds = []slashCmd{
 	{"/help", "", "show what you can do here"},
+	{"/task", "REQUEST", "run a request in bounded mode: isolated worktree, sandbox, verification"},
+	{"/mode", "[direct|bounded]", "what a plain message does (direct: in your checkout; bounded: a task)"},
 	{"/diff", "", "show the current task's changes"},
 	{"/apply", "[--commit]", "bring the current task's changes into your checkout (staged, or committed)"},
 	{"/verify", "[--full]", "run verification on the current task"},
 	{"/review", "", "ask the frontier model to review the current task (if enabled)"},
 	{"/cancel", "", "cancel the current task"},
-	{"/new", "", "start over: the next message is a new task from your HEAD"},
+	{"/new", "", "start over: a new session, and the next task starts from your HEAD"},
 	{"/open", "", "open the current task's full view (activity, diff, verification)"},
-	{"/status", "", "show the current task's status and budget"},
+	{"/status", "", "show the session's tokens, or the current task's status and budget"},
+	{"/compact", "", "summarise the conversation so far to free context"},
+	{"/sessions", "", "list earlier sessions in this project"},
+	{"/resume", "[ID]", "continue an earlier session (the most recent without ID)"},
+	{"/approval", "[ask|edits|auto]", "what needs your consent in direct mode"},
 	{"/model", "NAME", "use another model profile for the next runs"},
 	{"/index", "", "re-index this repository"},
 	{"/setup", "", "choose the model or provider and install what is missing"},
@@ -89,6 +150,14 @@ type chatView struct {
 	model   string // model profile override for runs
 	history []string
 	hpos    int
+
+	// Direct mode.
+	mode     string
+	session  string // direct session id ("" = start one; "last" = the most recent)
+	approval string // "" = configured
+	direct   *directRun
+	nextRun  int
+	resumed  bool // session names a stored session to continue
 
 	project     *Project
 	projErr     error
@@ -130,9 +199,14 @@ type chatCreatedMsg struct {
 	from string
 }
 
+type sessionsMsg struct {
+	list []direct.SessionInfo
+	err  error
+}
+
 func newChatView() *chatView {
 	ta := textarea.New()
-	ta.Placeholder = "Describe a change, ask for a fix, or type / for commands"
+	ta.Placeholder = "Ask about the code, describe a change, or type / for commands"
 	ta.ShowLineNumbers = false
 	ta.Prompt = ""
 	ta.CharLimit = 0
@@ -144,6 +218,7 @@ func newChatView() *chatView {
 	ta.BlurredStyle.Text = sMuted
 	ta.KeyMap.InsertNewline.SetEnabled(false) // enter sends; alt+enter / ctrl+j add a line
 	v := &chatView{input: ta, tasks: map[string]*chatTask{}, scroll: scroller{follow: true}}
+	v.mode = modeDirect
 	return v
 }
 
@@ -246,7 +321,11 @@ func (v *chatView) currentTask() *task.Task {
 	return nil
 }
 
-func (v *chatView) running(m *Model) bool { return v.current != "" && m.taskRunning(v.current) }
+func (v *chatView) running(m *Model) bool {
+	return v.directRunning() || (v.current != "" && m.taskRunning(v.current))
+}
+
+func (v *chatView) directRunning() bool { return v.direct != nil && !v.direct.done }
 
 func (v *chatView) update(m *Model, msg tea.Msg) tea.Cmd {
 	switch msg := msg.(type) {
@@ -331,6 +410,54 @@ func (v *chatView) update(m *Model, msg tea.Msg) tea.Cmd {
 		return tea.Batch(cmds...)
 	case queuedMsg:
 		return v.send(m, string(msg))
+	case sessionsMsg:
+		if msg.err != nil {
+			v.fail("Sessions: " + msg.err.Error())
+			return nil
+		}
+		if len(msg.list) == 0 {
+			v.note("No earlier sessions in this project.")
+			return nil
+		}
+		ls := []string{sSection.Render("Sessions (newest first) · /resume ID continues one")}
+		for i, s := range msg.list {
+			if i >= 20 {
+				ls = append(ls, sMuted.Render(fmt.Sprintf("… %d more", len(msg.list)-i)))
+				break
+			}
+			ls = append(ls, sKey.Render(fit(s.ID, 22))+sMuted.Render(fit(s.Updated.Local().Format("Jan 2 15:04"), 14))+sText.Render(trunc(s.Title, 60)))
+		}
+		v.entries = append(v.entries, chatEntry{kind: entryBlock, lines: ls})
+		return nil
+	case directEventMsg:
+		r := v.direct
+		if r == nil || r.id != msg.id {
+			return nil
+		}
+		r.apply(msg.e)
+		return nil
+	case directDoneMsg:
+		r := v.direct
+		if r == nil || r.id != msg.id {
+			return nil
+		}
+		r.done, r.end, r.err = true, time.Now(), msg.err
+		if msg.res.SessionID != "" {
+			v.session = msg.res.SessionID
+			v.resumed = false
+		}
+		u := msg.res.Usage
+		r.usage = &u
+		var cmds []tea.Cmd
+		if msg.err == nil {
+			cmds = append(cmds, m.loadInfo())
+		}
+		if len(v.queue) > 0 {
+			next := v.queue[0]
+			v.queue = v.queue[1:]
+			cmds = append(cmds, func() tea.Msg { return queuedMsg(next) })
+		}
+		return tea.Batch(cmds...)
 	case tea.KeyMsg:
 		return v.key(m, msg)
 	case tea.MouseMsg:
@@ -477,6 +604,11 @@ func (v *chatView) resize() {
 }
 
 func (v *chatView) interrupt(m *Model) tea.Cmd {
+	if v.directRunning() {
+		v.direct.cancel()
+		v.note("Interrupting… what was done so far is kept; send a message to continue.")
+		return nil
+	}
 	if j := m.taskJob(v.current); j != nil && j.running() {
 		j.cancel()
 		v.note("Interrupting… the work so far is kept; send a message to continue, or /new to start over.")
@@ -500,6 +632,83 @@ func (v *chatView) send(m *Model, text string) tea.Cmd {
 		return v.slash(m, text)
 	}
 	v.entries = append(v.entries, chatEntry{kind: entryUser, text: text})
+	if v.mode == modeDirect {
+		return v.sendDirect(m, text)
+	}
+	return v.sendBounded(m, text)
+}
+
+// sendDirect sends a message to the native agent loop in this checkout.
+func (v *chatView) sendDirect(m *Model, text string) tea.Cmd {
+	if ok, why := v.readyDirect(); !ok {
+		v.fail("Can't send: " + why)
+		return nil
+	}
+	if v.running(m) {
+		v.queue = append(v.queue, text)
+		v.note("Queued: it will be sent when the current run ends (esc interrupts the run).")
+		return nil
+	}
+	v.nextRun++
+	ctx, cancel := context.WithCancel(m.ctx)
+	r := &directRun{id: v.nextRun, cancel: cancel, start: time.Now()}
+	v.direct = r
+	v.entries = append(v.entries, chatEntry{kind: entryDirect, run: r})
+	v.scroll.follow = true
+	req := ChatRequest{Dir: v.projectDir(m), SessionID: v.session, Message: text, Model: v.model, Approval: v.approval}
+	be, send := m.be, m.send
+	return tea.Batch(func() tea.Msg {
+		defer cancel()
+		res, err := be.Chat(ctx, req, func(e direct.Event) { send(directEventMsg{r.id, e}) })
+		return directDoneMsg{r.id, res, err}
+	}, m.spinTick())
+}
+
+// compact summarises the direct session on request.
+func (v *chatView) compact(m *Model) tea.Cmd {
+	if v.session == "" || v.resumed {
+		v.note("Nothing to summarise yet in this session.")
+		return nil
+	}
+	if v.running(m) {
+		v.fail("Wait for the current run to end.")
+		return nil
+	}
+	v.nextRun++
+	ctx, cancel := context.WithCancel(m.ctx)
+	r := &directRun{id: v.nextRun, cancel: cancel, start: time.Now()}
+	v.direct = r
+	v.entries = append(v.entries, chatEntry{kind: entryDirect, run: r})
+	req := ChatRequest{Dir: v.projectDir(m), SessionID: v.session, Compact: true}
+	be, send := m.be, m.send
+	return func() tea.Msg {
+		defer cancel()
+		res, err := be.Chat(ctx, req, func(e direct.Event) { send(directEventMsg{r.id, e}) })
+		return directDoneMsg{r.id, res, err}
+	}
+}
+
+// projectDir is where direct mode works: the directory the interface was
+// started in (the backend confines tools to its git root).
+func (v *chatView) projectDir(m *Model) string { return m.opt.Dir }
+
+// readyDirect reports whether direct mode can run: the configuration and
+// the model (local server and weights, or a cloud provider). The sandbox
+// and repository tools are only needed for bounded mode.
+func (v *chatView) readyDirect() (bool, string) {
+	if v.project == nil {
+		return false, "still looking at this folder…"
+	}
+	for _, s := range v.setup {
+		if !s.OK && (s.Name == "config" || s.Name == "inference" || s.Name == "model") {
+			return false, "setup is not complete (" + s.Title + ": " + s.Detail + "); type /setup"
+		}
+	}
+	return true, ""
+}
+
+// sendBounded turns a message into a task, or steers the current one.
+func (v *chatView) sendBounded(m *Model, text string) tea.Cmd {
 	if ok, why := v.ready(); !ok {
 		v.fail("Can't start a task: " + why)
 		return nil
@@ -546,11 +755,14 @@ func (v *chatView) slash(m *Model, text string) tea.Cmd {
 	case "/help":
 		var ls []string
 		ls = append(ls, sSection.Render("Talk to BoundedCode"),
-			sText.Render("Describe what you want changed. Each request runs as a task in an isolated worktree"),
-			sText.Render("on branch agent/<task>, inside a sandbox; your checkout is untouched until you /apply."),
-			sText.Render("While a task runs you can keep typing (messages are queued); esc interrupts."),
-			sText.Render("If a task stops to ask a question, just answer. After it finishes, a new message"),
-			sText.Render("continues from its result."), "", sSection.Render("Commands"))
+			sText.Render("Direct mode (default): the agent works in this checkout with file, search and shell"),
+			sText.Render("tools, like other coding agents. Edits inside the project are applied; shell commands"),
+			sText.Render("other than builds, tests and read-only ones ask first (/approval changes that)."),
+			sText.Render("Bounded mode (/task REQUEST, or /mode bounded): the request runs as a task in an"),
+			sText.Render("isolated worktree on branch agent/<task>, inside a sandbox, and must be backed by a"),
+			sText.Render("test that fails without the change; your checkout is untouched until you /apply."),
+			sText.Render("While a run is going you can keep typing (messages are queued); esc interrupts."),
+			"", sSection.Render("Commands"))
 		for _, c := range slashCmds {
 			ls = append(ls, sKey.Render(fit(c.name+" "+c.args, 22))+sMuted.Render(c.help))
 		}
@@ -560,8 +772,75 @@ func (v *chatView) slash(m *Model, text string) tea.Cmd {
 	case "/clear":
 		v.entries = nil
 	case "/new":
-		v.current = ""
-		v.note("Starting fresh: the next message creates a new task from your current HEAD.")
+		v.current, v.session, v.resumed = "", "", false
+		v.note("Starting fresh: a new session; the next task starts from your current HEAD.")
+	case "/task":
+		if len(rest) == 0 {
+			v.note("Usage: /task REQUEST — runs the request in bounded mode. /mode bounded makes every message a task.")
+			return nil
+		}
+		return v.sendBounded(m, strings.TrimSpace(strings.TrimPrefix(text, name)))
+	case "/direct":
+		if len(rest) == 0 {
+			v.note("Usage: /direct MESSAGE — sends the message in direct mode.")
+			return nil
+		}
+		return v.sendDirect(m, strings.TrimSpace(strings.TrimPrefix(text, name)))
+	case "/mode":
+		if len(rest) == 0 {
+			v.note("Mode: " + v.mode + ". /mode direct works in your checkout; /mode bounded runs each message as a verified task.")
+			return nil
+		}
+		switch rest[0] {
+		case modeDirect, modeBounded:
+			v.mode = rest[0]
+			if v.mode == modeDirect {
+				v.note("Direct mode: messages go to the agent working in " + v.projectDir(m) + ".")
+			} else {
+				v.note("Bounded mode: each message becomes a task in an isolated worktree and sandbox, with verification.")
+			}
+		default:
+			v.fail("Mode must be direct or bounded.")
+		}
+	case "/approval":
+		if len(rest) == 0 {
+			cur := v.approval
+			if cur == "" {
+				cur = "configured default"
+			}
+			v.note("Approval: " + cur + ". ask: every change and command; edits: file edits and known build/test commands run freely; auto: nothing asks (policy still refuses pushes and infrastructure changes).")
+			return nil
+		}
+		switch rest[0] {
+		case direct.ApprovalAsk, direct.ApprovalEdits, direct.ApprovalAuto:
+			v.approval = rest[0]
+			v.note("Approval mode for the next messages: " + v.approval + ".")
+		default:
+			v.fail("Approval must be ask, edits or auto.")
+		}
+	case "/compact":
+		return v.compact(m)
+	case "/sessions":
+		be, ctx, dir := m.be, m.ctx, v.projectDir(m)
+		return func() tea.Msg {
+			list, err := be.Sessions(ctx, dir)
+			return sessionsMsg{list, err}
+		}
+	case "/resume":
+		if v.running(m) {
+			v.fail("Wait for the current run to end.")
+			return nil
+		}
+		id := "last"
+		if len(rest) > 0 {
+			id = rest[0]
+		}
+		v.session, v.resumed = id, true
+		if id == "last" {
+			v.note("The next message continues the most recent session of this project.")
+		} else {
+			v.note("The next message continues session " + id + ".")
+		}
 	case "/quit", "/exit":
 		return m.quit()
 	case "/open":
@@ -569,6 +848,15 @@ func (v *chatView) slash(m *Model, text string) tea.Cmd {
 			return m.openTask(t.ID)
 		}
 	case "/status":
+		if v.mode == modeDirect && t == nil {
+			if v.direct == nil || v.direct.usage == nil {
+				v.note("No session yet. Mode: " + v.mode + ".")
+				return nil
+			}
+			u := v.direct.usage
+			v.note(fmt.Sprintf("Session %s · %s tokens processed · %s generated · %s cached · mode %s", v.session, human(u.Processed), human(u.Generated), human(u.Cached), v.mode))
+			return nil
+		}
 		if needTask() {
 			b := t.Budget
 			v.note(fmt.Sprintf("%s · %s · %s · verification %s · attempts %d/%d · %s tokens · %s",
@@ -776,6 +1064,19 @@ func (v *chatView) view(m *Model, w, h int) string {
 func (v *chatView) statusLine(m *Model, w int) string {
 	left := ""
 	switch {
+	case v.directRunning():
+		r := v.direct
+		info := ""
+		for i := len(r.activity) - 1; i >= 0; i-- {
+			if r.activity[i].running {
+				info = " · " + trunc(r.activity[i].summary, 40)
+				break
+			}
+		}
+		left = m.spin.View() + sAccent.Render(" Working") + sMuted.Render(fmt.Sprintf(" %s%s", time.Since(r.start).Round(time.Second), info)) + sFaint.Render("  esc to interrupt")
+		if n := len(v.queue); n > 0 {
+			left += sFaint.Render(fmt.Sprintf(" · %d queued", n))
+		}
 	case v.running(m):
 		j := m.taskJob(v.current)
 		info := ""
@@ -795,6 +1096,9 @@ func (v *chatView) statusLine(m *Model, w int) string {
 		if v.current != "" {
 			right += sFaint.Render(" · task " + v.current)
 		}
+	}
+	if v.mode == modeBounded {
+		right = sWarn.Render("bounded ") + right
 	}
 	gap := w - lipgloss.Width(left) - lipgloss.Width(right) - 2
 	if gap < 1 {
@@ -835,9 +1139,113 @@ func (v *chatView) transcript(m *Model, w int) []string {
 			}
 		case entryTask:
 			out = append(out, v.taskLines(m, e.taskID, w)...)
+		case entryDirect:
+			out = append(out, e.run.lines(m, w)...)
 		}
 	}
 	return out
+}
+
+// apply folds an event into the run.
+func (r *directRun) apply(e direct.Event) {
+	switch e.Kind {
+	case direct.EventToolStart:
+		r.activity = append(r.activity, directActivity{summary: e.Summary, running: true})
+	case direct.EventToolEnd:
+		for i := len(r.activity) - 1; i >= 0; i-- {
+			if r.activity[i].running {
+				r.activity[i].running = false
+				r.activity[i].err = e.Err
+				break
+			}
+		}
+	case direct.EventDenied:
+		r.activity = append(r.activity, directActivity{summary: e.Summary, err: e.Err, denied: true})
+	case direct.EventText:
+		if r.text != "" {
+			r.text += "\n\n"
+		}
+		r.text += e.Text
+	case direct.EventCompact, direct.EventNote:
+		r.notes = append(r.notes, e.Text)
+	case direct.EventDone:
+		if e.Usage != nil {
+			u := *e.Usage
+			r.usage = &u
+		}
+		r.changed, r.inGit = e.Changed, e.Changed != nil
+	}
+	r.cacheN = -1 // invalidate
+}
+
+// lines renders the run: activity, answer, outcome.
+func (r *directRun) lines(m *Model, w int) []string {
+	n := len(r.activity)*2 + len(r.notes)
+	if r.done {
+		n++
+	}
+	if r.cacheW == w && r.cacheN == n && r.cacheText == r.text && !r.hasRunning() {
+		return r.cache
+	}
+	var out []string
+	for _, a := range r.activity {
+		switch {
+		case a.denied:
+			out = append(out, "  "+sErr.Render("✘ ")+sMuted.Render(trunc(a.summary, w-20))+sErr.Render(" · "+a.err))
+		case a.running:
+			out = append(out, "  "+m.spin.View()+" "+sMuted.Render(trunc(a.summary, w-6)))
+		case a.err != "":
+			out = append(out, "  "+sWarn.Render("⚙ ")+sMuted.Render(trunc(a.summary, w-20))+sWarn.Render(" · "+trunc(a.err, 60)))
+		default:
+			out = append(out, "  "+sFaint.Render("⚙ ")+sMuted.Render(trunc(a.summary, w-6)))
+		}
+	}
+	for _, n := range r.notes {
+		out = append(out, "  "+sFaint.Render("· "+trunc(n, w-6)))
+	}
+	if r.text != "" {
+		if len(out) > 0 {
+			out = append(out, "")
+		}
+		for i, l := range strings.Split(wrap(r.text, w-4), "\n") {
+			mark := "  "
+			if i == 0 {
+				mark = sAccent.Render("◆ ")
+			}
+			out = append(out, mark+sText.Render(l))
+		}
+	}
+	switch {
+	case !r.done:
+		if len(r.activity) == 0 && r.text == "" {
+			out = append(out, "  "+m.spin.View()+sMuted.Render(" thinking…"))
+		}
+	case r.err != nil:
+		out = append(out, "  "+sErr.Render("✘ "+trunc(r.err.Error(), w*2)))
+	default:
+		foot := fmt.Sprintf("· %s", r.end.Sub(r.start).Round(time.Second))
+		if r.usage != nil {
+			foot += fmt.Sprintf(" · %s tokens", human(r.usage.Processed))
+		}
+		switch {
+		case len(r.changed) > 0:
+			foot += fmt.Sprintf(" · %d file(s) changed: %s", len(r.changed), trunc(strings.Join(r.changed, ", "), max(20, w-40)))
+		case r.inGit:
+			foot += " · no files changed"
+		}
+		out = append(out, "  "+sFaint.Render(foot))
+	}
+	r.cacheW, r.cacheN, r.cacheText, r.cache = w, n, r.text, out
+	return out
+}
+
+func (r *directRun) hasRunning() bool {
+	for _, a := range r.activity {
+		if a.running {
+			return true
+		}
+	}
+	return false
 }
 
 func (v *chatView) welcome(m *Model, w int) []string {
@@ -875,10 +1283,10 @@ func (v *chatView) welcome(m *Model, w int) []string {
 			out = append(out, sMuted.Render("  Type ")+sKey.Render("/setup")+sMuted.Render(" to choose a local model or a cloud provider and install what is missing; you are asked first."))
 		} else if len(v.entries) == 0 {
 			out = append(out, "")
-			for _, l := range strings.Split(wrap("Describe a change to make, e.g. \"add input validation to the signup handler, with tests\"", w-4), "\n") {
+			for _, l := range strings.Split(wrap("Ask about the code or describe a change, e.g. \"add input validation to the signup handler, with tests\". The agent works in this checkout.", w-4), "\n") {
 				out = append(out, sMuted.Render("  "+l))
 			}
-			out = append(out, sMuted.Render("  Type ")+sKey.Render("/help")+sMuted.Render(" for commands."))
+			out = append(out, sMuted.Render("  For a sensitive change, ")+sKey.Render("/task REQUEST")+sMuted.Render(" runs it in an isolated worktree and sandbox, backed by a test. ")+sKey.Render("/help")+sMuted.Render(" lists commands."))
 		}
 	}
 	return out

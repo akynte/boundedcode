@@ -58,7 +58,23 @@ The chat (`bcode` in a repository) offers the same set-up through `/setup`;
 see [the terminal interface](tui.md). The rest of this page is the manual
 path, and the reference for what setup does.
 
-**3. Run a first task.** See [Your first task](#your-first-task).
+**3. Talk to the agent.** Run `bcode` in a project and ask about the code
+or describe a change. This is direct mode: the agent works in your checkout
+with file, search and shell tools, and needs only the configuration and
+the model (no Docker, no repository tools, no git). From a script:
+
+```bash
+bcode -p "explain how retries are configured"
+git diff | bcode chat -p "review this diff"
+bcode chat --continue -p "now add a test for it"
+```
+
+Edits are applied to your files; shell commands other than builds, tests
+and read-only ones ask first (`--approval ask|edits|auto`). See
+[direct mode](tui.md#direct-mode).
+
+**4. Run a first bounded task.** See [Your first task](#your-first-task).
+Type `/task` followed by the request in the chat, or use `bcode task create`.
 
 ## Platforms
 

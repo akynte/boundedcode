@@ -19,6 +19,7 @@ import (
 	"github.com/akynte/boundedcode/internal/buildinfo"
 	"github.com/akynte/boundedcode/internal/compat"
 	"github.com/akynte/boundedcode/internal/config"
+	"github.com/akynte/boundedcode/internal/direct"
 	"github.com/akynte/boundedcode/internal/frontier"
 	"github.com/akynte/boundedcode/internal/gitops"
 	"github.com/akynte/boundedcode/internal/inference"
@@ -83,6 +84,9 @@ type tuiBackend struct {
 
 	mu       sync.Mutex
 	prompter tui.Prompter
+	// runners keeps one direct-mode runner per open session, so the model
+	// endpoint and the token accounting persist across messages.
+	runners map[string]*direct.Runner
 }
 
 func newTUIBackend(ctx context.Context, app *App) (*tuiBackend, func(), error) {
@@ -122,6 +126,62 @@ func (b *tuiBackend) fork(out io.Writer) (*App, error) {
 		}
 	}
 	return a, a.load()
+}
+
+// Chat implements tui.Backend.
+func (b *tuiBackend) Chat(ctx context.Context, req tui.ChatRequest, sink func(direct.Event)) (tui.ChatResult, error) {
+	a, err := b.fork(io.Discard)
+	if err != nil {
+		return tui.ChatResult{}, err
+	}
+	b.mu.Lock()
+	r := b.runners[req.SessionID]
+	b.mu.Unlock()
+	if r == nil {
+		if r, err = a.directRunner(ctx, req.Dir, req.SessionID, req.Model, req.Approval); err != nil {
+			return tui.ChatResult{}, err
+		}
+		b.mu.Lock()
+		if b.runners == nil {
+			b.runners = map[string]*direct.Runner{}
+		}
+		b.runners[r.Session.ID] = r
+		b.mu.Unlock()
+	}
+	b.mu.Lock()
+	p := b.prompter
+	b.mu.Unlock()
+	r.Approve = func(ctx context.Context, ar direct.ApprovalRequest) bool {
+		if p == nil {
+			return false
+		}
+		return p(ctx, "Allow: "+ar.Summary, ar.Detail)
+	}
+	audit := r.Sink
+	r.Sink = func(e direct.Event) {
+		audit(e)
+		if sink != nil {
+			sink(e)
+		}
+	}
+	res := tui.ChatResult{SessionID: r.Session.ID, Model: r.Session.Model, Provider: r.Session.Provider}
+	if req.Compact {
+		err = r.Compact(ctx)
+	} else {
+		b.log.Info("tui chat", "session", r.Session.ID)
+		res.Text, err = r.Send(ctx, req.Message)
+	}
+	res.Usage = r.Usage()
+	return res, err
+}
+
+// Sessions implements tui.Backend.
+func (b *tuiBackend) Sessions(_ context.Context, dir string) ([]direct.SessionInfo, error) {
+	root, err := projectRoot(dir)
+	if err != nil {
+		return nil, err
+	}
+	return direct.ListSessions(b.base.sessionsDir(), root)
 }
 
 func (b *tuiBackend) SetPrompter(p tui.Prompter) {

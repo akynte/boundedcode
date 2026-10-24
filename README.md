@@ -50,8 +50,18 @@ that the change did anything.
 
 ## What BoundedCode does
 
-BoundedCode does not implement a new agent loop. It wraps an existing one
-(the [OpenHands Software Agent SDK](https://github.com/OpenHands/software-agent-sdk))
+BoundedCode has two modes.
+
+**Direct mode** (experimental, the chat's default) is an everyday coding
+agent: it works in your checkout with file, search and shell tools through
+the model you configured, like other coding agents. Edits land in your
+files; shell commands other than builds, tests and read-only ones ask
+first. See [direct mode](docs/usage/tui.md#direct-mode) and
+[ADR-0011](docs/architecture/adr/0011-direct-mode.md).
+
+**Bounded mode** (`/task`, or `bcode task create`) is for changes that must
+be trusted. It does not implement a new agent loop. It wraps an existing
+one (the [OpenHands Software Agent SDK](https://github.com/OpenHands/software-agent-sdk))
 in a control plane, written in Go, that decides what the agent sees, where
 it runs, and when its work counts as done.
 
@@ -154,9 +164,12 @@ You also need:
 - the project's dependencies installed (`node_modules`, `.venv`, or the Go
   module cache), because verification runs offline.
 
-**3. Run a first task** in a git repository whose tests pass. The easiest
-way is the chat: run `bcode` there and describe the change. From the plain
-CLI:
+**3. Talk to the agent.** Run `bcode` in a project and ask about the code or
+describe a change; it works in your checkout (direct mode). From a script,
+`bcode -p "explain how retries are configured"`.
+
+**4. Run a first bounded task** in a git repository whose tests pass: type
+`/task` followed by the request in the chat, or from the plain CLI:
 
 ```bash
 cd ~/src/my-service
@@ -316,6 +329,9 @@ What it adds sits around that loop:
 - **Context that does not grow with the repository.** The agent starts from
   a bounded pack instead of a repository dump.
 
+Direct mode is the general-purpose agent, for the rest of the day; bounded
+mode is one `/task` away when a change deserves the evidence.
+
 ## Verification
 
 | State | Meaning |
@@ -456,6 +472,10 @@ See [ADR-0009](docs/architecture/adr/0009-frontier-escalation.md).
    - No baseline was run on the held-out set.
 9. **Terminal only.** There is the CLI and the full-screen `bcode`
    interface, but no daemon or GUI.
+10. **Direct mode is new and unmeasured.** It has unit, interface and
+    headless tests, but has not been used on real work. Answers arrive
+    whole (no streaming), and there are no commands, skills, MCP tools or
+    hooks yet ([plan](docs/design/everyday-agent.md#3-phases)).
 
 ## Reference hardware
 
