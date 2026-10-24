@@ -259,3 +259,52 @@ func FindSession(dir, root, id string) (string, error) {
 	}
 	return "", fmt.Errorf("%q matches %d sessions", id, len(hits))
 }
+
+// Markdown renders the session as a readable transcript (the /export
+// command): user and assistant messages in full, tool calls as one line
+// each with their results clipped.
+func (s *Session) Markdown() string {
+	var b strings.Builder
+	title := s.Title
+	if title == "" {
+		title = "BoundedCode session"
+	}
+	fmt.Fprintf(&b, "# %s\n\n", title)
+	if s.ID != "" {
+		fmt.Fprintf(&b, "Session %s", s.ID)
+		if s.Model != "" {
+			fmt.Fprintf(&b, " · %s/%s", s.Provider, s.Model)
+		}
+		if !s.Created.IsZero() {
+			fmt.Fprintf(&b, " · %s", s.Created.Local().Format("2006-01-02 15:04"))
+		}
+		b.WriteString("\n\n")
+	}
+	for _, m := range s.Messages {
+		switch m.Role {
+		case "user":
+			text := m.Content
+			if text == "" && len(m.Parts) > 0 {
+				text = "(image)"
+			}
+			fmt.Fprintf(&b, "## User\n\n%s\n\n", strings.TrimSpace(text))
+		case "assistant":
+			if strings.TrimSpace(m.Content) != "" {
+				fmt.Fprintf(&b, "## Assistant\n\n%s\n\n", strings.TrimSpace(m.Content))
+			}
+			for _, tc := range m.ToolCalls {
+				fmt.Fprintf(&b, "- 🛠 `%s` %s\n", tc.Function.Name, oneLine(tc.Function.Arguments, 200))
+			}
+			if len(m.ToolCalls) > 0 {
+				b.WriteString("\n")
+			}
+		case "tool":
+			out := strings.TrimSpace(m.Content)
+			if len(out) > 1200 {
+				out = out[:1200] + "\n…"
+			}
+			fmt.Fprintf(&b, "<details><summary>result of %s</summary>\n\n```\n%s\n```\n\n</details>\n\n", m.Name, out)
+		}
+	}
+	return strings.TrimRight(b.String(), "\n") + "\n"
+}

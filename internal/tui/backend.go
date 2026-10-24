@@ -94,6 +94,9 @@ type Backend interface {
 	// DirectInfo describes what direct mode offers in a project: tools,
 	// skills, agents, MCP servers and user commands.
 	DirectInfo(ctx context.Context, dir string) (DirectInfo, error)
+	// Export writes a session's transcript as Markdown to path ("" = a file
+	// named after the session in dir) and returns the path written.
+	Export(ctx context.Context, dir, sessionID, path string) (string, error)
 	// ExpandCommand resolves "/name args" against the project's and the
 	// user's command templates; ok is false when there is no such command.
 	ExpandCommand(ctx context.Context, dir, name, args string) (prompt string, ok bool, err error)

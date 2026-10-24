@@ -131,6 +131,7 @@ func (a *App) directRunner(ctx context.Context, dir, sessionID, modelOverride, a
 		SkillDirs: []string{filepath.Join(root, ".boundedcode", "skills"), filepath.Join(root, ".agents", "skills"), filepath.Join(root, ".claude", "skills"),
 			filepath.Join(a.Paths.Config, "skills")},
 		AgentDirs: []string{filepath.Join(root, ".boundedcode", "agents"), filepath.Join(root, ".claude", "agents"), filepath.Join(a.Paths.Config, "agents")},
+		UserDir:   a.Paths.Config,
 	}
 	for _, h := range dc.Hooks {
 		opts.Hooks = append(opts.Hooks, direct.Hook{Event: h.Event, Matcher: h.Matcher, Command: h.Command, Timeout: h.Timeout.D()})
@@ -357,6 +358,39 @@ Examples:
 			return nil
 		},
 	})
+	var exportOut string
+	exportCmd := &cobra.Command{
+		Use: "export [SESSION]", Short: "Write a session's transcript as Markdown (the most recent session by default; standard output unless --out)", Args: cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			id := "last"
+			if len(args) == 1 {
+				id = args[0]
+			}
+			root, err := projectRoot(f.dir)
+			if err != nil {
+				return err
+			}
+			path, err := direct.FindSession(app.sessionsDir(), root, id)
+			if err != nil {
+				return err
+			}
+			sess, err := direct.LoadSession(path)
+			if err != nil {
+				return err
+			}
+			if exportOut == "" {
+				app.printf("%s", sess.Markdown())
+				return nil
+			}
+			if err := os.WriteFile(exportOut, []byte(sess.Markdown()), 0o644); err != nil {
+				return err
+			}
+			app.printf("wrote %s\n", exportOut)
+			return nil
+		},
+	}
+	exportCmd.Flags().StringVarP(&exportOut, "out", "o", "", "write to this file instead of standard output")
+	cmd.AddCommand(exportCmd)
 	cmd.AddCommand(&cobra.Command{
 		Use: "sessions", Short: "List stored direct-mode sessions of this project", Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {

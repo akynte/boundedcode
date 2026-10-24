@@ -90,6 +90,7 @@ func (r *Runner) environment() map[string]string {
 		env["git"] = "not a git repository"
 	}
 	r.Opts.Env = env
+	r.envAuto = true
 	return env
 }
 

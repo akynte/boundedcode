@@ -315,11 +315,11 @@ func TestGrepGlobLs(t *testing.T) {
 	os.WriteFile(filepath.Join(root, "src/b.ts"), []byte("const needle = 1\n"), 0o644)
 	os.WriteFile(filepath.Join(root, "node_modules/dep/c.go"), []byte("Needle"), 0o644)
 	ctx := context.Background()
-	out, err := r.goGrep(ctx, root, "Needle", "", false)
+	out, err := r.goGrep(ctx, root, "Needle", "", false, "content", 0)
 	if err != nil || out != "src/pkg/a.go:2:func Needle() {}" {
 		t.Fatalf("goGrep: %q %v", out, err)
 	}
-	out, _ = r.goGrep(ctx, root, "needle", "*.ts", true)
+	out, _ = r.goGrep(ctx, root, "needle", "*.ts", true, "content", 0)
 	if out != "src/b.ts:1:const needle = 1" {
 		t.Fatalf("goGrep glob+icase: %q", out)
 	}
@@ -638,7 +638,7 @@ func TestWorkingDirectoryInsideProject(t *testing.T) {
 	if out, _ := r.findTool("glob").Run(ctx, r, map[string]any{"pattern": "**/*.go"}); out != "pkg/a.go" {
 		t.Fatalf("glob relative to dir: %q", out)
 	}
-	if out, _ := r.goGrep(ctx, r.Opts.Dir, "needle", "", false); out != "pkg/a.go:1:package pkg // needle" {
+	if out, _ := r.goGrep(ctx, r.Opts.Dir, "needle", "", false, "content", 0); out != "pkg/a.go:1:package pkg // needle" {
 		t.Fatalf("grep relative to dir: %q", out)
 	}
 	if runtime.GOOS != "windows" {

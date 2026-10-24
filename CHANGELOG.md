@@ -36,7 +36,16 @@ See [docs/design/tool-coverage.md](docs/design/tool-coverage.md).
   `.boundedcode/mcp.json`).
 - `read` attaches images for vision models; `@path` in a message attaches
   files and images.
-- Checkpoints before every change: `/undo` and `bcode chat undo`.
+- `grep` has `output_mode` (content, files, count) and `context` lines.
+- Checkpoints before every file-tool change: `/undo` and `bcode chat undo`.
+- `/export [FILE]` and `bcode chat export` write a session's transcript
+  as Markdown.
+- Custom agents' `tools:` frontmatter restricts their tool set; the
+  `skill` tool also runs command templates; plan mode still runs
+  read-only, build and test commands; a turn that ends early (hand-off,
+  interrupt) records a result for every tool call so the session can be
+  continued with any provider; the git status in the system prompt is
+  refreshed every turn.
 - Permission rules `direct.permissions.allow/deny` (`tool(pattern)`), hooks
   (`pre_tool`, `post_tool`, `user_prompt`, `stop`), command templates
   (`.boundedcode/commands/*.md`, `/name args`), `!cmd` and `!!cmd`,

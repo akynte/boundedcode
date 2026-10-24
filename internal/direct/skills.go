@@ -180,7 +180,7 @@ func skillTool() Tool {
 		Description: "Load a skill's instructions by name (the available skills are listed in the system prompt). Use one when the task matches its description.",
 		Schema:      schema(map[string]any{"name": prop("string", "Skill name"), "args": prop("string", "Optional arguments the skill asks for")}, "name"),
 		Summary:     func(a map[string]any) string { return "skill " + str(a, "name") },
-		Run: func(_ context.Context, r *Runner, a map[string]any) (string, error) {
+		Run: func(ctx context.Context, r *Runner, a map[string]any) (string, error) {
 			name := strings.TrimSpace(str(a, "name"))
 			for i := range r.skills {
 				s := &r.skills[i]
@@ -191,8 +191,20 @@ func skillTool() Tool {
 					}
 					return fmt.Sprintf("<skill name=%q dir=%q>\n%s\n</skill>%s", s.Name, s.Dir, substituteArgs(body, str(a, "args")), argsNote(body, str(a, "args"))), nil
 				}
+				if s.Name == name {
+					return "", fmt.Errorf("skill %q is for the user to invoke (/%s), not the model", name, name)
+				}
 			}
-			return "", fmt.Errorf("no skill %q", name)
+			// A command template (.boundedcode/commands/NAME.md) works the
+			// same way for the model as /NAME does for the user.
+			prompt, ok, err := r.ExpandCommand(ctx, r.Opts.UserDir, name, str(a, "args"))
+			if err != nil {
+				return "", err
+			}
+			if ok {
+				return fmt.Sprintf("<command name=%q>\n%s\n</command>", name, prompt), nil
+			}
+			return "", fmt.Errorf("no skill or command %q", name)
 		},
 	}
 }
@@ -208,11 +220,18 @@ func argsNote(body, args string) string {
 func (r *Runner) skillsPrompt() string {
 	r.loadOnce.Do(r.loadDefinitions)
 	var ls []string
+	isSkill := map[string]bool{}
 	for _, s := range r.skills {
+		isSkill[s.Name] = true
 		if s.UserOnly {
 			continue
 		}
 		ls = append(ls, fmt.Sprintf("- %s: %s", s.Name, oneLine(s.Description, 200)))
+	}
+	for _, c := range r.Commands(r.Opts.UserDir) {
+		if !isSkill[c.Name] {
+			ls = append(ls, fmt.Sprintf("- %s (command template): %s", c.Name, oneLine(c.Description, 200)))
+		}
 	}
 	if len(ls) == 0 {
 		return ""
@@ -290,12 +309,14 @@ func (r *Runner) ExpandCommand(ctx context.Context, userDir, name, args string) 
 		}
 		body = strings.ReplaceAll(body, "${SKILL_DIR}", filepath.Dir(c.File))
 		body = strings.ReplaceAll(body, "${PROJECT_DIR}", r.Opts.Root)
+		template := body
 		body = substituteArgs(body, args)
 		body, err = r.injectShell(ctx, body)
 		if err != nil {
 			return "", true, err
 		}
-		return strings.TrimSpace(body) + argsNote(body+"$ARGUMENTS", args), true, nil
+		// A template that does not mention its arguments still gets them.
+		return strings.TrimSpace(body) + argsNote(template, args), true, nil
 	}
 	return "", false, nil
 }

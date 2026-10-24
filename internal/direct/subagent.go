@@ -85,6 +85,16 @@ func (r *Runner) subagent(kind string) (*Runner, error) {
 		Session: &Session{ID: r.Session.ID + "/" + kind}, ExtraSystem: extra, skills: r.skills, agents: r.agents}
 	child.cp = r.cp
 	child.loadOnce.Do(func() {})
+	// The parent's MCP servers are reused rather than started again.
+	child.mcp, child.sharedMCP = r.mcp, true
+	child.mcpOnce.Do(func() {})
+	if kind != agentExplore && kind != agentGeneral {
+		for i := range r.agents {
+			if r.agents[i].Name == kind {
+				child.only = r.agents[i].Tools
+			}
+		}
+	}
 	if r.Sink != nil {
 		child.Sink = func(e Event) {
 			if e.Kind == EventDone {
@@ -107,6 +117,9 @@ func agentNames(defs []AgentDef) []string {
 // Close releases what a runner holds: background shells and MCP servers.
 func (r *Runner) Close() {
 	r.bg.Close()
+	if r.sharedMCP {
+		return
+	}
 	for _, c := range r.mcp {
 		c.close()
 	}

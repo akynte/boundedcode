@@ -159,8 +159,8 @@ Further keys under `direct` (see the [tool coverage](../design/tool-coverage.md)
 
 Project files direct mode reads: `.boundedcode/skills/<name>/SKILL.md`
 (skills; also `.agents/skills`, `.claude/skills`), `.boundedcode/agents/*.md`
-(sub-agents: frontmatter `name`, `description`, `read_only`; the body is the
-agent's prompt), `.boundedcode/commands/*.md` (command templates with
+(sub-agents: frontmatter `name`, `description`, `read_only`, `tools` as a
+comma-separated list of tool names to allow; the body is the agent's prompt), `.boundedcode/commands/*.md` (command templates with
 `$ARGUMENTS`, `$1`…, `` !`cmd` ``; also `.claude/commands`). The user's
 own live under `<config>/skills`, `<config>/agents`, `<config>/commands`;
 `<config>/AGENTS.md` holds saved memory.

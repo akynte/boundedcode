@@ -116,6 +116,18 @@ func TestChatHeadless(t *testing.T) {
 	if len(last) != 6 || last[5].(map[string]any)["content"] != "go on" { // system + 4 earlier + new
 		t.Fatalf("continued history has %d messages", len(last))
 	}
+	// The transcript exports as Markdown, to stdout or a file.
+	out, err = runCLI(t, "", "chat", "-C", proj, "export")
+	if err != nil || !strings.Contains(out, "## User\n\nwhat does the README say?") || !strings.Contains(out, "- 🛠 `read`") {
+		t.Fatalf("export: %v\n%s", err, out)
+	}
+	exp := filepath.Join(t.TempDir(), "t.md")
+	if out, err = runCLI(t, "", "chat", "-C", proj, "export", "-o", exp); err != nil || !strings.Contains(out, "wrote "+exp) {
+		t.Fatalf("export -o: %v\n%s", err, out)
+	}
+	if b, _ := os.ReadFile(exp); !strings.HasPrefix(string(b), "# what does the README say?") {
+		t.Fatalf("exported file:\n%s", b)
+	}
 	// Root -p is the same thing; stdin is appended as context.
 	out, err = runCLI(t, "some piped diff", "-p", "review this")
 	if err != nil {

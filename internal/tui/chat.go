@@ -150,6 +150,7 @@ var slashCmds = []slashCmd{
 	{"/resume", "[ID]", "continue an earlier session (the most recent without ID)"},
 	{"/approval", "[ask|edits|auto]", "what needs your consent in direct mode"},
 	{"/undo", "", "restore the files changed by the last turn (repeat to go further back)"},
+	{"/export", "[FILE]", "write this session's transcript as Markdown (session-ID.md here by default)"},
 	{"/tools", "", "list the tools, skills, agents and MCP servers available here"},
 	{"/todos", "", "show the agent's task list"},
 	{"/init", "", "write an AGENTS.md for this project (the agent studies the code first)"},
@@ -245,6 +246,11 @@ type expandedMsg struct {
 type undoMsg struct {
 	restored []string
 	err      error
+}
+
+type exportMsg struct {
+	path string
+	err  error
 }
 
 type shellMsg struct {
@@ -512,6 +518,13 @@ func (v *chatView) update(m *Model, msg tea.Msg) tea.Cmd {
 		}
 		v.note("Restored " + strings.Join(msg.restored, ", ") + ".")
 		return nil
+	case exportMsg:
+		if msg.err != nil {
+			v.fail("Export: " + msg.err.Error())
+			return nil
+		}
+		v.note("Transcript written to " + msg.path + ".")
+		return nil
 	case shellMsg:
 		ls := []string{sKey.Render("$ " + msg.cmd)}
 		out := strings.TrimRight(msg.out, "\n")
@@ -529,7 +542,7 @@ func (v *chatView) update(m *Model, msg tea.Msg) tea.Cmd {
 			if msg.err != nil {
 				text += "\n(" + msg.err.Error() + ")"
 			}
-			return v.sendDirect(m, text, direct.ModeChat)
+			return v.sendDirect(m, text, direct.ModeChat, false)
 		}
 		return nil
 	case sessionsMsg:
@@ -799,7 +812,7 @@ func (v *chatView) send(m *Model, text string) tea.Cmd {
 		if mode == modeDirect {
 			mode = direct.ModeCode
 		}
-		return v.sendDirect(m, text, mode)
+		return v.sendDirect(m, text, mode, false)
 	}
 	if v.running(m) {
 		v.queue = append(v.queue, text)
@@ -823,16 +836,12 @@ func (v *chatView) dispatch(m *Model, text string, d direct.Decision) tea.Cmd {
 	if d.Mode == direct.ModeVerify {
 		return v.sendBounded(m, text)
 	}
-	cmd := v.sendDirect(m, text, d.Mode)
-	if v.direct != nil {
-		v.direct.allowRisky = d.Fallback != ""
-	}
-	return cmd
+	return v.sendDirect(m, text, d.Mode, d.Fallback != "")
 }
 
 // sendDirect sends a message to the native agent loop in this checkout,
 // in mode direct.ModeChat or direct.ModeCode.
-func (v *chatView) sendDirect(m *Model, text, mode string) tea.Cmd {
+func (v *chatView) sendDirect(m *Model, text, mode string, allowRisky bool) tea.Cmd {
 	if ok, why := v.readyDirect(); !ok {
 		v.fail("Can't send: " + why)
 		return nil
@@ -844,7 +853,7 @@ func (v *chatView) sendDirect(m *Model, text, mode string) tea.Cmd {
 	}
 	v.nextRun++
 	ctx, cancel := context.WithCancel(m.ctx)
-	r := &directRun{id: v.nextRun, cancel: cancel, start: time.Now(), mode: mode, request: text}
+	r := &directRun{id: v.nextRun, cancel: cancel, start: time.Now(), mode: mode, request: text, allowRisky: allowRisky}
 	v.direct = r
 	v.entries = append(v.entries, chatEntry{kind: entryDirect, run: r})
 	v.scroll.follow = true
@@ -981,13 +990,13 @@ func (v *chatView) slash(m *Model, text string) tea.Cmd {
 			v.note("Usage: " + name + " MESSAGE — makes the change directly in your checkout, whatever the router would pick.")
 			return nil
 		}
-		return v.sendDirect(m, strings.TrimSpace(strings.TrimPrefix(text, name)), direct.ModeCode)
+		return v.sendDirect(m, strings.TrimSpace(strings.TrimPrefix(text, name)), direct.ModeCode, false)
 	case "/chat":
 		if len(rest) == 0 {
 			v.note("Usage: /chat MESSAGE — answers without changing files.")
 			return nil
 		}
-		return v.sendDirect(m, strings.TrimSpace(strings.TrimPrefix(text, name)), direct.ModeChat)
+		return v.sendDirect(m, strings.TrimSpace(strings.TrimPrefix(text, name)), direct.ModeChat, false)
 	case "/mode":
 		if len(rest) == 0 {
 			v.note("Mode: " + v.mode + ". auto picks chat, code or verify per message from its intent and risk; /mode chat|code|verify forces one.")
@@ -1171,6 +1180,17 @@ func (v *chatView) slash(m *Model, text string) tea.Cmd {
 			restored, err := be.Undo(ctx, dir, sess)
 			return undoMsg{restored, err}
 		}
+	case "/export":
+		if v.session == "" {
+			v.fail("Nothing to export yet in this session.")
+			return nil
+		}
+		be, ctx, dir, sess := m.be, m.ctx, v.projectDir(m), v.session
+		out := strings.Join(rest, " ")
+		return func() tea.Msg {
+			path, err := be.Export(ctx, dir, sess, out)
+			return exportMsg{path, err}
+		}
 	case "/tools", "/skills", "/mcp", "/agents":
 		be, ctx, dir := m.be, m.ctx, v.projectDir(m)
 		return func() tea.Msg {
@@ -1188,7 +1208,7 @@ func (v *chatView) slash(m *Model, text string) tea.Cmd {
 		}
 		v.entries = append(v.entries, chatEntry{kind: entryBlock, lines: ls})
 	case "/init":
-		return v.sendDirect(m, "Study this project (layout, languages, build and test commands, conventions, anything an agent must know) and write an AGENTS.md at the project root for coding agents: concise, factual, under 150 lines. If one exists, improve it instead of replacing it. Show what you wrote.", direct.ModeCode)
+		return v.sendDirect(m, "Study this project (layout, languages, build and test commands, conventions, anything an agent must know) and write an AGENTS.md at the project root for coding agents: concise, factual, under 150 lines. If one exists, improve it instead of replacing it. Show what you wrote.", direct.ModeCode, false)
 	default:
 		// A project or user command template: /name args.
 		be, ctx, dir := m.be, m.ctx, v.projectDir(m)

@@ -255,6 +255,43 @@ func (b *tuiBackend) Undo(ctx context.Context, dir, sessionID string) ([]string,
 	return r.Undo()
 }
 
+// Export implements tui.Backend.
+func (b *tuiBackend) Export(_ context.Context, dir, sessionID, path string) (string, error) {
+	b.mu.Lock()
+	r := b.runners[sessionID]
+	b.mu.Unlock()
+	var sess *direct.Session
+	if r != nil {
+		sess = r.Session
+	} else {
+		root, err := projectRoot(dir)
+		if err != nil {
+			return "", err
+		}
+		p, err := direct.FindSession(b.base.sessionsDir(), root, sessionID)
+		if err != nil {
+			return "", err
+		}
+		if sess, err = direct.LoadSession(p); err != nil {
+			return "", err
+		}
+	}
+	if path == "" {
+		path = "session-" + sess.ID + ".md"
+	}
+	if !filepath.IsAbs(path) {
+		abs, err := filepath.Abs(filepath.Join(dir, path))
+		if err != nil {
+			return "", err
+		}
+		path = abs
+	}
+	if err := os.WriteFile(path, []byte(sess.Markdown()), 0o644); err != nil {
+		return "", err
+	}
+	return path, nil
+}
+
 // DirectInfo implements tui.Backend.
 func (b *tuiBackend) DirectInfo(ctx context.Context, dir string) (tui.DirectInfo, error) {
 	a, err := b.fork(io.Discard)

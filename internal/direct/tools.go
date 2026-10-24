@@ -82,7 +82,7 @@ func (r *Runner) buildTools() []Tool {
 	if r.Opts.MemoryFile != "" && !r.Opts.ReadOnly {
 		ts = append(ts, saveMemoryTool())
 	}
-	if len(r.skills) > 0 {
+	if len(r.skills) > 0 || len(r.Commands(r.Opts.UserDir)) > 0 {
 		ts = append(ts, skillTool())
 	}
 	if !r.Opts.NoSubagents && !r.Opts.ReadOnly && r.Depth < 2 {
@@ -92,7 +92,33 @@ func (r *Runner) buildTools() []Tool {
 		ts = append(ts, findSymbolTool(), findReferencesTool(), findImplementationsTool())
 	}
 	ts = append(ts, r.mcpTools()...)
+	if len(r.only) > 0 {
+		var kept []Tool
+		for _, t := range ts {
+			if toolAllowed(r.only, t.Name) {
+				kept = append(kept, t)
+			}
+		}
+		ts = kept
+	}
 	return ts
+}
+
+// toolAllowed matches a tool name against a custom agent's tools list,
+// ignoring case and underscores so other agents' names (Read, WebFetch,
+// TodoWrite) work too; "mcp" allows every MCP tool.
+func toolAllowed(only []string, name string) bool {
+	norm := func(s string) string { return strings.ReplaceAll(strings.ToLower(s), "_", "") }
+	n := norm(name)
+	for _, o := range only {
+		switch on := norm(o); {
+		case on == n, on == "*":
+			return true
+		case on == "mcp" && strings.HasPrefix(name, "mcp__"):
+			return true
+		}
+	}
+	return false
 }
 
 // permissionArg is the part of a call that permission rules match:
@@ -158,7 +184,7 @@ func (r *Runner) runTool(ctx context.Context, call ToolCall) string {
 		r.emit(Event{Kind: EventDenied, Tool: t.Name, CallID: call.ID, Summary: summary, Err: why})
 		return "error: " + why
 	}
-	if t.Mutates && r.plan {
+	if t.Mutates && r.plan && !(t.Name == "bash" && isSafeCommand(str(args, "command"))) {
 		r.emit(Event{Kind: EventDenied, Tool: t.Name, CallID: call.ID, Summary: summary, Err: "plan mode"})
 		return "Plan mode is on: no files are changed and no commands other than read-only ones run until the plan is approved. Finish the plan and call exit_plan_mode."
 	}
@@ -768,6 +794,8 @@ func grepTool() Tool {
 			"path":        prop("string", "Directory or file to search (default: the project root)"),
 			"glob":        prop("string", "Only files matching this glob, e.g. *.go or src/**/*.ts"),
 			"ignore_case": prop("boolean", "Case-insensitive search"),
+			"output_mode": map[string]any{"type": "string", "enum": []string{"content", "files", "count"}, "description": "content: matching lines (default); files: only the paths that match; count: matches per file"},
+			"context":     prop("integer", "Lines of context around each match (content mode)"),
 		}, "pattern"),
 		Summary: func(a map[string]any) string {
 			s := "grep " + oneLine(str(a, "pattern"), 60)
@@ -792,8 +820,28 @@ func grepTool() Tool {
 			if err := r.checkReadable(abs); err != nil {
 				return "", err
 			}
+			mode := str(a, "output_mode")
+			switch mode {
+			case "files", "files_with_matches":
+				mode = "files"
+			case "count":
+			default:
+				mode = "content"
+			}
+			ctxLines := num(a, "context")
 			if rg, err := exec.LookPath("rg"); err == nil {
-				args := []string{"--no-heading", "--line-number", "--color", "never", "--no-messages", "--max-count", "50", "--max-columns", "300", "--max-columns-preview"}
+				args := []string{"--no-heading", "--color", "never", "--no-messages", "--max-columns", "300", "--max-columns-preview"}
+				switch mode {
+				case "files":
+					args = append(args, "-l")
+				case "count":
+					args = append(args, "-c")
+				default:
+					args = append(args, "--line-number", "--max-count", "50")
+					if ctxLines > 0 {
+						args = append(args, "-C", fmt.Sprint(min(ctxLines, 10)))
+					}
+				}
 				if boolean(a, "ignore_case") {
 					args = append(args, "-i")
 				}
@@ -813,7 +861,7 @@ func grepTool() Tool {
 				}
 				return r.relativizeMatches(string(out)), nil
 			}
-			return r.goGrep(ctx, abs, pattern, str(a, "glob"), boolean(a, "ignore_case"))
+			return r.goGrep(ctx, abs, pattern, str(a, "glob"), boolean(a, "ignore_case"), mode, ctxLines)
 		},
 	}
 }
@@ -843,8 +891,9 @@ func (r *Runner) relativizeMatches(out string) string {
 	return s
 }
 
-// goGrep is the fallback without ripgrep.
-func (r *Runner) goGrep(ctx context.Context, abs, pattern, glob string, ignoreCase bool) (string, error) {
+// goGrep is the fallback without ripgrep. mode is content, files or count;
+// ctxLines adds context around matches in content mode.
+func (r *Runner) goGrep(ctx context.Context, abs, pattern, glob string, ignoreCase bool, mode string, ctxLines int) (string, error) {
 	if ignoreCase {
 		pattern = "(?i)" + pattern
 	}
@@ -852,6 +901,7 @@ func (r *Runner) goGrep(ctx context.Context, abs, pattern, glob string, ignoreCa
 	if err != nil {
 		return "", fmt.Errorf("invalid pattern: %w", err)
 	}
+	ctxLines = min(max(ctxLines, 0), 10)
 	var b strings.Builder
 	n := 0
 	err = r.walk(abs, func(file, rel string, d fs.DirEntry) error {
@@ -865,15 +915,52 @@ func (r *Runner) goGrep(ctx context.Context, abs, pattern, glob string, ignoreCa
 		if err != nil || bytes.IndexByte(data[:min(len(data), 8000)], 0) >= 0 {
 			return nil
 		}
-		for i, l := range strings.Split(string(data), "\n") {
-			if re.MatchString(l) {
-				if len(l) > 300 {
-					l = l[:300] + "…"
+		lines := strings.Split(string(data), "\n")
+		hits := 0
+		lastShown := -1
+		for i, l := range lines {
+			if !re.MatchString(l) {
+				continue
+			}
+			hits++
+			if mode == "files" {
+				break
+			}
+			if mode == "count" {
+				continue
+			}
+			if ctxLines > 0 {
+				if lastShown >= 0 && i-ctxLines > lastShown+1 {
+					b.WriteString("--\n")
 				}
-				fmt.Fprintf(&b, "%s:%d:%s\n", rel, i+1, l)
-				if n++; n >= maxGrepMatches {
-					return errStop
+				for j := max(i-ctxLines, lastShown+1); j < i; j++ {
+					fmt.Fprintf(&b, "%s-%d-%s\n", rel, j+1, clipLine(lines[j]))
 				}
+			}
+			fmt.Fprintf(&b, "%s:%d:%s\n", rel, i+1, clipLine(l))
+			lastShown = i
+			for j := i + 1; ctxLines > 0 && j <= i+ctxLines && j < len(lines); j++ {
+				if re.MatchString(lines[j]) {
+					break
+				}
+				fmt.Fprintf(&b, "%s-%d-%s\n", rel, j+1, clipLine(lines[j]))
+				lastShown = j
+			}
+			if n++; n >= maxGrepMatches {
+				return errStop
+			}
+		}
+		switch {
+		case hits == 0:
+		case mode == "files":
+			fmt.Fprintf(&b, "%s\n", rel)
+			if n++; n >= maxGrepMatches {
+				return errStop
+			}
+		case mode == "count":
+			fmt.Fprintf(&b, "%s:%d\n", rel, hits)
+			if n++; n >= maxGrepMatches {
+				return errStop
 			}
 		}
 		return nil
@@ -892,6 +979,13 @@ func (r *Runner) goGrep(ctx context.Context, abs, pattern, glob string, ignoreCa
 }
 
 var errStop = errors.New("stop")
+
+func clipLine(l string) string {
+	if len(l) > 300 {
+		return l[:300] + "…"
+	}
+	return l
+}
 
 var skippedDirs = map[string]bool{".git": true, "node_modules": true, ".venv": true, "venv": true, "__pycache__": true, "target": true, "dist": true, "build": true, ".next": true, ".cache": true, "vendor": true, ".idea": true, ".vscode": false}
 

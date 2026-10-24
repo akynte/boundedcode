@@ -56,6 +56,7 @@ type fakeBackend struct {
 	route      func(text string) direct.Decision
 	asker      Asker
 	undos      []string
+	exports    []string
 	undoErr    error
 }
 
@@ -102,6 +103,16 @@ func (f *fakeBackend) Undo(_ context.Context, _, sessionID string) ([]string, er
 		return nil, f.undoErr
 	}
 	return []string{"a.go", "b.go"}, nil
+}
+
+func (f *fakeBackend) Export(_ context.Context, _, sessionID, path string) (string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.exports = append(f.exports, sessionID+"→"+path)
+	if path == "" {
+		path = "session-" + sessionID + ".md"
+	}
+	return path, nil
 }
 
 func (f *fakeBackend) DirectInfo(context.Context, string) (DirectInfo, error) {
@@ -1422,6 +1433,12 @@ func TestChatToolsUndoTodosAndCustomCommands(t *testing.T) {
 	hn.mustSee("Restored a.go, b.go")
 	if len(be.undos) != 1 || be.undos[0] != "s-1" {
 		t.Fatalf("undos = %v", be.undos)
+	}
+	hn.say("/export notes/transcript.md")
+	hn.drain()
+	hn.mustSee("Transcript written to notes/transcript.md")
+	if len(be.exports) != 1 || be.exports[0] != "s-1→notes/transcript.md" {
+		t.Fatalf("exports = %v", be.exports)
 	}
 	// Custom command templates expand and are suggested.
 	hn.typeText("/fix")

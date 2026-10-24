@@ -139,6 +139,7 @@ Commands (type `/` for suggestions; `tab` completes):
 |---|---|
 | `/task REQUEST` | run the request as a verified task now |
 | `/undo` | restore the files changed by the last turn (repeat to go further back) |
+| `/export [FILE]` | write the session's transcript as Markdown (`session-ID.md` in the project by default) |
 | `/tools` (also `/skills`, `/mcp`, `/agents`) | what the agent can use here |
 | `/todos` | the agent's task list |
 | `/init` | write an `AGENTS.md` for the project |

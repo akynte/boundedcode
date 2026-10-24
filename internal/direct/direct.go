@@ -177,6 +177,9 @@ type Options struct {
 	// definitions (project and user locations).
 	SkillDirs []string
 	AgentDirs []string
+	// UserDir is the user's configuration directory, whose commands/ and
+	// skills/ hold personal command templates ("" = project ones only).
+	UserDir string
 	// NoSubagents disables the task tool (set for sub-agents).
 	NoSubagents bool
 	// ReadOnly offers only tools that do not change files or run commands
@@ -218,6 +221,12 @@ type Runner struct {
 	pendingImages []Message
 	// extraSystem is appended to the system prompt (tests, hand-offs).
 	ExtraSystem string
+	// envAuto: Opts.Env was filled by the runner and is refreshed per turn.
+	envAuto bool
+	// only restricts the tool set to these names (custom agents' tools:).
+	only []string
+	// sharedMCP: the MCP clients belong to the parent runner.
+	sharedMCP bool
 }
 
 // ErrInterrupted is returned when ctx ended while a message was processed;
@@ -277,6 +286,9 @@ func (r *Runner) Send(ctx context.Context, text string) (string, error) {
 	if err := r.Session.Append(um); err != nil {
 		return "", err
 	}
+	if r.envAuto {
+		r.Opts.Env = nil // refresh the git branch and status for this turn
+	}
 	r.checkpointsTurn()
 	tools := r.toolList()
 	final := ""
@@ -334,13 +346,14 @@ func (r *Runner) Send(ctx context.Context, text string) (string, error) {
 			}
 			return final, nil
 		}
-		for _, call := range msg.ToolCalls {
+		for i, call := range msg.ToolCalls {
 			result := r.runTool(ctx, call)
 			if r.handoff != nil {
 				h := r.handoff
 				r.handoff = nil
 				h.Changed = changedSince(before, r.gitState())
 				_ = r.Session.Append(Message{Role: "tool", ToolCallID: call.ID, Name: call.Function.Name, Content: result})
+				r.skipCalls(msg.ToolCalls[i+1:], "not run: the turn was handed off to verification")
 				return final, h
 			}
 			key := call.Function.Name + "\x00" + call.Function.Arguments
@@ -358,6 +371,7 @@ func (r *Runner) Send(ctx context.Context, text string) (string, error) {
 				return final, err
 			}
 			if ctx.Err() != nil {
+				r.skipCalls(msg.ToolCalls[i+1:], "not run: the user interrupted the turn")
 				return final, ErrInterrupted
 			}
 		}
@@ -370,6 +384,16 @@ func (r *Runner) Send(ctx context.Context, text string) (string, error) {
 	}
 	r.emit(Event{Kind: EventNote, Text: fmt.Sprintf("Stopped after %d model calls for this message (direct.max_turns). Send a message to continue.", r.maxTurns())})
 	return final, nil
+}
+
+// skipCalls records a result for tool calls that will not run, so every
+// call of the assistant message has an answer and the session can be
+// continued with any provider.
+func (r *Runner) skipCalls(calls []ToolCall, why string) {
+	for _, c := range calls {
+		r.emit(Event{Kind: EventDenied, Tool: c.Function.Name, CallID: c.ID, Err: why})
+		_ = r.Session.Append(Message{Role: "tool", ToolCallID: c.ID, Name: c.Function.Name, Content: why})
+	}
 }
 
 func (r *Runner) usageSince(start Usage) Usage {
