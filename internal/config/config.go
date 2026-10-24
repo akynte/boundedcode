@@ -67,7 +67,56 @@ type DirectConfig struct {
 	// MaxFiles: a change that names more files than this is routed to
 	// verification.
 	MaxFiles int `yaml:"max_files"`
+	// Web configures web_fetch and web_search.
+	Web WebConfig `yaml:"web"`
+	// Permissions are allow and deny rules, "tool(pattern)", applied before
+	// approval: deny refuses, allow skips the prompt.
+	Permissions PermissionRules `yaml:"permissions"`
+	// Hooks run shell commands around tools and turns.
+	Hooks []HookConfig `yaml:"hooks,omitempty"`
+	// MCP servers (stdio) whose tools are offered to the model, by name;
+	// .boundedcode/mcp.json in the project adds more ("mcpServers" form).
+	MCP map[string]MCPServerConfig `yaml:"mcp,omitempty"`
+	// Checkpoints keeps copies of files before direct mode changes them,
+	// for /undo (default true).
+	Checkpoints *bool `yaml:"checkpoints,omitempty"`
 }
+
+// WebConfig configures the web tools.
+type WebConfig struct {
+	// AllowHosts need no approval for web_fetch (host, or ".suffix").
+	AllowHosts []string `yaml:"allow_hosts,omitempty"`
+	// SearchURL is a SearXNG-style JSON search endpoint with {query};
+	// empty uses DuckDuckGo's HTML endpoint.
+	SearchURL string `yaml:"search_url,omitempty"`
+}
+
+// PermissionRules list allow and deny rules.
+type PermissionRules struct {
+	Allow []string `yaml:"allow,omitempty"`
+	Deny  []string `yaml:"deny,omitempty"`
+}
+
+// HookConfig is one hook: event pre_tool|post_tool|user_prompt|stop, an
+// optional tool-name regular expression, and the command.
+type HookConfig struct {
+	Event   string   `yaml:"event"`
+	Matcher string   `yaml:"matcher,omitempty"`
+	Command string   `yaml:"command"`
+	Timeout Duration `yaml:"timeout,omitempty"`
+}
+
+// MCPServerConfig starts an MCP server over stdio.
+type MCPServerConfig struct {
+	Command string            `yaml:"command"`
+	Args    []string          `yaml:"args,omitempty"`
+	Env     map[string]string `yaml:"env,omitempty"`
+	Cwd     string            `yaml:"cwd,omitempty"`
+	Timeout Duration          `yaml:"timeout,omitempty"`
+}
+
+// CheckpointsOn reports whether checkpoints are enabled (default true).
+func (d DirectConfig) CheckpointsOn() bool { return d.Checkpoints == nil || *d.Checkpoints }
 
 // TaskConfig configures how requests are read before implementation.
 type TaskConfig struct {
@@ -397,6 +446,21 @@ func (c Config) Validate() error {
 	case "auto", "chat", "code", "verify":
 	default:
 		errs = append(errs, fmt.Errorf("direct.mode: %q is not auto|chat|code|verify", c.Direct.Mode))
+	}
+	for i, h := range c.Direct.Hooks {
+		switch h.Event {
+		case "pre_tool", "post_tool", "user_prompt", "stop":
+		default:
+			errs = append(errs, fmt.Errorf("direct.hooks[%d].event: %q is not pre_tool|post_tool|user_prompt|stop", i, h.Event))
+		}
+		if strings.TrimSpace(h.Command) == "" {
+			errs = append(errs, fmt.Errorf("direct.hooks[%d].command: required", i))
+		}
+	}
+	for name, m := range c.Direct.MCP {
+		if strings.TrimSpace(m.Command) == "" {
+			errs = append(errs, fmt.Errorf("direct.mcp.%s.command: required", name))
+		}
 	}
 	if c.Agent.MaxOutputTokens < 512 {
 		errs = append(errs, errors.New("agent.max_output_tokens: must be >= 512"))

@@ -84,6 +84,7 @@ type tuiBackend struct {
 
 	mu       sync.Mutex
 	prompter tui.Prompter
+	asker    tui.Asker
 	// runners keeps one direct-mode runner per open session, so the model
 	// endpoint and the token accounting persist across messages.
 	runners map[string]*direct.Runner
@@ -149,13 +150,16 @@ func (b *tuiBackend) Chat(ctx context.Context, req tui.ChatRequest, sink func(di
 		b.mu.Unlock()
 	}
 	b.mu.Lock()
-	p := b.prompter
+	p, ask := b.prompter, b.asker
 	b.mu.Unlock()
 	r.Approve = func(ctx context.Context, ar direct.ApprovalRequest) bool {
 		if p == nil {
 			return false
 		}
 		return p(ctx, "Allow: "+ar.Summary, ar.Detail)
+	}
+	if ask != nil {
+		r.SetAsker(direct.Asker(ask))
 	}
 	audit := r.Sink
 	r.Sink = func(e direct.Event) {
@@ -218,6 +222,85 @@ func (b *tuiBackend) Sessions(_ context.Context, dir string) ([]direct.SessionIn
 		return nil, err
 	}
 	return direct.ListSessions(b.base.sessionsDir(), root)
+}
+
+// SetAsker implements tui.Backend.
+func (b *tuiBackend) SetAsker(a tui.Asker) {
+	b.mu.Lock()
+	b.asker = a
+	b.mu.Unlock()
+}
+
+// Undo implements tui.Backend.
+func (b *tuiBackend) Undo(ctx context.Context, dir, sessionID string) ([]string, error) {
+	b.mu.Lock()
+	r := b.runners[sessionID]
+	b.mu.Unlock()
+	if r != nil {
+		return r.Undo()
+	}
+	root, err := projectRoot(dir)
+	if err != nil {
+		return nil, err
+	}
+	path, err := direct.FindSession(b.base.sessionsDir(), root, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	sess, err := direct.LoadSession(path)
+	if err != nil {
+		return nil, err
+	}
+	r = &direct.Runner{Session: sess, Opts: direct.Options{Root: root, CheckpointDir: filepath.Join(b.base.sessionsDir(), ".checkpoints", direct.ProjectKey(root))}}
+	return r.Undo()
+}
+
+// DirectInfo implements tui.Backend.
+func (b *tuiBackend) DirectInfo(ctx context.Context, dir string) (tui.DirectInfo, error) {
+	a, err := b.fork(io.Discard)
+	if err != nil {
+		return tui.DirectInfo{}, err
+	}
+	root, err := projectRoot(dir)
+	if err != nil {
+		return tui.DirectInfo{}, err
+	}
+	b.mu.Lock()
+	var r *direct.Runner
+	for _, x := range b.runners {
+		if x.Opts.Root == root {
+			r = x
+		}
+	}
+	b.mu.Unlock()
+	temp := r == nil
+	if temp {
+		r = &direct.Runner{Session: &direct.Session{}, Opts: direct.Options{Root: root, MemoryFile: a.userInstructionsFile(), MCP: a.mcpServers(root)}}
+		r.Asker = func(context.Context, string, []string) (string, error) { return "", nil }
+	}
+	var info tui.DirectInfo
+	for _, t := range r.Tools() {
+		info.Tools = append(info.Tools, t.Name+": "+oneLineText(t.Description, 90))
+	}
+	info.Skills, info.Agents, info.MCP, info.Commands = r.Skills(), r.Agents(), r.MCPStatus(), r.Commands(a.Paths.Config)
+	if temp {
+		r.Close()
+	}
+	return info, nil
+}
+
+// ExpandCommand implements tui.Backend.
+func (b *tuiBackend) ExpandCommand(ctx context.Context, dir, name, args string) (string, bool, error) {
+	a, err := b.fork(io.Discard)
+	if err != nil {
+		return "", false, err
+	}
+	root, err := projectRoot(dir)
+	if err != nil {
+		return "", false, err
+	}
+	r := &direct.Runner{Session: &direct.Session{}, Opts: direct.Options{Root: root}}
+	return r.ExpandCommand(ctx, a.Paths.Config, name, args)
 }
 
 func (b *tuiBackend) SetPrompter(p tui.Prompter) {

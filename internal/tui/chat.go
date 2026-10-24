@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"os/exec"
 	"slices"
 	"strings"
 	"time"
@@ -82,6 +84,7 @@ type directRun struct {
 	inGit      bool
 	mode       string // the mode the turn runs in (chat or code)
 	request    string
+	todos      string
 	// render cache
 	cacheW, cacheN int
 	cacheText      string
@@ -146,11 +149,16 @@ var slashCmds = []slashCmd{
 	{"/sessions", "", "list earlier sessions in this project"},
 	{"/resume", "[ID]", "continue an earlier session (the most recent without ID)"},
 	{"/approval", "[ask|edits|auto]", "what needs your consent in direct mode"},
+	{"/undo", "", "restore the files changed by the last turn (repeat to go further back)"},
+	{"/tools", "", "list the tools, skills, agents and MCP servers available here"},
+	{"/todos", "", "show the agent's task list"},
+	{"/init", "", "write an AGENTS.md for this project (the agent studies the code first)"},
 	{"/model", "NAME", "use another model profile for the next runs"},
 	{"/index", "", "re-index this repository"},
 	{"/setup", "", "choose the model or provider and install what is missing"},
 	{"/git-init", "", "make this folder a git repository"},
 	{"/clear", "", "clear the transcript"},
+	{"!", "COMMAND", "run a shell command here and show its output (!! runs it without telling the agent)"},
 	{"/quit", "", "quit"},
 }
 
@@ -171,7 +179,10 @@ type chatView struct {
 	approval string // "" = configured
 	direct   *directRun
 	nextRun  int
-	resumed  bool // session names a stored session to continue
+	resumed  bool             // session names a stored session to continue
+	custom   []direct.Command // project and user /commands
+	customOK bool
+	todos    string
 
 	project     *Project
 	projErr     error
@@ -216,6 +227,30 @@ type chatCreatedMsg struct {
 type sessionsMsg struct {
 	list []direct.SessionInfo
 	err  error
+}
+
+type directInfoMsg struct {
+	info DirectInfo
+	err  error
+}
+
+type customCmdsMsg []direct.Command
+
+type expandedMsg struct {
+	name, prompt string
+	ok           bool
+	err          error
+}
+
+type undoMsg struct {
+	restored []string
+	err      error
+}
+
+type shellMsg struct {
+	cmd, out string
+	err      error
+	tell     bool
 }
 
 func newChatView() *chatView {
@@ -354,7 +389,7 @@ func (v *chatView) update(m *Model, msg tea.Msg) tea.Cmd {
 		if p.Created {
 			v.note(fmt.Sprintf("Registered %s as workspace %s.", p.Root, p.Workspace))
 		}
-		return tea.Batch(m.loadInfo(), v.maybeIndex(m))
+		return tea.Batch(m.loadInfo(), v.maybeIndex(m), v.loadCustom(m))
 	case setupMsg:
 		v.setup, v.setupLoaded = msg, true
 		return v.maybeIndex(m)
@@ -424,6 +459,79 @@ func (v *chatView) update(m *Model, msg tea.Msg) tea.Cmd {
 		return tea.Batch(cmds...)
 	case queuedMsg:
 		return v.send(m, string(msg))
+	case customCmdsMsg:
+		v.custom, v.customOK = msg, true
+		return nil
+	case directInfoMsg:
+		if msg.err != nil {
+			v.fail("Tools: " + msg.err.Error())
+			return nil
+		}
+		ls := []string{sSection.Render("Tools")}
+		for _, t := range msg.info.Tools {
+			name, desc, _ := strings.Cut(t, ": ")
+			ls = append(ls, sKey.Render(fit(name, 24))+sMuted.Render(trunc(desc, 90)))
+		}
+		if len(msg.info.Skills) > 0 {
+			ls = append(ls, "", sSection.Render("Skills (/name, or the agent loads them)"))
+			for _, sk := range msg.info.Skills {
+				ls = append(ls, sKey.Render(fit("/"+sk.Name, 24))+sMuted.Render(trunc(sk.Description, 90)))
+			}
+		}
+		if len(msg.info.Agents) > 0 {
+			ls = append(ls, "", sSection.Render("Sub-agents (task tool)"))
+			for _, ag := range msg.info.Agents {
+				ls = append(ls, sKey.Render(fit(ag.Name, 24))+sMuted.Render(trunc(ag.Description, 90)))
+			}
+		}
+		if len(msg.info.MCP) > 0 {
+			ls = append(ls, "", sSection.Render("MCP servers"))
+			for _, l := range msg.info.MCP {
+				ls = append(ls, sText.Render(trunc(l, 110)))
+			}
+		}
+		if n := len(msg.info.Commands); n > 0 {
+			ls = append(ls, "", sMuted.Render(fmt.Sprintf("%d command template(s): type / to see them", n)))
+		}
+		v.entries = append(v.entries, chatEntry{kind: entryBlock, lines: ls})
+		return nil
+	case expandedMsg:
+		if msg.err != nil {
+			v.fail("/" + msg.name + ": " + msg.err.Error())
+			return nil
+		}
+		if !msg.ok {
+			v.fail("Unknown command /" + msg.name + " (type /help).")
+			return nil
+		}
+		return v.send(m, msg.prompt)
+	case undoMsg:
+		if msg.err != nil {
+			v.fail("Undo: " + msg.err.Error())
+			return nil
+		}
+		v.note("Restored " + strings.Join(msg.restored, ", ") + ".")
+		return nil
+	case shellMsg:
+		ls := []string{sKey.Render("$ " + msg.cmd)}
+		out := strings.TrimRight(msg.out, "\n")
+		if out != "" {
+			for _, l := range strings.Split(out, "\n") {
+				ls = append(ls, sText.Render(l))
+			}
+		}
+		if msg.err != nil {
+			ls = append(ls, sErr.Render("✘ "+msg.err.Error()))
+		}
+		v.entries = append(v.entries, chatEntry{kind: entryBlock, lines: ls})
+		if msg.tell {
+			text := "I ran `" + msg.cmd + "` in the project. Output:\n\n```\n" + trunc(out, 20000) + "\n```"
+			if msg.err != nil {
+				text += "\n(" + msg.err.Error() + ")"
+			}
+			return v.sendDirect(m, text, direct.ModeChat)
+		}
+		return nil
 	case sessionsMsg:
 		if msg.err != nil {
 			v.fail("Sessions: " + msg.err.Error())
@@ -449,6 +557,9 @@ func (v *chatView) update(m *Model, msg tea.Msg) tea.Cmd {
 			return nil
 		}
 		r.apply(msg.e)
+		if msg.e.Kind == direct.EventTodos {
+			v.todos = msg.e.Text
+		}
 		return nil
 	case routedMsg:
 		if msg.err != nil {
@@ -629,6 +740,11 @@ func (v *chatView) suggest() {
 			v.sugg = append(v.sugg, c)
 		}
 	}
+	for _, c := range v.custom {
+		if name := "/" + c.Name; strings.HasPrefix(name, val) {
+			v.sugg = append(v.sugg, slashCmd{name, "[args]", firstNonEmpty(c.Description, "command template")})
+		}
+	}
 	v.scur = min(v.scur, max(0, len(v.sugg)-1))
 }
 
@@ -658,8 +774,18 @@ func (v *chatView) startRun(m *Model, id, title string, args []string) tea.Cmd {
 	})
 }
 
-// send handles a submitted message or slash command.
+// send handles a submitted message, a slash command or a ! shell command.
 func (v *chatView) send(m *Model, text string) tea.Cmd {
+	if strings.HasPrefix(text, "!") {
+		v.entries = append(v.entries, chatEntry{kind: entryUser, text: text})
+		tell := !strings.HasPrefix(text, "!!")
+		cmd := strings.TrimSpace(strings.TrimLeft(text, "!"))
+		if cmd == "" {
+			v.note("Usage: !COMMAND runs a shell command here and shows the agent its output; !!COMMAND keeps it to yourself.")
+			return nil
+		}
+		return v.runShell(m, cmd, tell)
+	}
 	if strings.HasPrefix(text, "/") {
 		v.entries = append(v.entries, chatEntry{kind: entryUser, text: text})
 		return v.slash(m, text)
@@ -1031,10 +1157,79 @@ func (v *chatView) slash(m *Model, text string) tea.Cmd {
 				return projectMsg{p, err}
 			}
 		})
+	case "/undo":
+		if v.session == "" || v.resumed {
+			v.fail("Nothing to undo yet in this session.")
+			return nil
+		}
+		if v.running(m) {
+			v.fail("Wait for the current run to end.")
+			return nil
+		}
+		be, ctx, dir, sess := m.be, m.ctx, v.projectDir(m), v.session
+		return func() tea.Msg {
+			restored, err := be.Undo(ctx, dir, sess)
+			return undoMsg{restored, err}
+		}
+	case "/tools", "/skills", "/mcp", "/agents":
+		be, ctx, dir := m.be, m.ctx, v.projectDir(m)
+		return func() tea.Msg {
+			info, err := be.DirectInfo(ctx, dir)
+			return directInfoMsg{info, err}
+		}
+	case "/todos":
+		if v.todos == "" {
+			v.note("No task list yet; the agent keeps one for multi-step work.")
+			return nil
+		}
+		ls := []string{sSection.Render("Tasks")}
+		for _, l := range strings.Split(v.todos, "\n") {
+			ls = append(ls, sText.Render(l))
+		}
+		v.entries = append(v.entries, chatEntry{kind: entryBlock, lines: ls})
+	case "/init":
+		return v.sendDirect(m, "Study this project (layout, languages, build and test commands, conventions, anything an agent must know) and write an AGENTS.md at the project root for coding agents: concise, factual, under 150 lines. If one exists, improve it instead of replacing it. Show what you wrote.", direct.ModeCode)
 	default:
-		v.fail("Unknown command " + name + " (type /help).")
+		// A project or user command template: /name args.
+		be, ctx, dir := m.be, m.ctx, v.projectDir(m)
+		cname := strings.TrimPrefix(name, "/")
+		args := strings.TrimSpace(strings.TrimPrefix(text, name))
+		return func() tea.Msg {
+			prompt, ok, err := be.ExpandCommand(ctx, dir, cname, args)
+			return expandedMsg{cname, prompt, ok, err}
+		}
 	}
 	return nil
+}
+
+// loadCustom lists the project's and user's command templates for the
+// slash menu.
+func (v *chatView) loadCustom(m *Model) tea.Cmd {
+	be, ctx, dir := m.be, m.ctx, v.projectDir(m)
+	return func() tea.Msg {
+		info, err := be.DirectInfo(ctx, dir)
+		if err != nil {
+			return customCmdsMsg(nil)
+		}
+		return customCmdsMsg(info.Commands)
+	}
+}
+
+// runShell runs a ! command in the project and shows its output; with
+// tell, the agent is told about it in chat mode.
+func (v *chatView) runShell(m *Model, cmd string, tell bool) tea.Cmd {
+	dir, ctx := v.projectDir(m), m.ctx
+	return func() tea.Msg {
+		argv := []string{"bash", "-c", cmd}
+		if _, err := exec.LookPath("bash"); err != nil {
+			argv = []string{"sh", "-c", cmd}
+		}
+		c := exec.CommandContext(ctx, argv[0], argv[1:]...)
+		c.Dir = dir
+		c.Env = append(os.Environ(), "NO_COLOR=1", "TERM=dumb", "PAGER=cat", "GIT_PAGER=cat")
+		out, err := c.CombinedOutput()
+		return shellMsg{cmd: cmd, out: string(out), err: err, tell: tell}
+	}
 }
 
 // maybeIndex indexes a repository registered for the first time once the
@@ -1252,6 +1447,14 @@ func (r *directRun) apply(e direct.Event) {
 	case direct.EventMode:
 		r.mode = e.Text
 		r.notes = append(r.notes, "◇ "+e.Text+" · "+e.Summary)
+	case direct.EventTodos:
+		r.todos = e.Text
+	case direct.EventQuestion:
+		r.activity = append(r.activity, directActivity{summary: "? " + oneLine(e.Text) + " → " + oneLine(e.Output)})
+	case direct.EventSubagent:
+		if e.Text == string(direct.EventToolStart) {
+			r.activity = append(r.activity, directActivity{summary: "↳ " + e.Tool + ": " + e.Summary})
+		}
 	case direct.EventDone:
 		if e.Usage != nil {
 			u := *e.Usage
@@ -1286,6 +1489,17 @@ func (r *directRun) lines(m *Model, w int) []string {
 	}
 	for _, n := range r.notes {
 		out = append(out, "  "+sFaint.Render("· "+trunc(n, w-6)))
+	}
+	if r.todos != "" {
+		for _, l := range strings.Split(r.todos, "\n") {
+			mark := sMuted
+			if strings.HasPrefix(l, "[>]") {
+				mark = sAccent
+			} else if strings.HasPrefix(l, "[x]") {
+				mark = sOK
+			}
+			out = append(out, "  "+mark.Render(trunc(l, w-4)))
+		}
 	}
 	if r.text != "" {
 		if len(out) > 0 {
@@ -1491,3 +1705,12 @@ func diffStats(ds []RepoDiff) (add, del, files int) {
 }
 
 func jsonUnmarshal(b []byte, v any) error { return json.Unmarshal(b, v) }
+
+func firstNonEmpty(ss ...string) string {
+	for _, s := range ss {
+		if s != "" {
+			return s
+		}
+	}
+	return ""
+}

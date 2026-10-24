@@ -132,6 +132,18 @@ verify downgrades to code and the reason is shown. Overrides exist
 21's hand-off is partly done by this: what remains is carrying the direct
 session's summary into the task's context pack.
 
+## 3b. Tool parity (2026-10-24)
+
+The maintainer then asked that every tool and capability of Pi, Qwen Code
+and Claude Code have an equivalent. The result is the
+[tool coverage matrix](tool-coverage.md): the model tools, the interaction
+features (`@file`, `!cmd`, templates, undo, hooks, permissions, MCP), what
+is deliberately not equivalent (RPC/SDKs, desktop and web apps, session
+trees, teams, provider logins, streaming, themes) and where each
+equivalent lives. It pulls phase 19 (extensibility) forward; phases 18
+(streaming), 20 (measured repository intelligence), 21 (session summary
+into the task pack), 22 and 23 stand.
+
 ## 4. Phase 17 in detail
 
 ### What was built

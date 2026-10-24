@@ -246,3 +246,25 @@ type promptMsg struct {
 	title, body string
 	reply       chan bool
 }
+
+// askUser asks a free-text or multiple-choice question from a background
+// goroutine (the agent's ask_user tool).
+func (m *Model) askUser(ctx context.Context, question string, options []string) (string, error) {
+	reply := make(chan string, 1)
+	m.send(questionMsg{question: question, options: options, reply: reply})
+	select {
+	case ans := <-reply:
+		if ans == "" {
+			return "", context.Canceled
+		}
+		return ans, nil
+	case <-ctx.Done():
+		return "", ctx.Err()
+	}
+}
+
+type questionMsg struct {
+	question string
+	options  []string
+	reply    chan string
+}

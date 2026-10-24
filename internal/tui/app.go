@@ -233,6 +233,39 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return nil
 		}})
 		return m, nil
+	case questionMsg:
+		var fields []*field
+		if len(msg.options) > 0 {
+			var items []listItem
+			for _, o := range msg.options {
+				items = append(items, listItem{value: o, title: o})
+			}
+			items = append(items, listItem{value: "__other__", title: "Something else (type it below)"})
+			fields = append(fields, listField("choice", "Answer", items, msg.options[0]))
+		}
+		fields = append(fields, textField("text", "Your answer", "", "type an answer"))
+		answered := false
+		f := newForm("The agent asks", msg.question, "Answer", fields, func(v formValues) (tea.Cmd, error) {
+			ans := strings.TrimSpace(v["text"].input.Value())
+			if c, ok := v["choice"]; ok {
+				if sel := c.items[c.choice].value; sel != "__other__" && ans == "" {
+					ans = sel
+				}
+			}
+			if ans == "" {
+				return nil, fmt.Errorf("an answer is needed")
+			}
+			answered = true
+			msg.reply <- ans
+			return nil, nil
+		})
+		f.onClose = func() {
+			if !answered {
+				msg.reply <- ""
+			}
+		}
+		m.push(f)
+		return m, nil
 	case tea.KeyMsg:
 		return m, m.handleKey(msg)
 	case tea.MouseMsg:
@@ -662,6 +695,7 @@ func Run(ctx context.Context, be Backend, opt Options) error {
 	p := tea.NewProgram(m, tea.WithAltScreen(), tea.WithMouseCellMotion(), tea.WithContext(ctx))
 	m.send = p.Send
 	be.SetPrompter(m.prompt)
+	be.SetAsker(m.askUser)
 	_, err := p.Run()
 	for _, j := range m.jobs {
 		if j.running() {

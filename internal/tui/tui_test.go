@@ -54,6 +54,9 @@ type fakeBackend struct {
 	sessions   []direct.SessionInfo
 	routed     []string
 	route      func(text string) direct.Decision
+	asker      Asker
+	undos      []string
+	undoErr    error
 }
 
 func (f *fakeBackend) Chat(ctx context.Context, req ChatRequest, sink func(direct.Event)) (ChatResult, error) {
@@ -87,6 +90,33 @@ func (f *fakeBackend) Chat(ctx context.Context, req ChatRequest, sink func(direc
 
 func (f *fakeBackend) Sessions(context.Context, string) ([]direct.SessionInfo, error) {
 	return f.sessions, nil
+}
+
+func (f *fakeBackend) SetAsker(a Asker) { f.asker = a }
+
+func (f *fakeBackend) Undo(_ context.Context, _, sessionID string) ([]string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.undos = append(f.undos, sessionID)
+	if f.undoErr != nil {
+		return nil, f.undoErr
+	}
+	return []string{"a.go", "b.go"}, nil
+}
+
+func (f *fakeBackend) DirectInfo(context.Context, string) (DirectInfo, error) {
+	return DirectInfo{Tools: []string{"read: Read a file", "bash: Run a command"},
+		Skills:   []direct.Skill{{Name: "review", Description: "Review a diff"}},
+		Agents:   []direct.AgentDef{{Name: "tester", Description: "Writes tests"}},
+		MCP:      []string{"calc: 1 tool(s): add"},
+		Commands: []direct.Command{{Name: "fix-issue", Description: "Fix an issue"}, {Name: "review", Description: "Review a diff"}}}, nil
+}
+
+func (f *fakeBackend) ExpandCommand(_ context.Context, _, name, args string) (string, bool, error) {
+	if name == "fix-issue" {
+		return "Fix issue " + args + " following our standards.", true, nil
+	}
+	return "", false, nil
 }
 
 func (f *fakeBackend) Route(_ context.Context, _, text string) (direct.Decision, error) {
@@ -369,6 +399,7 @@ func newChatHarness(t *testing.T, w, h int, be *fakeBackend) *harness {
 	hn := &harness{t: t, m: m, be: be, q: make(chan tea.Msg, 1024)}
 	m.send = func(msg tea.Msg) { hn.q <- msg }
 	be.SetPrompter(m.prompt)
+	be.SetAsker(m.askUser)
 	hn.run(m.Init())
 	hn.send(tea.WindowSizeMsg{Width: w, Height: h})
 	return hn
@@ -1367,5 +1398,87 @@ func TestChatForcedModes(t *testing.T) {
 	hn.drain()
 	if len(be.routed) != 1 {
 		t.Fatalf("auto did not route: %v", be.routed)
+	}
+}
+
+func TestChatToolsUndoTodosAndCustomCommands(t *testing.T) {
+	be := directBackend()
+	be.chatEvents = append(be.chatEvents, direct.Event{Kind: direct.EventTodos, Text: "[x] read\n[>] fix\n[ ] test"},
+		direct.Event{Kind: direct.EventQuestion, Text: "Which one?", Output: "the first"},
+		direct.Event{Kind: direct.EventSubagent, Tool: "explore", Text: string(direct.EventToolStart), Summary: "grep Needle"})
+	hn := newChatHarness(t, 140, 48, be)
+	hn.say("/tools")
+	hn.drain()
+	hn.mustSee("Tools", "read", "Read a file", "/review", "tester", "calc: 1 tool(s)", "2 command template(s)")
+	hn.say("/undo")
+	hn.mustSee("Nothing to undo yet")
+	hn.say("fix the typo in client.go")
+	hn.drain()
+	hn.mustSee("[>] fix", "? Which one? → the first", "↳ explore: grep Needle")
+	hn.say("/todos")
+	hn.mustSee("Tasks", "[ ] test")
+	hn.say("/undo")
+	hn.drain()
+	hn.mustSee("Restored a.go, b.go")
+	if len(be.undos) != 1 || be.undos[0] != "s-1" {
+		t.Fatalf("undos = %v", be.undos)
+	}
+	// Custom command templates expand and are suggested.
+	hn.typeText("/fix")
+	hn.mustSee("/fix-issue", "Fix an issue")
+	hn.keys("esc")
+	hn.say("/fix-issue 42")
+	hn.drain()
+	if req := be.lastChat(); req.Message != "Fix issue 42 following our standards." {
+		t.Fatalf("expanded = %q", req.Message)
+	}
+	hn.say("/nope")
+	hn.drain()
+	hn.mustSee("Unknown command /nope")
+}
+
+func TestChatShellPassthrough(t *testing.T) {
+	be := directBackend()
+	hn := newChatHarness(t, 140, 40, be)
+	n := len(be.chats)
+	hn.say("!!echo hello-there")
+	hn.drain()
+	hn.mustSee("$ echo hello-there", "hello-there")
+	if len(be.chats) != n {
+		t.Fatal("!! told the agent")
+	}
+	hn.say("!echo shared")
+	hn.drain()
+	if req := be.lastChat(); !strings.Contains(req.Message, "I ran `echo shared`") || !strings.Contains(req.Message, "shared") || req.Mode != direct.ModeChat {
+		t.Fatalf("! request = %+v", req)
+	}
+}
+
+func TestChatAnswersAgentQuestion(t *testing.T) {
+	be := directBackend()
+	hn := newChatHarness(t, 140, 40, be)
+	res := make(chan string, 1)
+	go func() {
+		a, _ := be.asker(context.Background(), "Tabs or spaces?", []string{"tabs", "spaces"})
+		res <- a
+	}()
+	for range 20 {
+		hn.drain()
+		if strings.Contains(hn.screen(), "The agent asks") {
+			break
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	hn.mustSee("The agent asks", "Tabs or spaces?", "tabs", "Something else")
+	hn.keys("tab")
+	hn.typeText("spaces")
+	hn.keys("ctrl+s")
+	select {
+	case a := <-res:
+		if a != "spaces" {
+			t.Fatalf("answer = %q", a)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("no answer")
 	}
 }

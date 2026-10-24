@@ -26,6 +26,7 @@ import (
 
 	"github.com/akynte/boundedcode/internal/contextplan"
 	"github.com/akynte/boundedcode/internal/inference"
+	"github.com/akynte/boundedcode/internal/repointel"
 )
 
 // Approval modes (config direct.approval).
@@ -46,6 +47,9 @@ type Message struct {
 	// Reasoning is the model's reasoning text (llama.cpp reasoning_content),
 	// kept for display and not sent back.
 	Reasoning string `json:"reasoning,omitempty"`
+	// Parts, when set, is multipart content (text and inline images) sent
+	// instead of Content.
+	Parts []map[string]any `json:"parts,omitempty"`
 }
 
 // ToolCall is an OpenAI-shaped function call.
@@ -72,6 +76,9 @@ const (
 	EventNote      EventKind = "note"       // informational
 	EventDone      EventKind = "done"       // the turn ended
 	EventMode      EventKind = "mode"       // the mode changed during the turn (Text: new mode, Summary: why)
+	EventTodos     EventKind = "todos"      // the task list changed (Text: rendered list)
+	EventQuestion  EventKind = "question"   // the agent asked the user (Text: question, Output: answer)
+	EventSubagent  EventKind = "subagent"   // a sub-agent's event (Tool: agent name, Text: nested kind)
 )
 
 // Event is what a Sink receives while a message is processed.
@@ -152,6 +159,29 @@ type Options struct {
 	// the request can run as a bounded task, unless AllowRisky is set.
 	Mode       string
 	AllowRisky bool
+	// Web configures web_fetch and web_search.
+	Web WebOptions
+	// Permissions are allow and deny rules applied before approval.
+	Permissions Rules
+	// Hooks run around tools and turns.
+	Hooks []Hook
+	// MCP servers whose tools are offered to the model.
+	MCP []MCPServer
+	// CheckpointDir keeps copies of files before direct mode changes them
+	// ("" = no checkpoints, no undo).
+	CheckpointDir string
+	// MemoryFile receives save_memory notes ("" = <config>/AGENTS.md is
+	// not configured; the tool is then absent).
+	MemoryFile string
+	// SkillDirs and AgentDirs are searched for skills and agent
+	// definitions (project and user locations).
+	SkillDirs []string
+	AgentDirs []string
+	// NoSubagents disables the task tool (set for sub-agents).
+	NoSubagents bool
+	// ReadOnly offers only tools that do not change files or run commands
+	// other than safe ones (explore sub-agents).
+	ReadOnly bool
 }
 
 // Runner processes messages of one session.
@@ -165,6 +195,27 @@ type Runner struct {
 	toolsErr error
 	handoff  *Handoff
 	mu       sync.Mutex
+	// Asker answers ask_user questions (nil: the tool reports that no user
+	// is available).
+	Asker Asker
+	// Nav, when set, offers symbol tools backed by a language server.
+	Nav repointel.Navigator
+	// Todos is the session's task list (todo_write).
+	Todos []Todo
+	// plan is set while plan mode is on (no changes until the plan is
+	// approved through exit_plan_mode).
+	plan     bool
+	bg       *shells
+	cp       *checkpoints
+	mcp      []*mcpClient
+	mcpOnce  sync.Once
+	skills   []Skill
+	agents   []AgentDef
+	loadOnce sync.Once
+	// Depth is the sub-agent nesting depth (0 = the user's agent).
+	Depth int
+	// pendingImages are images read by tools, sent after the tool results.
+	pendingImages []Message
 	// extraSystem is appended to the system prompt (tests, hand-offs).
 	ExtraSystem string
 }
@@ -217,9 +268,16 @@ func (r *Runner) Send(ctx context.Context, text string) (string, error) {
 	if r.Session.Title == "" {
 		r.Session.Title = title(text)
 	}
-	if err := r.Session.Append(Message{Role: "user", Content: text}); err != nil {
+	if res := r.runHooks(ctx, HookUserPrompt, HookInput{Prompt: text}); res.Block {
+		return "", fmt.Errorf("blocked by a hook: %s", res.Reason)
+	} else if res.Extra != "" {
+		text += "\n\n" + res.Extra
+	}
+	um := r.attach(text)
+	if err := r.Session.Append(um); err != nil {
 		return "", err
 	}
+	r.checkpointsTurn()
 	tools := r.toolList()
 	final := ""
 	start := Usage{}
@@ -256,6 +314,14 @@ func (r *Runner) Send(ctx context.Context, text string) (string, error) {
 			return final, err
 		}
 		if len(msg.ToolCalls) == 0 {
+			if res := r.runHooks(ctx, HookStop, HookInput{Prompt: msg.Content}); res.Block && !nudged {
+				nudged = true
+				r.emit(Event{Kind: EventNote, Text: "A stop hook asked to continue: " + res.Reason})
+				if err := r.Session.Append(Message{Role: "user", Content: res.Reason}); err != nil {
+					return final, err
+				}
+				continue
+			}
 			// Smaller models sometimes narrate what they are about to do
 			// instead of doing it. One nudge per message.
 			if !nudged && looksLikeIntent(msg.Content) {
@@ -295,6 +361,12 @@ func (r *Runner) Send(ctx context.Context, text string) (string, error) {
 				return final, ErrInterrupted
 			}
 		}
+		for _, im := range r.pendingImages {
+			if err := r.Session.Append(im); err != nil {
+				return final, err
+			}
+		}
+		r.pendingImages = nil
 	}
 	r.emit(Event{Kind: EventNote, Text: fmt.Sprintf("Stopped after %d model calls for this message (direct.max_turns). Send a message to continue.", r.maxTurns())})
 	return final, nil
@@ -372,7 +444,11 @@ func (r *Runner) wireMessages() []map[string]any {
 				w["tool_calls"] = m.ToolCalls
 			}
 		default:
-			w["content"] = m.Content
+			if len(m.Parts) > 0 {
+				w["content"] = m.Parts
+			} else {
+				w["content"] = m.Content
+			}
 		}
 		out = append(out, w)
 	}
@@ -553,6 +629,13 @@ func changedSince(before, after map[string]string) []string {
 	}
 	sort.Strings(out)
 	return out
+}
+
+// SetAsker installs the function that answers ask_user questions; the
+// tool set is rebuilt so the tool appears.
+func (r *Runner) SetAsker(a Asker) {
+	r.Asker = a
+	r.tools = nil
 }
 
 // Mode returns the current mode of the runner ("" counts as code).

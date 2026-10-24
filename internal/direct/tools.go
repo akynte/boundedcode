@@ -60,10 +60,67 @@ func toolSchemas(tools []Tool) []map[string]any {
 
 func (r *Runner) toolList() []Tool {
 	if r.tools == nil {
-		r.tools = defaultTools()
+		r.tools = r.buildTools()
 	}
 	return r.tools
 }
+
+// buildTools assembles the tool set for this runner's options.
+func (r *Runner) buildTools() []Tool {
+	r.loadOnce.Do(r.loadDefinitions)
+	var ts []Tool
+	if r.Opts.ReadOnly {
+		ts = []Tool{readTool(), readManyTool(), bashTool(), grepTool(), globTool(), lsTool()}
+	} else {
+		ts = append(defaultTools(), multiEditTool(), readManyTool(), notebookReadTool(), notebookEditTool(),
+			bashOutputTool(), killShellTool(), todoTool(), enterPlanTool(), exitPlanTool())
+	}
+	ts = append(ts, webFetchTool(), webSearchTool())
+	if r.Asker != nil {
+		ts = append(ts, askUserTool())
+	}
+	if r.Opts.MemoryFile != "" && !r.Opts.ReadOnly {
+		ts = append(ts, saveMemoryTool())
+	}
+	if len(r.skills) > 0 {
+		ts = append(ts, skillTool())
+	}
+	if !r.Opts.NoSubagents && !r.Opts.ReadOnly && r.Depth < 2 {
+		ts = append(ts, taskTool())
+	}
+	if r.Nav != nil {
+		ts = append(ts, findSymbolTool(), findReferencesTool(), findImplementationsTool())
+	}
+	ts = append(ts, r.mcpTools()...)
+	return ts
+}
+
+// permissionArg is the part of a call that permission rules match:
+// the command for bash, the path for file tools, the host for web tools.
+func permissionArg(t *Tool, args map[string]any) string {
+	switch t.Name {
+	case "bash":
+		return str(args, "command")
+	case "web_fetch":
+		return hostOf(str(args, "url"))
+	case "web_search":
+		return str(args, "query")
+	}
+	if p := str(args, "path"); p != "" {
+		return p
+	}
+	return ""
+}
+
+func errString(err error) string {
+	if err == nil {
+		return ""
+	}
+	return err.Error()
+}
+
+// Tools lists the tools this runner offers.
+func (r *Runner) Tools() []Tool { return r.toolList() }
 
 func (r *Runner) findTool(name string) *Tool {
 	for i := range r.toolList() {
@@ -96,6 +153,15 @@ func (r *Runner) runTool(ctx context.Context, call ToolCall) string {
 			return "error: " + err.Error()
 		}
 	}
+	spec := t.Name + "(" + permissionArg(t, args) + ")"
+	if why, denied := r.Opts.Permissions.Denied(spec); denied {
+		r.emit(Event{Kind: EventDenied, Tool: t.Name, CallID: call.ID, Summary: summary, Err: why})
+		return "error: " + why
+	}
+	if t.Mutates && r.plan {
+		r.emit(Event{Kind: EventDenied, Tool: t.Name, CallID: call.ID, Summary: summary, Err: "plan mode"})
+		return "Plan mode is on: no files are changed and no commands other than read-only ones run until the plan is approved. Finish the plan and call exit_plan_mode."
+	}
 	if t.Mutates {
 		rel := ""
 		if t.Name != "bash" {
@@ -105,15 +171,19 @@ func (r *Runner) runTool(ctx context.Context, call ToolCall) string {
 			}
 		} else if r.Opts.Mode != ModeChat || isSafeCommand(str(args, "command")) {
 			// a safe command is not a change; an unsafe one in chat mode is
-			goto consent
+			goto hooks
 		}
 		if !r.mutating(t.Name, rel) {
 			r.emit(Event{Kind: EventDenied, Tool: t.Name, CallID: call.ID, Summary: summary, Err: "handed off to verification"})
 			return "This change is being handed off to a verified task; stop here."
 		}
 	}
-consent:
-	if t.Consent != nil {
+hooks:
+	if res := r.runHooks(ctx, HookPreTool, HookInput{Tool: t.Name, Args: args}); res.Block {
+		r.emit(Event{Kind: EventDenied, Tool: t.Name, CallID: call.ID, Summary: summary, Err: "blocked by a hook: " + res.Reason})
+		return "error: blocked by a hook: " + res.Reason
+	}
+	if t.Consent != nil && !r.Opts.Permissions.Allowed(spec) {
 		if detail, needed := t.Consent(r, args); needed {
 			if r.Approve == nil || !r.Approve(ctx, ApprovalRequest{Tool: t.Name, Summary: summary, Detail: detail}) {
 				r.emit(Event{Kind: EventDenied, Tool: t.Name, CallID: call.ID, Summary: summary, Err: "not approved"})
@@ -121,10 +191,18 @@ consent:
 			}
 		}
 	}
+	if t.Mutates && t.Name != "bash" {
+		if abs, _, err := r.resolve(str(args, "path")); err == nil {
+			r.checkpoint(abs)
+		}
+	}
 	r.emit(Event{Kind: EventToolStart, Tool: t.Name, CallID: call.ID, Summary: summary, Args: args})
 	start := time.Now()
 	out, err := t.Run(ctx, r, args)
 	el := time.Since(start)
+	if res := r.runHooks(ctx, HookPostTool, HookInput{Tool: t.Name, Args: args, Result: clipOutput(out), Error: errString(err)}); res.Extra != "" {
+		out += "\n\n[hook] " + res.Extra
+	}
 	if err != nil {
 		r.emit(Event{Kind: EventToolEnd, Tool: t.Name, CallID: call.ID, Summary: summary, Err: err.Error(), Elapsed: el, Output: out})
 		if out == "" {
@@ -302,6 +380,20 @@ func readTool() Tool {
 				return "", err
 			}
 			defer f.Close()
+			if mime := imageMime(abs); mime != "" {
+				if st.Size() > maxImageBytes {
+					return fmt.Sprintf("%s is an image of %d bytes, above the %d-byte limit", rel, st.Size(), maxImageBytes), nil
+				}
+				data, err := os.ReadFile(abs)
+				if err != nil {
+					return "", err
+				}
+				r.attachImage(rel, mime, data)
+				return fmt.Sprintf("[image %s (%s, %d bytes) attached to the conversation; look at it in the next message]", rel, mime, len(data)), nil
+			}
+			if strings.HasSuffix(strings.ToLower(abs), ".ipynb") {
+				return notebookText(abs, rel)
+			}
 			buf := make([]byte, min(st.Size(), 4<<20))
 			n, _ := f.Read(buf)
 			buf = buf[:n]
@@ -563,9 +655,10 @@ func bashTool() Tool {
 		Name:        "bash",
 		Description: desc,
 		Schema: schema(map[string]any{
-			"command":     prop("string", "The command line to run"),
-			"timeout":     prop("integer", "Seconds before the command is killed (default from configuration)"),
-			"description": prop("string", "What the command is for, in a few words"),
+			"command":           prop("string", "The command line to run"),
+			"timeout":           prop("integer", "Seconds before the command is killed (default from configuration)"),
+			"description":       prop("string", "What the command is for, in a few words"),
+			"run_in_background": prop("boolean", "Start the command and return a shell id at once; read its output later with bash_output and stop it with kill_shell (servers, long builds)"),
 		}, "command"),
 		Mutates: true,
 		Summary: func(a map[string]any) string {
@@ -575,6 +668,12 @@ func bashTool() Tool {
 			cmd := str(a, "command")
 			if strings.TrimSpace(cmd) == "" {
 				return errors.New("command is empty")
+			}
+			if r.Opts.ReadOnly && !isSafeCommand(cmd) {
+				return errors.New("this agent is read-only: only inspection, build and test commands run")
+			}
+			if r.plan && !isSafeCommand(cmd) {
+				return errors.New("plan mode: only read-only, build and test commands run until the plan is approved")
 			}
 			return policy.CheckCommand(shellArgv(cmd))
 		},
@@ -606,6 +705,9 @@ func bashTool() Tool {
 			}
 			if s := num(a, "timeout"); s > 0 {
 				timeout = time.Duration(s) * time.Second
+			}
+			if boolean(a, "run_in_background") {
+				return r.shells().start(argv, r.cwd(), str(a, "description"))
 			}
 			cctx, cancel := context.WithTimeout(ctx, timeout)
 			defer cancel()
@@ -857,6 +959,9 @@ func matchGlob(glob, rel string) bool {
 			return false
 		}
 		rest := strings.TrimPrefix(strings.TrimPrefix(rel, pre), "/")
+		if post == "" {
+			return true
+		}
 		return matchGlob("**/"+post, rest)
 	}
 	ok, _ := path.Match(glob, rel)

@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -118,15 +119,29 @@ func (a *App) directRunner(ctx context.Context, dir, sessionID, modelOverride, a
 		}
 	}
 	rec := telemetry.New(a.st.DB, a.Log)
-	r := &direct.Runner{
-		Gateway: ep.newGateway(sess.ID),
-		Session: sess,
-		Opts: direct.Options{
-			Root: root, Dir: cwd, Approval: approval, MaxTurns: a.Config.Direct.MaxTurns,
-			CommandTimeout: a.Config.Direct.CommandTimeout.D(), ContextTokens: ep.ctxSize,
-			MaxOutputTokens: a.Config.Agent.MaxOutputTokens, Instructions: a.Config.Direct.Instructions,
-			UserInstructions: a.userInstructionsFile(),
-		},
+	dc := a.Config.Direct
+	opts := direct.Options{
+		Root: root, Dir: cwd, Approval: approval, MaxTurns: dc.MaxTurns,
+		CommandTimeout: dc.CommandTimeout.D(), ContextTokens: ep.ctxSize,
+		MaxOutputTokens: a.Config.Agent.MaxOutputTokens, Instructions: dc.Instructions,
+		UserInstructions: a.userInstructionsFile(),
+		Web:              direct.WebOptions{AllowHosts: dc.Web.AllowHosts, SearchURL: dc.Web.SearchURL},
+		Permissions:      direct.Rules{Allow: dc.Permissions.Allow, Deny: dc.Permissions.Deny},
+		MemoryFile:       a.userInstructionsFile(),
+		SkillDirs: []string{filepath.Join(root, ".boundedcode", "skills"), filepath.Join(root, ".agents", "skills"), filepath.Join(root, ".claude", "skills"),
+			filepath.Join(a.Paths.Config, "skills")},
+		AgentDirs: []string{filepath.Join(root, ".boundedcode", "agents"), filepath.Join(root, ".claude", "agents"), filepath.Join(a.Paths.Config, "agents")},
+	}
+	for _, h := range dc.Hooks {
+		opts.Hooks = append(opts.Hooks, direct.Hook{Event: h.Event, Matcher: h.Matcher, Command: h.Command, Timeout: h.Timeout.D()})
+	}
+	opts.MCP = a.mcpServers(root)
+	if dc.CheckpointsOn() {
+		opts.CheckpointDir = filepath.Join(a.sessionsDir(), ".checkpoints", direct.ProjectKey(root))
+	}
+	r := &direct.Runner{Gateway: ep.newGateway(sess.ID), Session: sess, Opts: opts}
+	if nav, _ := a.serenaNavigator(ctx, a.Paths); nav != nil {
+		r.Nav = nav
 	}
 	// The audit log records what ran, never file contents or outputs.
 	r.Sink = func(e direct.Event) {
@@ -183,6 +198,48 @@ func (a *App) forcedMode(d direct.Decision) direct.Decision {
 	return d
 }
 
+// mcpServers merges the configured MCP servers with the project's
+// .boundedcode/mcp.json (or .mcp.json), in the common "mcpServers" form.
+func (a *App) mcpServers(root string) []direct.MCPServer {
+	var out []direct.MCPServer
+	names := map[string]bool{}
+	for name, m := range a.Config.Direct.MCP {
+		names[name] = true
+		out = append(out, direct.MCPServer{Name: name, Command: m.Command, Args: m.Args, Env: m.Env, Cwd: m.Cwd, Timeout: m.Timeout.D()})
+	}
+	for _, f := range []string{filepath.Join(root, ".boundedcode", "mcp.json"), filepath.Join(root, ".mcp.json")} {
+		b, err := os.ReadFile(f)
+		if err != nil {
+			continue
+		}
+		var doc struct {
+			Servers map[string]struct {
+				Command string            `json:"command"`
+				Args    []string          `json:"args"`
+				Env     map[string]string `json:"env"`
+				Cwd     string            `json:"cwd"`
+			} `json:"mcpServers"`
+		}
+		if err := json.Unmarshal(b, &doc); err != nil {
+			a.Log.Warn("ignoring MCP configuration", "file", f, "err", err)
+			continue
+		}
+		for name, m := range doc.Servers {
+			if names[name] || m.Command == "" {
+				continue
+			}
+			names[name] = true
+			cwd := m.Cwd
+			if cwd == "" {
+				cwd = root
+			}
+			out = append(out, direct.MCPServer{Name: name, Command: m.Command, Args: m.Args, Env: m.Env, Cwd: cwd})
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+	return out
+}
+
 // projectRoot is the git top level containing dir, or dir itself.
 func projectRoot(dir string) (string, error) {
 	if dir == "" {
@@ -236,6 +293,70 @@ Examples:
 	cmd.Flags().StringVar(&f.approval, "approval", "", "ask|edits|auto (default: direct.approval in the configuration)")
 	cmd.Flags().BoolVar(&f.jsonEvents, "events", false, "print every event as a JSON line instead of text")
 	cmd.Flags().StringVar(&f.mode, "mode", "", "auto|chat|code|verify (default: direct.mode; auto routes from the message's intent and risk)")
+	cmd.AddCommand(&cobra.Command{
+		Use: "undo [SESSION]", Short: "Restore the files changed by the last turn of a session (the most recent session by default); repeat to go further back", Args: cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			id := "last"
+			if len(args) == 1 {
+				id = args[0]
+			}
+			root, err := projectRoot(f.dir)
+			if err != nil {
+				return err
+			}
+			path, err := direct.FindSession(app.sessionsDir(), root, id)
+			if err != nil {
+				return err
+			}
+			sess, err := direct.LoadSession(path)
+			if err != nil {
+				return err
+			}
+			r := &direct.Runner{Session: sess, Opts: direct.Options{Root: root, CheckpointDir: filepath.Join(app.sessionsDir(), ".checkpoints", direct.ProjectKey(root))}}
+			restored, err := r.Undo()
+			if err != nil {
+				return err
+			}
+			app.printf("restored %s\n", strings.Join(restored, ", "))
+			return nil
+		},
+	}, &cobra.Command{
+		Use: "tools", Short: "List the tools direct mode offers here (built-in, skills, agents, MCP)", Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			root, err := projectRoot(f.dir)
+			if err != nil {
+				return err
+			}
+			r := &direct.Runner{Session: &direct.Session{}, Opts: direct.Options{Root: root, MemoryFile: app.userInstructionsFile(), MCP: app.mcpServers(root)}}
+			r.Asker = func(context.Context, string, []string) (string, error) { return "", nil }
+			for _, t := range r.Tools() {
+				app.printf("%-24s %s\n", t.Name, oneLineText(t.Description, 100))
+			}
+			if sk := r.Skills(); len(sk) > 0 {
+				app.printf("\nskills:\n")
+				for _, s := range sk {
+					app.printf("  /%-22s %s\n", s.Name, oneLineText(s.Description, 100))
+				}
+			}
+			if ag := r.Agents(); len(ag) > 0 {
+				app.printf("\nagents:\n")
+				for _, s := range ag {
+					app.printf("  %-23s %s\n", s.Name, oneLineText(s.Description, 100))
+				}
+			}
+			if cs := r.Commands(app.Paths.Config); len(cs) > 0 {
+				app.printf("\ncommands (/name args):\n")
+				for _, c := range cs {
+					app.printf("  /%-22s %s\n", c.Name, oneLineText(c.Description, 100))
+				}
+			}
+			for _, l := range r.MCPStatus() {
+				app.printf("mcp %s\n", l)
+			}
+			r.Close()
+			return nil
+		},
+	})
 	cmd.AddCommand(&cobra.Command{
 		Use: "sessions", Short: "List stored direct-mode sessions of this project", Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
@@ -373,6 +494,32 @@ func (a *App) runChat(ctx context.Context, o chatOptions) error {
 		line, _ := bufio.NewReader(os.Stdin).ReadString('\n')
 		return strings.EqualFold(strings.TrimSpace(line), "y")
 	}
+	if interactive {
+		r.Asker = func(_ context.Context, q string, opts []string) (string, error) {
+			fmt.Fprintf(a.Err, "\n? %s\n", q)
+			for i, o := range opts {
+				fmt.Fprintf(a.Err, "  %d. %s\n", i+1, o)
+			}
+			fmt.Fprint(a.Err, "> ")
+			line, _ := bufio.NewReader(os.Stdin).ReadString('\n')
+			line = strings.TrimSpace(line)
+			var n int
+			if _, err := fmt.Sscanf(line, "%d", &n); err == nil && n >= 1 && n <= len(opts) {
+				return opts[n-1], nil
+			}
+			return line, nil
+		}
+	}
+	// /name args runs a project or user command template.
+	if strings.HasPrefix(prompt, "/") {
+		name, args, _ := strings.Cut(strings.TrimPrefix(prompt, "/"), " ")
+		if expanded, ok, err := r.ExpandCommand(ctx, a.Paths.Config, strings.TrimSpace(name), strings.TrimSpace(args)); err != nil {
+			return err
+		} else if ok {
+			prompt = expanded
+		}
+	}
+	defer r.Close()
 	audit := r.Sink
 	enc := json.NewEncoder(a.Out)
 	r.Sink = func(e direct.Event) {
@@ -394,6 +541,14 @@ func (a *App) runChat(ctx context.Context, o chatOptions) error {
 			fmt.Fprintf(a.Err, "· %s\n", e.Text)
 		case direct.EventMode:
 			fmt.Fprintf(a.Err, "· mode: %s (%s)\n", e.Text, e.Summary)
+		case direct.EventTodos:
+			fmt.Fprintf(a.Err, "· tasks:\n%s\n", indentLines(e.Text, "    "))
+		case direct.EventQuestion:
+			fmt.Fprintf(a.Err, "? %s\n  → %s\n", e.Text, e.Output)
+		case direct.EventSubagent:
+			if e.Text == string(direct.EventToolStart) {
+				fmt.Fprintf(a.Err, "  ↳ %s: %s\n", e.Tool, e.Summary)
+			}
 		case direct.EventText:
 			fmt.Fprintln(a.Out, e.Text)
 		case direct.EventDone:
@@ -418,6 +573,18 @@ func (a *App) runChat(ctx context.Context, o chatOptions) error {
 		return runBounded(ctx, a, o.dir, prompt, o.model)
 	}
 	return err
+}
+
+func oneLineText(s string, n int) string {
+	s = strings.Join(strings.Fields(s), " ")
+	if len(s) > n {
+		return s[:n] + "…"
+	}
+	return s
+}
+
+func indentLines(s, pre string) string {
+	return pre + strings.ReplaceAll(strings.TrimRight(s, "\n"), "\n", "\n"+pre)
 }
 
 func humanInt(n int) string {

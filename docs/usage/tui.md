@@ -80,6 +80,14 @@ The agent reads the project's instruction file (`AGENTS.md`,
 `BOUNDEDCODE.md`, `CLAUDE.md` or `.boundedcode/instructions.md`) and your
 own `<config>/AGENTS.md`.
 
+Its tools are the ones other coding agents have, and a few more: read,
+write, edit, multi_edit, read_many, notebook_read/edit, bash (with
+background shells), grep, glob, ls, web_fetch, web_search, todo_write,
+ask_user (a dialog opens), plan mode, sub-agents (`task`), skills,
+save_memory, language-server symbols when Serena is enabled, and the tools
+of configured MCP servers. The full matrix against Pi, Qwen Code and
+Claude Code is in [tool coverage](../design/tool-coverage.md).
+
 Direct mode needs only the configuration and the model: no Docker, no
 repository tools, and the folder need not be a git repository. When a
 change is sensitive (authentication, payments, migrations, shared
@@ -130,6 +138,13 @@ Commands (type `/` for suggestions; `tab` completes):
 | Command | |
 |---|---|
 | `/task REQUEST` | run the request as a verified task now |
+| `/undo` | restore the files changed by the last turn (repeat to go further back) |
+| `/tools` (also `/skills`, `/mcp`, `/agents`) | what the agent can use here |
+| `/todos` | the agent's task list |
+| `/init` | write an `AGENTS.md` for the project |
+| `/name args` | a project or user command template (`.boundedcode/commands/name.md`) or skill |
+| `!cmd`, `!!cmd` | run a shell command here; `!` shows the agent the output, `!!` does not |
+| `@path` in a message | attach a file (or image) from the project |
 | `/code MESSAGE`, `/chat MESSAGE` | force one message into code or chat |
 | `/mode [auto\|chat\|code\|verify]` | automatic routing (default), or a forced mode |
 | `/approval [ask\|edits\|auto]` | what needs your consent in direct mode |

@@ -21,6 +21,27 @@ used on real work or measured.
 - `direct.mode: auto|chat|code|verify`, `direct.max_files`; `/mode`,
   `/task`, `/code`, `/chat` and `bcode chat --mode` override the router.
 
+### Tool coverage (Pi, Qwen Code, Claude Code equivalents)
+
+See [docs/design/tool-coverage.md](docs/design/tool-coverage.md).
+
+- New tools: `multi_edit`, `read_many`, `notebook_read`, `notebook_edit`,
+  `bash run_in_background` with `bash_output` and `kill_shell`,
+  `web_fetch` (with an optional question answered from the page),
+  `web_search`, `todo_write`, `ask_user`, `enter_plan_mode` and
+  `exit_plan_mode`, `task` (sub-agents: `explore`, `general`, custom
+  `.boundedcode/agents/*.md`), `skill` (`.boundedcode/skills/*/SKILL.md`),
+  `save_memory`, `find_symbol`/`find_references`/`find_implementations`
+  (Serena), and the tools of stdio MCP servers (`direct.mcp`,
+  `.boundedcode/mcp.json`).
+- `read` attaches images for vision models; `@path` in a message attaches
+  files and images.
+- Checkpoints before every change: `/undo` and `bcode chat undo`.
+- Permission rules `direct.permissions.allow/deny` (`tool(pattern)`), hooks
+  (`pre_tool`, `post_tool`, `user_prompt`, `stop`), command templates
+  (`.boundedcode/commands/*.md`, `/name args`), `!cmd` and `!!cmd`,
+  `/tools`, `/todos`, `/init`, `bcode chat tools`.
+
 ### Direct mode
 
 - `bcode` chat now runs on **direct mode** for chat and code: a native

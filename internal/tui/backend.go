@@ -86,6 +86,29 @@ type Backend interface {
 	Sessions(ctx context.Context, dir string) ([]direct.SessionInfo, error)
 	// Route decides how a message is handled: chat, code or verify.
 	Route(ctx context.Context, dir, text string) (direct.Decision, error)
+	// SetAsker installs the function that answers the agent's questions
+	// (ask_user); it blocks until answered or ctx ends.
+	SetAsker(a Asker)
+	// Undo restores the files changed by the last turn of a session.
+	Undo(ctx context.Context, dir, sessionID string) ([]string, error)
+	// DirectInfo describes what direct mode offers in a project: tools,
+	// skills, agents, MCP servers and user commands.
+	DirectInfo(ctx context.Context, dir string) (DirectInfo, error)
+	// ExpandCommand resolves "/name args" against the project's and the
+	// user's command templates; ok is false when there is no such command.
+	ExpandCommand(ctx context.Context, dir, name, args string) (prompt string, ok bool, err error)
+}
+
+// Asker answers a question from the agent; options may be empty.
+type Asker func(ctx context.Context, question string, options []string) (string, error)
+
+// DirectInfo lists direct mode's capabilities in a project.
+type DirectInfo struct {
+	Tools    []string // name: description
+	Skills   []direct.Skill
+	Agents   []direct.AgentDef
+	MCP      []string
+	Commands []direct.Command
 }
 
 // ChatRequest is one direct-mode message.

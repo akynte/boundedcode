@@ -46,6 +46,9 @@ How to work:
 	for _, k := range keys {
 		fmt.Fprintf(&b, "- %s: %s\n", k, env[k])
 	}
+	if sk := r.skillsPrompt(); sk != "" {
+		b.WriteString("\n" + sk + "\n")
+	}
 	if ins := r.projectInstructions(); ins != "" {
 		b.WriteString("\nProject instructions (from the repository; follow them):\n\n")
 		b.WriteString(ins)

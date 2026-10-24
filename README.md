@@ -63,6 +63,10 @@ BoundedCode routes every request to one of three modes, automatically
   proof runs as a bounded task.
 
 A code turn that reaches a risky file hands off to verify before editing.
+The agent's tools match what Pi, Qwen Code and Claude Code offer (files,
+shell with background jobs, search, web, notebooks, task list, questions,
+plan mode, sub-agents, skills, memory, MCP servers, hooks, `@file`, `!cmd`,
+undo); see the [coverage matrix](docs/design/tool-coverage.md).
 
 **Bounded mode** (verify; also `/task` or `bcode task create`) is for
 changes that must be trusted. It does not implement a new agent loop. It wraps an existing

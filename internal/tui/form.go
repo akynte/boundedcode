@@ -216,6 +216,8 @@ type form struct {
 	onSubmit                  func(formValues) (tea.Cmd, error)
 	// onChange runs after every update (dependent fields).
 	onChange func(*form)
+	// onClose runs when the form is dismissed with esc.
+	onClose func()
 }
 
 func newForm(title, intro, submit string, fields []*field, onSubmit func(formValues) (tea.Cmd, error)) *form {
@@ -287,6 +289,9 @@ func (f *form) handle(msg tea.Msg) (bool, tea.Cmd) {
 		f.err = ""
 		switch k.String() {
 		case "esc":
+			if f.onClose != nil {
+				f.onClose()
+			}
 			return true, nil
 		case "ctrl+s":
 			return f.submit()

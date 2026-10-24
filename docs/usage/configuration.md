@@ -146,6 +146,25 @@ The model is the configured provider (`inference`); `--model` or `/model`
 override it per session. `agent.max_output_tokens` caps one response here
 too. Sessions are stored under `<data>/sessions/<project>/`.
 
+Further keys under `direct` (see the [tool coverage](../design/tool-coverage.md)):
+
+| Key | Default | Meaning |
+|---|---|---|
+| `web.allow_hosts` | none | Hosts `web_fetch` may read without asking (`docs.example.com`, or `.example.com` for subdomains). Other hosts ask in `ask` and `edits` modes. |
+| `web.search_url` | none | A SearXNG-style JSON endpoint with `{query}` for `web_search`; without it DuckDuckGo's HTML endpoint is used. |
+| `permissions.allow`, `permissions.deny` | none | Rules `tool(pattern)`: `bash(go test *)`, `edit(src/**)`, `web_fetch(docs.example.com)`, `read(.env*)`. Deny refuses the call; allow skips the approval prompt. The command policy still applies. |
+| `hooks` | none | List of `{event, matcher, command, timeout}`. Events: `pre_tool` (exit 2 or `{"decision":"deny"}` blocks the tool), `post_tool` (stdout is shown to the model), `user_prompt` (exit 2 blocks the message, stdout is appended), `stop` (exit 2 asks the model to continue with stderr as the reason). `matcher` is a regular expression on the tool name. The event's data arrives as JSON on stdin. |
+| `mcp` | none | Map of MCP servers started over stdio: `{command, args, env, cwd, timeout}`. Their tools are offered as `mcp__<server>__<tool>` and ask before running (except in `auto`). A project's `.boundedcode/mcp.json` or `.mcp.json` (`{"mcpServers": {...}}`) adds servers. |
+| `checkpoints` | `true` | Keep a copy of every file before direct mode changes it, per turn, for `/undo` and `bcode chat undo`. |
+
+Project files direct mode reads: `.boundedcode/skills/<name>/SKILL.md`
+(skills; also `.agents/skills`, `.claude/skills`), `.boundedcode/agents/*.md`
+(sub-agents: frontmatter `name`, `description`, `read_only`; the body is the
+agent's prompt), `.boundedcode/commands/*.md` (command templates with
+`$ARGUMENTS`, `$1`…, `` !`cmd` ``; also `.claude/commands`). The user's
+own live under `<config>/skills`, `<config>/agents`, `<config>/commands`;
+`<config>/AGENTS.md` holds saved memory.
+
 ### `repointel`
 
 | Key | Default | Notes |

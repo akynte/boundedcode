@@ -16,6 +16,7 @@
 |---|---|
 | [System architecture](architecture/system-architecture.md) | Processes, interfaces, control loop, context planning, package map |
 | [Everyday development: direct mode](design/everyday-agent.md) | The two-mode product shape, the competitive gap, phases 17–23 and what phase 17 built |
+| [Tool coverage](design/tool-coverage.md) | Every Pi, Qwen Code and Claude Code tool and capability, and its BoundedCode equivalent |
 | [Sandbox design](design/sandbox.md) | Threat model, controls, adversarial tests, residual risks |
 | [Cross-repository compatibility](design/cross-repo-compatibility.md) | The experimental gRPC/protobuf/OpenAPI gate |
 | [Cross-service analysis](design/cross-service-analysis.md) | Contract detection across repositories |
