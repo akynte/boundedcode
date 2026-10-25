@@ -34,12 +34,17 @@ type Session struct {
 }
 
 type sessionLine struct {
-	Type    string   `json:"type"` // "session" | "message" | "compact"
+	Type    string   `json:"type"` // "session" | "message" | "compact" | "elide"
 	Session *Session `json:"session,omitempty"`
 	Message *Message `json:"message,omitempty"`
 	// Keep is the number of trailing messages kept after a compaction;
 	// the summary message follows as a normal message line.
 	Keep int `json:"keep,omitempty"`
+	// Index and Stub record a tool result set aside to save context: the
+	// message at Index (in the history as it was then) keeps its text as
+	// Elided and shows Stub instead.
+	Index int    `json:"index,omitempty"`
+	Stub  string `json:"stub,omitempty"`
 }
 
 // NewSession creates a session for root, stored under dir (the sessions
@@ -100,6 +105,16 @@ func (s *Session) replace(summary Message, keep []Message) error {
 		return err
 	}
 	return s.writeLine(sessionLine{Type: "message", Message: &summary})
+}
+
+// elide records that the message at index i was set aside (its text is
+// already moved to Elided and replaced by stub in memory).
+func (s *Session) elide(i int, stub string) error {
+	s.Updated = time.Now().UTC()
+	if s.Path == "" {
+		return nil
+	}
+	return s.writeLine(sessionLine{Type: "elide", Index: i, Stub: stub})
 }
 
 func (s *Session) writeLine(l sessionLine) error {
@@ -164,6 +179,13 @@ func LoadSession(path string) (*Session, error) {
 			}
 			s.Compactions++
 			summaryNext = true
+		case "elide":
+			if s == nil || l.Index < 0 || l.Index >= len(s.Messages) {
+				return nil, fmt.Errorf("%s line %d: elision of message %d out of range", path, n, l.Index)
+			}
+			if m := &s.Messages[l.Index]; m.Elided == "" {
+				m.Elided, m.Content = m.Content, l.Stub
+			}
 		}
 	}
 	if err := sc.Err(); err != nil {
@@ -300,6 +322,9 @@ func (s *Session) Markdown() string {
 			}
 		case "tool":
 			out := strings.TrimSpace(m.Content)
+			if m.Elided != "" {
+				out = strings.TrimSpace(m.Elided)
+			}
 			if len(out) > 1200 {
 				out = out[:1200] + "\n…"
 			}

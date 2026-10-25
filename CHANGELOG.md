@@ -5,6 +5,32 @@
 Experimental (ADR-0011, [design](docs/design/everyday-agent.md)). Not yet
 used on real work or measured.
 
+### Fast and lean on a small local model
+
+- The system prompt is identical from turn to turn: the environment (git
+  branch and status, date, working directory) and the mode framing travel
+  with the user message instead. An OpenAI-compatible server reuses its
+  prompt cache only for an unchanged prefix, so this removes a re-prefill
+  of the whole history on every turn (tens of seconds per turn on a
+  40K-token session at local prompt-processing speeds).
+- A working-set budget sized for the model, not the window
+  (`direct.working_set_tokens`: 32K tokens for a local model, 96K for a
+  cloud provider). Before each model call, the oldest tool results the
+  model has already seen are set aside behind a one-line placeholder
+  (never the two newest); the `recall` tool brings one back. The history
+  is summarised only when that is not enough. Set-aside results stay in
+  the session file and in `/export`.
+- Tool results are capped per provider (`direct.max_tool_output`: 16 KiB
+  local, 48 KiB cloud); `read` returns an outline of a file's definitions
+  (Go parsed, other languages by pattern, headings for prose) when the
+  file has more than 400 lines and no range was asked for; `grep` with
+  too many matches returns the count per file instead of a cut dump.
+- Every file change is checked right away (`direct.checks`): a Go parse
+  and `go build` of the package (`go vet` for a test file), `python3`,
+  `node`, `bash`, `ruby` and `php` syntax checks when installed, JSON and
+  YAML parsing. The verdict is appended to the tool result, so a
+  misplaced brace costs a sub-second check instead of a test run.
+
 ### Automatic modes: chat, code, verify (ADR-0012)
 
 - Every message is routed automatically: **chat** answers without changing

@@ -75,7 +75,7 @@ func (r *Runner) buildTools() []Tool {
 		ts = append(defaultTools(), multiEditTool(), readManyTool(), notebookReadTool(), notebookEditTool(),
 			bashOutputTool(), killShellTool(), todoTool(), enterPlanTool(), exitPlanTool())
 	}
-	ts = append(ts, webFetchTool(), webSearchTool())
+	ts = append(ts, webFetchTool(), webSearchTool(), recallTool())
 	if r.Asker != nil {
 		ts = append(ts, askUserTool())
 	}
@@ -226,7 +226,14 @@ hooks:
 	start := time.Now()
 	out, err := t.Run(ctx, r, args)
 	el := time.Since(start)
-	if res := r.runHooks(ctx, HookPostTool, HookInput{Tool: t.Name, Args: args, Result: clipOutput(out), Error: errString(err)}); res.Extra != "" {
+	if err == nil && t.Mutates && t.Name != "bash" && !r.Opts.NoChecks {
+		if abs, rel, rerr := r.resolve(str(args, "path")); rerr == nil {
+			if diag := r.checkFile(ctx, abs, rel); diag != "" {
+				out += "\n" + diag
+			}
+		}
+	}
+	if res := r.runHooks(ctx, HookPostTool, HookInput{Tool: t.Name, Args: args, Result: r.clip(out), Error: errString(err)}); res.Extra != "" {
 		out += "\n\n[hook] " + res.Extra
 	}
 	if err != nil {
@@ -234,20 +241,15 @@ hooks:
 		if out == "" {
 			return "error: " + err.Error()
 		}
-		return clipOutput(out) + "\nerror: " + err.Error()
+		return r.clip(out) + "\nerror: " + err.Error()
 	}
 	r.emit(Event{Kind: EventToolEnd, Tool: t.Name, CallID: call.ID, Summary: summary, Output: out, Elapsed: el})
-	return clipOutput(out)
+	return r.clip(out)
 }
 
-func clipOutput(s string) string {
-	if len(s) <= maxToolOutput {
-		return s
-	}
-	head := s[:maxToolOutput*2/3]
-	tail := s[len(s)-maxToolOutput/3:]
-	return head + fmt.Sprintf("\n… [%d bytes cut] …\n", len(s)-len(head)-len(tail)) + tail
-}
+// clipOutput applies the package-wide cap; runTool applies the runner's
+// (provider-dependent) cap on top.
+func clipOutput(s string) string { return clipTo(s, maxToolOutput) }
 
 // cwd is the working directory tools use (Opts.Dir, or the root).
 func (r *Runner) cwd() string {
@@ -381,7 +383,7 @@ func defaultTools() []Tool {
 func readTool() Tool {
 	return Tool{
 		Name:        "read",
-		Description: "Read a file in the project. Returns numbered lines. Use offset and limit for large files.",
+		Description: "Read a file in the project. Returns numbered lines. A file over 400 lines returns an outline of its definitions unless offset or limit is given; then read the region you need.",
 		Schema: schema(map[string]any{
 			"path":   prop("string", "File path, relative to the project root"),
 			"offset": prop("integer", "First line to return (1-based, default 1)"),
@@ -443,6 +445,11 @@ func readTool() Tool {
 			}
 			if offset > total {
 				return fmt.Sprintf("(file has %d lines; offset %d is past the end)", total, offset), nil
+			}
+			if num(a, "offset") <= 0 && num(a, "limit") <= 0 && total > outlineLines {
+				if o, ok := outline(rel, lines[:total]); ok {
+					return o, nil
+				}
 			}
 			end := min(total, offset-1+limit)
 			var b strings.Builder
@@ -877,20 +884,15 @@ func (r *Runner) relativizeMatches(out string) string {
 	if len(lines) == 1 && lines[0] == "" {
 		return "(no matches)"
 	}
-	cut := false
-	if len(lines) > maxGrepMatches {
-		lines, cut = lines[:maxGrepMatches], true
-	}
 	for i, l := range lines {
 		if strings.HasPrefix(l, root+string(filepath.Separator)) {
 			lines[i] = filepath.ToSlash(l[len(root)+1:])
 		}
 	}
-	s := strings.Join(lines, "\n")
-	if cut {
-		s += fmt.Sprintf("\n… (more than %d matches; narrow the pattern or path)", maxGrepMatches)
+	if len(lines) > maxGrepMatches {
+		return collapseMatches(lines, maxGrepMatches)
 	}
-	return s
+	return strings.Join(lines, "\n")
 }
 
 // goGrep is the fallback without ripgrep. mode is content, files or count;
@@ -906,6 +908,8 @@ func (r *Runner) goGrep(ctx context.Context, abs, pattern, glob string, ignoreCa
 	ctxLines = min(max(ctxLines, 0), 10)
 	var b strings.Builder
 	n := 0
+	perFile := map[string]int{}
+	var fileOrder []string
 	err = r.walk(abs, func(file, rel string, d fs.DirEntry) error {
 		if ctx.Err() != nil {
 			return ctx.Err()
@@ -925,13 +929,17 @@ func (r *Runner) goGrep(ctx context.Context, abs, pattern, glob string, ignoreCa
 				continue
 			}
 			hits++
+			if hits == 1 && mode == "content" {
+				fileOrder = append(fileOrder, rel)
+			}
 			if mode == "files" {
 				break
 			}
 			if mode == "count" {
 				continue
 			}
-			if ctxLines > 0 {
+			show := n < maxGrepMatches
+			if ctxLines > 0 && show {
 				if lastShown >= 0 && i-ctxLines > lastShown+1 {
 					b.WriteString("--\n")
 				}
@@ -939,16 +947,19 @@ func (r *Runner) goGrep(ctx context.Context, abs, pattern, glob string, ignoreCa
 					fmt.Fprintf(&b, "%s-%d-%s\n", rel, j+1, clipLine(lines[j]))
 				}
 			}
-			fmt.Fprintf(&b, "%s:%d:%s\n", rel, i+1, clipLine(l))
+			if show {
+				fmt.Fprintf(&b, "%s:%d:%s\n", rel, i+1, clipLine(l))
+			}
+			perFile[rel]++
 			lastShown = i
-			for j := i + 1; ctxLines > 0 && j <= i+ctxLines && j < len(lines); j++ {
+			for j := i + 1; ctxLines > 0 && show && j <= i+ctxLines && j < len(lines); j++ {
 				if re.MatchString(lines[j]) {
 					break
 				}
 				fmt.Fprintf(&b, "%s-%d-%s\n", rel, j+1, clipLine(lines[j]))
 				lastShown = j
 			}
-			if n++; n >= maxGrepMatches {
+			if n++; n >= maxGrepMatches*50 {
 				return errStop
 			}
 		}
@@ -972,6 +983,16 @@ func (r *Runner) goGrep(ctx context.Context, abs, pattern, glob string, ignoreCa
 	}
 	if b.Len() == 0 {
 		return "(no matches)", nil
+	}
+	if mode == "content" && n > maxGrepMatches {
+		// Too many matches to show: the count per file instead.
+		var lines []string
+		for _, f := range fileOrder {
+			for i := 0; i < perFile[f]; i++ {
+				lines = append(lines, f+":0:")
+			}
+		}
+		return collapseMatches(lines, maxGrepMatches), nil
 	}
 	s := strings.TrimRight(b.String(), "\n")
 	if n >= maxGrepMatches {

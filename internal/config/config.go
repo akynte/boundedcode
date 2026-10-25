@@ -80,6 +80,18 @@ type DirectConfig struct {
 	// Checkpoints keeps copies of files before direct mode changes them,
 	// for /undo (default true).
 	Checkpoints *bool `yaml:"checkpoints,omitempty"`
+	// WorkingSetTokens is the history budget the model is asked to attend
+	// to: older tool results are set aside (recallable) and the history is
+	// summarised to stay within it. 0 = 32K tokens for a local model, 96K
+	// for a cloud provider, never above three quarters of the context
+	// window.
+	WorkingSetTokens int `yaml:"working_set_tokens,omitempty"`
+	// MaxToolOutput caps one tool result in bytes (0 = 16 KiB for a local
+	// model, 48 KiB for a cloud provider).
+	MaxToolOutput int `yaml:"max_tool_output,omitempty"`
+	// Checks runs a syntax check (and for Go a build of the package) after
+	// every file change and tells the model the result (default true).
+	Checks *bool `yaml:"checks,omitempty"`
 }
 
 // WebConfig configures the web tools.
@@ -117,6 +129,9 @@ type MCPServerConfig struct {
 
 // CheckpointsOn reports whether checkpoints are enabled (default true).
 func (d DirectConfig) CheckpointsOn() bool { return d.Checkpoints == nil || *d.Checkpoints }
+
+// ChecksOn reports whether post-change checks are enabled (default true).
+func (d DirectConfig) ChecksOn() bool { return d.Checks == nil || *d.Checks }
 
 // TaskConfig configures how requests are read before implementation.
 type TaskConfig struct {
@@ -441,6 +456,12 @@ func (c Config) Validate() error {
 	}
 	if c.Direct.MaxTurns <= 0 {
 		errs = append(errs, errors.New("direct.max_turns: must be positive"))
+	}
+	if c.Direct.WorkingSetTokens < 0 {
+		errs = append(errs, errors.New("direct.working_set_tokens: must not be negative"))
+	}
+	if c.Direct.MaxToolOutput < 0 {
+		errs = append(errs, errors.New("direct.max_tool_output: must not be negative"))
 	}
 	switch c.Direct.Mode {
 	case "auto", "chat", "code", "verify":

@@ -16,7 +16,7 @@ benchmark (design phase 23) has measured it.
 
 | Capability | Pi | Qwen Code | Claude Code | BoundedCode |
 |---|---|---|---|---|
-| Read a file (numbered lines, offset/limit) | read | read_file | Read | `read` |
+| Read a file (numbered lines, offset/limit) | read | read_file | Read | `read` (a file over 400 lines returns an outline of its definitions until a range is asked for) |
 | Read images (vision models) | paste/drag | read_file | Read | `read` on png/jpg/gif/webp attaches the image; `@pic.png` too |
 | Read notebooks | – | – | NotebookRead (legacy) | `notebook_read`; `read` on `.ipynb` |
 | Read PDFs | – | – | Read (pages) | not yet: `read` reports a PDF as binary; convert it first (`pdftotext`) |
@@ -40,6 +40,8 @@ benchmark (design phase 23) has measured it.
 | Memory | – | save_memory | `#` memory / CLAUDE.md | `save_memory` into `<config>/AGENTS.md`; project `AGENTS.md`/`BOUNDEDCODE.md`/`CLAUDE.md` in the prompt |
 | Language-server symbols | – | LSP integration | LSP (plugins) | `find_symbol`, `find_references`, `find_implementations` through Serena when enabled (ADR-0008) |
 | MCP tools | – (extensions) | MCP servers | MCP servers | stdio MCP servers from `direct.mcp` or `.boundedcode/mcp.json` / `.mcp.json`, exposed as `mcp__server__tool` |
+| Working set (older results set aside, recallable) | – | – | – (auto-compact) | `recall`: before each model call the oldest tool results the model has seen are replaced by a placeholder until the history fits `direct.working_set_tokens`; summarising comes only after that |
+| Check after a change | – | – | – (hooks) | built in: a syntax check (and `go build` of the package) after `write`, `edit`, `multi_edit`, reported to the model |
 
 ## Interaction
 

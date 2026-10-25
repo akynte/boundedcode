@@ -50,6 +50,15 @@ type Message struct {
 	// Parts, when set, is multipart content (text and inline images) sent
 	// instead of Content.
 	Parts []map[string]any `json:"parts,omitempty"`
+	// Context is the per-turn context of a user message (environment and
+	// mode framing), sent after the text and not shown as part of it. It
+	// keeps the system prompt identical across turns so the server's
+	// prompt cache is reused.
+	Context string `json:"context,omitempty"`
+	// Elided holds a tool result's full text once it was set aside to keep
+	// the history within the working set; Content is then a placeholder
+	// naming the id the recall tool takes.
+	Elided string `json:"elided,omitempty"`
 }
 
 // ToolCall is an OpenAI-shaped function call.
@@ -138,9 +147,17 @@ type Options struct {
 	MaxTurns int
 	// CommandTimeout bounds one shell command (0 = 3 minutes).
 	CommandTimeout time.Duration
-	// ContextTokens is the model's working context; the history is
-	// summarised when it nears this size (0 = 32768).
+	// ContextTokens is the model's context window (0 = 32768).
 	ContextTokens int
+	// WorkingSetTokens is the history budget: older tool results are set
+	// aside and the history summarised to stay within it (0 = a default by
+	// provider, never above three quarters of ContextTokens).
+	WorkingSetTokens int
+	// MaxToolOutput caps one tool result in bytes (0 = a default by
+	// provider).
+	MaxToolOutput int
+	// NoChecks disables the syntax and build check after a file change.
+	NoChecks bool
 	// MaxOutputTokens caps one completion (0 = provider default).
 	MaxOutputTokens int
 	// Instructions lists project instruction files tried at Root, in order.
@@ -226,6 +243,9 @@ type Runner struct {
 	only []string
 	// sharedMCP: the MCP clients belong to the parent runner.
 	sharedMCP bool
+	// seen is how many messages of the history have been sent to the
+	// model; a tool result is only set aside once the model has seen it.
+	seen int
 }
 
 // ErrInterrupted is returned when ctx ended while a message was processed;
@@ -281,12 +301,16 @@ func (r *Runner) Send(ctx context.Context, text string) (string, error) {
 	} else if res.Extra != "" {
 		text += "\n\n" + res.Extra
 	}
-	um := r.attach(text)
-	if err := r.Session.Append(um); err != nil {
-		return "", err
-	}
 	if r.envAuto {
 		r.Opts.Env = nil // refresh the git branch and status for this turn
+	}
+	if r.seen == 0 {
+		r.seen = len(r.Session.Messages) // a resumed session was seen in full
+	}
+	um := r.attach(text)
+	um.Context = r.turnContext()
+	if err := r.Session.Append(um); err != nil {
+		return "", err
 	}
 	r.checkpointsTurn()
 	tools := r.toolList()
@@ -304,6 +328,7 @@ func (r *Runner) Send(ctx context.Context, text string) (string, error) {
 		if err := ctx.Err(); err != nil {
 			return final, ErrInterrupted
 		}
+		r.elideIfNeeded()
 		if err := r.compactIfNeeded(ctx); err != nil {
 			return final, err
 		}
@@ -411,6 +436,7 @@ func (r *Runner) complete(ctx context.Context, tools []Tool) (Message, error) {
 	body := map[string]any{
 		"messages": r.wireMessages(),
 	}
+	r.seen = len(r.Session.Messages)
 	if len(tools) > 0 {
 		body["tools"] = toolSchemas(tools)
 		body["tool_choice"] = "auto"
@@ -467,9 +493,15 @@ func (r *Runner) wireMessages() []map[string]any {
 				w["tool_calls"] = m.ToolCalls
 			}
 		default:
-			if len(m.Parts) > 0 {
+			switch {
+			case len(m.Parts) > 0 && m.Context != "":
+				parts := append([]map[string]any(nil), m.Parts...)
+				w["content"] = append(parts, map[string]any{"type": "text", "text": m.Context})
+			case len(m.Parts) > 0:
 				w["content"] = m.Parts
-			} else {
+			case m.Context != "":
+				w["content"] = m.Content + "\n\n" + m.Context
+			default:
 				w["content"] = m.Content
 			}
 		}
@@ -561,7 +593,7 @@ func looksLikeContextOverflow(msg string) bool {
 func (r *Runner) estimateTokens() int {
 	n := contextplan.EstimateTokens(r.systemPrompt())
 	for _, m := range r.Session.Messages {
-		n += contextplan.EstimateTokens(m.Content) + 8
+		n += contextplan.EstimateTokens(m.Content) + contextplan.EstimateTokens(m.Context) + 8
 		for _, tc := range m.ToolCalls {
 			n += contextplan.EstimateTokens(tc.Function.Arguments) + 12
 		}
@@ -674,6 +706,7 @@ func (r *Runner) Mode() string {
 func (r *Runner) mutating(tool, relRoot string) bool {
 	if r.Opts.Mode == ModeChat {
 		r.Opts.Mode = ModeCode
+		r.reframeTurn()
 		r.emit(Event{Kind: EventMode, Text: ModeCode, Summary: "the answer needs a change: switching from chat to code"})
 	}
 	if relRoot != "" && !r.Opts.AllowRisky {

@@ -103,8 +103,11 @@ func TestChatHeadless(t *testing.T) {
 		t.Fatalf("%d model calls", len(*reqs))
 	}
 	sys := (*reqs)[0]["messages"].([]any)[0].(map[string]any)["content"].(string)
-	if !strings.Contains(sys, "Be terse.") || !strings.Contains(sys, "git branch") {
-		t.Fatalf("system prompt:\n%s", sys)
+	if !strings.Contains(sys, "Be terse.") || strings.Contains(sys, "git branch") {
+		t.Fatalf("system prompt (instructions in, environment out):\n%s", sys)
+	}
+	if um := (*reqs)[0]["messages"].([]any)[1].(map[string]any)["content"].(string); !strings.Contains(um, "git branch") {
+		t.Fatalf("user message lacks the turn context:\n%s", um)
 	}
 	if _, has := (*reqs)[0]["tools"]; !has {
 		t.Fatal("no tools sent")
@@ -119,8 +122,8 @@ func TestChatHeadless(t *testing.T) {
 		t.Fatalf("continue: %v\n%s", err, out)
 	}
 	last := (*reqs)[2]["messages"].([]any)
-	if len(last) != 6 || last[5].(map[string]any)["content"] != "go on" { // system + 4 earlier + new
-		t.Fatalf("continued history has %d messages", len(last))
+	if len(last) != 6 || !strings.HasPrefix(last[5].(map[string]any)["content"].(string), "go on\n\nEnvironment:") { // system + 4 earlier + new (text, then its turn context)
+		t.Fatalf("continued history has %d messages: %v", len(last), last[len(last)-1])
 	}
 	// The transcript exports as Markdown, to stdout or a file.
 	out, err = runCLI(t, "", "chat", "-C", proj, "export")

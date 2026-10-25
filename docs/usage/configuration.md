@@ -156,6 +156,9 @@ Further keys under `direct` (see the [tool coverage](../design/tool-coverage.md)
 | `hooks` | none | List of `{event, matcher, command, timeout}`. Events: `pre_tool` (exit 2 or `{"decision":"deny"}` blocks the tool), `post_tool` (stdout is shown to the model), `user_prompt` (exit 2 blocks the message, stdout is appended), `stop` (exit 2 asks the model to continue with stderr as the reason). `matcher` is a regular expression on the tool name. The event's data arrives as JSON on stdin. |
 | `mcp` | none | Map of MCP servers started over stdio: `{command, args, env, cwd, timeout}`. Their tools are offered as `mcp__<server>__<tool>` and ask before running (except in `auto`). A project's `.boundedcode/mcp.json` or `.mcp.json` (`{"mcpServers": {...}}`) adds servers. |
 | `checkpoints` | `true` | Keep a copy of every file before direct mode changes it, per turn, for `/undo` and `bcode chat undo`. |
+| `working_set_tokens` | `0` (32K local, 96K cloud) | The history budget the model is asked to attend to. Before each model call the oldest tool results the model has already seen are set aside (a one-line placeholder; the `recall` tool brings one back), and only if that is not enough is the history summarised. Never above three quarters of the context window. |
+| `max_tool_output` | `0` (16 KiB local, 48 KiB cloud) | Cap on one tool result in bytes; longer results keep their head and tail. |
+| `checks` | `true` | After every file change, run the cheapest check for its language (a Go parse and `go build` of the package, `python3`/`node`/`bash`/`ruby`/`php` syntax checks when installed, JSON and YAML parsing) and tell the model the result. |
 
 Project files direct mode reads: `.boundedcode/skills/<name>/SKILL.md`
 (skills; also `.agents/skills`, `.claude/skills`), `.boundedcode/agents/*.md`

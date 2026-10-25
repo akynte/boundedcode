@@ -123,6 +123,7 @@ func (a *App) directRunner(ctx context.Context, dir, sessionID, modelOverride, a
 	opts := direct.Options{
 		Root: root, Dir: cwd, Approval: approval, MaxTurns: dc.MaxTurns,
 		CommandTimeout: dc.CommandTimeout.D(), ContextTokens: ep.ctxSize,
+		WorkingSetTokens: dc.WorkingSetTokens, MaxToolOutput: dc.MaxToolOutput, NoChecks: !dc.ChecksOn(),
 		MaxOutputTokens: a.Config.Agent.MaxOutputTokens, Instructions: dc.Instructions,
 		UserInstructions: a.userInstructionsFile(),
 		Web:              direct.WebOptions{AllowHosts: dc.Web.AllowHosts, SearchURL: dc.Web.SearchURL},

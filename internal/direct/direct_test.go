@@ -130,8 +130,11 @@ func TestLoopReadsThenAnswers(t *testing.T) {
 	if !strings.Contains(ms[3]["content"].(string), "     3\tfunc main()") {
 		t.Fatalf("tool result: %q", ms[3]["content"])
 	}
-	if !strings.Contains(ms[0]["content"].(string), "platform: test") {
-		t.Fatalf("system prompt lacks environment: %q", ms[0]["content"])
+	if !strings.Contains(ms[1]["content"].(string), "platform: test") {
+		t.Fatalf("the user message lacks the turn context: %q", ms[1]["content"])
+	}
+	if strings.Contains(ms[0]["content"].(string), "platform: test") {
+		t.Fatal("the environment must not be in the system prompt")
 	}
 	got := strings.Join(kinds(*evs), ",")
 	if got != "tool_start,tool_end,text,done" {

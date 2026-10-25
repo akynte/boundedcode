@@ -237,8 +237,12 @@ func TestEnvironmentRefreshesPerTurn(t *testing.T) {
 	if _, err := r.Send(context.Background(), "one"); err != nil {
 		t.Fatal(err)
 	}
-	if sys := up.lastMessages(t)[0]["content"].(string); !strings.Contains(sys, "git status: clean") {
-		t.Fatalf("first prompt: %q", sys)
+	first := up.lastMessages(t)
+	if sys := first[0]["content"].(string); strings.Contains(sys, "git status") {
+		t.Fatal("the environment must not be in the system prompt (it would break the prompt cache every turn)")
+	}
+	if um := first[1]["content"].(string); !strings.Contains(um, "git status: clean") {
+		t.Fatalf("first prompt: %q", um)
 	}
 	if err := os.WriteFile(filepath.Join(root, "new.txt"), []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
@@ -246,7 +250,14 @@ func TestEnvironmentRefreshesPerTurn(t *testing.T) {
 	if _, err := r.Send(context.Background(), "two"); err != nil {
 		t.Fatal(err)
 	}
-	if sys := up.lastMessages(t)[0]["content"].(string); !strings.Contains(sys, "git status: 1 changed path(s)") {
-		t.Fatalf("second prompt: %q", sys)
+	second := up.lastMessages(t)
+	if sys := second[0]["content"].(string); sys != first[0]["content"].(string) {
+		t.Fatal("the system prompt changed between turns")
+	}
+	if um := second[3]["content"].(string); !strings.Contains(um, "git status: 1 changed path(s)") {
+		t.Fatalf("second prompt: %q", um)
+	}
+	if um := second[1]["content"].(string); !strings.Contains(um, "git status: clean") {
+		t.Fatalf("the first turn's context must stay as it was sent (prefix stability): %q", um)
 	}
 }

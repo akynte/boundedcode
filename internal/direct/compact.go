@@ -8,16 +8,16 @@ import (
 	"strings"
 )
 
-// compactThreshold is the share of the context window at which the history
-// is summarised before the next call.
-const compactThreshold = 0.75
-
 // keepTail is how many trailing messages survive a compaction verbatim
 // (the current user message and recent exchange).
 const keepTail = 6
 
+// compactIfNeeded summarises the history when it is still well above the
+// working set after the oldest tool results were set aside (a tenth of
+// headroom: the estimate is rough, and a summary costs a model call and
+// loses detail).
 func (r *Runner) compactIfNeeded(ctx context.Context) error {
-	if float64(r.estimateTokens()) < compactThreshold*float64(r.contextTokens()) {
+	if r.estimateTokens() <= r.workingSetTokens()*11/10 {
 		return nil
 	}
 	return r.compact(ctx)

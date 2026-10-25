@@ -95,9 +95,12 @@ func TestChatSwitchesToCodeOnFirstEdit(t *testing.T) {
 	if r.Mode() != ModeCode {
 		t.Fatal("mode not switched")
 	}
-	sys := up.lastMessages(t)[0]["content"].(string)
-	if !strings.Contains(sys, "classified as a request for a direct change") {
-		t.Fatal("prompt framing did not follow the switch")
+	ms := up.lastMessages(t)
+	if sys := ms[0]["content"].(string); strings.Contains(sys, "classified as") || strings.Contains(sys, "Environment:") {
+		t.Fatal("the system prompt must stay identical across turns (no framing, no environment)")
+	}
+	if um := ms[1]["content"].(string); !strings.Contains(um, "classified as a request for a direct change") {
+		t.Fatalf("prompt framing did not follow the switch: %q", um)
 	}
 }
 

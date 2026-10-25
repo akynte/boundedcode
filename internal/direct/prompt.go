@@ -15,7 +15,11 @@ import (
 const maxInstructionBytes = 24 << 10
 
 // systemPrompt builds the system message: identity, how to work, the
-// environment and the project's own instructions.
+// skills and the project's own instructions. It is identical from turn to
+// turn on purpose: an OpenAI-compatible server reuses the key-value cache
+// only for an unchanged prefix, so anything that varies per turn (the git
+// status, the date, the mode) travels with the user message instead
+// (turnContext).
 func (r *Runner) systemPrompt() string {
 	var b strings.Builder
 	b.WriteString(`You are BoundedCode, a coding agent working directly in the user's project checkout. You help with everyday software development: reading and explaining code, fixing bugs, adding features, writing tests, refactoring, and running builds and tests.
@@ -31,22 +35,6 @@ How to work:
 - When a request is genuinely ambiguous in a way that changes the work, ask one precise question instead of guessing.
 - When a change is risky (authentication, payments, migrations, shared contracts, large multi-file changes) suggest that the user run it in bounded mode (the /task command), where it runs in an isolated worktree and sandbox and must be backed by a test that fails without the change.
 `)
-	switch r.Opts.Mode {
-	case ModeChat:
-		b.WriteString("\nThis message was classified as a question or discussion: answer it from the code. Do not change files unless the user clearly asked for a change; if they did, go ahead (the mode switches automatically).\n")
-	case ModeCode:
-		b.WriteString("\nThis message was classified as a request for a direct change in the checkout. Changes to authentication, payments, migrations, shared contracts or infrastructure are handed off automatically to a verified task; do not work around that.\n")
-	}
-	env := r.environment()
-	b.WriteString("\nEnvironment:\n")
-	keys := make([]string, 0, len(env))
-	for k := range env {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	for _, k := range keys {
-		fmt.Fprintf(&b, "- %s: %s\n", k, env[k])
-	}
 	if sk := r.skillsPrompt(); sk != "" {
 		b.WriteString("\n" + sk + "\n")
 	}
@@ -59,6 +47,63 @@ How to work:
 		b.WriteString("\n" + r.ExtraSystem + "\n")
 	}
 	return b.String()
+}
+
+// turnContext is what changes from turn to turn: the environment (working
+// directory, git branch and status, date) and how this message was
+// classified. It is stored with the user message (Message.Context) and
+// sent after its text, so the system prompt and the earlier history stay
+// a stable prefix for the server's cache.
+func (r *Runner) turnContext() string {
+	var b strings.Builder
+	env := r.environment()
+	b.WriteString("Environment:\n")
+	keys := make([]string, 0, len(env))
+	for k := range env {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		fmt.Fprintf(&b, "- %s: %s\n", k, env[k])
+	}
+	if f := modeFraming(r.Opts.Mode); f != "" {
+		b.WriteString("\n" + f + "\n")
+	}
+	return strings.TrimRight(b.String(), "\n")
+}
+
+// modeFraming tells the model how the message was classified.
+func modeFraming(mode string) string {
+	switch mode {
+	case ModeChat:
+		return "This message was classified as a question or discussion: answer it from the code. Do not change files unless the user clearly asked for a change; if they did, go ahead (the mode switches automatically)."
+	case ModeCode:
+		return "This message was classified as a request for a direct change in the checkout. Changes to authentication, payments, migrations, shared contracts or infrastructure are handed off automatically to a verified task; do not work around that."
+	}
+	return ""
+}
+
+// reframeTurn updates the current user message's framing after a mode
+// switch during the turn, so the model is told what mode it is in now.
+// Only the in-memory message changes: the framing is per turn, and the
+// history before this message stays a stable prefix.
+func (r *Runner) reframeTurn() {
+	if r.Session == nil {
+		return
+	}
+	for i := len(r.Session.Messages) - 1; i >= 0; i-- {
+		m := &r.Session.Messages[i]
+		if m.Role != "user" || m.Context == "" {
+			continue
+		}
+		if idx := strings.Index(m.Context, "\n\nThis message was classified"); idx >= 0 {
+			m.Context = m.Context[:idx]
+		}
+		if f := modeFraming(r.Opts.Mode); f != "" {
+			m.Context += "\n\n" + f
+		}
+		return
+	}
 }
 
 func (r *Runner) environment() map[string]string {
