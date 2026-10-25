@@ -189,15 +189,14 @@ type Options struct {
 
 // Runner processes messages of one session.
 type Runner struct {
-	Gateway  *inference.Gateway
-	Opts     Options
-	Approve  Approver
-	Sink     Sink
-	Session  *Session
-	tools    []Tool
-	toolsErr error
-	handoff  *Handoff
-	mu       sync.Mutex
+	Gateway *inference.Gateway
+	Opts    Options
+	Approve Approver
+	Sink    Sink
+	Session *Session
+	tools   []Tool
+	handoff *Handoff
+	mu      sync.Mutex
 	// Asker answers ask_user questions (nil: the tool reports that no user
 	// is available).
 	Asker Asker
@@ -610,7 +609,7 @@ var sentenceEnd = regexp.MustCompile(`[.!?]+\s+|\n+`)
 // gitState is the working tree's status per path (nil outside git).
 func (r *Runner) gitState() map[string]string {
 	// Not gitOutput: a leading space in the first status line is significant.
-	c := exec.Command("git", "status", "--porcelain", "--untracked-files=all")
+	c := exec.CommandContext(context.Background(), "git", "status", "--porcelain", "--untracked-files=all")
 	c.Dir = r.Opts.Root
 	c.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0")
 	raw, err := c.Output()

@@ -72,8 +72,12 @@ func TestChatHeadless(t *testing.T) {
 		t.Fatal(err)
 	}
 	proj := t.TempDir()
-	os.WriteFile(filepath.Join(proj, "README.md"), []byte("hello from the project\n"), 0o644)
-	os.WriteFile(filepath.Join(proj, "AGENTS.md"), []byte("Be terse."), 0o644)
+	if err := os.WriteFile(filepath.Join(proj, "README.md"), []byte("hello from the project\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(proj, "AGENTS.md"), []byte("Be terse."), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	for _, args := range [][]string{{"init", "-q"}, {"add", "."}, {"-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "-m", "init"}} {
 		c := exec.Command("git", args...)
 		c.Dir = proj
@@ -82,7 +86,9 @@ func TestChatHeadless(t *testing.T) {
 		}
 	}
 	sub := filepath.Join(proj, "sub")
-	os.Mkdir(sub, 0o755)
+	if err := os.Mkdir(sub, 0o755); err != nil {
+		t.Fatal(err)
+	}
 
 	out, err := runCLI(t, "", "chat", "-C", sub, "-p", "what does the README say?")
 	if err != nil {
@@ -177,8 +183,12 @@ func TestChatRoutesToVerification(t *testing.T) {
 		t.Fatal(err)
 	}
 	proj := t.TempDir()
-	os.MkdirAll(filepath.Join(proj, "internal/auth"), 0o755)
-	os.WriteFile(filepath.Join(proj, "internal/auth/login.go"), []byte("package auth\n"), 0o644)
+	if err := os.MkdirAll(filepath.Join(proj, "internal/auth"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(proj, "internal/auth/login.go"), []byte("package auth\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	for _, args := range [][]string{{"init", "-q"}, {"add", "."}, {"-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "-m", "init"}} {
 		c := exec.Command("git", args...)
 		c.Dir = proj

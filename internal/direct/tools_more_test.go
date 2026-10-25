@@ -15,7 +15,9 @@ import (
 func TestMultiEditAtomic(t *testing.T) {
 	r, root, _ := newRunner(t, &scripted{}, ApprovalAuto)
 	p := filepath.Join(root, "a.go")
-	os.WriteFile(p, []byte("a\nb\nc\n"), 0o644)
+	if err := os.WriteFile(p, []byte("a\nb\nc\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	tool := r.findTool("multi_edit")
 	_, err := tool.Run(context.Background(), r, map[string]any{"path": "a.go", "edits": []any{
 		map[string]any{"old_string": "a", "new_string": "A"}, map[string]any{"old_string": "zzz", "new_string": "Z"}}})
@@ -36,10 +38,18 @@ func TestMultiEditAtomic(t *testing.T) {
 
 func TestReadMany(t *testing.T) {
 	r, root, _ := newRunner(t, &scripted{}, ApprovalAuto)
-	os.MkdirAll(filepath.Join(root, "src/x"), 0o755)
-	os.WriteFile(filepath.Join(root, "src/x/a.go"), []byte("package x"), 0o644)
-	os.WriteFile(filepath.Join(root, "src/b.ts"), []byte("let b"), 0o644)
-	os.WriteFile(filepath.Join(root, "README.md"), []byte("readme"), 0o644)
+	if err := os.MkdirAll(filepath.Join(root, "src/x"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "src/x/a.go"), []byte("package x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "src/b.ts"), []byte("let b"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "README.md"), []byte("readme"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	out, err := r.findTool("read_many").Run(context.Background(), r, map[string]any{"paths": []any{"README.md", "src/**/*.go"}})
 	if err != nil || !strings.Contains(out, "==> README.md <==\nreadme") || !strings.Contains(out, "==> src/x/a.go <==") || strings.Contains(out, "b.ts") {
 		t.Fatalf("%q %v", out, err)
@@ -141,7 +151,9 @@ func TestCheckpointsAndUndo(t *testing.T) {
 	r, root, _ := newRunner(t, up, ApprovalAuto)
 	r.Opts.CheckpointDir = t.TempDir()
 	r.Session.ID = "s1"
-	os.WriteFile(filepath.Join(root, "a.txt"), []byte("one\n"), 0o644)
+	if err := os.WriteFile(filepath.Join(root, "a.txt"), []byte("one\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := r.Send(context.Background(), "first"); err != nil {
 		t.Fatal(err)
 	}
@@ -266,7 +278,9 @@ func TestTodoPlanAskMemory(t *testing.T) {
 func TestNotebookTools(t *testing.T) {
 	r, root, _ := newRunner(t, &scripted{}, ApprovalAuto)
 	nb := `{"cells":[{"cell_type":"markdown","id":"m1","metadata":{},"source":["# Title\n"]},{"cell_type":"code","id":"c1","metadata":{},"execution_count":1,"outputs":[{"output_type":"stream","name":"stdout","text":["hi\n"]}],"source":["print('hi')\n"]}],"metadata":{},"nbformat":4,"nbformat_minor":5}`
-	os.WriteFile(filepath.Join(root, "n.ipynb"), []byte(nb), 0o644)
+	if err := os.WriteFile(filepath.Join(root, "n.ipynb"), []byte(nb), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	ctx := context.Background()
 	out, err := r.findTool("notebook_read").Run(ctx, r, map[string]any{"path": "n.ipynb"})
 	if err != nil || !strings.Contains(out, "cell 1 (code, id c1)") || !strings.Contains(out, "[output]\nhi") {
@@ -340,12 +354,24 @@ func TestWebFetchAndSearch(t *testing.T) {
 
 func TestSkillsCommandsAndAgents(t *testing.T) {
 	r, root, _ := newRunner(t, &scripted{}, ApprovalAuto)
-	os.MkdirAll(filepath.Join(root, ".boundedcode/skills/review"), 0o755)
-	os.WriteFile(filepath.Join(root, ".boundedcode/skills/review/SKILL.md"), []byte("---\nname: review\ndescription: Review a diff\n---\nReview $ARGUMENTS carefully. Files live in ${SKILL_DIR}.\n"), 0o644)
-	os.MkdirAll(filepath.Join(root, ".boundedcode/commands"), 0o755)
-	os.WriteFile(filepath.Join(root, ".boundedcode/commands/fix-issue.md"), []byte("---\ndescription: Fix an issue\n---\nFix issue $1 (all: $ARGUMENTS). Branch: !`echo main`\n"), 0o644)
-	os.MkdirAll(filepath.Join(root, ".boundedcode/agents"), 0o755)
-	os.WriteFile(filepath.Join(root, ".boundedcode/agents/tester.md"), []byte("---\nname: tester\ndescription: Writes tests\nread_only: true\n---\nYou write tests.\n"), 0o644)
+	if err := os.MkdirAll(filepath.Join(root, ".boundedcode/skills/review"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, ".boundedcode/skills/review/SKILL.md"), []byte("---\nname: review\ndescription: Review a diff\n---\nReview $ARGUMENTS carefully. Files live in ${SKILL_DIR}.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(root, ".boundedcode/commands"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, ".boundedcode/commands/fix-issue.md"), []byte("---\ndescription: Fix an issue\n---\nFix issue $1 (all: $ARGUMENTS). Branch: !`echo main`\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(root, ".boundedcode/agents"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, ".boundedcode/agents/tester.md"), []byte("---\nname: tester\ndescription: Writes tests\nread_only: true\n---\nYou write tests.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	r.tools = nil
 	if sk := r.Skills(); len(sk) != 1 || sk[0].Name != "review" {
 		t.Fatalf("skills: %+v", sk)
@@ -383,7 +409,9 @@ func TestSubagentTask(t *testing.T) {
 		{text: "Found: a.go."},
 	}}
 	r, root, evs := newRunner(t, up, ApprovalAuto)
-	os.WriteFile(filepath.Join(root, "a.go"), []byte("Needle\n"), 0o644)
+	if err := os.WriteFile(filepath.Join(root, "a.go"), []byte("Needle\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	out, err := r.Send(context.Background(), "find Needle")
 	if err != nil || out != "Found: a.go." {
 		t.Fatalf("%q %v", out, err)
@@ -413,9 +441,15 @@ func TestSubagentTask(t *testing.T) {
 func TestAttachReferencesAndImages(t *testing.T) {
 	up := &scripted{replies: []reply{{text: "ok"}}}
 	r, root, _ := newRunner(t, up, ApprovalAuto)
-	os.WriteFile(filepath.Join(root, "notes.md"), []byte("hello notes"), 0o644)
-	os.WriteFile(filepath.Join(root, "pic.png"), []byte("\x89PNG\r\n\x1a\nfake"), 0o644)
-	os.WriteFile(filepath.Join(root, ".env"), []byte("S=1"), 0o644)
+	if err := os.WriteFile(filepath.Join(root, "notes.md"), []byte("hello notes"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "pic.png"), []byte("\x89PNG\r\n\x1a\nfake"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, ".env"), []byte("S=1"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := r.Send(context.Background(), "look at @notes.md and @pic.png and @.env and @missing.txt"); err != nil {
 		t.Fatal(err)
 	}
@@ -447,7 +481,7 @@ func TestMCPServerTools(t *testing.T) {
 		t.Skip("python3")
 	}
 	script := filepath.Join(t.TempDir(), "mcp.py")
-	os.WriteFile(script, []byte(`
+	if err := os.WriteFile(script, []byte(`
 import sys, json
 for line in sys.stdin:
     m = json.loads(line)
@@ -461,7 +495,9 @@ for line in sys.stdin:
     else:
         continue
     sys.stdout.write(json.dumps(out)+"\n"); sys.stdout.flush()
-`), 0o644)
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	r, _, _ := newRunner(t, &scripted{}, ApprovalAuto)
 	r.Opts.MCP = []MCPServer{{Name: "calc", Command: "/usr/bin/python3", Args: []string{"-I", script}}, {Name: "broken", Command: "/nonexistent"}}
 	tool := r.findTool("mcp__calc__add")

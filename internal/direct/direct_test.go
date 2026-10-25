@@ -3,6 +3,7 @@ package direct
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -111,7 +112,9 @@ func TestLoopReadsThenAnswers(t *testing.T) {
 		{text: "main prints hello"},
 	}}
 	r, root, evs := newRunner(t, up, ApprovalEdits)
-	os.WriteFile(filepath.Join(root, "main.go"), []byte("package main\n\nfunc main() { println(\"hello\") }\n"), 0o644)
+	if err := os.WriteFile(filepath.Join(root, "main.go"), []byte("package main\n\nfunc main() { println(\"hello\") }\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	out, err := r.Send(context.Background(), "what does main do?")
 	if err != nil {
 		t.Fatal(err)
@@ -142,9 +145,13 @@ func TestLoopReadsThenAnswers(t *testing.T) {
 func TestProjectInstructionsAndUserFile(t *testing.T) {
 	up := &scripted{replies: []reply{{text: "ok"}}}
 	r, root, _ := newRunner(t, up, ApprovalEdits)
-	os.WriteFile(filepath.Join(root, "AGENTS.md"), []byte("Always run go vet."), 0o644)
+	if err := os.WriteFile(filepath.Join(root, "AGENTS.md"), []byte("Always run go vet."), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	uf := filepath.Join(t.TempDir(), "me.md")
-	os.WriteFile(uf, []byte("Prefer British spelling."), 0o644)
+	if err := os.WriteFile(uf, []byte("Prefer British spelling."), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	r.Opts.UserInstructions = uf
 	if _, err := r.Send(context.Background(), "hi"); err != nil {
 		t.Fatal(err)
@@ -160,7 +167,9 @@ func TestProjectInstructionsAndUserFile(t *testing.T) {
 func TestEditToolUniqueness(t *testing.T) {
 	r, root, _ := newRunner(t, &scripted{}, ApprovalEdits)
 	p := filepath.Join(root, "a.txt")
-	os.WriteFile(p, []byte("x = 1\ny = 1\n"), 0o644)
+	if err := os.WriteFile(p, []byte("x = 1\ny = 1\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	tool := r.findTool("edit")
 	if _, err := tool.Run(context.Background(), r, map[string]any{"path": "a.txt", "old_string": "= 1", "new_string": "= 2"}); err == nil || !strings.Contains(err.Error(), "occurs 2 times") {
 		t.Fatalf("ambiguous edit: %v", err)
@@ -180,7 +189,9 @@ func TestEditToolUniqueness(t *testing.T) {
 func TestPathsAreConfined(t *testing.T) {
 	r, root, _ := newRunner(t, &scripted{}, ApprovalAuto)
 	outside := t.TempDir()
-	os.WriteFile(filepath.Join(outside, "secret.txt"), []byte("s"), 0o644)
+	if err := os.WriteFile(filepath.Join(outside, "secret.txt"), []byte("s"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	read := r.findTool("read")
 	for _, p := range []string{"../x", filepath.Join(outside, "secret.txt"), "/etc/passwd"} {
 		if _, err := read.Run(context.Background(), r, map[string]any{"path": p}); err == nil || !strings.Contains(err.Error(), "outside the project") {
@@ -188,7 +199,7 @@ func TestPathsAreConfined(t *testing.T) {
 		}
 	}
 	if runtime.GOOS != "windows" {
-		os.Symlink(outside, filepath.Join(root, "link"))
+		_ = os.Symlink(outside, filepath.Join(root, "link"))
 		if _, err := read.Run(context.Background(), r, map[string]any{"path": "link/secret.txt"}); err == nil || !strings.Contains(err.Error(), "outside the project") {
 			t.Errorf("symlink escape: %v", err)
 		}
@@ -196,7 +207,9 @@ func TestPathsAreConfined(t *testing.T) {
 			t.Error("write through symlink escape succeeded")
 		}
 	}
-	os.WriteFile(filepath.Join(root, ".env"), []byte("KEY=1"), 0o644)
+	if err := os.WriteFile(filepath.Join(root, ".env"), []byte("KEY=1"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := read.Run(context.Background(), r, map[string]any{"path": ".env"}); err == nil || !strings.Contains(err.Error(), "secret") {
 		t.Errorf(".env: %v", err)
 	}
@@ -289,7 +302,9 @@ func TestSafeCommands(t *testing.T) {
 
 func TestMutationConsentModes(t *testing.T) {
 	r, root, _ := newRunner(t, &scripted{}, ApprovalEdits)
-	os.MkdirAll(filepath.Join(root, ".github/workflows"), 0o755)
+	if err := os.MkdirAll(filepath.Join(root, ".github/workflows"), 0o755); err != nil {
+		t.Fatal(err)
+	}
 	w := r.findTool("write")
 	if _, need := w.Consent(r, map[string]any{"path": "x.go", "content": "x"}); need {
 		t.Error("edits mode asked for a plain file")
@@ -309,11 +324,21 @@ func TestMutationConsentModes(t *testing.T) {
 
 func TestGrepGlobLs(t *testing.T) {
 	r, root, _ := newRunner(t, &scripted{}, ApprovalAuto)
-	os.MkdirAll(filepath.Join(root, "src/pkg"), 0o755)
-	os.MkdirAll(filepath.Join(root, "node_modules/dep"), 0o755)
-	os.WriteFile(filepath.Join(root, "src/pkg/a.go"), []byte("package pkg\nfunc Needle() {}\n"), 0o644)
-	os.WriteFile(filepath.Join(root, "src/b.ts"), []byte("const needle = 1\n"), 0o644)
-	os.WriteFile(filepath.Join(root, "node_modules/dep/c.go"), []byte("Needle"), 0o644)
+	if err := os.MkdirAll(filepath.Join(root, "src/pkg"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(root, "node_modules/dep"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "src/pkg/a.go"), []byte("package pkg\nfunc Needle() {}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "src/b.ts"), []byte("const needle = 1\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "node_modules/dep/c.go"), []byte("Needle"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	ctx := context.Background()
 	out, err := r.goGrep(ctx, root, "Needle", "", false, "content", 0)
 	if err != nil || out != "src/pkg/a.go:2:func Needle() {}" {
@@ -369,13 +394,13 @@ func TestSessionPersistsAndReloads(t *testing.T) {
 		t.Fatal(err)
 	}
 	s.Title = "t"
-	s.Append(Message{Role: "user", Content: "one"})
+	_ = s.Append(Message{Role: "user", Content: "one"})
 	tc := ToolCall{ID: "c1", Type: "function"}
 	tc.Function.Name = "read"
 	tc.Function.Arguments = `{"path":"x"}`
-	s.Append(Message{Role: "assistant", ToolCalls: []ToolCall{tc}})
-	s.Append(Message{Role: "tool", ToolCallID: "c1", Content: "r"})
-	s.Append(Message{Role: "assistant", Content: "a"})
+	_ = s.Append(Message{Role: "assistant", ToolCalls: []ToolCall{tc}})
+	_ = s.Append(Message{Role: "tool", ToolCallID: "c1", Content: "r"})
+	_ = s.Append(Message{Role: "assistant", Content: "a"})
 	got, err := LoadSession(s.Path)
 	if err != nil {
 		t.Fatal(err)
@@ -384,7 +409,7 @@ func TestSessionPersistsAndReloads(t *testing.T) {
 		t.Fatalf("reloaded: %+v", got)
 	}
 	// Compaction keeps order: summary first, then the tail.
-	s.replace(Message{Role: "user", Content: "SUMMARY"}, s.Messages[3:])
+	_ = s.replace(Message{Role: "user", Content: "SUMMARY"}, s.Messages[3:])
 	got, err = LoadSession(s.Path)
 	if err != nil {
 		t.Fatal(err)
@@ -413,8 +438,8 @@ func TestCompactionWhenContextIsSmall(t *testing.T) {
 	r, _, evs := newRunner(t, up, ApprovalAuto)
 	r.Opts.ContextTokens = 4000
 	for i := 0; i < 12; i++ {
-		r.Session.Append(Message{Role: "user", Content: "q" + fmt.Sprint(i)})
-		r.Session.Append(Message{Role: "assistant", Content: strings.Repeat("blah ", 60)})
+		_ = r.Session.Append(Message{Role: "user", Content: "q" + fmt.Sprint(i)})
+		_ = r.Session.Append(Message{Role: "assistant", Content: strings.Repeat("blah ", 60)})
 	}
 	if _, err := r.Send(context.Background(), "first"); err != nil {
 		t.Fatal(err)
@@ -453,8 +478,8 @@ func TestContextOverflowErrorCompactsAndRetries(t *testing.T) {
 	}, status: http.StatusBadRequest, errBody: "This model's maximum context length is 8192 tokens"}
 	r, _, _ := newRunner(t, up, ApprovalAuto)
 	for i := 0; i < 8; i++ {
-		r.Session.Append(Message{Role: "user", Content: "q"})
-		r.Session.Append(Message{Role: "assistant", Content: "a"})
+		_ = r.Session.Append(Message{Role: "user", Content: "q"})
+		_ = r.Session.Append(Message{Role: "assistant", Content: "a"})
 	}
 	out, err := r.Send(context.Background(), "x")
 	if err != nil || out != "recovered" {
@@ -474,7 +499,7 @@ func TestInterruptKeepsHistory(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() { time.Sleep(200 * time.Millisecond); cancel() }()
 	_, err := r.Send(ctx, "go")
-	if err != ErrInterrupted {
+	if !errors.Is(err, ErrInterrupted) {
 		t.Fatalf("err = %v", err)
 	}
 	if n := len(r.Session.Messages); n != 3 { // user, assistant call, tool result
@@ -559,7 +584,9 @@ func TestEditToleratesIndentation(t *testing.T) {
 	r, root, _ := newRunner(t, &scripted{}, ApprovalAuto)
 	p := filepath.Join(root, "cart.go")
 	src := "func Total() int {\n\tif count > 10 {\n\t\tsum = sum * 90 / 100\n\t}\n\treturn sum\n}\n"
-	os.WriteFile(p, []byte(src), 0o644)
+	if err := os.WriteFile(p, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	tool := r.findTool("edit")
 	// Spaces for tabs, as models often send.
 	if _, err := tool.Run(context.Background(), r, map[string]any{"path": "cart.go",
@@ -573,7 +600,9 @@ func TestEditToleratesIndentation(t *testing.T) {
 		t.Fatalf("got:\n%q\nwant:\n%q", b, want)
 	}
 	// Ambiguous loose matches are refused; other character differences too.
-	os.WriteFile(p, []byte("\tx := 1\n\ty := 2\n\tx := 1\n"), 0o644)
+	if err := os.WriteFile(p, []byte("\tx := 1\n\ty := 2\n\tx := 1\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := tool.Run(context.Background(), r, map[string]any{"path": "cart.go", "old_string": "x := 1", "new_string": "x := 3"}); err == nil || !strings.Contains(err.Error(), "occurs 2 times") {
 		t.Fatalf("exact ambiguity: %v", err)
 	}
@@ -584,7 +613,9 @@ func TestEditToleratesIndentation(t *testing.T) {
 		t.Fatalf("not found: %v", err)
 	}
 	// Spaces file, tab-indented old_string.
-	os.WriteFile(p, []byte("fn main() {\n    if a {\n        b()\n    }\n}\n"), 0o644)
+	if err := os.WriteFile(p, []byte("fn main() {\n    if a {\n        b()\n    }\n}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := tool.Run(context.Background(), r, map[string]any{"path": "cart.go", "old_string": "\tif a {\n\t\tb()\n\t}", "new_string": "\tif a {\n\t\tc()\n\t}"}); err != nil {
 		t.Fatal(err)
 	}
@@ -617,10 +648,18 @@ func TestRepeatedFailingCallIsFlagged(t *testing.T) {
 
 func TestWorkingDirectoryInsideProject(t *testing.T) {
 	r, root, _ := newRunner(t, &scripted{}, ApprovalAuto)
-	os.MkdirAll(filepath.Join(root, "svc/pkg"), 0o755)
-	os.WriteFile(filepath.Join(root, "svc/pkg/a.go"), []byte("package pkg // needle\n"), 0o644)
-	os.WriteFile(filepath.Join(root, "top.txt"), []byte("top\n"), 0o644)
-	os.WriteFile(filepath.Join(root, ".env"), []byte("S=1"), 0o644)
+	if err := os.MkdirAll(filepath.Join(root, "svc/pkg"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "svc/pkg/a.go"), []byte("package pkg // needle\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "top.txt"), []byte("top\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, ".env"), []byte("S=1"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	r.Opts.Dir = filepath.Join(root, "svc")
 	ctx := context.Background()
 	if out, err := r.findTool("read").Run(ctx, r, map[string]any{"path": "pkg/a.go"}); err != nil || !strings.Contains(out, "needle") {
@@ -662,7 +701,9 @@ func TestDoneEventListsChangedFiles(t *testing.T) {
 		{text: "nothing"},
 	}}
 	r, root, evs := newRunner(t, up, ApprovalAuto)
-	os.WriteFile(filepath.Join(root, "a.txt"), []byte("1\n"), 0o644)
+	if err := os.WriteFile(filepath.Join(root, "a.txt"), []byte("1\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	for _, args := range [][]string{{"init", "-q"}, {"add", "."}, {"-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", "i"}} {
 		c := exec.Command("git", args...)
 		c.Dir = root

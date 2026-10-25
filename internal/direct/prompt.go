@@ -1,6 +1,7 @@
 package direct
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -95,7 +96,7 @@ func (r *Runner) environment() map[string]string {
 }
 
 func gitOutput(dir string, args ...string) string {
-	c := exec.Command("git", args...)
+	c := exec.CommandContext(context.Background(), "git", args...)
 	c.Dir = dir
 	c.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0")
 	out, err := c.Output()

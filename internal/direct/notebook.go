@@ -190,7 +190,7 @@ func notebookEditTool() Tool {
 			if mode == "" {
 				mode = "replace"
 			}
-			if idx == -2 || idx >= len(nb.cells) || (idx < 0 && !(mode == "insert" && idx == -1)) {
+			if idx == -2 || idx >= len(nb.cells) || (idx < 0 && (mode != "insert" || idx != -1)) {
 				return "", fmt.Errorf("no cell %q (the notebook has %d cells)", sel, len(nb.cells))
 			}
 			source := str(a, "source")

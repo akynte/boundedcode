@@ -23,8 +23,12 @@ func TestHandoffAnswersEveryToolCall(t *testing.T) {
 		}},
 	}}
 	r, root, evs := newRunner(t, up, ApprovalAuto)
-	os.MkdirAll(filepath.Join(root, "internal/auth"), 0o755)
-	os.WriteFile(filepath.Join(root, "internal/auth/login.go"), []byte("a"), 0o644)
+	if err := os.MkdirAll(filepath.Join(root, "internal/auth"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "internal/auth/login.go"), []byte("a"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	r.Opts.Mode = ModeCode
 	_, err := r.Send(context.Background(), "change login")
 	var h *Handoff
@@ -80,7 +84,7 @@ func TestInterruptAnswersEveryToolCall(t *testing.T) {
 	r, _, _ := newRunner(t, up, ApprovalAuto)
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() { time.Sleep(200 * time.Millisecond); cancel() }()
-	if _, err := r.Send(ctx, "go"); err != ErrInterrupted {
+	if _, err := r.Send(ctx, "go"); !errors.Is(err, ErrInterrupted) {
 		t.Fatalf("err = %v", err)
 	}
 	ms := r.Session.Messages
@@ -115,8 +119,12 @@ func TestPlanModeAllowsSafeCommands(t *testing.T) {
 // names for the same tools are accepted.
 func TestCustomAgentToolsAreHonoured(t *testing.T) {
 	r, root, _ := newRunner(t, &scripted{}, ApprovalAuto)
-	os.MkdirAll(filepath.Join(root, ".boundedcode/agents"), 0o755)
-	os.WriteFile(filepath.Join(root, ".boundedcode/agents/reader.md"), []byte("---\nname: reader\ndescription: Reads\ntools: Read, grep, WebFetch\n---\nYou read.\n"), 0o644)
+	if err := os.MkdirAll(filepath.Join(root, ".boundedcode/agents"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, ".boundedcode/agents/reader.md"), []byte("---\nname: reader\ndescription: Reads\ntools: Read, grep, WebFetch\n---\nYou read.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	child, err := r.subagent("reader")
 	if err != nil {
 		t.Fatal(err)
@@ -137,8 +145,12 @@ func TestCustomAgentToolsAreHonoured(t *testing.T) {
 // and the model can run a template through the skill tool.
 func TestCommandArgumentsAndModelInvocation(t *testing.T) {
 	r, root, _ := newRunner(t, &scripted{}, ApprovalAuto)
-	os.MkdirAll(filepath.Join(root, ".boundedcode/commands"), 0o755)
-	os.WriteFile(filepath.Join(root, ".boundedcode/commands/triage.md"), []byte("---\ndescription: Triage\n---\nTriage the issue.\n"), 0o644)
+	if err := os.MkdirAll(filepath.Join(root, ".boundedcode/commands"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, ".boundedcode/commands/triage.md"), []byte("---\ndescription: Triage\n---\nTriage the issue.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	ctx := context.Background()
 	prompt, ok, err := r.ExpandCommand(ctx, "", "triage", "#12 urgent")
 	if err != nil || !ok || prompt != "Triage the issue.\n\nARGUMENTS: #12 urgent" {
@@ -162,8 +174,12 @@ func TestCommandArgumentsAndModelInvocation(t *testing.T) {
 
 func TestGrepOutputModesAndContext(t *testing.T) {
 	r, root, _ := newRunner(t, &scripted{}, ApprovalAuto)
-	os.WriteFile(filepath.Join(root, "a.txt"), []byte("one\ntwo needle\nthree\nfour\nfive needle\nsix\n"), 0o644)
-	os.WriteFile(filepath.Join(root, "b.txt"), []byte("needle\n"), 0o644)
+	if err := os.WriteFile(filepath.Join(root, "a.txt"), []byte("one\ntwo needle\nthree\nfour\nfive needle\nsix\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "b.txt"), []byte("needle\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	ctx := context.Background()
 	out, err := r.goGrep(ctx, root, "needle", "", false, "files", 0)
 	if err != nil || out != "a.txt\nb.txt" {
@@ -224,7 +240,9 @@ func TestEnvironmentRefreshesPerTurn(t *testing.T) {
 	if sys := up.lastMessages(t)[0]["content"].(string); !strings.Contains(sys, "git status: clean") {
 		t.Fatalf("first prompt: %q", sys)
 	}
-	os.WriteFile(filepath.Join(root, "new.txt"), []byte("x"), 0o644)
+	if err := os.WriteFile(filepath.Join(root, "new.txt"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := r.Send(context.Background(), "two"); err != nil {
 		t.Fatal(err)
 	}

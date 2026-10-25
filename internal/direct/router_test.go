@@ -107,8 +107,12 @@ func TestRiskyEditHandsOffBeforeWriting(t *testing.T) {
 		{text: "never"},
 	}}
 	r, root, evs := newRunner(t, up, ApprovalAuto)
-	os.MkdirAll(filepath.Join(root, "internal/auth"), 0o755)
-	os.WriteFile(filepath.Join(root, "internal/auth/login.go"), []byte("a"), 0o644)
+	if err := os.MkdirAll(filepath.Join(root, "internal/auth"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "internal/auth/login.go"), []byte("a"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	r.Opts.Mode = ModeCode
 	_, err := r.Send(context.Background(), "change login")
 	var h *Handoff

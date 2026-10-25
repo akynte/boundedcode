@@ -85,6 +85,12 @@ See [docs/design/tool-coverage.md](docs/design/tool-coverage.md).
   announces a plan is asked once to act; an identical failing tool call is
   flagged after three repeats.
 
+
+### Build
+
+- Builds now require Go 1.27.3 (`go.mod`), which fixes GO-2026-6809 in
+  crypto/x509 (distrust of compromised intermediate certificates),
+  reachable from the installer's download path.
 ## v0.1.0-alpha.6 (2026-10-13): a recorded crash test and a reproducible licenses archive
 
 Release notes: [docs/releases/v0.1.0-alpha.6.md](docs/releases/v0.1.0-alpha.6.md).

@@ -184,7 +184,7 @@ func (r *Runner) runTool(ctx context.Context, call ToolCall) string {
 		r.emit(Event{Kind: EventDenied, Tool: t.Name, CallID: call.ID, Summary: summary, Err: why})
 		return "error: " + why
 	}
-	if t.Mutates && r.plan && !(t.Name == "bash" && isSafeCommand(str(args, "command"))) {
+	if t.Mutates && r.plan && (t.Name != "bash" || !isSafeCommand(str(args, "command"))) {
 		r.emit(Event{Kind: EventDenied, Tool: t.Name, CallID: call.ID, Summary: summary, Err: "plan mode"})
 		return "Plan mode is on: no files are changed and no commands other than read-only ones run until the plan is approved. Finish the plan and call exit_plan_mode."
 	}
@@ -319,7 +319,7 @@ func (r *Runner) checkReadable(abs string) error {
 	}
 	rel, err := filepath.Rel(root, abs)
 	if err != nil || rel == "." {
-		return nil
+		return nil //nolint:nilerr // outside the root or the root itself: nothing to mask
 	}
 	rel = filepath.ToSlash(rel)
 	if policy.IsSecretPath(rel) {
@@ -344,7 +344,9 @@ func num(args map[string]any, key string) int {
 		return v
 	case string:
 		var n int
-		fmt.Sscanf(v, "%d", &n)
+		if _, err := fmt.Sscanf(v, "%d", &n); err != nil {
+			return 0
+		}
 		return n
 	}
 	return 0
@@ -853,7 +855,7 @@ func grepTool() Tool {
 				c.Dir = r.cwd()
 				out, err := c.Output()
 				var ee *exec.ExitError
-				if err != nil && !(errors.As(err, &ee) && ee.ExitCode() == 1) {
+				if err != nil && (!errors.As(err, &ee) || ee.ExitCode() != 1) {
 					if ee != nil && ee.ExitCode() == 2 {
 						return "", fmt.Errorf("invalid pattern: %s", strings.TrimSpace(string(ee.Stderr)))
 					}
@@ -913,7 +915,7 @@ func (r *Runner) goGrep(ctx context.Context, abs, pattern, glob string, ignoreCa
 		}
 		data, err := os.ReadFile(file)
 		if err != nil || bytes.IndexByte(data[:min(len(data), 8000)], 0) >= 0 {
-			return nil
+			return nil //nolint:nilerr // unreadable or binary files are skipped
 		}
 		lines := strings.Split(string(data), "\n")
 		hits := 0
@@ -1006,7 +1008,7 @@ func (r *Runner) walk(dir string, fn func(file, rel string, d fs.DirEntry) error
 	}
 	return filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
-			return nil
+			return nil //nolint:nilerr // unreadable entries are skipped
 		}
 		rel, _ := filepath.Rel(cwd, p)
 		rel = filepath.ToSlash(rel)
@@ -1017,7 +1019,7 @@ func (r *Runner) walk(dir string, fn func(file, rel string, d fs.DirEntry) error
 			return nil
 		}
 		if !d.Type().IsRegular() || r.checkReadable(p) != nil {
-			return nil
+			return nil //nolint:nilerr // masked or non-regular entries are skipped
 		}
 		return fn(p, rel, d)
 	})
@@ -1195,7 +1197,7 @@ func fuzzyReplace(src, old, new string) (string, error) {
 		return "", errNotFound
 	}
 	srcLines := strings.Split(src, "\n")
-	trim := func(l string) string { return strings.TrimSpace(l) }
+	trim := strings.TrimSpace
 	start := -1
 	for i := 0; i+len(oldLines) <= len(srcLines); i++ {
 		ok := true

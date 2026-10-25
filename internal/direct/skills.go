@@ -3,7 +3,6 @@ package direct
 import (
 	"bufio"
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -39,7 +38,6 @@ type AgentDef struct {
 // and !`cmd` shell injection), the older form of a skill.
 type Command struct {
 	Name, Description, File string
-	body                    string
 }
 
 // loadDefinitions discovers skills and agents in the configured dirs
@@ -386,7 +384,7 @@ func (r *Runner) injectShell(ctx context.Context, body string) (string, error) {
 		c.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "NO_COLOR=1")
 		b, err := c.CombinedOutput()
 		if err != nil && firstErr == nil {
-			firstErr = fmt.Errorf("command %q in the template failed: %v", cmd, err)
+			firstErr = fmt.Errorf("command %q in the template failed: %w", cmd, err)
 		}
 		return sub[1] + strings.TrimRight(string(b), "\n")
 	})
@@ -395,5 +393,3 @@ func (r *Runner) injectShell(ctx context.Context, body string) (string, error) {
 	}
 	return out, nil
 }
-
-var errNoCommand = errors.New("no such command")
