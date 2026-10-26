@@ -31,6 +31,10 @@ used on real work or measured.
   OpenAI-compatible servers stream (server-sent events folded into one
   answer in the gateway, metered like any call); Anthropic and Gemini
   answers still arrive whole.
+- A session's first message carries a project map (build system and test
+  command, top-level directories with source-file counts, top-level
+  files), so the model does not spend its first calls on ls, glob and the
+  README.
 - The names a message mentions (identifiers, paths, quoted errors, ranked
   by the context planner's seed rules) are looked up in the project before
   the first model call and the places found travel with the message,

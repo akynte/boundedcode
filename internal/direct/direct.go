@@ -319,6 +319,11 @@ func (r *Runner) Send(ctx context.Context, text string) (string, error) {
 	}
 	um := r.attach(text)
 	um.Context = r.turnContext()
+	if len(r.Session.Messages) == 0 && !r.Opts.NoSeedPack && r.Depth == 0 {
+		if pm := r.projectMap(); pm != "" {
+			um.Context += "\n\n" + pm
+		}
+	}
 	if sp := r.seedPack(ctx, text); sp != "" {
 		um.Context += "\n\n" + sp
 	}

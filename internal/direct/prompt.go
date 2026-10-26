@@ -96,15 +96,19 @@ func (r *Runner) reframeTurn() {
 		if m.Role != "user" || m.Context == "" {
 			continue
 		}
-		// The context is: environment, framing, then the places found for
-		// the request; only the framing changes.
+		// The context is: environment, framing, then the project map and
+		// the places found for the request; only the framing changes.
 		env, rest, _ := strings.Cut(m.Context, "\n\nThis message was classified")
 		places := ""
 		if i := strings.Index(rest, "\n\n"); rest != "" && i >= 0 {
 			places = rest[i:]
-		} else if rest == "" && strings.Contains(env, "\n\nLikely relevant places") {
-			i := strings.Index(env, "\n\nLikely relevant places")
-			env, places = env[:i], env[i:]
+		} else if rest == "" {
+			for _, marker := range []string{"\n\nProject map", "\n\nLikely relevant places"} {
+				if i := strings.Index(env, marker); i >= 0 {
+					env, places = env[:i], env[i:]
+					break
+				}
+			}
 		}
 		m.Context = env
 		if f := modeFraming(r.Opts.Mode); f != "" {

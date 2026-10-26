@@ -358,3 +358,44 @@ func TestAnswerStreamsAsDeltas(t *testing.T) {
 		}
 	}
 }
+
+// The first message of a session carries a map of the project.
+func TestProjectMapOnFirstMessage(t *testing.T) {
+	up := &scripted{replies: []reply{{text: "ok"}, {text: "ok"}}}
+	r, root, _ := newRunner(t, up, ApprovalAuto)
+	for f, content := range map[string]string{
+		"go.mod":                     "module example.com/shop\n\ngo 1.22\n",
+		"README.md":                  "# shop\n",
+		"Makefile":                   "build:\n\tgo build ./...\n.PHONY: test\ntest:\n\tgo test ./...\n",
+		"internal/cart/cart.go":      "package cart\n",
+		"internal/cart/cart_test.go": "package cart\n",
+		"cmd/shop/main.go":           "package main\n",
+		"web/app.ts":                 "export {}\n",
+		"node_modules/x/index.js":    "",
+	} {
+		if err := os.MkdirAll(filepath.Dir(filepath.Join(root, f)), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(root, f), []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := r.Send(context.Background(), "hello"); err != nil {
+		t.Fatal(err)
+	}
+	um := up.lastMessages(t)[1]["content"].(string)
+	for _, want := range []string{"Project map", "- Go module example.com/shop (build: go build ./..., test: go test ./...)", "- Makefile targets: build, test", "- internal/: 2 source files (Go 2)", "- cmd/: 1 source files (Go 1)", "- web/: 1 source files (TypeScript 1)", "- top-level files: Makefile, README.md, go.mod"} {
+		if !strings.Contains(um, want) {
+			t.Fatalf("missing %q in:\n%s", want, um)
+		}
+	}
+	if strings.Contains(um, "node_modules") {
+		t.Fatal("dependency directories are not mapped")
+	}
+	if _, err := r.Send(context.Background(), "and again"); err != nil {
+		t.Fatal(err)
+	}
+	if um := up.lastMessages(t)[3]["content"].(string); strings.Contains(um, "Project map") {
+		t.Fatal("the map is sent once per session")
+	}
+}
