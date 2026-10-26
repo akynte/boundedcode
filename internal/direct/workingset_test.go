@@ -237,13 +237,13 @@ func TestGoBuildCheckInAModule(t *testing.T) {
 	if _, err := w.Run(context.Background(), r, map[string]any{"path": "lib/a.go", "content": "package lib\n\nfunc A() int { return undefinedName }\n"}); err != nil {
 		t.Fatal(err)
 	}
-	if diag := r.checkFile(context.Background(), filepath.Join(root, "lib/a.go"), "lib/a.go"); !strings.Contains(diag, "go build ./lib failed") || !strings.Contains(diag, "undefinedName") {
+	if diag := r.checkFile(context.Background(), filepath.Join(root, "lib/a.go"), "lib/a.go", nil); !strings.Contains(diag, "go build ./lib failed") || !strings.Contains(diag, "undefinedName") {
 		t.Fatalf("type error: %q", diag)
 	}
 	if err := os.WriteFile(filepath.Join(root, "lib/a.go"), []byte("package lib\n\nfunc A() int { return 1 }\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if diag := r.checkFile(context.Background(), filepath.Join(root, "lib/a.go"), "lib/a.go"); diag != "check: ok (go build ./lib)" {
+	if diag := r.checkFile(context.Background(), filepath.Join(root, "lib/a.go"), "lib/a.go", nil); diag != "check: ok (go build ./lib)" {
 		t.Fatalf("clean: %q", diag)
 	}
 	r.Opts.NoChecks = true
@@ -252,7 +252,7 @@ func TestGoBuildCheckInAModule(t *testing.T) {
 		if err := os.WriteFile(filepath.Join(root, "s.py"), []byte("def f(:\n  pass\n"), 0o644); err != nil {
 			t.Fatal(err)
 		}
-		if diag := r.checkFile(context.Background(), filepath.Join(root, "s.py"), "s.py"); !strings.Contains(diag, "check: python3 reports") || !strings.Contains(diag, "SyntaxError") {
+		if diag := r.checkFile(context.Background(), filepath.Join(root, "s.py"), "s.py", nil); !strings.Contains(diag, "check: python3 reports") || !strings.Contains(diag, "SyntaxError") {
 			t.Fatalf("python: %q", diag)
 		}
 	}

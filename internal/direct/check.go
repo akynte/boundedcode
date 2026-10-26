@@ -33,13 +33,15 @@ const (
 )
 
 // checkFile checks a changed file and returns a line for the model:
-// "check: ok (what)" or the diagnostic; "" when no check applies.
-func (r *Runner) checkFile(ctx context.Context, abs, rel string) string {
+// "check: ok (what)" or the diagnostic; "" when no check applies. before
+// is a Go file's content before the change (nil when new), so notes about
+// mistakes that compile (goPitfalls) cover only what the change added.
+func (r *Runner) checkFile(ctx context.Context, abs, rel string, before []byte) string {
 	ctx, cancel := context.WithTimeout(ctx, checkTimeout)
 	defer cancel()
 	switch strings.ToLower(filepath.Ext(abs)) {
 	case ".go":
-		return r.checkGo(ctx, abs, rel)
+		return r.checkGo(ctx, abs, rel, before)
 	case ".py":
 		return r.checkWith(ctx, "python3", "python3", "-c", pyParse, abs)
 	case ".js", ".mjs", ".cjs":
@@ -99,7 +101,7 @@ func (r *Runner) checkWith(ctx context.Context, what, bin string, args ...string
 
 // checkGo parses the file, then builds (or vets, for a test file) its
 // package when the Go toolchain is installed.
-func (r *Runner) checkGo(ctx context.Context, abs, rel string) string {
+func (r *Runner) checkGo(ctx context.Context, abs, rel string, before []byte) string {
 	src, err := os.ReadFile(abs)
 	if err != nil {
 		return ""
@@ -107,6 +109,16 @@ func (r *Runner) checkGo(ctx context.Context, abs, rel string) string {
 	if _, perr := parser.ParseFile(token.NewFileSet(), rel, src, parser.SkipObjectResolution); perr != nil {
 		return "check: Go syntax error:\n" + perr.Error() + "\nFix this before going on."
 	}
+	verdict := r.buildGo(ctx, abs)
+	if notes := newPitfalls(rel, before, src); len(notes) > 0 {
+		verdict += "\ncheck note (compiles, but probably not what you meant):\n- " + strings.Join(notes, "\n- ")
+	}
+	return verdict
+}
+
+// buildGo builds (or vets, for a test file) a Go file's package when the
+// Go toolchain is installed.
+func (r *Runner) buildGo(ctx context.Context, abs string) string {
 	goBin, err := exec.LookPath("go")
 	if err != nil {
 		return "check: ok (Go parse)"

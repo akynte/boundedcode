@@ -223,6 +223,19 @@ func TestDirectSuiteRunsSessionTurns(t *testing.T) {
 	}
 }
 
+// A run whose check commands are missing is refused before any task.
+func TestDirectSuiteRefusesMissingCheckCommands(t *testing.T) {
+	dr := &DirectRunner{NewRunner: func(context.Context, string, string) (*direct.Runner, func(), error) {
+		t.Fatal("no task may run")
+		return nil, nil, nil
+	}}
+	tasks := []TaskSpec{{ID: "a", Checks: []Check{{Run: []string{"no-such-command-xyz", "test"}}}}, {ID: "b", Checks: []Check{{Run: []string{"no-such-command-xyz"}}}}}
+	_, err := dr.Run(context.Background(), "m", tasks, "")
+	if err == nil || err.Error() != "not on PATH: no-such-command-xyz (needed by a, b)" {
+		t.Fatalf("err = %v", err)
+	}
+}
+
 // The shipped suite loads and every task fits the direct runner.
 func TestDirectSuiteDefinitions(t *testing.T) {
 	tasks, err := LoadTasks(filepath.Join("..", "..", "benchmarks", "direct"))

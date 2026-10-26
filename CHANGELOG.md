@@ -34,6 +34,15 @@ used on real work or measured.
   (`streamGenerateContent`, text parts joined, thought signatures kept).
   The stream is folded into one answer in the gateway and metered like
   any call. The OpenAI reasoning effort now reaches streamed requests too.
+- After a Go edit, the check also notes code that compiles but is
+  probably wrong, only when the edit introduced it: a function returning
+  `&v` where `v` is a range loop's copy of the element ("return
+  &xs[i] if the caller should get the element itself"). Small models
+  write this for lookups; it failed `large-change-txtar` in 5 of 6 runs,
+  and with the note it passed 4 of 4. Across 20,031 files of real Go code
+  (x/tools, cobra, the module cache, the standard library) the rule finds
+  11 places, mostly deliberate copies, and it never fires on code the
+  edit did not add.
 - The system prompt asks for the cause, not the symptom: after a failing
   test, re-read the whole function and correct every part of the mistake.
   Measured on the suite's planted two-fault bug: fixed in 0 of 2 runs
@@ -75,6 +84,8 @@ used on real work or measured.
   working set and whose change depends on the first answer. Reports add
   the largest single prompt and the recalls; `--working-set N` overrides
   the history budget for a run.
+- `bcode bench direct` refuses to start when a task's check command
+  (such as `go`) is not on the PATH, instead of failing every task.
 - `bcode bench lease` scores request-derived leases (the declarations,
   files and directories a request is about, `internal/lease`) against
   real commits. On 663 commits of golang.org/x/tools, cobra and this

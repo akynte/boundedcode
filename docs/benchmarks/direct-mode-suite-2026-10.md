@@ -107,6 +107,32 @@ tool results, 26 s per task; `large-change-txtar` failed as before. Tool
 calls are 0.7 below the previous best, more than the 0.2 noise between
 identical builds; `diagnose-failing-test` is now routed as a question.
 
+## Pitfall note (third series, same day)
+
+`large-change-txtar` failed in 5 of 6 runs with the same code:
+`for _, f := range a.Files { if f.Name == name { return &f, true } }`, a
+pointer to the loop's copy. The post-change Go check now adds a note when
+an edit introduces a `return &v` of a range value variable (not for a
+slice the function built itself, not inside closures); the note says the
+pointer is to a copy and how to return the element.
+
+| Run | Result | Model calls | Notes |
+|---|---|---|---|
+| large-change-txtar, three runs | pass, pass, pass | 6, 8, 7 | 1 each; the model changed to `&a.Files[i]` every time |
+| full suite (`20261026T*-pitfall-suite`) | 14/15 | 6.1 per task | 1, on large-change-txtar (passed) |
+
+In the full suite the 13 original tasks passed 12/13 with 4.6 model calls,
+5.0 tool calls, 24.4K prompt tokens and 29 s per task; the failure was
+`fix-balance-query` fixing one of its two planted faults (it passed 4 of
+the 5 runs before). The note fired on no other task. A first attempt at
+this run had Go missing from the PATH, so every check failed; it was
+discarded, and `bench direct` now refuses to start in that state.
+
+The rule was sized on real code first: in 20,031 Go files (x/tools,
+cobra, the module cache, the standard library) it finds 11 places, mostly
+deliberate copies such as `crypto/tls` returning a certificate copy. Since
+a note is only given for code the edit added, these never appear.
+
 ## Not measured yet
 
 Cloud providers (their streaming is tested against recorded event

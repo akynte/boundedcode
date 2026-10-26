@@ -1,0 +1,93 @@
+{
+  "id": "direct-20261026T181719Z",
+  "model": "qwen3.6-35b-a3b",
+  "started": "2026-10-26T18:17:19.33966548Z",
+  "finished": "2026-10-26T18:18:29.083116572Z",
+  "results": [
+    {
+      "id": "large-change-txtar",
+      "category": "large-change",
+      "model": "qwen3.6-35b-a3b",
+      "success": true,
+      "mode": "code",
+      "routed": "a request for a change",
+      "turns": 1,
+      "model_calls": 8,
+      "tool_calls": 9,
+      "tools": {
+        "bash": 1,
+        "edit": 3,
+        "ls": 1,
+        "read": 4
+      },
+      "prompt_tokens": 60675,
+      "cached_prompt_tokens": 51021,
+      "generated_tokens": 1830,
+      "peak_prompt_tokens": 12715,
+      "tool_result_bytes": 19856,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 0,
+      "check_notes": 1,
+      "wall_seconds": 69.735208286,
+      "files_changed": [
+        "txtar/archive.go",
+        "txtar/archive_test.go"
+      ],
+      "answer": "Done. Here's what was added:\n\n**`txtar/archive.go`** — `Lookup` method (lines 67-75):\n```go\n// Lookup returns the file with the given name, or nil and false if no such file exists.\nfunc (a *Archive) Lookup(name string) (*File, bool) {\n\tfor i, f := range a.Files {\n\t\tif f.Name == name {\n\t\t\treturn \u0026a.Files[i], true\n\t\t}\n\t}\n\treturn nil, false\n}\n```\n\n- Iterates over `a.Files` and returns a pointer to the matching `File` (using `\u0026a.Files[i]` to avoid the range-loop-copy pitfall).\n- Returns `nil, false` when the name isn't found.\n- Documented in the same style as the neighbouring `Format` and `ParseFile` functions.\n\n**`txtar/archive_test.go`** — `TestLookup` (lines 128-147):\n- Tests the **found** case: looks up `\"foo\"` and verifies `ok == true`, `f != nil`, and that `Name`/`Data` match.\n- Tests the **not found** case: looks up `\"baz\"` and verifies `ok == false`, `f == nil`.\n\nAll tests pass: `ok golang.org/x/tools/txtar 0.002s`.",
+      "agent_patch": "diff --git a/txtar/archive.go b/txtar/archive.go\nindex 85e4dc4..7166e84 100644\n--- a/txtar/archive.go\n+++ b/txtar/archive.go\n@@ -64,6 +64,16 @@ func Format(a *Archive) []byte {\n \treturn buf.Bytes()\n }\n \n+// Lookup returns the file with the given name, or nil and false if no such file exists.\n+func (a *Archive) Lookup(name string) (*File, bool) {\n+\tfor i, f := range a.Files {\n+\t\tif f.Name == name {\n+\t\t\treturn \u0026a.Files[i], true\n+\t\t}\n+\t}\n+\treturn nil, false\n+}\n+\n // ParseFile parses the named file as an archive.\n func ParseFile(file string) (*Archive, error) {\n \tdata, err := os.ReadFile(file)\ndiff --git a/txtar/archive_test.go b/txtar/archive_test.go\nindex e05fd5f..c095e48 100644\n--- a/txtar/archive_test.go\n+++ b/txtar/archive_test.go\n@@ -125,6 +125,27 @@ hello world\n \t}\n }\n \n+func TestLookup(t *testing.T) {\n+\ta := \u0026Archive{\n+\t\tFiles: []File{\n+\t\t\t{\"foo\", []byte(\"hello\")},\n+\t\t\t{\"bar\", []byte(\"world\")},\n+\t\t},\n+\t}\n+\n+\t// Found case\n+\tf, ok := a.Lookup(\"foo\")\n+\tif !ok || f == nil || f.Name != \"foo\" || string(f.Data) != \"hello\" {\n+\t\tt.Fatalf(\"Lookup(foo) = (%v, %v), want (*File{foo, hello}, true)\", f, ok)\n+\t}\n+\n+\t// Not found case\n+\tf, ok = a.Lookup(\"baz\")\n+\tif ok || f != nil {\n+\t\tt.Fatalf(\"Lookup(baz) = (%v, %v), want (nil, false)\", f, ok)\n+\t}\n+}\n+\n func shortArchive(a *Archive) string {\n \tvar buf bytes.Buffer\n \tfmt.Fprintf(\u0026buf, \"comment: %q\\n\", a.Comment)\n",
+      "session_id": "20261026-181719-a54e"
+    }
+  ],
+  "summary": {
+    "tasks": 1,
+    "passed": 1,
+    "pass_rate": 1,
+    "model_calls_per_task": 8,
+    "tool_calls_per_task": 9,
+    "prompt_tokens_per_task": 60675,
+    "prompt_cache_hit_rate": 0.8408899876390605,
+    "generated_tokens_per_task": 1830,
+    "tool_result_bytes_per_task": 19856,
+    "wall_seconds_per_task": 69.735208286,
+    "peak_prompt_tokens": 12715,
+    "elided": 0,
+    "recalls": 0,
+    "compactions": 0,
+    "checks_caught": 0,
+    "check_notes": 1,
+    "errors": 0
+  },
+  "settings": {
+    "approval": "auto",
+    "checks": true,
+    "context_tokens": 131072,
+    "max_tool_output": 0,
+    "provider": "local",
+    "seed_pack": true,
+    "working_set_tokens": 0
+  },
+  "by_category": [
+    {
+      "category": "large-change",
+      "tasks": 1,
+      "passed": 1,
+      "pass_rate": 1,
+      "model_calls_per_task": 8,
+      "tool_calls_per_task": 9,
+      "prompt_tokens_per_task": 60675,
+      "prompt_cache_hit_rate": 0.8408899876390605,
+      "generated_tokens_per_task": 1830,
+      "tool_result_bytes_per_task": 19856,
+      "wall_seconds_per_task": 69.735208286,
+      "peak_prompt_tokens": 12715,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 0,
+      "check_notes": 1,
+      "errors": 0
+    }
+  ]
+}

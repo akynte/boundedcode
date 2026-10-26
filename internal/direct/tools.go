@@ -217,9 +217,13 @@ hooks:
 			}
 		}
 	}
+	var before []byte // a Go file's content before the change, for the check
 	if t.Mutates && t.Name != "bash" {
 		if abs, _, err := r.resolve(str(args, "path")); err == nil {
 			r.checkpoint(abs)
+			if strings.HasSuffix(abs, ".go") {
+				before, _ = os.ReadFile(abs)
+			}
 		}
 	}
 	r.emit(Event{Kind: EventToolStart, Tool: t.Name, CallID: call.ID, Summary: summary, Args: args})
@@ -228,7 +232,7 @@ hooks:
 	el := time.Since(start)
 	if err == nil && t.Mutates && t.Name != "bash" && !r.Opts.NoChecks {
 		if abs, rel, rerr := r.resolve(str(args, "path")); rerr == nil {
-			if diag := r.checkFile(ctx, abs, rel); diag != "" {
+			if diag := r.checkFile(ctx, abs, rel, before); diag != "" {
 				out += "\n" + diag
 			}
 		}

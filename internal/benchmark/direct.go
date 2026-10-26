@@ -85,6 +85,9 @@ type DirectResult struct {
 	Recalls      int `json:"recalls"`
 	Compactions  int `json:"compactions"`
 	ChecksCaught int `json:"checks_caught"`
+	// CheckNotes counts notes about code that compiles but is probably
+	// wrong (a pointer to a range loop's copy).
+	CheckNotes int `json:"check_notes,omitempty"`
 	// Nudged: the model described a plan without acting and was asked to
 	// continue.
 	Nudged       bool     `json:"nudged,omitempty"`
@@ -131,6 +134,7 @@ type DirectSummary struct {
 	Recalls         int     `json:"recalls"`
 	Compactions     int     `json:"compactions"`
 	ChecksCaught    int     `json:"checks_caught"`
+	CheckNotes      int     `json:"check_notes"`
 	Errors          int     `json:"errors"`
 }
 
@@ -163,6 +167,9 @@ func (d *DirectRunner) Run(ctx context.Context, model string, tasks []TaskSpec, 
 		}
 		return config.WriteFileAtomic(out, b, 0o644)
 	}
+	if err := checkCommands(tasks); err != nil {
+		return nil, err
+	}
 	for i, t := range tasks {
 		if ctx.Err() != nil {
 			return rep, ctx.Err()
@@ -181,6 +188,44 @@ func (d *DirectRunner) Run(ctx context.Context, model string, tasks []TaskSpec, 
 		}
 	}
 	return rep, save()
+}
+
+// checkCommands refuses a run whose acceptance commands are not
+// installed: every task would fail for a reason that has nothing to do
+// with the agent (and the agent could not run them either).
+func checkCommands(tasks []TaskSpec) error {
+	missing := map[string][]string{}
+	for _, t := range tasks {
+		for _, c := range t.Checks {
+			if len(c.Run) == 0 {
+				continue
+			}
+			if _, err := exec.LookPath(c.Run[0]); err != nil {
+				missing[c.Run[0]] = append(missing[c.Run[0]], t.ID)
+			}
+		}
+	}
+	if len(missing) == 0 {
+		return nil
+	}
+	var parts []string
+	for bin, ids := range missing {
+		parts = append(parts, fmt.Sprintf("%s (needed by %s)", bin, strings.Join(uniqStrings(ids), ", ")))
+	}
+	sort.Strings(parts)
+	return fmt.Errorf("not on PATH: %s", strings.Join(parts, "; "))
+}
+
+func uniqStrings(ss []string) []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, s := range ss {
+		if !seen[s] {
+			seen[s] = true
+			out = append(out, s)
+		}
+	}
+	return out
 }
 
 func errSuffix(r DirectResult) string {
@@ -248,6 +293,9 @@ func (d *DirectRunner) runOne(ctx context.Context, model string, spec TaskSpec) 
 			res.ResultBytes += len(e.Output)
 			if strings.Contains(e.Output, "Fix this before going on") {
 				res.ChecksCaught++
+			}
+			if strings.Contains(e.Output, "check note (") {
+				res.CheckNotes++
 			}
 		case direct.EventDenied:
 			res.Denied++
@@ -455,6 +503,7 @@ func summarizeDirect(category string, rs []DirectResult) DirectSummary {
 		s.Recalls += r.Recalls
 		s.Compactions += r.Compactions
 		s.ChecksCaught += r.ChecksCaught
+		s.CheckNotes += r.CheckNotes
 		s.PeakPrompt = max(s.PeakPrompt, r.PeakPrompt)
 	}
 	if s.Tasks == 0 {
@@ -490,8 +539,8 @@ func WriteDirectMarkdown(w io.Writer, r *DirectReport) error {
 		}
 		fmt.Fprintf(w, "Settings: %s.\n\n", strings.Join(parts, ", "))
 	}
-	fmt.Fprintf(w, "**%d/%d passed (%.0f%%)**, %.1f model calls and %.1f tool calls per task, %.0f prompt tokens per task with a %.0f%% prompt-cache hit rate, %.0f generated tokens per task, %.0f KB of tool results per task, %.0f s per task, %d tokens in the largest single prompt; %d results set aside, %d recalled, %d summaries, %d broken edits caught by the check, %d errors.\n\n",
-		s.Passed, s.Tasks, 100*s.PassRate, s.MeanCalls, s.MeanToolCalls, s.MeanPrompt, 100*s.CacheHitRate, s.MeanGenerated, s.MeanResultBytes/1024, s.MeanWallSeconds, s.PeakPrompt, s.Elided, s.Recalls, s.Compactions, s.ChecksCaught, s.Errors)
+	fmt.Fprintf(w, "**%d/%d passed (%.0f%%)**, %.1f model calls and %.1f tool calls per task, %.0f prompt tokens per task with a %.0f%% prompt-cache hit rate, %.0f generated tokens per task, %.0f KB of tool results per task, %.0f s per task, %d tokens in the largest single prompt; %d results set aside, %d recalled, %d summaries, %d broken edits caught by the check, %d check notes, %d errors.\n\n",
+		s.Passed, s.Tasks, 100*s.PassRate, s.MeanCalls, s.MeanToolCalls, s.MeanPrompt, 100*s.CacheHitRate, s.MeanGenerated, s.MeanResultBytes/1024, s.MeanWallSeconds, s.PeakPrompt, s.Elided, s.Recalls, s.Compactions, s.ChecksCaught, s.CheckNotes, s.Errors)
 	if len(r.ByClass) > 1 {
 		fmt.Fprintf(w, "| Category | Passed | Calls | Tools | Prompt tok | Cache | Gen tok | s/task |\n|---|---|---|---|---|---|---|---|\n")
 		for _, c := range r.ByClass {

@@ -1,0 +1,93 @@
+{
+  "id": "direct-20261026T181631Z",
+  "model": "qwen3.6-35b-a3b",
+  "started": "2026-10-26T18:16:31.583707147Z",
+  "finished": "2026-10-26T18:17:19.311411519Z",
+  "results": [
+    {
+      "id": "large-change-txtar",
+      "category": "large-change",
+      "model": "qwen3.6-35b-a3b",
+      "success": true,
+      "mode": "code",
+      "routed": "a request for a change",
+      "turns": 1,
+      "model_calls": 6,
+      "tool_calls": 7,
+      "tools": {
+        "bash": 1,
+        "edit": 3,
+        "glob": 1,
+        "read": 2
+      },
+      "prompt_tokens": 43189,
+      "cached_prompt_tokens": 34845,
+      "generated_tokens": 1123,
+      "peak_prompt_tokens": 8324,
+      "tool_result_bytes": 9793,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 0,
+      "check_notes": 1,
+      "wall_seconds": 47.719392983,
+      "files_changed": [
+        "txtar/archive.go",
+        "txtar/archive_test.go"
+      ],
+      "answer": "All done. Here's what I added:\n\n**`txtar/archive.go`** — `Lookup` method (lines 53–61):\n```go\n// Lookup returns the file with the given name, or nil and false if no such\n// file exists in the archive.\nfunc (a *Archive) Lookup(name string) (*File, bool) {\n\tfor i, f := range a.Files {\n\t\tif f.Name == name {\n\t\t\treturn \u0026a.Files[i], true\n\t\t}\n\t}\n\treturn nil, false\n}\n```\n\n**`txtar/archive_test.go`** — `TestLookup` covering both the found and not-found cases.\n\nAll tests pass (`ok golang.org/x/tools/txtar`).",
+      "agent_patch": "diff --git a/txtar/archive.go b/txtar/archive.go\nindex 85e4dc4..de7d5b2 100644\n--- a/txtar/archive.go\n+++ b/txtar/archive.go\n@@ -50,6 +50,17 @@ type File struct {\n \tData []byte // text content of file\n }\n \n+// Lookup returns the file with the given name, or nil and false if no such\n+// file exists in the archive.\n+func (a *Archive) Lookup(name string) (*File, bool) {\n+\tfor i, f := range a.Files {\n+\t\tif f.Name == name {\n+\t\t\treturn \u0026a.Files[i], true\n+\t\t}\n+\t}\n+\treturn nil, false\n+}\n+\n // Format returns the serialized form of an Archive.\n // It is assumed that the Archive data structure is well-formed:\n // a.Comment and all a.File[i].Data contain no file marker lines,\ndiff --git a/txtar/archive_test.go b/txtar/archive_test.go\nindex e05fd5f..42c944c 100644\n--- a/txtar/archive_test.go\n+++ b/txtar/archive_test.go\n@@ -125,6 +125,28 @@ hello world\n \t}\n }\n \n+func TestLookup(t *testing.T) {\n+\ta := \u0026Archive{\n+\t\tComment: []byte(\"comment\\n\"),\n+\t\tFiles: []File{\n+\t\t\t{\"file1\", []byte(\"data1\\n\")},\n+\t\t\t{\"file2\", []byte(\"data2\\n\")},\n+\t\t},\n+\t}\n+\n+\t// Existing file\n+\tf, ok := a.Lookup(\"file1\")\n+\tif !ok || f == nil || f.Name != \"file1\" {\n+\t\tt.Fatalf(\"Lookup(%q): want ok, got ok=%v f=%v\", \"file1\", ok, f)\n+\t}\n+\n+\t// Non-existing file\n+\tf, ok = a.Lookup(\"nope\")\n+\tif ok || f != nil {\n+\t\tt.Fatalf(\"Lookup(%q): want nil,false, got ok=%v f=%v\", \"nope\", ok, f)\n+\t}\n+}\n+\n func shortArchive(a *Archive) string {\n \tvar buf bytes.Buffer\n \tfmt.Fprintf(\u0026buf, \"comment: %q\\n\", a.Comment)\n",
+      "session_id": "20261026-181631-69a8"
+    }
+  ],
+  "summary": {
+    "tasks": 1,
+    "passed": 1,
+    "pass_rate": 1,
+    "model_calls_per_task": 6,
+    "tool_calls_per_task": 7,
+    "prompt_tokens_per_task": 43189,
+    "prompt_cache_hit_rate": 0.8068026580842345,
+    "generated_tokens_per_task": 1123,
+    "tool_result_bytes_per_task": 9793,
+    "wall_seconds_per_task": 47.719392983,
+    "peak_prompt_tokens": 8324,
+    "elided": 0,
+    "recalls": 0,
+    "compactions": 0,
+    "checks_caught": 0,
+    "check_notes": 1,
+    "errors": 0
+  },
+  "settings": {
+    "approval": "auto",
+    "checks": true,
+    "context_tokens": 131072,
+    "max_tool_output": 0,
+    "provider": "local",
+    "seed_pack": true,
+    "working_set_tokens": 0
+  },
+  "by_category": [
+    {
+      "category": "large-change",
+      "tasks": 1,
+      "passed": 1,
+      "pass_rate": 1,
+      "model_calls_per_task": 6,
+      "tool_calls_per_task": 7,
+      "prompt_tokens_per_task": 43189,
+      "prompt_cache_hit_rate": 0.8068026580842345,
+      "generated_tokens_per_task": 1123,
+      "tool_result_bytes_per_task": 9793,
+      "wall_seconds_per_task": 47.719392983,
+      "peak_prompt_tokens": 8324,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 0,
+      "check_notes": 1,
+      "errors": 0
+    }
+  ]
+}
