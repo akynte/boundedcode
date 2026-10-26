@@ -31,6 +31,11 @@ used on real work or measured.
   OpenAI-compatible servers stream (server-sent events folded into one
   answer in the gateway, metered like any call); Anthropic and Gemini
   answers still arrive whole.
+- The system prompt asks for the cause, not the symptom: after a failing
+  test, re-read the whole function and correct every part of the mistake.
+  Measured on the suite's planted two-fault bug: fixed in 0 of 2 runs
+  before, 3 of 3 since (one of those before the rule, so part of it is the
+  project map or luck; see docs/benchmarks/direct-mode-suite-2026-10.md).
 - A session's first message carries a project map (build system and test
   command, top-level directories with source-file counts, top-level
   files), so the model does not spend its first calls on ls, glob and the
