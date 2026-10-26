@@ -230,10 +230,17 @@ hooks:
 	start := time.Now()
 	out, err := t.Run(ctx, r, args)
 	el := time.Since(start)
-	if err == nil && t.Mutates && t.Name != "bash" && !r.Opts.NoChecks {
+	if err == nil && t.Mutates && t.Name != "bash" {
 		if abs, rel, rerr := r.resolve(str(args, "path")); rerr == nil {
-			if diag := r.checkFile(ctx, abs, rel, before); diag != "" {
-				out += "\n" + diag
+			if !r.Opts.NoChecks {
+				if diag := r.checkFile(ctx, abs, rel, before); diag != "" {
+					out += "\n" + diag
+				}
+			}
+			if !r.Opts.NoHistoryNotes {
+				if note := r.coChangeNote(r.rootRel(abs)); note != "" {
+					out += "\n" + note
+				}
 			}
 		}
 	}

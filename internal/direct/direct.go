@@ -166,6 +166,10 @@ type Options struct {
 	// NoSeedPack disables the lookup of the request's names that travels
 	// with the user message (direct.seed_pack).
 	NoSeedPack bool
+	// NoHistoryNotes disables the note after a file change naming the
+	// files the repository's history usually changes with it
+	// (direct.history_notes).
+	NoHistoryNotes bool
 	// NoStream disables streaming: the answer is delivered whole.
 	NoStream bool
 	// MaxOutputTokens caps one completion (0 = provider default).
@@ -253,6 +257,9 @@ type Runner struct {
 	only []string
 	// sharedMCP: the MCP clients belong to the parent runner.
 	sharedMCP bool
+	// co is the co-change index behind history notes (read on first use).
+	co     *coChange
+	coOnce sync.Once
 	// seen is how many messages of the history have been sent to the
 	// model; a tool result is only set aside once the model has seen it.
 	seen int

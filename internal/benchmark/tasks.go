@@ -34,7 +34,9 @@ type TaskSpec struct {
 	// "gomod:<module>@<version>" copies a module from the Go module cache
 	// (large real-world repositories without vendoring them here);
 	// "git:<url>@<commit>" checks out a public repository at an exact commit
-	// (benchmark datasets such as SWE-bench), without its history.
+	// (benchmark datasets such as SWE-bench), without its history;
+	// "githistory:<url>@<commit>" keeps the history up to that commit (and
+	// nothing after it), for tasks replayed from a repository's own commits.
 	Sources  map[string]string `yaml:"sources"`
 	Repos    []string          `yaml:"repos"` // repositories the task may change
 	Setup    []Edit            `yaml:"setup"` // edits applied and committed before the task (planted defects)
@@ -488,6 +490,18 @@ func materialize(ctx context.Context, fixture string, sources map[string]string,
 		if err := os.MkdirAll(dst, 0o755); err != nil {
 			return nil, err
 		}
+		if strings.HasPrefix(src, "githistory:") {
+			// A local clone hardlinks the cached objects (git never
+			// rewrites an object file) and keeps only the cached history.
+			if _, err := gitops.Run(ctx, dst, "clone", "-q", dir, name); err != nil {
+				return nil, err
+			}
+			if _, err := gitops.Run(ctx, target, "remote", "remove", "origin"); err != nil {
+				return nil, err
+			}
+			repos[name] = target
+			continue
+		}
 		// Copied files are writable (module cache files are read-only).
 		if err := copyTree(ctx, dir, target); err != nil {
 			return nil, err
@@ -529,7 +543,9 @@ func materialize(ctx context.Context, fixture string, sources map[string]string,
 		}
 	}
 	for _, path := range repos {
-		for _, a := range [][]string{{"init", "-q", "-b", "main"}, {"add", "-A"}, {"-c", "user.name=bench", "-c", "user.email=bench@example.invalid", "commit", "-qm", "base"}} {
+		// A repository with history gets an empty base commit when the
+		// task plants nothing.
+		for _, a := range [][]string{{"init", "-q", "-b", "main"}, {"add", "-A"}, {"-c", "user.name=bench", "-c", "user.email=bench@example.invalid", "commit", "-q", "--allow-empty", "-m", "base"}} {
 			if _, err := gitops.Run(ctx, path, a...); err != nil {
 				return nil, err
 			}
@@ -566,11 +582,14 @@ func checkSpec(ctx context.Context, spec TaskSpec, dir string, run []string) san
 // sourceDir resolves a Sources entry to a local directory.
 func sourceDir(ctx context.Context, src string) (string, error) {
 	if g, ok := strings.CutPrefix(src, "git:"); ok {
-		return gitSourceDir(ctx, g)
+		return gitSourceDir(ctx, g, false)
+	}
+	if g, ok := strings.CutPrefix(src, "githistory:"); ok {
+		return gitSourceDir(ctx, g, true)
 	}
 	spec, ok := strings.CutPrefix(src, "gomod:")
 	if !ok {
-		return "", fmt.Errorf("unsupported source %q (want gomod:<module>@<version> or git:<url>@<commit>)", src)
+		return "", fmt.Errorf("unsupported source %q (want gomod:<module>@<version>, git:<url>@<commit> or githistory:<url>@<commit>)", src)
 	}
 	mod, ver, ok := strings.Cut(spec, "@")
 	if !ok || ver == "" || strings.Contains(ver, "latest") {
@@ -667,8 +686,9 @@ func SourcesDir() string {
 
 // gitSourceDir checks out url at an exact commit into the sources cache,
 // without .git, so the task repository has no upstream history (and no
-// future commits that could contain the fix).
-func gitSourceDir(ctx context.Context, spec string) (string, error) {
+// future commits that could contain the fix). With history, the commit's
+// ancestors are fetched and kept on a branch "main"; nothing newer is.
+func gitSourceDir(ctx context.Context, spec string, history bool) (string, error) {
 	i := strings.LastIndex(spec, "@")
 	if i < 0 {
 		return "", fmt.Errorf("git source %q: want <url>@<commit>", spec)
@@ -679,7 +699,14 @@ func gitSourceDir(ctx context.Context, spec string) (string, error) {
 	}
 	name := strings.NewReplacer("https://github.com/", "", "/", "__", ".git", "").Replace(url)
 	dir := filepath.Join(SourcesDir(), name+"@"+commit[:12])
-	if _, err := os.Stat(filepath.Join(dir, ".bc-source-ready")); err == nil {
+	ready := filepath.Join(dir, ".bc-source-ready")
+	steps := [][]string{{"init", "-q"}, {"fetch", "-q", "--depth", "1", url, commit}, {"-c", "advice.detachedHead=false", "checkout", "-q", "FETCH_HEAD"}}
+	if history {
+		dir += "-history"
+		ready = filepath.Join(dir, ".git", "bc-source-ready")
+		steps = [][]string{{"init", "-q", "-b", "main"}, {"fetch", "-q", "--no-tags", url, commit}, {"checkout", "-q", "-B", "main", "FETCH_HEAD"}}
+	}
+	if _, err := os.Stat(ready); err == nil {
 		return dir, nil
 	}
 	tmp := dir + ".partial"
@@ -687,7 +714,7 @@ func gitSourceDir(ctx context.Context, spec string) (string, error) {
 	if err := os.MkdirAll(tmp, 0o755); err != nil {
 		return "", err
 	}
-	for _, a := range [][]string{{"init", "-q"}, {"fetch", "-q", "--depth", "1", url, commit}, {"-c", "advice.detachedHead=false", "checkout", "-q", "FETCH_HEAD"}} {
+	for _, a := range steps {
 		if _, err := gitops.Run(ctx, tmp, a...); err != nil {
 			return "", err
 		}
@@ -695,10 +722,15 @@ func gitSourceDir(ctx context.Context, spec string) (string, error) {
 	if head, err := gitops.Run(ctx, tmp, "rev-parse", "HEAD"); err != nil || head != commit {
 		return "", fmt.Errorf("git source %s: checked out %q", spec, head)
 	}
-	if err := os.RemoveAll(filepath.Join(tmp, ".git")); err != nil {
-		return "", err
+	if history {
+		ready = filepath.Join(tmp, ".git", "bc-source-ready")
+	} else {
+		if err := os.RemoveAll(filepath.Join(tmp, ".git")); err != nil {
+			return "", err
+		}
+		ready = filepath.Join(tmp, ".bc-source-ready")
 	}
-	if err := os.WriteFile(filepath.Join(tmp, ".bc-source-ready"), []byte(spec+"\n"), 0o644); err != nil {
+	if err := os.WriteFile(ready, []byte(spec+"\n"), 0o644); err != nil {
 		return "", err
 	}
 	_ = os.RemoveAll(dir)

@@ -254,27 +254,10 @@ func (s *LeaseStudy) score(g *gitReader, commit, parent string, maxFiles int, ca
 	if !goChanged || len(changedFiles) > maxFiles {
 		return nil, nil
 	}
-	tree, err := g.run("ls-tree", "-r", "--full-tree", parent)
+	ix, err := g.index(parent, cache)
 	if err != nil {
 		return nil, err
 	}
-	var paths []string
-	blobs := map[string]string{}
-	for _, l := range strings.Split(strings.TrimSpace(tree), "\n") {
-		meta, p, ok := strings.Cut(l, "\t")
-		if !ok {
-			continue
-		}
-		mf := strings.Fields(meta)
-		if len(mf) == 3 && mf[1] == "blob" {
-			paths = append(paths, p)
-			blobs[p] = mf[2]
-		}
-	}
-	ix := lease.NewIndex(paths, func(p string) []lease.Decl {
-		d, _ := g.blobDecls(blobs[p], p, cache)
-		return d
-	})
 	raw, err := g.run("log", "-1", "--format=%B", commit)
 	if err != nil {
 		return nil, err
@@ -462,6 +445,31 @@ func (g *gitReader) object(name string) ([]byte, error) {
 		return nil, err
 	}
 	return buf[:size], nil
+}
+
+// index is the lease index of the tree at rev.
+func (g *gitReader) index(rev string, cache map[string][]lease.Decl) (*lease.Index, error) {
+	tree, err := g.run("ls-tree", "-r", "--full-tree", rev)
+	if err != nil {
+		return nil, err
+	}
+	var paths []string
+	blobs := map[string]string{}
+	for _, l := range strings.Split(strings.TrimSpace(tree), "\n") {
+		meta, p, ok := strings.Cut(l, "\t")
+		if !ok {
+			continue
+		}
+		mf := strings.Fields(meta)
+		if len(mf) == 3 && mf[1] == "blob" {
+			paths = append(paths, p)
+			blobs[p] = mf[2]
+		}
+	}
+	return lease.NewIndex(paths, func(p string) []lease.Decl {
+		d, _ := g.blobDecls(blobs[p], p, cache)
+		return d
+	}), nil
 }
 
 // decls returns the declarations of path at rev.

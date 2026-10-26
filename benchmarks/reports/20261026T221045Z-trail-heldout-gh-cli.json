@@ -1,0 +1,7553 @@
+[
+  {
+    "repo": "gh-cli",
+    "head": "63837fb778d6a39f02be0ce76ff89f2bc8d74bdc",
+    "started": "2026-10-26T22:10:48.452239133Z",
+    "commits": [
+      {
+        "commit": "ab3efc24f8e7",
+        "subject": "fix(gh auth status): only diagnose token expiry after HTTP 401",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 1,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 6,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 2,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "29013b709fc0",
+        "subject": "fix(gh auth status): explain expired expiring tokens with --no-refresh",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 2,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "17ac598e6afc",
+        "subject": "Defer --attach credential checks to the server",
+        "changed": 14,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 2
+        },
+        "edit": [
+          {
+            "fired": 12,
+            "suggested": 32,
+            "right": 26,
+            "examples": [
+              "internal/attachments/doc.go -\u003e pkg/cmd/issue/comment/comment.go",
+              "internal/attachments/doc.go -\u003e pkg/cmd/issue/create/create.go",
+              "pkg/cmd/issue/artifact/create/create.go -\u003e pkg/cmd/issue/artifact/edit/edit.go"
+            ]
+          },
+          {
+            "fired": 10,
+            "suggested": 26,
+            "right": 24,
+            "examples": [
+              "internal/attachments/doc.go -\u003e pkg/cmd/issue/comment/comment.go",
+              "internal/attachments/doc.go -\u003e pkg/cmd/issue/create/create.go",
+              "pkg/cmd/issue/artifact/edit/edit.go -\u003e pkg/cmd/issue/artifact/create/create.go"
+            ]
+          },
+          {
+            "fired": 7,
+            "suggested": 20,
+            "right": 20,
+            "examples": [
+              "pkg/cmd/issue/comment/comment.go -\u003e pkg/cmd/pr/comment/comment.go",
+              "pkg/cmd/issue/comment/comment.go -\u003e pkg/cmd/issue/create/create.go",
+              "pkg/cmd/issue/comment/comment.go -\u003e pkg/cmd/issue/edit/edit.go"
+            ]
+          }
+        ]
+      },
+      {
+        "commit": "fa812ef2b1ab",
+        "subject": "Allow installation tokens to attach files",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "da42d395407d",
+        "subject": "feat(gh auth login): hint at --expiring when no preference is set",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 3,
+            "right": 0
+          },
+          {
+            "fired": 1,
+            "suggested": 2,
+            "right": 0
+          },
+          {
+            "fired": 1,
+            "suggested": 2,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "c61327f40013",
+        "subject": "Avoid repeating the skill installation safety warning",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 1
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 3,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "6ec1ba54542b",
+        "subject": "fix(gh status): restore left column width under Lip Gloss v2",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 3,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "fd1b1feb222d",
+        "subject": "chore(deps): bump github.com/cli/oauth to v1.3.0",
+        "changed": 3,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 2
+        },
+        "edit": [
+          {
+            "fired": 3,
+            "suggested": 3,
+            "right": 2,
+            "examples": [
+              "go.mod -\u003e go.sum",
+              "go.sum -\u003e go.mod"
+            ]
+          },
+          {
+            "fired": 3,
+            "suggested": 3,
+            "right": 2,
+            "examples": [
+              "go.mod -\u003e go.sum",
+              "go.sum -\u003e go.mod"
+            ]
+          },
+          {
+            "fired": 2,
+            "suggested": 2,
+            "right": 2,
+            "examples": [
+              "go.mod -\u003e go.sum",
+              "go.sum -\u003e go.mod"
+            ]
+          }
+        ]
+      },
+      {
+        "commit": "3c69a302ae37",
+        "subject": "refactor(debug): parse overrides in an untagged function",
+        "changed": 2,
+        "new_files": 0,
+        "named": {
+          "size": 1,
+          "hits": 1
+        },
+        "named_with_cochange": {
+          "size": 3,
+          "hits": 2
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "49146773c0a9",
+        "subject": "chore: rebuild bin/gh when build tags change",
+        "changed": 2,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "d00a58660e78",
+        "subject": "refactor: read testing overrides through internal/debug",
+        "changed": 4,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 4,
+            "suggested": 6,
+            "right": 2,
+            "examples": [
+              "script/refreshable-token-e2e.sh -\u003e script/refreshable-token-gitcredential-e2e.sh",
+              "script/refreshable-token-gitcredential-e2e.sh -\u003e script/refreshable-token-e2e.sh"
+            ]
+          },
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "f7f178ad0205",
+        "subject": "feat(version): mark debug builds in the version output",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "30ce37dca5ca",
+        "subject": "feat(debug): add build-gated internal debug configuration",
+        "changed": 0,
+        "new_files": 3,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "3048af154ade",
+        "subject": "fix(text): round FuzzyIn to the nearest unit instead of truncating",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 1,
+          "hits": 1
+        },
+        "named_with_cochange": {
+          "size": 6,
+          "hits": 1
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "5ff04428ee11",
+        "subject": "feat(auth/status): show relative time-to-expiry for refreshable tokens",
+        "changed": 2,
+        "new_files": 0,
+        "named": {
+          "size": 3,
+          "hits": 1
+        },
+        "named_with_cochange": {
+          "size": 8,
+          "hits": 1
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 2,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "c1134186b085",
+        "subject": "test(config): cover login when the other credential kind survives purge",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "ac9fe18560fe",
+        "subject": "test(auth): cover telemetry when storage or post-login setup fails",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 2,
+          "hits": 1
+        },
+        "named_with_cochange": {
+          "size": 7,
+          "hits": 1
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "41ec082660be",
+        "subject": "docs(config): describe expiring_credentials as a login-only preference",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 1
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "24184c85810c",
+        "subject": "fix(auth/shared): choose the auth method before acting on expiring intent",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 3,
+            "right": 0
+          },
+          {
+            "fired": 1,
+            "suggested": 2,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "1d2e77957a91",
+        "subject": "fix(config): create the refresh lock directory behind the lock seam",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 1,
+          "hits": 1
+        },
+        "named_with_cochange": {
+          "size": 6,
+          "hits": 1
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "cbac639fc160",
+        "subject": "fix(config): place the refresh lock in the state directory",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "127cc0d53f71",
+        "subject": "fix(auth): record expiring_received and auth_success at the right time",
+        "changed": 2,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 2,
+            "suggested": 5,
+            "right": 2,
+            "examples": [
+              "pkg/cmd/auth/refresh/refresh.go -\u003e pkg/cmd/auth/shared/login_flow.go",
+              "pkg/cmd/auth/shared/login_flow.go -\u003e pkg/cmd/auth/refresh/refresh.go"
+            ]
+          },
+          {
+            "fired": 1,
+            "suggested": 2,
+            "right": 1,
+            "examples": [
+              "pkg/cmd/auth/shared/login_flow.go -\u003e pkg/cmd/auth/refresh/refresh.go"
+            ]
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "fdeda38c6085",
+        "subject": "fix(auth/refresh): keep the current token kind when --expiring is unset",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 2,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "3419f1e1dd04",
+        "subject": "fix(auth/token): warn on stderr when printing an expiring token",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 3,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "bd9f0721d5c3",
+        "subject": "fix(auth/shared): offer token paste when expiring is config-derived",
+        "changed": 2,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 2,
+            "suggested": 6,
+            "right": 2,
+            "examples": [
+              "pkg/cmd/auth/login/login.go -\u003e pkg/cmd/auth/shared/login_flow.go",
+              "pkg/cmd/auth/shared/login_flow.go -\u003e pkg/cmd/auth/login/login.go"
+            ]
+          },
+          {
+            "fired": 2,
+            "suggested": 4,
+            "right": 2,
+            "examples": [
+              "pkg/cmd/auth/login/login.go -\u003e pkg/cmd/auth/shared/login_flow.go",
+              "pkg/cmd/auth/shared/login_flow.go -\u003e pkg/cmd/auth/login/login.go"
+            ]
+          },
+          {
+            "fired": 2,
+            "suggested": 3,
+            "right": 1,
+            "examples": [
+              "pkg/cmd/auth/login/login.go -\u003e pkg/cmd/auth/shared/login_flow.go"
+            ]
+          }
+        ]
+      },
+      {
+        "commit": "ff4e9aad5629",
+        "subject": "perf(config): probe the ordinary keyring before the refreshable credential",
+        "changed": 2,
+        "new_files": 0,
+        "named": {
+          "size": 3,
+          "hits": 2
+        },
+        "named_with_cochange": {
+          "size": 8,
+          "hits": 2
+        },
+        "hot": {
+          "size": 10,
+          "hits": 1
+        },
+        "edit": [
+          {
+            "fired": 2,
+            "suggested": 2,
+            "right": 1,
+            "examples": [
+              "internal/config/refreshable.go -\u003e internal/config/config.go"
+            ]
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "521c944291a5",
+        "subject": "fix(auth/refresh): refine the expiring-token downgrade warning",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 2,
+            "right": 0
+          },
+          {
+            "fired": 1,
+            "suggested": 2,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "ef8bf0c69016",
+        "subject": "refactor(config): rename prefer_expiring_credentials to expiring_credentials",
+        "changed": 7,
+        "new_files": 0,
+        "named": {
+          "size": 3,
+          "hits": 3
+        },
+        "named_with_cochange": {
+          "size": 8,
+          "hits": 7
+        },
+        "hot": {
+          "size": 10,
+          "hits": 1
+        },
+        "edit": [
+          {
+            "fired": 7,
+            "suggested": 14,
+            "right": 12,
+            "examples": [
+              "internal/config/config.go -\u003e internal/gh/gh.go",
+              "internal/config/test.go -\u003e internal/config/config.go",
+              "internal/gh/gh.go -\u003e internal/config/config.go"
+            ]
+          },
+          {
+            "fired": 4,
+            "suggested": 7,
+            "right": 7,
+            "examples": [
+              "internal/gh/gh.go -\u003e internal/config/config.go",
+              "internal/gh/mock/config.go -\u003e internal/config/config.go",
+              "internal/gh/mock/config.go -\u003e internal/gh/gh.go"
+            ]
+          },
+          {
+            "fired": 2,
+            "suggested": 3,
+            "right": 3,
+            "examples": [
+              "pkg/cmd/auth/login/login.go -\u003e pkg/cmd/auth/refresh/refresh.go",
+              "pkg/cmd/auth/login/login.go -\u003e pkg/cmd/auth/shared/login_flow.go",
+              "pkg/cmd/auth/shared/login_flow.go -\u003e pkg/cmd/auth/refresh/refresh.go"
+            ]
+          }
+        ]
+      },
+      {
+        "commit": "738838edbae5",
+        "subject": "docs(config): clarify the refresh lock godoc",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 1,
+          "hits": 1
+        },
+        "named_with_cochange": {
+          "size": 6,
+          "hits": 1
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "04528169484c",
+        "subject": "refactor(auth/shared): record only expiring cred-helper cancellations",
+        "changed": 5,
+        "new_files": 0,
+        "named": {
+          "size": 2,
+          "hits": 1
+        },
+        "named_with_cochange": {
+          "size": 7,
+          "hits": 5
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 5,
+            "suggested": 10,
+            "right": 10,
+            "examples": [
+              "pkg/cmd/auth/login/login.go -\u003e pkg/cmd/auth/refresh/refresh.go",
+              "pkg/cmd/auth/login/login.go -\u003e pkg/cmd/auth/shared/login_flow.go",
+              "pkg/cmd/auth/refresh/refresh.go -\u003e pkg/cmd/auth/login/login.go"
+            ]
+          },
+          {
+            "fired": 2,
+            "suggested": 4,
+            "right": 4,
+            "examples": [
+              "pkg/cmd/auth/login/login.go -\u003e pkg/cmd/auth/refresh/refresh.go",
+              "pkg/cmd/auth/login/login.go -\u003e pkg/cmd/auth/shared/login_flow.go",
+              "pkg/cmd/auth/shared/login_flow.go -\u003e pkg/cmd/auth/refresh/refresh.go"
+            ]
+          },
+          {
+            "fired": 1,
+            "suggested": 2,
+            "right": 2,
+            "examples": [
+              "pkg/cmd/auth/login/login.go -\u003e pkg/cmd/auth/refresh/refresh.go",
+              "pkg/cmd/auth/login/login.go -\u003e pkg/cmd/auth/shared/login_flow.go"
+            ]
+          }
+        ]
+      },
+      {
+        "commit": "e1100dca6430",
+        "subject": "feat(auth/shared): report an error category for unreadable credential helpers",
+        "changed": 2,
+        "new_files": 0,
+        "named": {
+          "size": 1,
+          "hits": 1
+        },
+        "named_with_cochange": {
+          "size": 6,
+          "hits": 1
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 2,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "5f278b0b2935",
+        "subject": "feat(auth): rework login and refresh telemetry",
+        "changed": 6,
+        "new_files": 1,
+        "named": {
+          "size": 1,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 6,
+          "hits": 1
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 5,
+            "suggested": 10,
+            "right": 8,
+            "examples": [
+              "pkg/cmd/auth/login/login.go -\u003e pkg/cmd/auth/refresh/refresh.go",
+              "pkg/cmd/auth/login/login.go -\u003e pkg/cmd/auth/shared/login_flow.go",
+              "pkg/cmd/auth/refresh/refresh.go -\u003e pkg/cmd/auth/login/login.go"
+            ]
+          },
+          {
+            "fired": 2,
+            "suggested": 4,
+            "right": 4,
+            "examples": [
+              "pkg/cmd/auth/login/login.go -\u003e pkg/cmd/auth/refresh/refresh.go",
+              "pkg/cmd/auth/login/login.go -\u003e pkg/cmd/auth/shared/login_flow.go",
+              "pkg/cmd/auth/shared/login_flow.go -\u003e pkg/cmd/auth/refresh/refresh.go"
+            ]
+          },
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 1,
+            "examples": [
+              "pkg/cmd/auth/login/login.go -\u003e pkg/cmd/auth/refresh/refresh.go"
+            ]
+          }
+        ]
+      },
+      {
+        "commit": "46c342f57d87",
+        "subject": "feat(auth): prompt for gh as git credential helper on expiring login",
+        "changed": 3,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 2,
+            "suggested": 4,
+            "right": 2,
+            "examples": [
+              "pkg/cmd/auth/refresh/refresh.go -\u003e pkg/cmd/auth/shared/login_flow.go",
+              "pkg/cmd/auth/shared/login_flow.go -\u003e pkg/cmd/auth/refresh/refresh.go"
+            ]
+          },
+          {
+            "fired": 1,
+            "suggested": 2,
+            "right": 1,
+            "examples": [
+              "pkg/cmd/auth/shared/login_flow.go -\u003e pkg/cmd/auth/refresh/refresh.go"
+            ]
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "6897f68d238c",
+        "subject": "feat(auth): add prefer_expiring_credentials config option",
+        "changed": 7,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 1
+        },
+        "edit": [
+          {
+            "fired": 6,
+            "suggested": 11,
+            "right": 9,
+            "examples": [
+              "internal/config/config.go -\u003e internal/gh/gh.go",
+              "internal/gh/gh.go -\u003e internal/config/config.go",
+              "internal/gh/mock/config.go -\u003e internal/config/config.go"
+            ]
+          },
+          {
+            "fired": 3,
+            "suggested": 5,
+            "right": 5,
+            "examples": [
+              "internal/gh/gh.go -\u003e internal/config/config.go",
+              "pkg/cmd/auth/login/login.go -\u003e pkg/cmd/auth/refresh/refresh.go",
+              "pkg/cmd/auth/login/login.go -\u003e pkg/cmd/auth/shared/login_flow.go"
+            ]
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "00334d5e81fd",
+        "subject": "refactor(auth): make --expiring a tri-state *bool flag",
+        "changed": 3,
+        "new_files": 0,
+        "named": {
+          "size": 2,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 7,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 3,
+            "suggested": 7,
+            "right": 5,
+            "examples": [
+              "pkg/cmd/auth/login/login.go -\u003e pkg/cmd/auth/refresh/refresh.go",
+              "pkg/cmd/auth/login/login.go -\u003e pkg/cmd/auth/shared/login_flow.go",
+              "pkg/cmd/auth/refresh/refresh.go -\u003e pkg/cmd/auth/login/login.go"
+            ]
+          },
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 1,
+            "examples": [
+              "pkg/cmd/auth/login/login.go -\u003e pkg/cmd/auth/refresh/refresh.go"
+            ]
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "ee01699da75a",
+        "subject": "refactor(auth): rename --short-lived flag to --expiring",
+        "changed": 16,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 6,
+            "suggested": 11,
+            "right": 6,
+            "examples": [
+              "internal/authflow/flow.go -\u003e api/http_client.go",
+              "internal/authflow/flow.go -\u003e internal/authflow/refresh.go",
+              "internal/authflow/refresh.go -\u003e internal/authflow/flow.go"
+            ]
+          },
+          {
+            "fired": 3,
+            "suggested": 3,
+            "right": 1,
+            "examples": [
+              "internal/authflow/refresh.go -\u003e internal/authflow/flow.go"
+            ]
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "153adc66eef2",
+        "subject": "fix(config): run login under the shared refresh lock",
+        "changed": 2,
+        "new_files": 0,
+        "named": {
+          "size": 1,
+          "hits": 1
+        },
+        "named_with_cochange": {
+          "size": 2,
+          "hits": 2
+        },
+        "hot": {
+          "size": 10,
+          "hits": 1
+        },
+        "edit": [
+          {
+            "fired": 2,
+            "suggested": 2,
+            "right": 1,
+            "examples": [
+              "internal/config/refreshable.go -\u003e internal/config/config.go"
+            ]
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "797e08975c86",
+        "subject": "fix(config): don't fail refresh when the config dir can't be created",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 1,
+          "hits": 1
+        },
+        "named_with_cochange": {
+          "size": 2,
+          "hits": 1
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "a5d9d3c3f54d",
+        "subject": "fix(config): skip destructive refresh cleanup when the lock is unavailable",
+        "changed": 2,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "85883f6e13a4",
+        "subject": "fix(config): run logout under the shared refresh lock",
+        "changed": 2,
+        "new_files": 0,
+        "named": {
+          "size": 1,
+          "hits": 1
+        },
+        "named_with_cochange": {
+          "size": 1,
+          "hits": 1
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "503cfce894d4",
+        "subject": "fix(agent-task): accept plaintext refreshable OAuth credentials",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 2,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "93ab2cf49821",
+        "subject": "fix(auth/status): handle rejected refresh token without an empty-token request",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 3,
+          "hits": 1
+        },
+        "named_with_cochange": {
+          "size": 8,
+          "hits": 1
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 3,
+            "right": 0
+          },
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "604120a8cf26",
+        "subject": "fix(auth/token): restore legacy unkeyed keyring lookup when --user is omitted",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "6c0796608ef5",
+        "subject": "refactor(auth/token): drop redundant RefreshStatusDone check under --secure-storage",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 2,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 7,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "d3bea60de51b",
+        "subject": "refactor(authflow): extract authResultFromToken for test coverage",
+        "changed": 2,
+        "new_files": 0,
+        "named": {
+          "size": 1,
+          "hits": 1
+        },
+        "named_with_cochange": {
+          "size": 6,
+          "hits": 1
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 2,
+            "suggested": 4,
+            "right": 1,
+            "examples": [
+              "internal/authflow/refresh.go -\u003e internal/authflow/flow.go"
+            ]
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "a5b82df18b30",
+        "subject": "fix(auth/shared): clarify warning when declining gh helper setup",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "00ca7f0ce750",
+        "subject": "fix(auth/shared): force web flow for short-lived interactive login",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "2eb947df329e",
+        "subject": "fix(auth/shared): offer to set up gh when a non-gh helper meets a refreshable token",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "1fb36c1e957c",
+        "subject": "fix(auth refresh): preserve scopes when refreshing an expired refreshable token",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 1,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 6,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "cae209fb9c9a",
+        "subject": "fix(auth refresh): avoid printing short-lived downgrade warning twice",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "bf41ffd2b725",
+        "subject": "fix(config): align TokenForUser precedence with setActiveCredential",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 1,
+          "hits": 1
+        },
+        "named_with_cochange": {
+          "size": 6,
+          "hits": 1
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "165affa72a7a",
+        "subject": "fix(config): purge refreshable record on non-refreshable login",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 2,
+          "hits": 1
+        },
+        "named_with_cochange": {
+          "size": 7,
+          "hits": 1
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "7715b6e9cbba",
+        "subject": "test(config): pin intentional active-token lookup behavior",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 1,
+          "hits": 1
+        },
+        "named_with_cochange": {
+          "size": 6,
+          "hits": 1
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "7fea69a1fd08",
+        "subject": "fix(api): keep public HTTP client token config backward compatible",
+        "changed": 5,
+        "new_files": 1,
+        "named": {
+          "size": 3,
+          "hits": 2
+        },
+        "named_with_cochange": {
+          "size": 8,
+          "hits": 3
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 4,
+            "suggested": 10,
+            "right": 3,
+            "examples": [
+              "internal/authflow/flow.go -\u003e api/http_client.go",
+              "pkg/cmd/api/api.go -\u003e pkg/cmd/factory/default.go",
+              "pkg/cmd/factory/default.go -\u003e api/http_client.go"
+            ]
+          },
+          {
+            "fired": 4,
+            "suggested": 5,
+            "right": 1,
+            "examples": [
+              "pkg/cmd/api/api.go -\u003e pkg/cmd/factory/default.go"
+            ]
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "9b2838de9670",
+        "subject": "fix(agent-task/capi): refresh short-lived tokens per CAPI request",
+        "changed": 2,
+        "new_files": 0,
+        "named": {
+          "size": 3,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 8,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "ea4f442b3e22",
+        "subject": "fix(auth status): show and refresh short-lived token details",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 3,
+            "right": 0
+          },
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "c1a3f1184049",
+        "subject": "fix(auth token): refresh short-lived tokens before printing",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "98ea0f41dad6",
+        "subject": "fix(auth gitcredential): refresh tokens and mark them non-cacheable for git",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 2,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 7,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "1492e8366ead",
+        "subject": "fix(auth refresh): preserve or acquire refreshable credentials",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 3,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "ffcbcbada483",
+        "subject": "fix(auth login): add --short-lived flag",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "060fa973181b",
+        "subject": "fix(auth/shared): store refreshable credentials during login",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 1,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 1,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "d33927fde547",
+        "subject": "fix(auth/shared): do not store refreshable credentials in external git helpers",
+        "changed": 2,
+        "new_files": 0,
+        "named": {
+          "size": 1,
+          "hits": 1
+        },
+        "named_with_cochange": {
+          "size": 3,
+          "hits": 1
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "14050c2cc4c1",
+        "subject": "fix(authflow): return an AuthResult with an optional refreshable credential",
+        "changed": 2,
+        "new_files": 0,
+        "named": {
+          "size": 1,
+          "hits": 1
+        },
+        "named_with_cochange": {
+          "size": 6,
+          "hits": 1
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 3,
+            "right": 0
+          },
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "b593e2156aba",
+        "subject": "fix(factory): wire the token refresher into the default factory",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 3,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 8,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 3,
+            "right": 0
+          },
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "e7e04a622717",
+        "subject": "fix(api): refresh expired tokens on API requests",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 3,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 8,
+          "hits": 1
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 3,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "eda6b8e164c5",
+        "subject": "fix(config): integrate refreshable credentials into auth config",
+        "changed": 2,
+        "new_files": 0,
+        "named": {
+          "size": 3,
+          "hits": 1
+        },
+        "named_with_cochange": {
+          "size": 8,
+          "hits": 1
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "b40b3a875351",
+        "subject": "fix(config): add refreshable credential storage",
+        "changed": 0,
+        "new_files": 1,
+        "named": {
+          "size": 2,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 7,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "065791e50536",
+        "subject": "fix(authflow): add OAuth token refresher",
+        "changed": 1,
+        "new_files": 1,
+        "named": {
+          "size": 2,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 7,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 3,
+            "right": 0
+          },
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "e8497912a9a8",
+        "subject": "fix(gh): add generated TokenRefresher mock",
+        "changed": 0,
+        "new_files": 1,
+        "named": {
+          "size": 1,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 6,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "9f48d0f777cd",
+        "subject": "fix(gh): add refreshable credential types and token refresher interface",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 2,
+          "hits": 1
+        },
+        "named_with_cochange": {
+          "size": 7,
+          "hits": 1
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "389b60d0b6df",
+        "subject": "Update glamour to v2",
+        "changed": 5,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 2
+        },
+        "edit": [
+          {
+            "fired": 3,
+            "suggested": 5,
+            "right": 2,
+            "examples": [
+              "go.mod -\u003e go.sum",
+              "go.sum -\u003e go.mod"
+            ]
+          },
+          {
+            "fired": 2,
+            "suggested": 2,
+            "right": 2,
+            "examples": [
+              "go.mod -\u003e go.sum",
+              "go.sum -\u003e go.mod"
+            ]
+          },
+          {
+            "fired": 2,
+            "suggested": 2,
+            "right": 2,
+            "examples": [
+              "go.mod -\u003e go.sum",
+              "go.sum -\u003e go.mod"
+            ]
+          }
+        ]
+      },
+      {
+        "commit": "9e1e1c929f88",
+        "subject": "Clarify release creation atomicity and immutability",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 2,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "f3e2147f249b",
+        "subject": "Fix help text that references nonexistent flags",
+        "changed": 3,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 2,
+            "suggested": 5,
+            "right": 2,
+            "examples": [
+              "pkg/cmd/search/issues/issues.go -\u003e pkg/cmd/search/prs/prs.go",
+              "pkg/cmd/search/prs/prs.go -\u003e pkg/cmd/search/issues/issues.go"
+            ]
+          },
+          {
+            "fired": 2,
+            "suggested": 3,
+            "right": 2,
+            "examples": [
+              "pkg/cmd/search/issues/issues.go -\u003e pkg/cmd/search/prs/prs.go",
+              "pkg/cmd/search/prs/prs.go -\u003e pkg/cmd/search/issues/issues.go"
+            ]
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "8ea0faaa3d4c",
+        "subject": "Clarify PR comments output",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 2,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "4536b2180ef7",
+        "subject": "Clarify --comments behavior when piped in view commands",
+        "changed": 3,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 2,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "6cfbe26f7ff3",
+        "subject": "Create HTML documents from .html files",
+        "changed": 2,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 2,
+            "suggested": 2,
+            "right": 1,
+            "examples": [
+              "pkg/cmd/issue/artifact/shared/content.go -\u003e pkg/cmd/issue/artifact/create/create.go"
+            ]
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "4fc08acb5451",
+        "subject": "Support HTML documents in issue artifact commands",
+        "changed": 7,
+        "new_files": 0,
+        "named": {
+          "size": 1,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 6,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 6,
+            "suggested": 17,
+            "right": 8,
+            "examples": [
+              "pkg/cmd/issue/artifact/artifact.go -\u003e pkg/cmd/issue/artifact/shared/shared.go",
+              "pkg/cmd/issue/artifact/download/download.go -\u003e pkg/cmd/issue/artifact/edit/edit.go",
+              "pkg/cmd/issue/artifact/edit/edit.go -\u003e pkg/cmd/issue/artifact/download/download.go"
+            ]
+          },
+          {
+            "fired": 3,
+            "suggested": 5,
+            "right": 1,
+            "examples": [
+              "pkg/cmd/issue/artifact/artifact.go -\u003e pkg/cmd/issue/artifact/shared/shared.go"
+            ]
+          },
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "3756d3f69480",
+        "subject": "Accept artifact URLs in issue artifact commands",
+        "changed": 7,
+        "new_files": 0,
+        "named": {
+          "size": 1,
+          "hits": 1
+        },
+        "named_with_cochange": {
+          "size": 1,
+          "hits": 1
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 5,
+            "suggested": 9,
+            "right": 7,
+            "examples": [
+              "pkg/cmd/issue/artifact/create/create.go -\u003e pkg/cmd/issue/artifact/edit/edit.go",
+              "pkg/cmd/issue/artifact/delete/delete.go -\u003e pkg/cmd/issue/artifact/download/download.go",
+              "pkg/cmd/issue/artifact/edit/edit.go -\u003e pkg/cmd/issue/artifact/create/create.go"
+            ]
+          },
+          {
+            "fired": 2,
+            "suggested": 2,
+            "right": 1,
+            "examples": [
+              "pkg/cmd/issue/artifact/edit/edit.go -\u003e pkg/cmd/issue/artifact/create/create.go"
+            ]
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "379161aa4b74",
+        "subject": "Show issue artifact URLs in list and view",
+        "changed": 2,
+        "new_files": 0,
+        "named": {
+          "size": 1,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 6,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 2,
+            "suggested": 5,
+            "right": 0
+          },
+          {
+            "fired": 1,
+            "suggested": 2,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "e04bc0145a89",
+        "subject": "Allow attachments only on generic and plan artifacts",
+        "changed": 3,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 3,
+            "suggested": 3,
+            "right": 2,
+            "examples": [
+              "pkg/cmd/issue/artifact/create/create.go -\u003e pkg/cmd/issue/artifact/edit/edit.go",
+              "pkg/cmd/issue/artifact/edit/edit.go -\u003e pkg/cmd/issue/artifact/create/create.go"
+            ]
+          },
+          {
+            "fired": 2,
+            "suggested": 2,
+            "right": 1,
+            "examples": [
+              "pkg/cmd/issue/artifact/edit/edit.go -\u003e pkg/cmd/issue/artifact/create/create.go"
+            ]
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "a4e66b5de192",
+        "subject": "Say how to give a link artifact new content",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "2694da1fefc7",
+        "subject": "Name the step that failed in artifact create and edit errors",
+        "changed": 2,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 2,
+            "suggested": 4,
+            "right": 2,
+            "examples": [
+              "pkg/cmd/issue/artifact/create/create.go -\u003e pkg/cmd/issue/artifact/edit/edit.go",
+              "pkg/cmd/issue/artifact/edit/edit.go -\u003e pkg/cmd/issue/artifact/create/create.go"
+            ]
+          },
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 1,
+            "examples": [
+              "pkg/cmd/issue/artifact/edit/edit.go -\u003e pkg/cmd/issue/artifact/create/create.go"
+            ]
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "7694b6b53689",
+        "subject": "Show usage for a blank artifact name after #",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "752564d1254f",
+        "subject": "Explain two checks in artifact create's validation",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "f6dbeb2815c0",
+        "subject": "Say when artifact create needs --name",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "766f037efa0b",
+        "subject": "Format flag names as code in artifact command errors",
+        "changed": 4,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 3,
+            "suggested": 3,
+            "right": 2,
+            "examples": [
+              "pkg/cmd/issue/artifact/create/create.go -\u003e pkg/cmd/issue/artifact/edit/edit.go",
+              "pkg/cmd/issue/artifact/edit/edit.go -\u003e pkg/cmd/issue/artifact/create/create.go"
+            ]
+          },
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 1,
+            "examples": [
+              "pkg/cmd/issue/artifact/edit/edit.go -\u003e pkg/cmd/issue/artifact/create/create.go"
+            ]
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "c97f2dbe99a6",
+        "subject": "Drop the add alias from artifact create",
+        "changed": 2,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "d91d73a2214b",
+        "subject": "Reword artifact create and edit examples",
+        "changed": 2,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 2,
+            "suggested": 4,
+            "right": 2,
+            "examples": [
+              "pkg/cmd/issue/artifact/create/create.go -\u003e pkg/cmd/issue/artifact/edit/edit.go",
+              "pkg/cmd/issue/artifact/edit/edit.go -\u003e pkg/cmd/issue/artifact/create/create.go"
+            ]
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "358ae9c0c5e5",
+        "subject": "Reword artifact create help without naming gh",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 3,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "cbf759f375c8",
+        "subject": "Rename the --body source kind in artifact create",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 3,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "13c1c3304dde",
+        "subject": "Build artifact request bodies from ad hoc structs",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 2,
+            "right": 0
+          },
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "aa344787583c",
+        "subject": "Remove the artifact shared package comment",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 3,
+            "right": 0
+          },
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "febd360b3449",
+        "subject": "Refuse a symlink at artifact download's --output path",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "8676746b8c6e",
+        "subject": "Explain the kept extension in artifact download file names",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "94c5a6fa2781",
+        "subject": "Clarify --repo and --owner checks for attestation bundles",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 1,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 6,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "f81606a98126",
+        "subject": "Reset search code highlight only when open",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 1,
+          "hits": 1
+        },
+        "named_with_cochange": {
+          "size": 5,
+          "hits": 1
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 3,
+            "right": 0
+          },
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "9175cdca666e",
+        "subject": "Fix the unclean background colors of gh-search-code",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 3,
+            "right": 0
+          },
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "d2fd24bbb4d4",
+        "subject": "Simplify the failure tracking in artifact download",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "2f638908e3b3",
+        "subject": "Refuse a blank --dir in artifact download",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "f7f2583e9c6c",
+        "subject": "Mention --dir in artifact download help",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "6ea10e3fa999",
+        "subject": "Name the lookup failure check in artifact delete",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 2,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "36eb08f89176",
+        "subject": "Reword artifact delete help without naming gh",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 2,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "577b3b86b970",
+        "subject": "Stub artifact deletes with the responses a delete can get",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 2,
+            "right": 0
+          },
+          {
+            "fired": 1,
+            "suggested": 2,
+            "right": 0
+          },
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "cde6bc91b4ce",
+        "subject": "Refuse repeated artifact numbers in delete and download",
+        "changed": 2,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "01d01a44f94a",
+        "subject": "Report artifact delete results like other gh delete commands",
+        "changed": 3,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 2,
+            "right": 0
+          },
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "32c8ada64592",
+        "subject": "Say which version artifact view shows by default",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "38787d7aafc9",
+        "subject": "Show usage for invalid artifact command arguments",
+        "changed": 6,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 2,
+            "suggested": 3,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "7129683381b5",
+        "subject": "Remove exportTime from artifact JSON export",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 1,
+          "hits": 1
+        },
+        "named_with_cochange": {
+          "size": 3,
+          "hits": 1
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 2,
+            "right": 0
+          },
+          {
+            "fired": 1,
+            "suggested": 2,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "d3c13784070b",
+        "subject": "Format --limit as code in artifact list help",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "c4055d1f0f56",
+        "subject": "Document how artifact list finds the last page",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 2,
+            "right": 0
+          },
+          {
+            "fired": 1,
+            "suggested": 2,
+            "right": 0
+          },
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "b6cb86775d89",
+        "subject": "Preallocate the failures in UploadAndAttachDocuments",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 1,
+          "hits": 1
+        },
+        "named_with_cochange": {
+          "size": 6,
+          "hits": 1
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 2,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "0d1d62eacad4",
+        "subject": "Scope DocumentResult.Err to the document's own attachments",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 2,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "c7c38472a725",
+        "subject": "Add cmdutil.ReadMarkdownBodyFile",
+        "changed": 10,
+        "new_files": 0,
+        "named": {
+          "size": 1,
+          "hits": 1
+        },
+        "named_with_cochange": {
+          "size": 6,
+          "hits": 2
+        },
+        "hot": {
+          "size": 10,
+          "hits": 2
+        },
+        "edit": [
+          {
+            "fired": 7,
+            "suggested": 19,
+            "right": 18,
+            "examples": [
+              "pkg/cmd/issue/comment/comment.go -\u003e pkg/cmd/pr/comment/comment.go",
+              "pkg/cmd/issue/comment/comment.go -\u003e pkg/cmd/issue/create/create.go",
+              "pkg/cmd/issue/comment/comment.go -\u003e pkg/cmd/issue/edit/edit.go"
+            ]
+          },
+          {
+            "fired": 6,
+            "suggested": 18,
+            "right": 18,
+            "examples": [
+              "pkg/cmd/issue/comment/comment.go -\u003e pkg/cmd/pr/comment/comment.go",
+              "pkg/cmd/issue/comment/comment.go -\u003e pkg/cmd/issue/create/create.go",
+              "pkg/cmd/issue/comment/comment.go -\u003e pkg/cmd/issue/edit/edit.go"
+            ]
+          },
+          {
+            "fired": 6,
+            "suggested": 12,
+            "right": 12,
+            "examples": [
+              "pkg/cmd/issue/comment/comment.go -\u003e pkg/cmd/pr/comment/comment.go",
+              "pkg/cmd/issue/comment/comment.go -\u003e pkg/cmd/issue/create/create.go",
+              "pkg/cmd/issue/comment/comment.go -\u003e pkg/cmd/issue/edit/edit.go"
+            ]
+          }
+        ]
+      },
+      {
+        "commit": "2c7ec97fddb8",
+        "subject": "Merge pull request #14578 from cli/williammartin-extension-browse-bubbletea",
+        "changed": 5,
+        "new_files": 1,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 2
+        },
+        "edit": [
+          {
+            "fired": 2,
+            "suggested": 2,
+            "right": 2,
+            "examples": [
+              "go.mod -\u003e go.sum",
+              "go.sum -\u003e go.mod"
+            ]
+          },
+          {
+            "fired": 2,
+            "suggested": 2,
+            "right": 2,
+            "examples": [
+              "go.mod -\u003e go.sum",
+              "go.sum -\u003e go.mod"
+            ]
+          },
+          {
+            "fired": 2,
+            "suggested": 2,
+            "right": 2,
+            "examples": [
+              "go.mod -\u003e go.sum",
+              "go.sum -\u003e go.mod"
+            ]
+          }
+        ]
+      },
+      {
+        "commit": "731e9b50e46a",
+        "subject": "Avoid spawning git for each extension at startup",
+        "changed": 2,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "63166b82ce15",
+        "subject": "Add gh issue artifact edit --restore-version",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "221e12681ec0",
+        "subject": "Add a shared result line for unchanged artifacts",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 1,
+          "hits": 1
+        },
+        "named_with_cochange": {
+          "size": 6,
+          "hits": 1
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 2,
+            "right": 0
+          },
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "740b05942657",
+        "subject": "Add gh issue artifact edit",
+        "changed": 1,
+        "new_files": 1,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 3,
+            "right": 0
+          },
+          {
+            "fired": 1,
+            "suggested": 2,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "f43525d7f7a0",
+        "subject": "Move the artifact --attach uploader to the shared package",
+        "changed": 2,
+        "new_files": 0,
+        "named": {
+          "size": 1,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 6,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 3,
+            "right": 0
+          },
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "ea4e1b57a35b",
+        "subject": "Add issue artifact Update to the API client",
+        "changed": 2,
+        "new_files": 0,
+        "named": {
+          "size": 1,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 6,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 2,
+            "suggested": 4,
+            "right": 2,
+            "examples": [
+              "pkg/cmd/issue/artifact/client/client.go -\u003e pkg/cmd/issue/artifact/client/client_mock.go",
+              "pkg/cmd/issue/artifact/client/client_mock.go -\u003e pkg/cmd/issue/artifact/client/client.go"
+            ]
+          },
+          {
+            "fired": 2,
+            "suggested": 4,
+            "right": 2,
+            "examples": [
+              "pkg/cmd/issue/artifact/client/client.go -\u003e pkg/cmd/issue/artifact/client/client_mock.go",
+              "pkg/cmd/issue/artifact/client/client_mock.go -\u003e pkg/cmd/issue/artifact/client/client.go"
+            ]
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "10d9dd67a149",
+        "subject": "Add gh issue artifact create",
+        "changed": 4,
+        "new_files": 2,
+        "named": {
+          "size": 1,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 6,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 4,
+            "suggested": 8,
+            "right": 4,
+            "examples": [
+              "pkg/cmd/issue/artifact/artifact.go -\u003e pkg/cmd/issue/artifact/shared/shared.go",
+              "pkg/cmd/issue/artifact/artifact.go -\u003e pkg/cmd/issue/artifact/shared/results.go",
+              "pkg/cmd/issue/artifact/shared/results.go -\u003e pkg/cmd/issue/artifact/artifact.go"
+            ]
+          },
+          {
+            "fired": 2,
+            "suggested": 2,
+            "right": 2,
+            "examples": [
+              "pkg/cmd/issue/artifact/artifact.go -\u003e pkg/cmd/issue/artifact/shared/shared.go",
+              "pkg/cmd/issue/artifact/shared/shared.go -\u003e pkg/cmd/issue/artifact/artifact.go"
+            ]
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "817a1a91e467",
+        "subject": "Export the --attach \u003cfile\u003e#\u003ctext\u003e parsing",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 3,
+            "right": 0
+          },
+          {
+            "fired": 1,
+            "suggested": 3,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "636297fb9b2e",
+        "subject": "Add issue artifact Create to the API client",
+        "changed": 3,
+        "new_files": 0,
+        "named": {
+          "size": 5,
+          "hits": 2
+        },
+        "named_with_cochange": {
+          "size": 10,
+          "hits": 3
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 3,
+            "suggested": 6,
+            "right": 6,
+            "examples": [
+              "pkg/cmd/issue/artifact/client/client.go -\u003e pkg/cmd/issue/artifact/client/client_mock.go",
+              "pkg/cmd/issue/artifact/client/client.go -\u003e pkg/cmd/issue/artifact/client/types.go",
+              "pkg/cmd/issue/artifact/client/client_mock.go -\u003e pkg/cmd/issue/artifact/client/client.go"
+            ]
+          },
+          {
+            "fired": 2,
+            "suggested": 2,
+            "right": 2,
+            "examples": [
+              "pkg/cmd/issue/artifact/client/client.go -\u003e pkg/cmd/issue/artifact/client/client_mock.go",
+              "pkg/cmd/issue/artifact/client/client_mock.go -\u003e pkg/cmd/issue/artifact/client/client.go"
+            ]
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "7d61f9530450",
+        "subject": "Add gh issue artifact download",
+        "changed": 2,
+        "new_files": 1,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "64da12d3e28e",
+        "subject": "Move artifact version lookup to the shared package",
+        "changed": 2,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "ea2fd6b15178",
+        "subject": "Add gh issue artifact delete",
+        "changed": 2,
+        "new_files": 2,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 2,
+            "suggested": 2,
+            "right": 2,
+            "examples": [
+              "pkg/cmd/issue/artifact/artifact.go -\u003e pkg/cmd/issue/artifact/shared/shared.go",
+              "pkg/cmd/issue/artifact/shared/shared.go -\u003e pkg/cmd/issue/artifact/artifact.go"
+            ]
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "63200abe505b",
+        "subject": "Add issue artifact Delete to the API client",
+        "changed": 2,
+        "new_files": 0,
+        "named": {
+          "size": 1,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 6,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 2,
+            "suggested": 4,
+            "right": 2,
+            "examples": [
+              "pkg/cmd/issue/artifact/client/client.go -\u003e pkg/cmd/issue/artifact/client/client_mock.go",
+              "pkg/cmd/issue/artifact/client/client_mock.go -\u003e pkg/cmd/issue/artifact/client/client.go"
+            ]
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "2a4a25dadf54",
+        "subject": "Add gh issue artifact view",
+        "changed": 2,
+        "new_files": 1,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "d6eac5cdb495",
+        "subject": "Add issue artifact Get to the API client",
+        "changed": 3,
+        "new_files": 0,
+        "named": {
+          "size": 1,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 6,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "160715502db6",
+        "subject": "Add gh issue artifact list",
+        "changed": 1,
+        "new_files": 3,
+        "named": {
+          "size": 1,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 6,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 3,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "01f9dd397519",
+        "subject": "Add issue artifact API client",
+        "changed": 0,
+        "new_files": 3,
+        "named": {
+          "size": 3,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 8,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "c07e1dd05400",
+        "subject": "Attach one set of files to several Markdown documents",
+        "changed": 2,
+        "new_files": 0,
+        "named": {
+          "size": 1,
+          "hits": 1
+        },
+        "named_with_cochange": {
+          "size": 6,
+          "hits": 2
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 2,
+            "suggested": 4,
+            "right": 0
+          },
+          {
+            "fired": 1,
+            "suggested": 3,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "2f195d678843",
+        "subject": "Resolve --attach references against the body file's directory",
+        "changed": 12,
+        "new_files": 0,
+        "named": {
+          "size": 1,
+          "hits": 1
+        },
+        "named_with_cochange": {
+          "size": 6,
+          "hits": 4
+        },
+        "hot": {
+          "size": 10,
+          "hits": 2
+        },
+        "edit": [
+          {
+            "fired": 10,
+            "suggested": 29,
+            "right": 26,
+            "examples": [
+              "internal/attachments/attach.go -\u003e internal/attachments/test.go",
+              "internal/attachments/doc.go -\u003e pkg/cmd/issue/comment/comment.go",
+              "internal/attachments/doc.go -\u003e pkg/cmd/issue/create/create.go"
+            ]
+          },
+          {
+            "fired": 8,
+            "suggested": 24,
+            "right": 23,
+            "examples": [
+              "internal/attachments/test.go -\u003e pkg/cmd/issue/create/create.go",
+              "internal/attachments/test.go -\u003e pkg/cmd/issue/edit/edit.go",
+              "pkg/cmd/issue/comment/comment.go -\u003e pkg/cmd/pr/comment/comment.go"
+            ]
+          },
+          {
+            "fired": 7,
+            "suggested": 15,
+            "right": 15,
+            "examples": [
+              "pkg/cmd/issue/comment/comment.go -\u003e pkg/cmd/pr/comment/comment.go",
+              "pkg/cmd/issue/comment/comment.go -\u003e pkg/cmd/issue/create/create.go",
+              "pkg/cmd/issue/comment/comment.go -\u003e pkg/cmd/issue/edit/edit.go"
+            ]
+          }
+        ]
+      },
+      {
+        "commit": "b6289046c5b1",
+        "subject": "Remove extra blank line in search issues help",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 2,
+            "right": 0
+          },
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "3bc352e06367",
+        "subject": "Remove host versions from project item-list help",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "b473ca8c43eb",
+        "subject": "Anchor exactly when --signer-workflow pins a ref of its own",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "97577e407ff3",
+        "subject": "Document search operator support in `gh search` help",
+        "changed": 2,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 2,
+            "suggested": 6,
+            "right": 2,
+            "examples": [
+              "pkg/cmd/search/issues/issues.go -\u003e pkg/cmd/search/prs/prs.go",
+              "pkg/cmd/search/prs/prs.go -\u003e pkg/cmd/search/issues/issues.go"
+            ]
+          },
+          {
+            "fired": 2,
+            "suggested": 4,
+            "right": 2,
+            "examples": [
+              "pkg/cmd/search/issues/issues.go -\u003e pkg/cmd/search/prs/prs.go",
+              "pkg/cmd/search/prs/prs.go -\u003e pkg/cmd/search/issues/issues.go"
+            ]
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "35f6001c47f2",
+        "subject": "Allow unset without repository argument",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "9b6eae11d703",
+        "subject": "Allow ghu_ tokens to attach files",
+        "changed": 2,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "41aeb5352f50",
+        "subject": "Match the signer workflow ref by shape rather than excluding \"@\"",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "4fe4b593fdb4",
+        "subject": "Normalize filenames for repository directory output",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 3,
+            "right": 0
+          },
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "8c2454d5a951",
+        "subject": "make SourceRepositoryRef check case-sensitive",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "c906a6ad5a69",
+        "subject": "Anchor the end of the --signer-workflow SAN pattern",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 1,
+          "hits": 1
+        },
+        "named_with_cochange": {
+          "size": 1,
+          "hits": 1
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "f1722876718b",
+        "subject": "Clarify and test lexical child-path validation",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 3,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "f0215ad6776b",
+        "subject": "Allow callers to choose directory creation modes",
+        "changed": 6,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 3,
+            "suggested": 7,
+            "right": 2,
+            "examples": [
+              "pkg/cmd/release/download/download.go -\u003e pkg/cmd/repo/read-file/read_file.go",
+              "pkg/cmd/repo/read-file/read_file.go -\u003e pkg/cmd/release/download/download.go"
+            ]
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "a89d820f6b6d",
+        "subject": "Document rooted filesystem ownership",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 3,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "3c4e972c3b20",
+        "subject": "Remove skill changes from filesystem update",
+        "changed": 5,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 1
+        },
+        "edit": [
+          {
+            "fired": 3,
+            "suggested": 9,
+            "right": 5,
+            "examples": [
+              "internal/skills/installer/installer.go -\u003e pkg/cmd/skills/install/install.go",
+              "internal/skills/installer/installer.go -\u003e pkg/cmd/skills/update/update.go",
+              "pkg/cmd/skills/install/install.go -\u003e pkg/cmd/skills/update/update.go"
+            ]
+          },
+          {
+            "fired": 2,
+            "suggested": 4,
+            "right": 3,
+            "examples": [
+              "internal/skills/installer/installer.go -\u003e pkg/cmd/skills/install/install.go",
+              "internal/skills/installer/installer.go -\u003e pkg/cmd/skills/update/update.go",
+              "pkg/cmd/skills/update/update.go -\u003e pkg/cmd/skills/install/install.go"
+            ]
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "e4270ae938db",
+        "subject": "Restore extraction rationale and align test cleanup",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "1a5a947e419c",
+        "subject": "Use iterator-based path splitting",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "2761962e6aef",
+        "subject": "fix(flock): add blocking lock acquisition with timeout",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "bb793c5db983",
+        "subject": "fix(config): migrate auth storage layer and callers to gh.Credential",
+        "changed": 12,
+        "new_files": 0,
+        "named": {
+          "size": 3,
+          "hits": 1
+        },
+        "named_with_cochange": {
+          "size": 8,
+          "hits": 2
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 7,
+            "suggested": 11,
+            "right": 3,
+            "examples": [
+              "internal/authflow/flow.go -\u003e internal/config/config.go",
+              "pkg/cmd/auth/shared/writeable.go -\u003e pkg/cmd/auth/status/status.go",
+              "pkg/cmd/auth/status/status.go -\u003e pkg/cmd/auth/shared/writeable.go"
+            ]
+          },
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "d55e1d4685e4",
+        "subject": "fix(gh): introduce gh.Credential and switch auth storage interface to it",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 2,
+          "hits": 1
+        },
+        "named_with_cochange": {
+          "size": 7,
+          "hits": 1
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "ba51bb47799e",
+        "subject": "Retire multi-account migration (#14430)",
+        "changed": 3,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "8fcd6a643f99",
+        "subject": "Fix remote branch deletion for owner case mismatch (#14429)",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 2,
+            "right": 0
+          },
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "5448cdc20d82",
+        "subject": "Delete repo garden command",
+        "changed": 3,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "983071ab7fc0",
+        "subject": "Restore GH_EXTENSION and GH_PATH help entries",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 2,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "c708a53e5274",
+        "subject": "Remove GH_EXTENSION help text per review feedback",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 2,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "30419651a944",
+        "subject": "Propagate gh path to extensions",
+        "changed": 2,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 3,
+            "right": 0
+          },
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "9174ffb070f7",
+        "subject": "Validate repository names during interactive creation (#14313)",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 2,
+            "right": 0
+          },
+          {
+            "fired": 1,
+            "suggested": 2,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "1ba640d1c525",
+        "subject": "clarify attachment tests and telemetry state",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 3,
+            "right": 0
+          },
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "81780e761889",
+        "subject": "simplify telemetry recording and tests",
+        "changed": 7,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 3
+        },
+        "edit": [
+          {
+            "fired": 7,
+            "suggested": 21,
+            "right": 17,
+            "examples": [
+              "internal/attachments/telemetry.go -\u003e internal/telemetry/fake.go",
+              "internal/attachments/telemetry.go -\u003e pkg/cmd/issue/create/create.go",
+              "internal/telemetry/fake.go -\u003e internal/attachments/telemetry.go"
+            ]
+          },
+          {
+            "fired": 6,
+            "suggested": 17,
+            "right": 13,
+            "examples": [
+              "internal/attachments/telemetry.go -\u003e internal/telemetry/fake.go",
+              "internal/attachments/telemetry.go -\u003e pkg/cmd/issue/create/create.go",
+              "internal/telemetry/fake.go -\u003e internal/attachments/telemetry.go"
+            ]
+          },
+          {
+            "fired": 4,
+            "suggested": 7,
+            "right": 5,
+            "examples": [
+              "pkg/cmd/issue/create/create.go -\u003e pkg/cmd/issue/edit/edit.go",
+              "pkg/cmd/issue/edit/edit.go -\u003e pkg/cmd/issue/create/create.go",
+              "pkg/cmd/issue/edit/edit.go -\u003e pkg/cmd/pr/edit/edit.go"
+            ]
+          }
+        ]
+      },
+      {
+        "commit": "38704130e876",
+        "subject": "use typed attachment telemetry events",
+        "changed": 8,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 2
+        },
+        "edit": [
+          {
+            "fired": 8,
+            "suggested": 24,
+            "right": 17,
+            "examples": [
+              "internal/attachments/flags.go -\u003e pkg/cmd/issue/create/create.go",
+              "internal/attachments/flags.go -\u003e pkg/cmd/issue/edit/edit.go",
+              "internal/attachments/test.go -\u003e internal/attachments/telemetry.go"
+            ]
+          },
+          {
+            "fired": 6,
+            "suggested": 16,
+            "right": 10,
+            "examples": [
+              "internal/attachments/test.go -\u003e internal/attachments/telemetry.go",
+              "internal/attachments/test.go -\u003e pkg/cmd/issue/create/create.go",
+              "pkg/cmd/issue/create/create.go -\u003e pkg/cmd/issue/edit/edit.go"
+            ]
+          },
+          {
+            "fired": 4,
+            "suggested": 7,
+            "right": 3,
+            "examples": [
+              "pkg/cmd/issue/create/create.go -\u003e pkg/cmd/issue/edit/edit.go",
+              "pkg/cmd/issue/edit/edit.go -\u003e pkg/cmd/issue/create/create.go",
+              "pkg/cmd/issue/edit/edit.go -\u003e pkg/cmd/pr/edit/edit.go"
+            ]
+          }
+        ]
+      },
+      {
+        "commit": "d2fe6e98dca4",
+        "subject": "start attachment telemetry before asset validation",
+        "changed": 8,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 2
+        },
+        "edit": [
+          {
+            "fired": 8,
+            "suggested": 24,
+            "right": 21,
+            "examples": [
+              "pkg/cmd/issue/comment/comment.go -\u003e pkg/cmd/pr/comment/comment.go",
+              "pkg/cmd/issue/comment/comment.go -\u003e pkg/cmd/issue/create/create.go",
+              "pkg/cmd/issue/comment/comment.go -\u003e pkg/cmd/issue/edit/edit.go"
+            ]
+          },
+          {
+            "fired": 6,
+            "suggested": 18,
+            "right": 15,
+            "examples": [
+              "pkg/cmd/issue/comment/comment.go -\u003e pkg/cmd/pr/comment/comment.go",
+              "pkg/cmd/issue/comment/comment.go -\u003e pkg/cmd/issue/create/create.go",
+              "pkg/cmd/issue/comment/comment.go -\u003e pkg/cmd/issue/edit/edit.go"
+            ]
+          },
+          {
+            "fired": 5,
+            "suggested": 11,
+            "right": 9,
+            "examples": [
+              "pkg/cmd/issue/comment/comment.go -\u003e pkg/cmd/pr/comment/comment.go",
+              "pkg/cmd/issue/comment/comment.go -\u003e pkg/cmd/issue/create/create.go",
+              "pkg/cmd/issue/comment/comment.go -\u003e pkg/cmd/issue/edit/edit.go"
+            ]
+          }
+        ]
+      },
+      {
+        "commit": "75fc31e57c9f",
+        "subject": "Prepare exit errors for Go 1.27",
+        "changed": 3,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 3,
+            "suggested": 5,
+            "right": 4,
+            "examples": [
+              "pkg/cmd/repo/create/create.go -\u003e git/client.go",
+              "pkg/cmd/repo/create/create.go -\u003e pkg/cmd/repo/fork/fork.go",
+              "pkg/cmd/repo/fork/fork.go -\u003e git/client.go"
+            ]
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "14fc1ff8426d",
+        "subject": "minimize incidental telemetry service changes",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 3,
+            "right": 0
+          },
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "2ac2543e339a",
+        "subject": "simplify attachment telemetry initialization",
+        "changed": 9,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 2
+        },
+        "edit": [
+          {
+            "fired": 9,
+            "suggested": 27,
+            "right": 20,
+            "examples": [
+              "internal/attachments/test.go -\u003e internal/attachments/telemetry.go",
+              "pkg/cmd/issue/comment/comment.go -\u003e pkg/cmd/pr/comment/comment.go",
+              "pkg/cmd/issue/comment/comment.go -\u003e pkg/cmd/issue/create/create.go"
+            ]
+          },
+          {
+            "fired": 6,
+            "suggested": 16,
+            "right": 13,
+            "examples": [
+              "pkg/cmd/issue/comment/comment.go -\u003e pkg/cmd/pr/comment/comment.go",
+              "pkg/cmd/issue/comment/comment.go -\u003e pkg/cmd/issue/create/create.go",
+              "pkg/cmd/issue/comment/comment.go -\u003e pkg/cmd/issue/edit/edit.go"
+            ]
+          },
+          {
+            "fired": 4,
+            "suggested": 10,
+            "right": 8,
+            "examples": [
+              "pkg/cmd/issue/comment/comment.go -\u003e pkg/cmd/pr/comment/comment.go",
+              "pkg/cmd/issue/comment/comment.go -\u003e pkg/cmd/issue/create/create.go",
+              "pkg/cmd/issue/comment/comment.go -\u003e pkg/cmd/issue/edit/edit.go"
+            ]
+          }
+        ]
+      },
+      {
+        "commit": "03acc10bb051",
+        "subject": "name pending telemetry updates as upserts",
+        "changed": 5,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 5,
+            "suggested": 15,
+            "right": 12,
+            "examples": [
+              "internal/attachments/telemetry.go -\u003e internal/gh/ghtelemetry/telemetry.go",
+              "internal/attachments/telemetry.go -\u003e internal/telemetry/fake.go",
+              "internal/attachments/telemetry.go -\u003e pkg/cmdutil/telemetry.go"
+            ]
+          },
+          {
+            "fired": 5,
+            "suggested": 11,
+            "right": 9,
+            "examples": [
+              "internal/attachments/telemetry.go -\u003e internal/gh/ghtelemetry/telemetry.go",
+              "internal/attachments/telemetry.go -\u003e internal/telemetry/fake.go",
+              "internal/attachments/telemetry.go -\u003e pkg/cmdutil/telemetry.go"
+            ]
+          },
+          {
+            "fired": 2,
+            "suggested": 2,
+            "right": 2,
+            "examples": [
+              "internal/gh/ghtelemetry/telemetry.go -\u003e internal/telemetry/fake.go",
+              "internal/telemetry/fake.go -\u003e internal/gh/ghtelemetry/telemetry.go"
+            ]
+          }
+        ]
+      },
+      {
+        "commit": "3c517fa04080",
+        "subject": "limit telemetry disabling to the service",
+        "changed": 2,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 2,
+            "suggested": 6,
+            "right": 2,
+            "examples": [
+              "internal/gh/ghtelemetry/telemetry.go -\u003e internal/telemetry/fake.go",
+              "internal/telemetry/fake.go -\u003e internal/gh/ghtelemetry/telemetry.go"
+            ]
+          },
+          {
+            "fired": 2,
+            "suggested": 6,
+            "right": 2,
+            "examples": [
+              "internal/gh/ghtelemetry/telemetry.go -\u003e internal/telemetry/fake.go",
+              "internal/telemetry/fake.go -\u003e internal/gh/ghtelemetry/telemetry.go"
+            ]
+          },
+          {
+            "fired": 2,
+            "suggested": 2,
+            "right": 2,
+            "examples": [
+              "internal/gh/ghtelemetry/telemetry.go -\u003e internal/telemetry/fake.go",
+              "internal/telemetry/fake.go -\u003e internal/gh/ghtelemetry/telemetry.go"
+            ]
+          }
+        ]
+      },
+      {
+        "commit": "07105963fbf3",
+        "subject": "move service back into telemetry.go",
+        "changed": 2,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 2,
+            "suggested": 5,
+            "right": 0
+          },
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "570183b09859",
+        "subject": "rename telemetry BeginEvent to Begin",
+        "changed": 5,
+        "new_files": 0,
+        "named": {
+          "size": 2,
+          "hits": 2
+        },
+        "named_with_cochange": {
+          "size": 7,
+          "hits": 4
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 4,
+            "suggested": 12,
+            "right": 6,
+            "examples": [
+              "internal/attachments/telemetry.go -\u003e internal/gh/ghtelemetry/telemetry.go",
+              "internal/attachments/telemetry.go -\u003e internal/telemetry/fake.go",
+              "internal/gh/ghtelemetry/telemetry.go -\u003e internal/telemetry/fake.go"
+            ]
+          },
+          {
+            "fired": 4,
+            "suggested": 10,
+            "right": 6,
+            "examples": [
+              "internal/attachments/telemetry.go -\u003e internal/gh/ghtelemetry/telemetry.go",
+              "internal/attachments/telemetry.go -\u003e internal/telemetry/fake.go",
+              "internal/gh/ghtelemetry/telemetry.go -\u003e internal/telemetry/fake.go"
+            ]
+          },
+          {
+            "fired": 2,
+            "suggested": 2,
+            "right": 2,
+            "examples": [
+              "internal/gh/ghtelemetry/telemetry.go -\u003e internal/telemetry/fake.go",
+              "internal/telemetry/fake.go -\u003e internal/gh/ghtelemetry/telemetry.go"
+            ]
+          }
+        ]
+      },
+      {
+        "commit": "c41dd03ff3fe",
+        "subject": "restore telemetry service naming",
+        "changed": 5,
+        "new_files": 1,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 5,
+            "suggested": 13,
+            "right": 7,
+            "examples": [
+              "cmd/gen-docs/main.go -\u003e internal/gh/ghtelemetry/telemetry.go",
+              "cmd/gen-docs/main.go -\u003e internal/ghcmd/cmd.go",
+              "cmd/gen-docs/main.go -\u003e internal/telemetry/fake.go"
+            ]
+          },
+          {
+            "fired": 2,
+            "suggested": 6,
+            "right": 2,
+            "examples": [
+              "internal/gh/ghtelemetry/telemetry.go -\u003e internal/telemetry/fake.go",
+              "internal/telemetry/fake.go -\u003e internal/gh/ghtelemetry/telemetry.go"
+            ]
+          },
+          {
+            "fired": 2,
+            "suggested": 2,
+            "right": 2,
+            "examples": [
+              "internal/gh/ghtelemetry/telemetry.go -\u003e internal/telemetry/fake.go",
+              "internal/telemetry/fake.go -\u003e internal/gh/ghtelemetry/telemetry.go"
+            ]
+          }
+        ]
+      },
+      {
+        "commit": "7f3b49171f20",
+        "subject": "send telemetry when invocation finishes",
+        "changed": 4,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 3,
+            "suggested": 7,
+            "right": 2,
+            "examples": [
+              "internal/ghcmd/cmd.go -\u003e internal/telemetry/telemetry.go",
+              "internal/telemetry/telemetry.go -\u003e internal/ghcmd/cmd.go"
+            ]
+          },
+          {
+            "fired": 1,
+            "suggested": 3,
+            "right": 1,
+            "examples": [
+              "internal/telemetry/telemetry.go -\u003e internal/ghcmd/cmd.go"
+            ]
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "46e09a5485d0",
+        "subject": "separate event recording from invocation policy",
+        "changed": 21,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 4
+        },
+        "edit": [
+          {
+            "fired": 15,
+            "suggested": 43,
+            "right": 26,
+            "examples": [
+              "internal/attachments/telemetry.go -\u003e internal/gh/ghtelemetry/telemetry.go",
+              "internal/attachments/telemetry.go -\u003e internal/telemetry/fake.go",
+              "internal/gh/ghtelemetry/telemetry.go -\u003e internal/telemetry/fake.go"
+            ]
+          },
+          {
+            "fired": 8,
+            "suggested": 23,
+            "right": 15,
+            "examples": [
+              "internal/gh/ghtelemetry/telemetry.go -\u003e internal/telemetry/fake.go",
+              "internal/telemetry/fake.go -\u003e internal/gh/ghtelemetry/telemetry.go",
+              "pkg/cmd/issue/comment/comment.go -\u003e pkg/cmd/pr/comment/comment.go"
+            ]
+          },
+          {
+            "fired": 3,
+            "suggested": 4,
+            "right": 4,
+            "examples": [
+              "pkg/cmd/issue/comment/comment.go -\u003e pkg/cmd/pr/comment/comment.go",
+              "pkg/cmd/issue/edit/edit.go -\u003e pkg/cmd/issue/create/create.go",
+              "pkg/cmd/issue/edit/edit.go -\u003e pkg/cmd/pr/edit/edit.go"
+            ]
+          }
+        ]
+      },
+      {
+        "commit": "5e078edf27c4",
+        "subject": "finalize telemetry at invocation completion",
+        "changed": 7,
+        "new_files": 2,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 3,
+            "suggested": 9,
+            "right": 9,
+            "examples": [
+              "internal/gh/ghtelemetry/telemetry.go -\u003e internal/telemetry/fake.go",
+              "internal/gh/ghtelemetry/telemetry.go -\u003e internal/telemetry/telemetry.go",
+              "internal/gh/ghtelemetry/telemetry.go -\u003e internal/ghcmd/cmd.go"
+            ]
+          },
+          {
+            "fired": 3,
+            "suggested": 5,
+            "right": 5,
+            "examples": [
+              "internal/gh/ghtelemetry/telemetry.go -\u003e internal/telemetry/fake.go",
+              "internal/gh/ghtelemetry/telemetry.go -\u003e internal/telemetry/telemetry.go",
+              "internal/telemetry/fake.go -\u003e internal/gh/ghtelemetry/telemetry.go"
+            ]
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "091c24d70257",
+        "subject": "Record attachment operation counts",
+        "changed": 15,
+        "new_files": 1,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 1
+        },
+        "edit": [
+          {
+            "fired": 11,
+            "suggested": 30,
+            "right": 26,
+            "examples": [
+              "internal/attachments/flags.go -\u003e pkg/cmd/issue/comment/comment.go",
+              "internal/attachments/flags.go -\u003e pkg/cmd/issue/create/create.go",
+              "internal/attachments/flags.go -\u003e pkg/cmd/issue/edit/edit.go"
+            ]
+          },
+          {
+            "fired": 5,
+            "suggested": 12,
+            "right": 11,
+            "examples": [
+              "pkg/cmd/issue/comment/comment.go -\u003e pkg/cmd/pr/comment/comment.go",
+              "pkg/cmd/issue/comment/comment.go -\u003e internal/attachments/flags.go",
+              "pkg/cmd/issue/comment/comment.go -\u003e pkg/cmd/issue/create/create.go"
+            ]
+          },
+          {
+            "fired": 2,
+            "suggested": 2,
+            "right": 2,
+            "examples": [
+              "pkg/cmd/issue/comment/comment.go -\u003e pkg/cmd/pr/comment/comment.go",
+              "pkg/cmd/pr/comment/comment.go -\u003e pkg/cmd/issue/comment/comment.go"
+            ]
+          }
+        ]
+      },
+      {
+        "commit": "fda2d6138967",
+        "subject": "Defer Go source migrations to bump",
+        "changed": 3,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "41b7d3c180e9",
+        "subject": "Validate automated Go version bumps",
+        "changed": 3,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "6de236a152ae",
+        "subject": "Apply Go fixes to changed packages",
+        "changed": 3,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 2,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "e316a01d2778",
+        "subject": "Enable clipboard auth by default",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "c11b7021eaa8",
+        "subject": "Preserve host-scoped config compatibility",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "03740ac4cf2b",
+        "subject": "Use API SSH URLs for repository clones",
+        "changed": 2,
+        "new_files": 0,
+        "named": {
+          "size": 2,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 7,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "cbe04588f1b6",
+        "subject": "Add clipboard preference for auth flows",
+        "changed": 8,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 3,
+            "suggested": 5,
+            "right": 2,
+            "examples": [
+              "internal/config/config.go -\u003e internal/gh/gh.go",
+              "internal/gh/gh.go -\u003e internal/config/config.go"
+            ]
+          },
+          {
+            "fired": 2,
+            "suggested": 2,
+            "right": 2,
+            "examples": [
+              "internal/config/config.go -\u003e internal/gh/gh.go",
+              "internal/gh/gh.go -\u003e internal/config/config.go"
+            ]
+          },
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 1,
+            "examples": [
+              "internal/gh/gh.go -\u003e internal/config/config.go"
+            ]
+          }
+        ]
+      },
+      {
+        "commit": "4a75987727d9",
+        "subject": "Fix gh api telemetry disablement",
+        "changed": 3,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 3,
+            "suggested": 9,
+            "right": 3,
+            "examples": [
+              "pkg/cmd/api/api.go -\u003e pkg/cmd/factory/default.go",
+              "pkg/cmd/factory/default.go -\u003e pkg/cmdutil/factory.go",
+              "pkg/cmdutil/factory.go -\u003e pkg/cmd/factory/default.go"
+            ]
+          },
+          {
+            "fired": 2,
+            "suggested": 4,
+            "right": 2,
+            "examples": [
+              "pkg/cmd/factory/default.go -\u003e pkg/cmdutil/factory.go",
+              "pkg/cmdutil/factory.go -\u003e pkg/cmd/factory/default.go"
+            ]
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "bf19e9cdfa5b",
+        "subject": "Expose per-host API host config",
+        "changed": 2,
+        "new_files": 0,
+        "named": {
+          "size": 1,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 6,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "5b02f9abc063",
+        "subject": "Record attachment invocation telemetry",
+        "changed": 10,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 1
+        },
+        "edit": [
+          {
+            "fired": 6,
+            "suggested": 15,
+            "right": 14,
+            "examples": [
+              "pkg/cmd/issue/comment/comment.go -\u003e pkg/cmd/pr/comment/comment.go",
+              "pkg/cmd/issue/comment/comment.go -\u003e internal/attachments/flags.go",
+              "pkg/cmd/issue/comment/comment.go -\u003e pkg/cmd/issue/create/create.go"
+            ]
+          },
+          {
+            "fired": 4,
+            "suggested": 5,
+            "right": 5,
+            "examples": [
+              "pkg/cmd/issue/comment/comment.go -\u003e pkg/cmd/pr/comment/comment.go",
+              "pkg/cmd/issue/create/create.go -\u003e pkg/cmd/issue/edit/edit.go",
+              "pkg/cmd/issue/edit/edit.go -\u003e pkg/cmd/issue/create/create.go"
+            ]
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "d00109a4c354",
+        "subject": "Add webhook as an official extension",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "05a0a0230bff",
+        "subject": "Remove redundant searcher comment",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "0580da935fec",
+        "subject": "Remove unnecessary 204 on release edit",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "6e7b1fe27422",
+        "subject": "Remove redundant comment in gist create",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "5ba76c62f18b",
+        "subject": "Comment api command api_host usage",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "8b3e2f1fd74b",
+        "subject": "Comment missing api-client-rollout todo",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "714e5ea57aad",
+        "subject": "Document when telemetry disabling is overzealous",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "628e85c9cd92",
+        "subject": "Refactor AddAuthTokenHeader",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 1,
+          "hits": 1
+        },
+        "named_with_cochange": {
+          "size": 6,
+          "hits": 1
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "fe76ff52762a",
+        "subject": "Rename tokenGetter to config",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 1,
+          "hits": 1
+        },
+        "named_with_cochange": {
+          "size": 6,
+          "hits": 1
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "2f88d0581597",
+        "subject": "refactor(attachments): send uploads through api.Client.DoRequest",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 3,
+          "hits": 1
+        },
+        "named_with_cochange": {
+          "size": 8,
+          "hits": 1
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "061e585ee44d",
+        "subject": "chore: apply go fix",
+        "changed": 4,
+        "new_files": 0,
+        "named": {
+          "size": 0,
+          "hits": 0
+        },
+        "named_with_cochange": {
+          "size": 0,
+          "hits": 0
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "48922accff35",
+        "subject": "fix(api): compare request hostname without port when attaching auth token",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 1,
+          "hits": 1
+        },
+        "named_with_cochange": {
+          "size": 6,
+          "hits": 1
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 3,
+            "right": 0
+          },
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "061b2a1f1fa0",
+        "subject": "fix(auth/shared): route GetScopes path through safeurl",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 1,
+          "hits": 1
+        },
+        "named_with_cochange": {
+          "size": 6,
+          "hits": 1
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "fbda842467a0",
+        "subject": "refactor(api): use errors.AsType for HTTP error checks",
+        "changed": 9,
+        "new_files": 0,
+        "named": {
+          "size": 1,
+          "hits": 1
+        },
+        "named_with_cochange": {
+          "size": 6,
+          "hits": 1
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 4,
+            "suggested": 7,
+            "right": 3,
+            "examples": [
+              "pkg/cmd/release/create/http.go -\u003e api/client.go",
+              "pkg/cmd/run/view/logs.go -\u003e pkg/cmd/run/view/view.go",
+              "pkg/cmd/run/view/view.go -\u003e pkg/cmd/run/view/logs.go"
+            ]
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          },
+          {
+            "fired": 0,
+            "suggested": 0,
+            "right": 0
+          }
+        ]
+      },
+      {
+        "commit": "dbbaed858336",
+        "subject": "fix(config): resolve api_host collisions deterministically",
+        "changed": 1,
+        "new_files": 0,
+        "named": {
+          "size": 2,
+          "hits": 1
+        },
+        "named_with_cochange": {
+          "size": 7,
+          "hits": 1
+        },
+        "hot": {
+          "size": 10,
+          "hits": 0
+        },
+        "edit": [
+          {
+            "fired": 1,
+            "suggested": 3,
+            "right": 0
+          },
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          },
+          {
+            "fired": 1,
+            "suggested": 1,
+            "right": 0
+          }
+        ]
+      }
+    ],
+    "skipped_commits": 161,
+    "summary": {
+      "commits": 200,
+      "multi_file_commits": 88,
+      "named_recall": 0.09760956175298804,
+      "named_precision": 0.44954128440366975,
+      "named_with_cochange_recall": 0.14143426294820718,
+      "cochange_added_precision": 0.0728476821192053,
+      "hot_recall": 0.06772908366533864,
+      "hot_precision": 0.017,
+      "edit": [
+        {
+          "support": 2,
+          "confidence": 0.3,
+          "suggested": 768,
+          "precision": 0.5013020833333334,
+          "coverage": 0.6136363636363636,
+          "single_file_nag": 0.7222222222222222
+        },
+        {
+          "support": 3,
+          "confidence": 0.5,
+          "suggested": 354,
+          "precision": 0.6412429378531074,
+          "coverage": 0.4772727272727273,
+          "single_file_nag": 0.2962962962962963
+        },
+        {
+          "support": 5,
+          "confidence": 0.7,
+          "suggested": 124,
+          "precision": 0.8064516129032258,
+          "coverage": 0.23863636363636365,
+          "single_file_nag": 0.07407407407407407
+        }
+      ]
+    }
+  }
+]

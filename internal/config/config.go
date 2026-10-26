@@ -96,6 +96,10 @@ type DirectConfig struct {
 	// quoted errors) in the project before the first model call and sends
 	// the places found with the message (default true).
 	SeedPack *bool `yaml:"seed_pack,omitempty"`
+	// HistoryNotes names, after a file change in a git repository, the
+	// files its history usually changes together with that file
+	// (default true).
+	HistoryNotes *bool `yaml:"history_notes,omitempty"`
 	// Stream shows the answer as it is generated when the provider can
 	// stream (default true).
 	Stream *bool `yaml:"stream,omitempty"`
@@ -142,6 +146,9 @@ func (d DirectConfig) ChecksOn() bool { return d.Checks == nil || *d.Checks }
 
 // SeedPackOn reports whether the request lookup is enabled (default true).
 func (d DirectConfig) SeedPackOn() bool { return d.SeedPack == nil || *d.SeedPack }
+
+// HistoryNotesOn reports whether history notes are enabled (default true).
+func (d DirectConfig) HistoryNotesOn() bool { return d.HistoryNotes == nil || *d.HistoryNotes }
 
 // StreamOn reports whether streaming is enabled (default true).
 func (d DirectConfig) StreamOn() bool { return d.Stream == nil || *d.Stream }

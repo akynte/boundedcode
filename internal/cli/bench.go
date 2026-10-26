@@ -25,7 +25,7 @@ import (
 
 func newBenchCmd(app *App) *cobra.Command {
 	cmd := &cobra.Command{Use: "bench", Short: "Run reproducible benchmarks"}
-	cmd.AddCommand(newBenchInfraCmd(app), newBenchTasksCmd(app), newBenchDirectCmd(app), newBenchIntelCmd(app), newBenchLeaseCmd(app))
+	cmd.AddCommand(newBenchInfraCmd(app), newBenchTasksCmd(app), newBenchDirectCmd(app), newBenchIntelCmd(app), newBenchLeaseCmd(app), newBenchTrailCmd(app))
 	return cmd
 }
 
@@ -266,6 +266,7 @@ func newBenchDirectCmd(app *App) *cobra.Command {
 		only, compare            []string
 		timeout                  time.Duration
 		workingSet               int
+		noHistoryNotes           bool
 	)
 	cmd := &cobra.Command{
 		Use:   "direct",
@@ -339,8 +340,12 @@ aside and recalled, summaries, broken edits caught by the check, and time.`,
 			if workingSet > 0 {
 				dc.WorkingSetTokens = workingSet
 			}
+			if noHistoryNotes {
+				off := false
+				dc.HistoryNotes = &off
+			}
 			dr := &benchmark.DirectRunner{FixturesDir: fixtures, WorkRoot: work, Rules: app.riskRules(), Timeout: timeout,
-				Settings: map[string]any{"approval": approval, "working_set_tokens": dc.WorkingSetTokens, "max_tool_output": dc.MaxToolOutput, "checks": dc.ChecksOn(), "seed_pack": dc.SeedPackOn(), "context_tokens": ep.ctxSize, "provider": ep.provider},
+				Settings: map[string]any{"approval": approval, "working_set_tokens": dc.WorkingSetTokens, "max_tool_output": dc.MaxToolOutput, "checks": dc.ChecksOn(), "seed_pack": dc.SeedPackOn(), "history_notes": dc.HistoryNotesOn(), "context_tokens": ep.ctxSize, "provider": ep.provider},
 				Progress: func(s string) { fmt.Fprintf(app.Err, "%s %s\n", time.Now().Format("15:04:05"), s) },
 				NewRunner: func(ctx context.Context, root, stateDir string) (*direct.Runner, func(), error) {
 					sess, err := direct.NewSession(filepath.Join(stateDir, "sessions"), root, ep.provider, ep.model)
@@ -358,6 +363,7 @@ aside and recalled, summaries, broken edits caught by the check, and time.`,
 					if workingSet > 0 {
 						opts.WorkingSetTokens = workingSet
 					}
+					opts.NoHistoryNotes = opts.NoHistoryNotes || noHistoryNotes
 					r := &direct.Runner{Gateway: ep.newGateway(sess.ID), Session: sess, Opts: opts}
 					return r, func() { r.Close() }, nil
 				}}
@@ -385,6 +391,7 @@ aside and recalled, summaries, broken edits caught by the check, and time.`,
 	f.DurationVar(&timeout, "timeout", 20*time.Minute, "time limit per task when the task sets none")
 	f.StringSliceVar(&compare, "compare", nil, "compare two saved reports (OLD.json,NEW.json) instead of running")
 	f.IntVar(&workingSet, "working-set", 0, "history budget in tokens for this run (0 = direct.working_set_tokens)")
+	f.BoolVar(&noHistoryNotes, "no-history-notes", false, "turn off history notes for this run (direct.history_notes)")
 	return cmd
 }
 
@@ -508,6 +515,62 @@ changed outside tests. The message is scored as written and without its
 	f := cmd.Flags()
 	f.StringSliceVar(&repos, "repo", nil, "git checkout to study (repeatable)")
 	f.IntVar(&commits, "commits", 100, "commits per repository (the newest that change Go code)")
+	f.IntVar(&maxFiles, "max-files", 30, "skip commits that change more non-test files than this")
+	f.StringVar(&out, "out", "", "report path (.json; .md written alongside)")
+	return cmd
+}
+
+func newBenchTrailCmd(app *App) *cobra.Command {
+	var repos []string
+	var out string
+	var rev string
+	var commits, history, maxFiles int
+	cmd := &cobra.Command{
+		Use:   "trail",
+		Short: "Score whether a repository's history predicts the files a change needs",
+		Long: `For each recent commit of each repository, suggest files from the
+commits before it and compare them with what the commit changed outside
+tests: at request time (the files the message names, those plus the files
+most often changed with them, the most changed files overall) and at edit
+time (for each changed file, the files usually changed with it). No model
+is involved.`,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if len(repos) == 0 {
+				return fmt.Errorf("--repo is required (a git checkout; repeatable)")
+			}
+			var reps []*benchmark.TrailReport
+			for _, r := range repos {
+				st := &benchmark.TrailStudy{Repo: r, Rev: rev, Commits: commits, History: history, MaxFiles: maxFiles,
+					Progress: func(s string) { fmt.Fprintf(app.Err, "%s %s\n", time.Now().Format("15:04:05"), s) }}
+				rep, err := st.Run(cmd.Context())
+				if err != nil {
+					return fmt.Errorf("%s: %w", r, err)
+				}
+				reps = append(reps, rep)
+			}
+			var md bytes.Buffer
+			benchmark.WriteTrailMarkdown(&md, reps)
+			if out != "" {
+				b, err := benchmark.MarshalTrail(reps)
+				if err != nil {
+					return err
+				}
+				if err := config.WriteFileAtomic(out, b, 0o644); err != nil {
+					return err
+				}
+				if err := os.WriteFile(strings.TrimSuffix(out, ".json")+".md", md.Bytes(), 0o644); err != nil {
+					return err
+				}
+			}
+			app.printf("%s", md.String())
+			return nil
+		},
+	}
+	f := cmd.Flags()
+	f.StringSliceVar(&repos, "repo", nil, "git checkout to study (repeatable)")
+	f.IntVar(&commits, "commits", 100, "commits per repository (the newest that change Go code)")
+	f.StringVar(&rev, "rev", "", "newest commit to consider (default HEAD); an older one holds out the newest commits")
+	f.IntVar(&history, "history", 1000, "earlier commits that form each commit's trail")
 	f.IntVar(&maxFiles, "max-files", 30, "skip commits that change more non-test files than this")
 	f.StringVar(&out, "out", "", "report path (.json; .md written alongside)")
 	return cmd

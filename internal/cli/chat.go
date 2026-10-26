@@ -146,7 +146,7 @@ func (a *App) directOptions(root, dir, approval string, ctxSize int) direct.Opti
 	opts := direct.Options{
 		Root: root, Dir: dir, Approval: approval, MaxTurns: dc.MaxTurns,
 		CommandTimeout: dc.CommandTimeout.D(), ContextTokens: ctxSize,
-		WorkingSetTokens: dc.WorkingSetTokens, MaxToolOutput: dc.MaxToolOutput, NoChecks: !dc.ChecksOn(), NoSeedPack: !dc.SeedPackOn(), NoStream: !dc.StreamOn(),
+		WorkingSetTokens: dc.WorkingSetTokens, MaxToolOutput: dc.MaxToolOutput, NoChecks: !dc.ChecksOn(), NoSeedPack: !dc.SeedPackOn(), NoHistoryNotes: !dc.HistoryNotesOn(), NoStream: !dc.StreamOn(),
 		MaxOutputTokens: a.Config.Agent.MaxOutputTokens, Instructions: dc.Instructions,
 		UserInstructions: a.userInstructionsFile(),
 		Web:              direct.WebOptions{AllowHosts: dc.Web.AllowHosts, SearchURL: dc.Web.SearchURL},

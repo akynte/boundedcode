@@ -88,6 +88,9 @@ type DirectResult struct {
 	// CheckNotes counts notes about code that compiles but is probably
 	// wrong (a pointer to a range loop's copy).
 	CheckNotes int `json:"check_notes,omitempty"`
+	// HistoryNotes counts notes naming files the repository's history
+	// changes together with a changed file.
+	HistoryNotes int `json:"history_notes,omitempty"`
 	// Nudged: the model described a plan without acting and was asked to
 	// continue.
 	Nudged       bool     `json:"nudged,omitempty"`
@@ -135,6 +138,7 @@ type DirectSummary struct {
 	Compactions     int     `json:"compactions"`
 	ChecksCaught    int     `json:"checks_caught"`
 	CheckNotes      int     `json:"check_notes"`
+	HistoryNotes    int     `json:"history_notes"`
 	Errors          int     `json:"errors"`
 }
 
@@ -296,6 +300,9 @@ func (d *DirectRunner) runOne(ctx context.Context, model string, spec TaskSpec) 
 			}
 			if strings.Contains(e.Output, "check note (") {
 				res.CheckNotes++
+			}
+			if strings.Contains(e.Output, "history note: ") {
+				res.HistoryNotes++
 			}
 		case direct.EventDenied:
 			res.Denied++
@@ -504,6 +511,7 @@ func summarizeDirect(category string, rs []DirectResult) DirectSummary {
 		s.Compactions += r.Compactions
 		s.ChecksCaught += r.ChecksCaught
 		s.CheckNotes += r.CheckNotes
+		s.HistoryNotes += r.HistoryNotes
 		s.PeakPrompt = max(s.PeakPrompt, r.PeakPrompt)
 	}
 	if s.Tasks == 0 {
@@ -539,8 +547,8 @@ func WriteDirectMarkdown(w io.Writer, r *DirectReport) error {
 		}
 		fmt.Fprintf(w, "Settings: %s.\n\n", strings.Join(parts, ", "))
 	}
-	fmt.Fprintf(w, "**%d/%d passed (%.0f%%)**, %.1f model calls and %.1f tool calls per task, %.0f prompt tokens per task with a %.0f%% prompt-cache hit rate, %.0f generated tokens per task, %.0f KB of tool results per task, %.0f s per task, %d tokens in the largest single prompt; %d results set aside, %d recalled, %d summaries, %d broken edits caught by the check, %d check notes, %d errors.\n\n",
-		s.Passed, s.Tasks, 100*s.PassRate, s.MeanCalls, s.MeanToolCalls, s.MeanPrompt, 100*s.CacheHitRate, s.MeanGenerated, s.MeanResultBytes/1024, s.MeanWallSeconds, s.PeakPrompt, s.Elided, s.Recalls, s.Compactions, s.ChecksCaught, s.CheckNotes, s.Errors)
+	fmt.Fprintf(w, "**%d/%d passed (%.0f%%)**, %.1f model calls and %.1f tool calls per task, %.0f prompt tokens per task with a %.0f%% prompt-cache hit rate, %.0f generated tokens per task, %.0f KB of tool results per task, %.0f s per task, %d tokens in the largest single prompt; %d results set aside, %d recalled, %d summaries, %d broken edits caught by the check, %d check notes, %d history notes, %d errors.\n\n",
+		s.Passed, s.Tasks, 100*s.PassRate, s.MeanCalls, s.MeanToolCalls, s.MeanPrompt, 100*s.CacheHitRate, s.MeanGenerated, s.MeanResultBytes/1024, s.MeanWallSeconds, s.PeakPrompt, s.Elided, s.Recalls, s.Compactions, s.ChecksCaught, s.CheckNotes, s.HistoryNotes, s.Errors)
 	if len(r.ByClass) > 1 {
 		fmt.Fprintf(w, "| Category | Passed | Calls | Tools | Prompt tok | Cache | Gen tok | s/task |\n|---|---|---|---|---|---|---|---|\n")
 		for _, c := range r.ByClass {

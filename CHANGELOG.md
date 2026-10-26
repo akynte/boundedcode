@@ -43,6 +43,22 @@ used on real work or measured.
   (x/tools, cobra, the module cache, the standard library) the rule finds
   11 places, mostly deliberate copies, and it never fires on code the
   edit did not add.
+- After a file change in a git repository, the tool result names the
+  files that this repository's history usually changes together with it
+  (`direct.history_notes`). The rule: changed together in at least 5 of
+  the last 1,000 commits, and in at least 70% of the commits that changed
+  the file. Up to three files are named, and none twice in a session.
+  Examples are a generated file and its source, a command and its mirror,
+  an interface and its test fake, `go.mod` and `go.sum`.
+  - Measured first by `bcode bench trail` on commits nobody had looked at:
+    70–81% of the named files were changed by the same commit, and a note
+    fired on 2–7% of single-file commits. See
+    docs/benchmarks/trail-study-2026-10.md.
+  - The same study found that adding co-changed files to the request's
+    lookup does not help, so that was not built.
+- `bench direct` tasks can replay a repository's own commits: a
+  `githistory:<url>@<commit>` source keeps the history up to the commit
+  and nothing after it. `--no-history-notes` turns the note off for a run.
 - The system prompt asks for the cause, not the symptom: after a failing
   test, re-read the whole function and correct every part of the mistake.
   Measured on the suite's planted two-fault bug: fixed in 0 of 2 runs
@@ -92,6 +108,10 @@ used on real work or measured.
   repository, symbol precision is 33–55% and the lease holds the whole
   change in 0–65% of commits, so the planned lease check on edits is not
   built (docs/benchmarks/lease-study-2026-10.md).
+- `bcode bench trail` scores whether a repository's history predicts the
+  files a change needs, at request time and after each edit, against
+  real commits (`--rev` holds out the newest ones). It is the measurement
+  behind `direct.history_notes`.
 - The router no longer reads a ruled-out change ("do not change anything
   yet", "without editing") as a request for one, finds a question after a
   scene-setting clause ("In package txtar, how does …"), and no longer

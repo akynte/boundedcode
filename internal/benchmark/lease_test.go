@@ -14,23 +14,7 @@ func TestLeaseStudyScoresCommits(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git")
 	}
-	dir := t.TempDir()
-	git := func(args ...string) {
-		t.Helper()
-		c := exec.Command("git", append([]string{"-c", "user.email=t@t", "-c", "user.name=t", "-c", "commit.gpgsign=false"}, args...)...)
-		c.Dir = dir
-		if out, err := c.CombinedOutput(); err != nil {
-			t.Fatalf("git %v: %v %s", args, err, out)
-		}
-	}
-	write := func(p, s string) {
-		t.Helper()
-		_ = os.MkdirAll(filepath.Dir(filepath.Join(dir, p)), 0o755)
-		if err := os.WriteFile(filepath.Join(dir, p), []byte(s), 0o644); err != nil {
-			t.Fatal(err)
-		}
-	}
-	git("init", "-q")
+	dir, git, write := testRepo(t)
 	write("shop/cart/cart.go", "package cart\n\nfunc AlphaThing() int { return 1 }\n\nfunc Other() int { return 2 }\n")
 	write("shop/api/api.go", "package api\n\nfunc Serve() {}\n")
 	write("shop/cart/data.txtar", "-- a.txt --\nA\n-- b.txt --\nB\n")
@@ -84,4 +68,27 @@ func TestLeaseStudyScoresCommits(t *testing.T) {
 	if message("fix: x\n\nbody line\n\nReviewed-on: https://r\nFixes golang/go#1") != "fix: x\n\nbody line\n\nFixes golang/go#1" {
 		t.Fatal("trailers")
 	}
+}
+
+// testRepo is an empty git repository with commands to commit into it.
+func testRepo(t *testing.T) (dir string, git func(args ...string), write func(p, s string)) {
+	t.Helper()
+	dir = t.TempDir()
+	git = func(args ...string) {
+		t.Helper()
+		c := exec.Command("git", append([]string{"-c", "user.email=t@t", "-c", "user.name=t", "-c", "commit.gpgsign=false"}, args...)...)
+		c.Dir = dir
+		if out, err := c.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v %s", args, err, out)
+		}
+	}
+	write = func(p, s string) {
+		t.Helper()
+		_ = os.MkdirAll(filepath.Dir(filepath.Join(dir, p)), 0o755)
+		if err := os.WriteFile(filepath.Join(dir, p), []byte(s), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	git("init", "-q")
+	return dir, git, write
 }
