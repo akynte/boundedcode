@@ -1,0 +1,103 @@
+{
+  "id": "direct-20261026T173908Z",
+  "model": "qwen3.6-35b-a3b",
+  "started": "2026-10-26T17:39:08.230484518Z",
+  "finished": "2026-10-26T17:40:24.05547245Z",
+  "results": [
+    {
+      "id": "session-ledger",
+      "category": "session",
+      "model": "qwen3.6-35b-a3b",
+      "success": true,
+      "mode": "chat",
+      "routed": "a request to run or check something",
+      "switched": "code",
+      "turns": 4,
+      "turn_modes": [
+        "chat",
+        "code",
+        "code",
+        "chat"
+      ],
+      "turn_answers": [
+        "…s also false for positive amounts, so the whole condition is false — wait, let me re-trace).\n\nActually, let me trace more carefully for account \"a\" with the posted entries:\n- Entry 1: `AccountID=\"a\"`, `AmountCents=100` → `e.AccountID != \"a\"` is `false`, `e.AmountCents \u003c 0` is `false` → `false || false` = `false` → **skipped** (not added)\n- Entry 2: `AccountID=\"b\"`, `AmountCents=-100` → `e.AccountID != \"a\"` is `true` → condition is `true` → **added** (`b += -100`)\n\nSo the balance for \"a\" ends up as `-100` instead of `100`. The bug is that the condition is inverted — it should only sum entries **for** the requested account, not skip them.\n\n---\n\n### Test 2: `TestHandlePaymentCharged` (consumer_test.go:17)\n\n**Failure:** `balance = -500`\n\n**Root cause:** The **same bug** in `Balance`. The test posts a valid balanced pair (credit 500 to account \"a1\", debit -500 to settlement), but `Balance(\"a1\")` returns `-500` instead of `500` because of the inverted condition in `ledger.go:49`.\n\n---\n\n### Summary\n\n| Test | Expected | Got | Cause |\n|------|----------|-----|-------|\n| `TestBalance` | `balance(a) = 100` | `-100` | `Balance()` skips positive entries for the target account and includes negative entries from other accounts |\n| `TestHandlePaymentCharged` | `balance(\"a1\") = 500` | `-500` | Same `Balance()` bug |\n\nThe single fix is in `internal/ledger/ledger.go` line 49: change the condition from `e.AccountID != accountID || e.AmountCents \u003c 0` to `e.AccountID == accountID`.",
+        "Both tests pass now. The fix was in `internal/ledger/ledger.go` line 49: the `Balance` method had the wrong condition (`e.AccountID != accountID || e.AmountCents \u003c 0`) which caused it to skip positive entries for the target account and include negative entries from other accounts. Changed it to `e.AccountID == accountID` so it correctly sums all entries for the requested account.",
+        "All tests pass, including the new `TestBalanceMultiplePostings` test in `internal/ledger/balance_test.go`.",
+        "The original condition on line 49 of `ledger.go` was:\n\n```go\nif e.AccountID != accountID || e.AmountCents \u003c 0 {\n    b += e.AmountCents\n}\n```\n\nThis is a single logical expression, but it contains **two separate mistakes** that compound each other:\n\n1. **Wrong account filter** — it uses `!=` instead of `==`. The intent is to sum only entries *for* the target account. Using `!=` means it includes entries for *other* accounts and excludes entries for the target account.\n\n2. **Wrong amount filter** — the `|| e.AmountCents \u003c 0` clause further restricts the sum to only negative (debit) amounts. Even if the account filter were correct, this would still skip all positive (credit) entries.\n\nTogether, the condition means: *\"add this entry if it belongs to a different account **or** if it's a debit.\"* In practice this causes two incorrect behaviors:\n\n- **Positive entries for the target account are skipped** (the account matches, so the first part is false; the amount is positive, so the second part is false; `false || false = false`).\n- **Negative entries for other accounts are included** (the account doesn't match, so the first part is true; `true || anything = true`).\n\nThe correct logic is simply:\n\n```go\nif e.AccountID == accountID {\n    b += e.AmountCents\n}\n```\n\nSum every entry for the requested account, regardless of whether it's a credit or debit — the balance is the net sum of all amounts."
+      ],
+      "model_calls": 10,
+      "tool_calls": 9,
+      "tools": {
+        "bash": 3,
+        "edit": 1,
+        "read": 4,
+        "write": 1
+      },
+      "prompt_tokens": 61826,
+      "cached_prompt_tokens": 56818,
+      "generated_tokens": 2087,
+      "peak_prompt_tokens": 7766,
+      "tool_result_bytes": 5546,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 0,
+      "wall_seconds": 75.816342974,
+      "files_changed": [
+        "internal/ledger/ledger.go",
+        "internal/ledger/balance_test.go"
+      ],
+      "answer": "The original condition on line 49 of `ledger.go` was:\n\n```go\nif e.AccountID != accountID || e.AmountCents \u003c 0 {\n    b += e.AmountCents\n}\n```\n\nThis is a single logical expression, but it contains **two separate mistakes** that compound each other:\n\n1. **Wrong account filter** — it uses `!=` instead of `==`. The intent is to sum only entries *for* the target account. Using `!=` means it includes entries for *other* accounts and excludes entries for the target account.\n\n2. **Wrong amount filter** — the `|| e.AmountCents \u003c 0` clause further restricts the sum to only negative (debit) amounts. Even if the account filter were correct, this would still skip all positive (credit) entries.\n\nTogether, the condition means: *\"add this entry if it belongs to a different account **or** if it's a debit.\"* In practice this causes two incorrect behaviors:\n\n- **Positive entries for the target account are skipped** (the account matches, so the first part is false; the amount is positive, so the second part is false; `false || false = false`).\n- **Negative entries for other accounts are included** (the account doesn't match, so the first part is true; `true || anything = true`).\n\nThe correct logic is simply:\n\n```go\nif e.AccountID == accountID {\n    b += e.AmountCents\n}\n```\n\nSum every entry for the requested account, regardless of whether it's a credit or debit — the balance is the net sum of all amounts.",
+      "agent_patch": "diff --git a/internal/ledger/ledger.go b/internal/ledger/ledger.go\nindex bfbbbd2..690c3c5 100644\n--- a/internal/ledger/ledger.go\n+++ b/internal/ledger/ledger.go\n@@ -46,7 +46,7 @@ func (l *Ledger) Balance(accountID string) int64 {\n \tdefer l.mu.Unlock()\n \tvar b int64\n \tfor _, e := range l.entries {\n-\t\tif e.AccountID != accountID || e.AmountCents \u003c 0 {\n+\t\tif e.AccountID == accountID {\n \t\t\tb += e.AmountCents\n \t\t}\n \t}\ndiff --git a/internal/ledger/balance_test.go b/internal/ledger/balance_test.go\nnew file mode 100644\nindex 0000000..fd3d5e8\n--- /dev/null\n+++ b/internal/ledger/balance_test.go\n@@ -0,0 +1,27 @@\n+package ledger\n+\n+import \"testing\"\n+\n+func TestBalanceMultiplePostings(t *testing.T) {\n+\tl := \u0026Ledger{}\n+\n+\t// Post 1: credit 300 to account \"a\", debit 300 from account \"x\"\n+\tif err := l.Post(\n+\t\tEntry{AccountID: \"a\", AmountCents: 300, Currency: \"EUR\"},\n+\t\tEntry{AccountID: \"x\", AmountCents: -300, Currency: \"EUR\"},\n+\t); err != nil {\n+\t\tt.Fatal(err)\n+\t}\n+\n+\t// Post 2: debit 100 from account \"a\", credit 100 to account \"y\"\n+\tif err := l.Post(\n+\t\tEntry{AccountID: \"a\", AmountCents: -100, Currency: \"EUR\"},\n+\t\tEntry{AccountID: \"y\", AmountCents: 100, Currency: \"EUR\"},\n+\t); err != nil {\n+\t\tt.Fatal(err)\n+\t}\n+\n+\tif got := l.Balance(\"a\"); got != 200 {\n+\t\tt.Fatalf(\"balance(a) = %d, want 200\", got)\n+\t}\n+}\n",
+      "session_id": "20261026-173908-1f3e"
+    }
+  ],
+  "summary": {
+    "tasks": 1,
+    "passed": 1,
+    "pass_rate": 1,
+    "model_calls_per_task": 10,
+    "tool_calls_per_task": 9,
+    "prompt_tokens_per_task": 61826,
+    "prompt_cache_hit_rate": 0.9189984796040501,
+    "generated_tokens_per_task": 2087,
+    "tool_result_bytes_per_task": 5546,
+    "wall_seconds_per_task": 75.816342974,
+    "peak_prompt_tokens": 7766,
+    "elided": 0,
+    "recalls": 0,
+    "compactions": 0,
+    "checks_caught": 0,
+    "errors": 0
+  },
+  "settings": {
+    "approval": "auto",
+    "checks": true,
+    "context_tokens": 131072,
+    "max_tool_output": 0,
+    "provider": "local",
+    "seed_pack": true,
+    "working_set_tokens": 0
+  },
+  "by_category": [
+    {
+      "category": "session",
+      "tasks": 1,
+      "passed": 1,
+      "pass_rate": 1,
+      "model_calls_per_task": 10,
+      "tool_calls_per_task": 9,
+      "prompt_tokens_per_task": 61826,
+      "prompt_cache_hit_rate": 0.9189984796040501,
+      "generated_tokens_per_task": 2087,
+      "tool_result_bytes_per_task": 5546,
+      "wall_seconds_per_task": 75.816342974,
+      "peak_prompt_tokens": 7766,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 0,
+      "errors": 0
+    }
+  ]
+}

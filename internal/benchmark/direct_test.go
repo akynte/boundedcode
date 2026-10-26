@@ -143,6 +143,86 @@ func TestDirectSuiteScoresAnswersAndChanges(t *testing.T) {
 	}
 }
 
+// A session task sends its follow-up turns in the same session, routes
+// each one, checks each turn's answer and runs the checks after the last.
+func TestDirectSuiteRunsSessionTurns(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git")
+	}
+	fixtures := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(fixtures, "f", "app"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(fixtures, "f", "app", "note.txt"), []byte("settlement\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var sessions []*direct.Session
+	dr := &DirectRunner{FixturesDir: fixtures, WorkRoot: t.TempDir(),
+		NewRunner: func(_ context.Context, root, stateDir string) (*direct.Runner, func(), error) {
+			sess, err := direct.NewSession(filepath.Join(stateDir, "sessions"), root, "local", "fake")
+			if err != nil {
+				return nil, nil, err
+			}
+			sessions = append(sessions, sess)
+			r := &direct.Runner{Gateway: &inference.Gateway{Upstream: fakeModel{}, Model: "fake"}, Session: sess,
+				Opts: direct.Options{Root: root, Approval: direct.ApprovalAuto, Env: map[string]string{"platform": "test"}}}
+			return r, func() { r.Close() }, nil
+		}}
+	session := TaskSpec{ID: "session", Category: "session", Fixture: "f", Repos: []string{"app"}, Request: "What account gets the debit?",
+		Turns: []Turn{
+			{Request: "Create hello.txt with hi in it", Expect: []string{"created"}},
+			{Request: "Which account was it again?", Expect: []string{"settlement"}},
+		},
+		Checks: []Check{{Repo: "app", Run: []string{"sh", "-c", "grep -q hi hello.txt"}}}}
+	failing := session
+	failing.ID = "failing"
+	failing.Turns = []Turn{{Request: "Which account was it again?", Expect: []string{"\\bpayments\\b"}}}
+	failing.Checks = nil
+	failing.Expect = []string{"settlement"} // the first answer's
+	rep, err := dr.Run(context.Background(), "fake", []TaskSpec{session, failing}, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ok, bad := rep.Results[0], rep.Results[1]
+	if !ok.Success || ok.Turns != 3 || strings.Join(ok.TurnModes, ",") != "chat,code,chat" || ok.Calls != 4 || ok.Tools["write"] != 1 || len(ok.TurnAnswers) != 3 || ok.PeakPrompt != 120 {
+		t.Fatalf("session: %+v", ok)
+	}
+	if !strings.Contains(ok.Answer, "settlement") {
+		t.Fatalf("the answer is the last turn's: %q", ok.Answer)
+	}
+	// All turns ran in one session.
+	if len(sessions) != 2 {
+		t.Fatalf("%d sessions", len(sessions))
+	}
+	users := 0
+	for _, m := range sessions[0].Messages {
+		if m.Role == "user" {
+			users++
+		}
+	}
+	if users != 3 {
+		t.Fatalf("%d user messages in the session", users)
+	}
+	if bad.Success || len(bad.FailedChecks) != 1 || !strings.HasPrefix(bad.FailedChecks[0], "turn 2: answer does not match") {
+		t.Fatalf("failing: %+v", bad)
+	}
+	var md bytes.Buffer
+	if err := WriteDirectMarkdown(&md, rep); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(md.String(), "| session | session | chat, code, chat | pass |") {
+		t.Fatalf("markdown:\n%s", md.String())
+	}
+	// A turn without a request is refused.
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "t.yaml"), []byte("id: t\nfixture: f\nrepos: [app]\nrequest: hi\nexpect: [x]\nturns:\n  - expect: [y]\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := LoadTasks(dir); err == nil || !strings.Contains(err.Error(), "turn 2 has no request") {
+		t.Fatalf("empty turn: %v", err)
+	}
+}
+
 // The shipped suite loads and every task fits the direct runner.
 func TestDirectSuiteDefinitions(t *testing.T) {
 	tasks, err := LoadTasks(filepath.Join("..", "..", "benchmarks", "direct"))
@@ -162,7 +242,7 @@ func TestDirectSuiteDefinitions(t *testing.T) {
 		}
 		cats[task.Category]++
 	}
-	for _, c := range []string{"explain", "locate", "diagnose", "small-fix", "add-test", "refactor", "feature", "large-locate", "large-change"} {
+	for _, c := range []string{"explain", "locate", "diagnose", "small-fix", "add-test", "refactor", "feature", "large-locate", "large-change", "session"} {
 		if cats[c] == 0 {
 			t.Errorf("no %s task", c)
 		}

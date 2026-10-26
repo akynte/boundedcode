@@ -265,6 +265,7 @@ func newBenchDirectCmd(app *App) *cobra.Command {
 		approval                 string
 		only, compare            []string
 		timeout                  time.Duration
+		workingSet               int
 	)
 	cmd := &cobra.Command{
 		Use:   "direct",
@@ -332,6 +333,12 @@ aside and recalled, summaries, broken edits caught by the check, and time.`,
 				out = filepath.Join("benchmarks", "reports", fmt.Sprintf("%s-direct-%s.json", stamp, ep.model))
 			}
 			dc := app.Config.Direct
+			if workingSet < 0 {
+				return fmt.Errorf("--working-set must be positive")
+			}
+			if workingSet > 0 {
+				dc.WorkingSetTokens = workingSet
+			}
 			dr := &benchmark.DirectRunner{FixturesDir: fixtures, WorkRoot: work, Rules: app.riskRules(), Timeout: timeout,
 				Settings: map[string]any{"approval": approval, "working_set_tokens": dc.WorkingSetTokens, "max_tool_output": dc.MaxToolOutput, "checks": dc.ChecksOn(), "seed_pack": dc.SeedPackOn(), "context_tokens": ep.ctxSize, "provider": ep.provider},
 				Progress: func(s string) { fmt.Fprintf(app.Err, "%s %s\n", time.Now().Format("15:04:05"), s) },
@@ -348,6 +355,9 @@ aside and recalled, summaries, broken edits caught by the check, and time.`,
 					opts.SkillDirs = opts.SkillDirs[:len(opts.SkillDirs)-1]
 					opts.AgentDirs = opts.AgentDirs[:len(opts.AgentDirs)-1]
 					opts.CheckpointDir = filepath.Join(stateDir, "checkpoints")
+					if workingSet > 0 {
+						opts.WorkingSetTokens = workingSet
+					}
 					r := &direct.Runner{Gateway: ep.newGateway(sess.ID), Session: sess, Opts: opts}
 					return r, func() { r.Close() }, nil
 				}}
@@ -374,6 +384,7 @@ aside and recalled, summaries, broken edits caught by the check, and time.`,
 	f.StringVar(&approval, "approval", direct.ApprovalAuto, "approval mode for the agent: ask|edits|auto")
 	f.DurationVar(&timeout, "timeout", 20*time.Minute, "time limit per task when the task sets none")
 	f.StringSliceVar(&compare, "compare", nil, "compare two saved reports (OLD.json,NEW.json) instead of running")
+	f.IntVar(&workingSet, "working-set", 0, "history budget in tokens for this run (0 = direct.working_set_tokens)")
 	return cmd
 }
 

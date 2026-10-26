@@ -1,0 +1,159 @@
+{
+  "id": "direct-20261026T173037Z",
+  "model": "qwen3.6-35b-a3b",
+  "started": "2026-10-26T17:30:37.536459925Z",
+  "finished": "2026-10-26T17:34:26.10354915Z",
+  "results": [
+    {
+      "id": "session-ledger",
+      "category": "session",
+      "model": "qwen3.6-35b-a3b",
+      "success": false,
+      "mode": "chat",
+      "routed": "a request to run or check something",
+      "switched": "code",
+      "turns": 4,
+      "turn_modes": [
+        "chat",
+        "code",
+        "code",
+        "chat"
+      ],
+      "turn_answers": [
+        "… The `Balance` method in `internal/ledger/ledger.go` line 49 has the `||` condition **backwards**:\n\n```go\nif e.AccountID != accountID || e.Currency == \"\" {\n    b += e.AmountCents\n}\n```\n\nIt should be `\u0026\u0026`, not `||`. The current logic says \"add this entry's amount if the account doesn't match **OR** the currency is empty.\" Since `e.Currency == \"\"` is false for both entries, the `||` short-circuits to the left side — but `e.AccountID != accountID` is **true** for the *other* entry (account \"b\"), so it adds `-100` to account \"a\"'s balance instead of skipping it.\n\nThe correct logic is: **only** include entries that match the account **and** have a non-empty currency:\n\n```go\nif e.AccountID == accountID \u0026\u0026 e.Currency != \"\" {\n    b += e.AmountCents\n}\n```\n\n---\n\n### 2. `TestHandlePaymentCharged` in `internal/consumer/consumer_test.go`\n\n**Failure:** `balance = -500` (should be `500`)\n\n**Root cause:** This is a **cascading failure** from the same bug in `Balance()`. The `HandlePaymentCharged` method correctly posts two balanced entries (credit `+500` to account \"a1\", debit `-500` to \"settlement\"). But because `Balance(\"a1\")` is broken (as described above), it returns `-500` instead of `500` — it's including the settlement entry's `-500` instead of the \"a1\" entry's `+500`.\n\n---\n\n**Summary:** One bug in `ledger.go` line 49 — the condition `e.AccountID != accountID || e.Currency == \"\"` should be `e.AccountID == accountID \u0026\u0026 e.Currency != \"\"`. This single bug causes both test failures.",
+        "Both tests pass now. The fix was a single-line change in `internal/ledger/ledger.go` line 49 — the `Balance` method's filter condition was inverted (`!=` / `||` / `== \"\"`) and is now correct (`==` / `\u0026\u0026` / `!= \"\"`).",
+        "All tests pass, including the new `TestBalanceMultiplePostings` test in `internal/ledger/balance_test.go`.",
+        "The original condition on line 49 of `internal/ledger/ledger.go` was:\n\n```go\nif e.AccountID != accountID || e.Currency == \"\" {\n```\n\nThe fixed version is:\n\n```go\nif e.AccountID == accountID \u0026\u0026 e.Currency != \"\" {\n```\n\nThat condition contained **two** separate mistakes:\n\n1. **Wrong comparison operator** — `!=` instead of `==`. The intent is to *include* entries for the requested account, so it should check `e.AccountID == accountID`, not `!=`.\n\n2. **Wrong logical operator and polarity** — `||` with `== \"\"` instead of `\u0026\u0026` with `!= \"\"`. The intent is to *skip* entries with no currency, so the guard should be `e.Currency != \"\"` joined with `\u0026\u0026`. The original said \"include this entry if the account doesn't match **OR** the currency is empty,\" which is the exact opposite of the intended filter.\n\nBy De Morgan's law, `!(A \u0026\u0026 B)` ≡ `!A || !B`, so the original code was effectively computing `!(e.AccountID == accountID \u0026\u0026 e.Currency != \"\")` — it was negating the entire correct predicate, which meant it **included the wrong entries and excluded the right ones**."
+      ],
+      "model_calls": 10,
+      "tool_calls": 9,
+      "tools": {
+        "bash": 3,
+        "edit": 1,
+        "read": 4,
+        "write": 1
+      },
+      "prompt_tokens": 60437,
+      "cached_prompt_tokens": 55645,
+      "generated_tokens": 1995,
+      "peak_prompt_tokens": 7550,
+      "tool_result_bytes": 5545,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 0,
+      "wall_seconds": 73.086018856,
+      "files_changed": [
+        "internal/ledger/ledger.go",
+        "internal/ledger/balance_test.go"
+      ],
+      "answer": "The original condition on line 49 of `internal/ledger/ledger.go` was:\n\n```go\nif e.AccountID != accountID || e.Currency == \"\" {\n```\n\nThe fixed version is:\n\n```go\nif e.AccountID == accountID \u0026\u0026 e.Currency != \"\" {\n```\n\nThat condition contained **two** separate mistakes:\n\n1. **Wrong comparison operator** — `!=` instead of `==`. The intent is to *include* entries for the requested account, so it should check `e.AccountID == accountID`, not `!=`.\n\n2. **Wrong logical operator and polarity** — `||` with `== \"\"` instead of `\u0026\u0026` with `!= \"\"`. The intent is to *skip* entries with no currency, so the guard should be `e.Currency != \"\"` joined with `\u0026\u0026`. The original said \"include this entry if the account doesn't match **OR** the currency is empty,\" which is the exact opposite of the intended filter.\n\nBy De Morgan's law, `!(A \u0026\u0026 B)` ≡ `!A || !B`, so the original code was effectively computing `!(e.AccountID == accountID \u0026\u0026 e.Currency != \"\")` — it was negating the entire correct predicate, which meant it **included the wrong entries and excluded the right ones**.",
+      "failed_checks": [
+        "go test ./...: ok  \texample.com/ledger-service/internal/consumer\t(cached)\n--- FAIL: TestHiddenBalanceIgnoresOtherAccounts (0.00s)\n    hidden_session_test.go:14: x=7 y=0 z=-7 w=0\nFAIL\nFAIL\texample.com/ledger-service/internal/ledger\t0.002s\nFAIL\n",
+        "turn 4: answer does not match /Balance/"
+      ],
+      "agent_patch": "diff --git a/internal/ledger/ledger.go b/internal/ledger/ledger.go\nindex 5f31c1d..f03bb84 100644\n--- a/internal/ledger/ledger.go\n+++ b/internal/ledger/ledger.go\n@@ -46,7 +46,7 @@ func (l *Ledger) Balance(accountID string) int64 {\n \tdefer l.mu.Unlock()\n \tvar b int64\n \tfor _, e := range l.entries {\n-\t\tif e.AccountID != accountID || e.Currency == \"\" {\n+\t\tif e.AccountID == accountID \u0026\u0026 e.Currency != \"\" {\n \t\t\tb += e.AmountCents\n \t\t}\n \t}\ndiff --git a/internal/ledger/balance_test.go b/internal/ledger/balance_test.go\nnew file mode 100644\nindex 0000000..07bd6de\n--- /dev/null\n+++ b/internal/ledger/balance_test.go\n@@ -0,0 +1,27 @@\n+package ledger\n+\n+import \"testing\"\n+\n+func TestBalanceMultiplePostings(t *testing.T) {\n+\tl := \u0026Ledger{}\n+\n+\t// Credit 300 to account \"a\", debited from \"other\"\n+\tif err := l.Post(\n+\t\tEntry{AccountID: \"a\", AmountCents: 300, Currency: \"EUR\"},\n+\t\tEntry{AccountID: \"other\", AmountCents: -300, Currency: \"EUR\"},\n+\t); err != nil {\n+\t\tt.Fatal(err)\n+\t}\n+\n+\t// Debit 100 from account \"a\", credited to \"other\"\n+\tif err := l.Post(\n+\t\tEntry{AccountID: \"a\", AmountCents: -100, Currency: \"EUR\"},\n+\t\tEntry{AccountID: \"other\", AmountCents: 100, Currency: \"EUR\"},\n+\t); err != nil {\n+\t\tt.Fatal(err)\n+\t}\n+\n+\tif got := l.Balance(\"a\"); got != 200 {\n+\t\tt.Fatalf(\"balance(a) = %d, want 200\", got)\n+\t}\n+}\n",
+      "session_id": "20261026-173037-9e34"
+    },
+    {
+      "id": "session-x-tools",
+      "category": "session",
+      "model": "qwen3.6-35b-a3b",
+      "success": true,
+      "mode": "chat",
+      "routed": "a question about how to change something",
+      "switched": "code",
+      "turns": 6,
+      "turn_modes": [
+        "chat",
+        "chat",
+        "chat",
+        "chat",
+        "code",
+        "chat"
+      ],
+      "turn_answers": [
+        "Here are the answers:\n\n**How repeated traversals are fast:** During `New`, the inspector does a single complete traversal of the AST and records every push/pop event into a flat list. Subsequent traversals (Preorder, Nodes, WithStack) scan this pre-built list instead of walking the AST recursively. Type filtering is done with efficient bit-set masks (`uint64`), and subtrees that don't contain any of the requested types are skipped entirely by jumping to the corresponding pop event. This avoids the overhead of recursive function calls and pointer chasing on every traversal.\n\n**Data structure built during `New`:** A flat `[]event` slice — a sequence of push and pop events encoding the full traversal as a \"balanced parenthesis tree.\" Each `event` records the node, its type bits, the index of its matching push/pop event, and parent/edge information.\n\n**File that defines it:** `go/ast/inspector/inspector.go` (the `event` struct at line 79 and the `Inspector` struct containing `events []event` at line 56).",
+        "The Cursor type lets you navigate the AST in all four \"cardinal directions\" (parent, previous sibling, next sibling, children) and materialize the traversal stack — capabilities the Inspector's flat `Preorder`/`Nodes`/`WithStack` methods don't provide.\n\nSpecifically, the Inspector's methods only do sequential depth-first traversal with optional type filtering. Cursor gives you random-access navigation:\n\n1. **`Parent()`** — move to the parent node (no equivalent in Inspector's methods)\n2. **`NextSibling()` / `PrevSibling()`** — move to adjacent siblings\n3. **`FirstChild()` / `LastChild()`** — jump to a node's children\n4. **`Enclosing()`** — collect the full traversal stack from root to current node\n5. **`Contains(c2)`** — check if one cursor's node contains another's\n6. **`FindByPos(start, end)`** — find the node at a given token position\n\nThese are documented in the package comment:\n\n\u003e The Cursor type provides a more flexible API for efficient navigation of syntax trees in all four \"cardinal directions\". For example, traversals may be nested, so you can find each node of type A and then search within it for nodes of type B. Or you can traverse from a node to its immediate neighbors: its parent, its previous and next sibling, or its first and last child.",
+        "**What Apply can do that ast.Inspect cannot:** `Apply` lets you **mutate** the AST during traversal. The `Cursor` it passes to the callback provides four mutation methods:\n\n- **`Replace(n)`** — replace the current node with a different node\n- **`Delete()`** — remove the current node from its containing slice\n- **`InsertAfter(n)`** — insert a new node after the current one in its slice\n- **`InsertBefore(n)`** — insert a new node before the current one in its slice\n\n`ast.Inspect` only lets you visit nodes; it provides no way to modify the tree.\n\nAdditionally, `Apply`'s `Cursor` exposes `Parent()`, `Name()` (the parent field name), and `Index()` (the node's position in its parent's slice), giving context that `ast.Inspect` does not provide.\n\n**File that defines it:** `go/ast/astutil/rewrite.go` (line 42).",
+        "**How Parse recognises a new file:** It looks for a *file marker line* — a line beginning with `-- ` and ending with ` --`, with the filename between them (e.g. `-- foo/bar.txt --`).\n\nThe `Parse` function delegates to `findFileMarker`, which scans forward looking for a line starting with `-- ` (using `bytes.Index` with the `newlineMarker` prefix `\\n-- `), then calls `isMarker` to verify the full pattern.\n\n**Function that checks a single line:** `isMarker` (line 117 of `txtar/archive.go`). It checks that the data has the `-- ` prefix, finds the end of the line (the `\\n`), verifies it ends with ` --`, and returns the trimmed filename.\n\nThe relevant constants are:\n- `marker = []byte(\"-- \")`\n- `markerEnd = []byte(\" --\")`",
+        "Done. I added:\n\n1. **`Len()` method** in `go/ast/inspector/inspector.go` — counts push events in the `events` slice (each push corresponds to one AST node), matching the count `ast.Inspect` visits.\n\n2. **`TestLen`** in `go/ast/inspector/inspector_test.go` — parses a small file, counts nodes via `ast.Inspect`, and asserts `inspect.Len()` matches.\n\nAll tests pass.",
+        "- **`astutil.Apply`** is defined in `go/ast/astutil/rewrite.go` (line 42).\n- **`txtar`'s single-line checker** is `isMarker` (line 117 of `txtar/archive.go`)."
+      ],
+      "model_calls": 19,
+      "tool_calls": 15,
+      "tools": {
+        "bash": 2,
+        "edit": 2,
+        "glob": 1,
+        "grep": 2,
+        "read": 8
+      },
+      "prompt_tokens": 294666,
+      "cached_prompt_tokens": 272467,
+      "generated_tokens": 3671,
+      "peak_prompt_tokens": 24721,
+      "tool_result_bytes": 46766,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 0,
+      "wall_seconds": 155.454984688,
+      "files_changed": [
+        "go/ast/inspector/inspector.go",
+        "go/ast/inspector/inspector_test.go"
+      ],
+      "answer": "- **`astutil.Apply`** is defined in `go/ast/astutil/rewrite.go` (line 42).\n- **`txtar`'s single-line checker** is `isMarker` (line 117 of `txtar/archive.go`).",
+      "agent_patch": "diff --git a/go/ast/inspector/inspector.go b/go/ast/inspector/inspector.go\nindex b414d17..c9ffcea 100644\n--- a/go/ast/inspector/inspector.go\n+++ b/go/ast/inspector/inspector.go\n@@ -226,6 +226,19 @@ func (in *Inspector) WithStack(types []ast.Node, f func(n ast.Node, push bool, s\n \t}\n }\n \n+// Len returns the number of AST nodes in the files supplied to [New],\n+// the same count that ast.Inspect visits over those files.\n+func (in *Inspector) Len() int {\n+\tvar n int\n+\tfor i := int32(0); i \u003c int32(len(in.events)); i++ {\n+\t\tif in.events[i].index \u003e i {\n+\t\t\t// push\n+\t\t\tn++\n+\t\t}\n+\t}\n+\treturn n\n+}\n+\n // traverse builds the table of events representing a traversal.\n func traverse(files []*ast.File) []event {\n \t// Preallocate approximate number of events\ndiff --git a/go/ast/inspector/inspector_test.go b/go/ast/inspector/inspector_test.go\nindex 316e7c2..ea7029f 100644\n--- a/go/ast/inspector/inspector_test.go\n+++ b/go/ast/inspector/inspector_test.go\n@@ -178,6 +178,32 @@ func compare[N comparable](t *testing.T, nodesA, nodesB []N) {\n \t}\n }\n \n+func TestLen(t *testing.T) {\n+\tconst src = `package a\n+func f() {\n+\tprint(\"hi\")\n+\tpanic(\"oops\")\n+}\n+`\n+\tfset := token.NewFileSet()\n+\tf, _ := parser.ParseFile(fset, \"a.go\", src, 0)\n+\tinspect := inspector.New([]*ast.File{f})\n+\n+\t// Count nodes via ast.Inspect\n+\tvar want int\n+\tast.Inspect(f, func(n ast.Node) bool {\n+\t\tif n != nil {\n+\t\t\twant++\n+\t\t}\n+\t\treturn true\n+\t})\n+\n+\tgot := inspect.Len()\n+\tif got != want {\n+\t\tt.Errorf(\"Len() = %d, want %d\", got, want)\n+\t}\n+}\n+\n func TestTypeFiltering(t *testing.T) {\n \tconst src = `package a\n func f() {\n",
+      "session_id": "20261026-173150-c96f"
+    }
+  ],
+  "summary": {
+    "tasks": 2,
+    "passed": 1,
+    "pass_rate": 0.5,
+    "model_calls_per_task": 14.5,
+    "tool_calls_per_task": 12,
+    "prompt_tokens_per_task": 177551.5,
+    "prompt_cache_hit_rate": 0.9239910673804502,
+    "generated_tokens_per_task": 2833,
+    "tool_result_bytes_per_task": 26155.5,
+    "wall_seconds_per_task": 114.27050177199999,
+    "peak_prompt_tokens": 24721,
+    "elided": 0,
+    "recalls": 0,
+    "compactions": 0,
+    "checks_caught": 0,
+    "errors": 0
+  },
+  "settings": {
+    "approval": "auto",
+    "checks": true,
+    "context_tokens": 131072,
+    "max_tool_output": 0,
+    "provider": "local",
+    "seed_pack": true,
+    "working_set_tokens": 0
+  },
+  "by_category": [
+    {
+      "category": "session",
+      "tasks": 2,
+      "passed": 1,
+      "pass_rate": 0.5,
+      "model_calls_per_task": 14.5,
+      "tool_calls_per_task": 12,
+      "prompt_tokens_per_task": 177551.5,
+      "prompt_cache_hit_rate": 0.9239910673804502,
+      "generated_tokens_per_task": 2833,
+      "tool_result_bytes_per_task": 26155.5,
+      "wall_seconds_per_task": 114.27050177199999,
+      "peak_prompt_tokens": 24721,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 0,
+      "errors": 0
+    }
+  ]
+}

@@ -51,11 +51,65 @@ two runs side by side.
 - **The post-change check caught one broken edit** (a syntax error in the
   refactor task) in two runs, before any test run.
 - **Nothing was set aside or summarised**: every task stayed under the
-  32K working set. The eviction and recall path is exercised by unit
-  tests only until a longer session is measured.
+  32K working set. Sessions below exercise setting results aside.
+
+## Sessions (second series, same day)
+
+Two `session` tasks were added: several messages in one conversation, each
+routed on its own and with its own expected answer, checks after the last.
+`session-ledger` (payment fixture: diagnose, fix, add a test, explain the
+mistakes) and `session-x-tools` (`golang.org/x/tools`: four questions in
+three packages, then a change that depends on the first answer, then a
+question about earlier answers). Reports:
+`benchmarks/reports/20261026T17*-direct-*-session*`.
+
+| Run | Build | Result | Model calls | Tool calls | Prompt tokens | Cache hits | Largest prompt | Set aside | s |
+|---|---|---|---|---|---|---|---|---|---|
+| session-x-tools, 32K working set | router fix | pass | 19 | 15 | 295K | 92% | 24.7K | 0 | 155 |
+| session-x-tools, 16K working set | router fix | pass | 19 | 15 | 220K | 89% | 16.4K | 5 | 159 |
+| session-x-tools, 32K, full-suite run | router fix | pass | 21 | 16 | 277K | 93% | 22.3K | 0 | 187 |
+| session-ledger, two runs | revised task | pass, pass | 10, 10 | 9, 9 | 60K, 62K | 92% | 7.6K | 0 | 69, 76 |
+
+- **A long session stays correct when older results are set aside.**
+  With the working set halved to 16K, five older tool results were set
+  aside, the largest prompt fell from 24.7K to 16.4K tokens and the
+  session's prompt tokens from 295K to 220K, in the same time and with the
+  same answers. The model did not call `recall`; where it needed a file
+  again it re-read it. One run per setting: this shows the path works on
+  a real session, not that it is faster.
+- **The change that depends on an earlier answer was right in every run**:
+  `Inspector.Len` counts nodes, not events (an Inspector holds a push and
+  a pop per node, which the first answer established).
+- **Routing.** The first session run showed two router mistakes, both
+  fixed: "Do not change anything yet" was read as a request for a change,
+  and "In go/ast/astutil, what can Apply do …?" as a change (the question
+  came after a scene-setting clause, the first sentence was cut at the dot
+  in `ast.Inspect`, and "Apply" is a change verb). Since the fix every
+  question turn is routed as a question.
+- **Task corrections, stated plainly.** The first runs scored a task's
+  `expect` against the last turn's answer instead of the first's (a
+  harness bug; that report was discarded). The first `session-ledger`
+  planted `AccountID != accountID || Currency == ""`, the exact negation of
+  a defensible currency filter; the model fixed it to
+  `== && Currency != ""` in two runs and argued for that reading. A task
+  must not admit a reasonable alternative, so the second fault became
+  `|| AmountCents < 0` (debits counted for every account), which the
+  visible tests and the test asked for in the third turn both expose
+  (`20261026T173037Z` still shows the old task). In the full-suite run the
+  revised task's code passed the hidden test but its last answer, which
+  named both mistakes correctly, said `ledger.go` rather than `Balance`;
+  the expected answer now accepts either.
+
+The 13 original tasks in the full-suite run (`20261026T174314Z`, router
+fix, streaming refactor): 12/13, 4.5 model calls and 4.6 tool calls per
+task, 23.1K prompt tokens, 88% cache hits, 661 generated tokens, 5.1 KB of
+tool results, 26 s per task; `large-change-txtar` failed as before. Tool
+calls are 0.7 below the previous best, more than the 0.2 noise between
+identical builds; `diagnose-failing-test` is now routed as a question.
 
 ## Not measured yet
 
-Multi-turn sessions (where the working set and recall matter), cloud
-providers, and repositories larger than `golang.org/x/tools`. The suite
-has 13 tasks; a pass-rate difference of one task is within noise.
+Cloud providers (their streaming is tested against recorded event
+sequences only), repositories larger than `golang.org/x/tools`, and
+sessions long enough to need `recall` rather than a re-read. The suite has
+15 tasks; a pass-rate difference of one task is within noise.

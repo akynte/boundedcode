@@ -46,13 +46,24 @@ type TaskSpec struct {
 	// Expect lists regular expressions (case-insensitive) the agent's final
 	// answer must match; for questions in the direct-mode suite, where the
 	// answer is the deliverable. A task needs checks or expect, or both.
-	Expect  []string        `yaml:"expect,omitempty"`
+	Expect []string `yaml:"expect,omitempty"`
+	// Turns are follow-up messages in the same session, after Request
+	// (direct-mode suite only): each is routed as the chat routes it and
+	// its answer must match its own Expect (the task's Expect is the
+	// first message's). Checks run after the last turn.
+	Turns   []Turn          `yaml:"turns,omitempty"`
 	Timeout config.Duration `yaml:"timeout"`
 	// InterruptAfter cancels the run after this long, then resumes the same
 	// task with a freshly built runner (context-continuity evidence).
 	InterruptAfter config.Duration `yaml:"interrupt_after"`
 	// Source records where the task comes from (dataset and instance id).
 	Source string `yaml:"source"`
+}
+
+// Turn is one follow-up message of a direct-mode session task.
+type Turn struct {
+	Request string   `yaml:"request"`
+	Expect  []string `yaml:"expect,omitempty"`
 }
 
 // Edit replaces text in a fixture file (or writes a file when Old is empty).
@@ -97,7 +108,14 @@ func LoadTasks(dir string) ([]TaskSpec, error) {
 		if t.ID == "" || t.Request == "" || (len(t.Checks) == 0 && len(t.Expect) == 0) || (t.Fixture == "" && len(t.Sources) == 0) {
 			return fmt.Errorf("%s: id, fixture (or sources), request and checks (or expect) are required", p)
 		}
-		for _, e := range t.Expect {
+		exps := t.Expect
+		for i, turn := range t.Turns {
+			if strings.TrimSpace(turn.Request) == "" {
+				return fmt.Errorf("%s: turn %d has no request", p, i+2)
+			}
+			exps = append(exps, turn.Expect...)
+		}
+		for _, e := range exps {
 			if _, err := regexp.Compile("(?is)" + e); err != nil {
 				return fmt.Errorf("%s: expect %q: %w", p, e, err)
 			}

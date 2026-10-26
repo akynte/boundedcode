@@ -1,0 +1,86 @@
+id: session-x-tools
+category: session
+# A long session on golang.org/x/tools v0.50.0 (see large-locate-preorder):
+# four questions across three packages, then a change that depends on what
+# the first answer established (an Inspector holds a push and a pop event
+# per node, so the node count is half the events), then a question about
+# earlier answers. Its history outgrows a 32K working set, so older tool
+# results are set aside while the session goes on.
+sources:
+  x-tools: gomod:golang.org/x/tools@v0.50.0
+repos: [x-tools]
+request: >-
+  How does package go/ast/inspector make repeated traversals fast? Name the
+  data structure it builds during New and the file that defines it.
+expect:
+  - "event"
+  - "inspector\\.go"
+turns:
+  - request: >-
+      In the same package, what does the Cursor type let you do that the
+      Inspector's own traversal methods do not? Name at least two Cursor methods.
+    expect:
+      - "Parent|NextSibling|PrevSibling|FirstChild|LastChild|Children|Enclosing|FindNode|Inspect"
+  - request: >-
+      In go/ast/astutil, what can Apply do that ast.Inspect cannot, and which
+      file defines Apply?
+    expect:
+      - "rewrite\\.go"
+      - "replac|delet|insert"
+  - request: >-
+      In package txtar, how does Parse recognise the line that starts a new
+      file, and which function checks a single line?
+    expect:
+      - "isMarker"
+      - "--"
+  - request: >-
+      Back in go/ast/inspector: add a method `func (in *Inspector) Len() int`
+      that returns the number of AST nodes the inspector holds, the same count
+      ast.Inspect visits over the files given to New. Document it like the
+      neighbouring methods, add a test for it in inspector_test.go, and run the
+      package's tests.
+  - request: >-
+      Which file did you say defines astutil.Apply, and what is the name of
+      txtar's function that checks a single line for a file marker?
+    expect:
+      - "rewrite\\.go"
+      - "isMarker"
+hidden:
+  - repo: x-tools
+    path: go/ast/inspector/hidden_len_test.go
+    content: |
+      package inspector
+
+      import (
+      	"go/ast"
+      	"go/parser"
+      	"go/token"
+      	"testing"
+      )
+
+      func TestHiddenLen(t *testing.T) {
+      	fset := token.NewFileSet()
+      	f, err := parser.ParseFile(fset, "x.go", "package p\n\nimport \"fmt\"\n\n// F adds.\nfunc F(a, b int) int {\n\tfor i := range 3 {\n\t\tfmt.Println(i)\n\t}\n\treturn a + b\n}\n", parser.ParseComments)
+      	if err != nil {
+      		t.Fatal(err)
+      	}
+      	want := 0
+      	ast.Inspect(f, func(n ast.Node) bool {
+      		if n != nil {
+      			want++
+      		}
+      		return true
+      	})
+      	if got := New([]*ast.File{f}).Len(); got != want {
+      		t.Fatalf("Len() = %d, want %d", got, want)
+      	}
+      	if got := New(nil).Len(); got != 0 {
+      		t.Fatalf("empty Len() = %d", got)
+      	}
+      }
+checks:
+  - repo: x-tools
+    run: [go, test, ./go/ast/inspector/]
+  - repo: x-tools
+    run: [sh, -c, "grep -l 'Len()' go/ast/inspector/*_test.go | grep -qv hidden_"]
+timeout: 40m

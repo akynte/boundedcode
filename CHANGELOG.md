@@ -27,10 +27,13 @@ used on real work or measured.
   too many matches returns the count per file instead of a cut dump.
 - Streaming (`direct.stream`): the answer shows as it is generated in the
   TUI and in `bcode chat -p`; `--events` carries `text_delta` and
-  `reasoning_delta` events before the whole `text`. llama.cpp, OpenAI and
-  OpenAI-compatible servers stream (server-sent events folded into one
-  answer in the gateway, metered like any call); Anthropic and Gemini
-  answers still arrive whole.
+  `reasoning_delta` events before the whole `text`. Every provider
+  streams: llama.cpp, OpenAI and OpenAI-compatible servers, Anthropic
+  (the Messages stream events folded into the whole response, thinking
+  blocks and their signatures kept for replay) and Gemini
+  (`streamGenerateContent`, text parts joined, thought signatures kept).
+  The stream is folded into one answer in the gateway and metered like
+  any call. The OpenAI reasoning effort now reaches streamed requests too.
 - The system prompt asks for the cause, not the symptom: after a failing
   test, re-read the whole function and correct every part of the mistake.
   Measured on the suite's planted two-fault bug: fixed in 0 of 2 runs
@@ -64,6 +67,18 @@ used on real work or measured.
   tokens, tool-result bytes, results set aside and recalled, summaries,
   broken edits caught by the check, mode switches and wall time, per task
   and per category.
+- Session tasks (`category: session`, `turns`): several messages in one
+  conversation, each routed on its own and checked against its own
+  expected answer, with the checks after the last. Two ship: a short
+  diagnose, fix, test and explain session on the payment fixture, and a
+  six-message session on `golang.org/x/tools` whose history outgrows the
+  working set and whose change depends on the first answer. Reports add
+  the largest single prompt and the recalls; `--working-set N` overrides
+  the history budget for a run.
+- The router no longer reads a ruled-out change ("do not change anything
+  yet", "without editing") as a request for one, finds a question after a
+  scene-setting clause ("In package txtar, how does …"), and no longer
+  ends a sentence at the dot in `ast.Inspect`.
 
 ### Automatic modes: chat, code, verify (ADR-0012)
 

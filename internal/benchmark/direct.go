@@ -56,6 +56,12 @@ type DirectResult struct {
 	Mode     string `json:"mode"`
 	Routed   string `json:"routed"`
 	Switched string `json:"switched,omitempty"`
+	// Turns is the number of messages sent (the request and its
+	// follow-ups); TurnModes and TurnAnswers are per message, kept for
+	// session tasks only.
+	Turns       int      `json:"turns"`
+	TurnModes   []string `json:"turn_modes,omitempty"`
+	TurnAnswers []string `json:"turn_answers,omitempty"`
 	// Calls is the number of model calls; ToolCalls the tool calls, by
 	// name in Tools; Denied the calls refused by policy or approval.
 	Calls     int            `json:"model_calls"`
@@ -66,6 +72,9 @@ type DirectResult struct {
 	PromptTokens    int `json:"prompt_tokens"`
 	CachedTokens    int `json:"cached_prompt_tokens"`
 	GeneratedTokens int `json:"generated_tokens"`
+	// PeakPrompt is the largest prompt of one model call: the most history
+	// the model was given at once.
+	PeakPrompt int `json:"peak_prompt_tokens"`
 	// ResultBytes is what tool results added to the history before
 	// anything was set aside.
 	ResultBytes int `json:"tool_result_bytes"`
@@ -117,6 +126,7 @@ type DirectSummary struct {
 	MeanGenerated   float64 `json:"generated_tokens_per_task"`
 	MeanResultBytes float64 `json:"tool_result_bytes_per_task"`
 	MeanWallSeconds float64 `json:"wall_seconds_per_task"`
+	PeakPrompt      int     `json:"peak_prompt_tokens"` // the largest prompt of one call in the run
 	Elided          int     `json:"elided"`
 	Recalls         int     `json:"recalls"`
 	Compactions     int     `json:"compactions"`
@@ -221,13 +231,6 @@ func (d *DirectRunner) runOne(ctx context.Context, model string, spec TaskSpec) 
 	if r.Session != nil {
 		res.SessionID = r.Session.ID
 	}
-	// Route as the chat would, with bounded mode unavailable.
-	dec := direct.Route(spec.Request, d.Rules, direct.Capabilities{BoundedReason: "benchmark: direct mode only"})
-	res.Mode, res.Routed = dec.Mode, dec.Reason
-	if dec.Fallback != "" {
-		res.Routed += " (" + dec.Fallback + ")"
-	}
-	r.Opts.Mode = dec.Mode
 	r.Opts.AllowRisky = true // the suite measures the everyday loop; hand-offs are counted, not run
 	inner := r.Sink
 	r.Sink = func(e direct.Event) {
@@ -275,12 +278,54 @@ func (d *DirectRunner) runOne(ctx context.Context, model string, spec TaskSpec) 
 	}
 	tctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	answer, sendErr := r.Send(tctx, spec.Request)
+	// The request, then each follow-up turn, in one session; each message
+	// is routed as the chat would route it, with bounded mode unavailable.
+	turns := append([]Turn{{Request: spec.Request, Expect: spec.Expect}}, spec.Turns...)
+	res.Turns = len(turns)
+	var answer string
+	var sendErr error
+	var turnFailures []string
+	for i, t := range turns {
+		dec := direct.Route(t.Request, d.Rules, direct.Capabilities{BoundedReason: "benchmark: direct mode only"})
+		if i == 0 {
+			res.Mode, res.Routed = dec.Mode, dec.Reason
+			if dec.Fallback != "" {
+				res.Routed += " (" + dec.Fallback + ")"
+			}
+		}
+		if len(turns) > 1 {
+			res.TurnModes = append(res.TurnModes, dec.Mode)
+		}
+		r.Opts.Mode = dec.Mode
+		if len(turns) > 1 {
+			d.progress("task %s: turn %d/%d (%s)", spec.ID, i+1, len(turns), dec.Mode)
+		}
+		answer, sendErr = r.Send(tctx, t.Request)
+		if len(turns) > 1 {
+			res.TurnAnswers = append(res.TurnAnswers, tailStr(answer, 1500))
+		}
+		for _, e := range t.Expect {
+			if !regexp.MustCompile("(?is)" + e).MatchString(answer) {
+				label := ""
+				if len(turns) > 1 {
+					label = fmt.Sprintf("turn %d: ", i+1)
+				}
+				turnFailures = append(turnFailures, label+"answer does not match /"+e+"/")
+			}
+		}
+		if sendErr != nil {
+			if i < len(turns)-1 {
+				sendErr = fmt.Errorf("turn %d of %d: %w", i+1, len(turns), sendErr)
+			}
+			break
+		}
+	}
 	res.Answer = tailStr(answer, 4000)
 	p, g, c := r.Gateway.Stats()
 	res.Calls = r.Gateway.Calls()
 	res.GeneratedTokens, res.CachedTokens = g, c
 	res.PromptTokens = p - g + c
+	res.PeakPrompt = r.Gateway.PeakPrompt()
 	var handoff *direct.Handoff
 	switch {
 	case errors.As(sendErr, &handoff):
@@ -333,11 +378,9 @@ func (d *DirectRunner) runOne(ctx context.Context, model string, spec TaskSpec) 
 			res.FailedChecks = append(res.FailedChecks, fmt.Sprintf("%s: %s", strings.Join(c.Run, " "), tailStr(out, 600)))
 		}
 	}
-	for _, e := range spec.Expect {
-		if !regexp.MustCompile("(?is)" + e).MatchString(answer) {
-			res.Success = false
-			res.FailedChecks = append(res.FailedChecks, "answer does not match /"+e+"/")
-		}
+	if len(turnFailures) > 0 {
+		res.Success = false
+		res.FailedChecks = append(res.FailedChecks, turnFailures...)
 	}
 	// Reports are kept in the repository: no machine-specific paths.
 	redact := newRedactor(dir, d.WorkRoot)
@@ -346,6 +389,9 @@ func (d *DirectRunner) runOne(ctx context.Context, model string, spec TaskSpec) 
 	res.AgentPatch = redact(res.AgentPatch)
 	for i := range res.FailedChecks {
 		res.FailedChecks[i] = redact(res.FailedChecks[i])
+	}
+	for i := range res.TurnAnswers {
+		res.TurnAnswers[i] = redact(res.TurnAnswers[i])
 	}
 	return res
 }
@@ -409,6 +455,7 @@ func summarizeDirect(category string, rs []DirectResult) DirectSummary {
 		s.Recalls += r.Recalls
 		s.Compactions += r.Compactions
 		s.ChecksCaught += r.ChecksCaught
+		s.PeakPrompt = max(s.PeakPrompt, r.PeakPrompt)
 	}
 	if s.Tasks == 0 {
 		return s
@@ -443,8 +490,8 @@ func WriteDirectMarkdown(w io.Writer, r *DirectReport) error {
 		}
 		fmt.Fprintf(w, "Settings: %s.\n\n", strings.Join(parts, ", "))
 	}
-	fmt.Fprintf(w, "**%d/%d passed (%.0f%%)**, %.1f model calls and %.1f tool calls per task, %.0f prompt tokens per task with a %.0f%% prompt-cache hit rate, %.0f generated tokens per task, %.0f KB of tool results per task, %.0f s per task; %d results set aside, %d recalled, %d summaries, %d broken edits caught by the check, %d errors.\n\n",
-		s.Passed, s.Tasks, 100*s.PassRate, s.MeanCalls, s.MeanToolCalls, s.MeanPrompt, 100*s.CacheHitRate, s.MeanGenerated, s.MeanResultBytes/1024, s.MeanWallSeconds, s.Elided, s.Recalls, s.Compactions, s.ChecksCaught, s.Errors)
+	fmt.Fprintf(w, "**%d/%d passed (%.0f%%)**, %.1f model calls and %.1f tool calls per task, %.0f prompt tokens per task with a %.0f%% prompt-cache hit rate, %.0f generated tokens per task, %.0f KB of tool results per task, %.0f s per task, %d tokens in the largest single prompt; %d results set aside, %d recalled, %d summaries, %d broken edits caught by the check, %d errors.\n\n",
+		s.Passed, s.Tasks, 100*s.PassRate, s.MeanCalls, s.MeanToolCalls, s.MeanPrompt, 100*s.CacheHitRate, s.MeanGenerated, s.MeanResultBytes/1024, s.MeanWallSeconds, s.PeakPrompt, s.Elided, s.Recalls, s.Compactions, s.ChecksCaught, s.Errors)
 	if len(r.ByClass) > 1 {
 		fmt.Fprintf(w, "| Category | Passed | Calls | Tools | Prompt tok | Cache | Gen tok | s/task |\n|---|---|---|---|---|---|---|---|\n")
 		for _, c := range r.ByClass {
@@ -452,7 +499,7 @@ func WriteDirectMarkdown(w io.Writer, r *DirectReport) error {
 		}
 		fmt.Fprintln(w)
 	}
-	fmt.Fprintf(w, "| Task | Category | Mode | Result | Calls | Tools | Prompt tok | Cached | Gen tok | Set aside | Checks caught | s | Note |\n|---|---|---|---|---|---|---|---|---|---|---|---|---|\n")
+	fmt.Fprintf(w, "| Task | Category | Mode | Result | Calls | Tools | Prompt tok | Cached | Peak prompt | Gen tok | Set aside | Recalls | Checks caught | s | Note |\n|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|\n")
 	for _, t := range r.Results {
 		verdict := "pass"
 		if !t.Success {
@@ -471,10 +518,14 @@ func WriteDirectMarkdown(w io.Writer, r *DirectReport) error {
 		if t.Nudged {
 			note = strings.TrimSpace("nudged. " + note)
 		}
+		mode := t.Mode
+		if len(t.TurnModes) > 0 {
+			mode = strings.Join(t.TurnModes, ", ")
+		}
 		note = strings.ReplaceAll(tailStr(note, 160), "|", "\\|")
 		note = strings.ReplaceAll(note, "\n", " ")
-		fmt.Fprintf(w, "| %s | %s | %s | %s | %d | %d | %d | %d | %d | %d | %d | %.0f | %s |\n",
-			t.ID, t.Category, t.Mode, verdict, t.Calls, t.ToolCalls, t.PromptTokens, t.CachedTokens, t.GeneratedTokens, t.Elided, t.ChecksCaught, t.WallSeconds, note)
+		fmt.Fprintf(w, "| %s | %s | %s | %s | %d | %d | %d | %d | %d | %d | %d | %d | %d | %.0f | %s |\n",
+			t.ID, t.Category, mode, verdict, t.Calls, t.ToolCalls, t.PromptTokens, t.CachedTokens, t.PeakPrompt, t.GeneratedTokens, t.Elided, t.Recalls, t.ChecksCaught, t.WallSeconds, note)
 	}
 	return nil
 }
@@ -510,7 +561,9 @@ func CompareDirect(w io.Writer, a, b *DirectReport) {
 	row("generated tokens per task", sa.MeanGenerated, sb.MeanGenerated, "%.0f")
 	row("tool-result KB per task", sa.MeanResultBytes/1024, sb.MeanResultBytes/1024, "%.1f")
 	row("seconds per task", sa.MeanWallSeconds, sb.MeanWallSeconds, "%.0f")
+	row("largest single prompt", float64(sa.PeakPrompt), float64(sb.PeakPrompt), "%.0f")
 	row("results set aside", float64(sa.Elided), float64(sb.Elided), "%.0f")
+	row("recalls", float64(sa.Recalls), float64(sb.Recalls), "%.0f")
 	row("summaries", float64(sa.Compactions), float64(sb.Compactions), "%.0f")
 	row("checks caught", float64(sa.ChecksCaught), float64(sb.ChecksCaught), "%.0f")
 	fmt.Fprintln(w)
