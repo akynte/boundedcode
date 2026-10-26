@@ -25,7 +25,7 @@ import (
 
 func newBenchCmd(app *App) *cobra.Command {
 	cmd := &cobra.Command{Use: "bench", Short: "Run reproducible benchmarks"}
-	cmd.AddCommand(newBenchInfraCmd(app), newBenchTasksCmd(app), newBenchDirectCmd(app), newBenchIntelCmd(app))
+	cmd.AddCommand(newBenchInfraCmd(app), newBenchTasksCmd(app), newBenchDirectCmd(app), newBenchIntelCmd(app), newBenchLeaseCmd(app))
 	return cmd
 }
 
@@ -457,6 +457,58 @@ func newBenchIntelCmd(app *App) *cobra.Command {
 	f.StringVar(&dir, "specs", "benchmarks/intel", "study definitions directory")
 	f.StringVar(&fixtures, "fixtures", "benchmarks/fixtures", "fixtures directory")
 	f.StringSliceVar(&only, "only", nil, "study ids to run")
+	f.StringVar(&out, "out", "", "report path (.json; .md written alongside)")
+	return cmd
+}
+
+func newBenchLeaseCmd(app *App) *cobra.Command {
+	var repos []string
+	var out string
+	var commits, maxFiles int
+	cmd := &cobra.Command{
+		Use:   "lease",
+		Short: "Score request-derived leases against real commits (precision and recall of the deriver)",
+		Long: `For each recent commit of each repository, derive a lease (the
+declarations, files and directories the request is about) from the commit
+message against the parent's tree, and compare it with what the commit
+changed outside tests. The message is scored as written and without its
+"pkg/path:" prefix. No model is involved.`,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if len(repos) == 0 {
+				return fmt.Errorf("--repo is required (a git checkout; repeatable)")
+			}
+			var reps []*benchmark.LeaseReport
+			for _, r := range repos {
+				st := &benchmark.LeaseStudy{Repo: r, Commits: commits, MaxFiles: maxFiles,
+					Progress: func(s string) { fmt.Fprintf(app.Err, "%s %s\n", time.Now().Format("15:04:05"), s) }}
+				rep, err := st.Run(cmd.Context())
+				if err != nil {
+					return fmt.Errorf("%s: %w", r, err)
+				}
+				reps = append(reps, rep)
+			}
+			var md bytes.Buffer
+			benchmark.WriteLeaseMarkdown(&md, reps)
+			if out != "" {
+				b, err := benchmark.MarshalLease(reps)
+				if err != nil {
+					return err
+				}
+				if err := config.WriteFileAtomic(out, b, 0o644); err != nil {
+					return err
+				}
+				if err := os.WriteFile(strings.TrimSuffix(out, ".json")+".md", md.Bytes(), 0o644); err != nil {
+					return err
+				}
+			}
+			app.printf("%s", md.String())
+			return nil
+		},
+	}
+	f := cmd.Flags()
+	f.StringSliceVar(&repos, "repo", nil, "git checkout to study (repeatable)")
+	f.IntVar(&commits, "commits", 100, "commits per repository (the newest that change Go code)")
+	f.IntVar(&maxFiles, "max-files", 30, "skip commits that change more non-test files than this")
 	f.StringVar(&out, "out", "", "report path (.json; .md written alongside)")
 	return cmd
 }

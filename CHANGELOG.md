@@ -75,6 +75,12 @@ used on real work or measured.
   working set and whose change depends on the first answer. Reports add
   the largest single prompt and the recalls; `--working-set N` overrides
   the history budget for a run.
+- `bcode bench lease` scores request-derived leases (the declarations,
+  files and directories a request is about, `internal/lease`) against
+  real commits. On 663 commits of golang.org/x/tools, cobra and this
+  repository, symbol precision is 33–55% and the lease holds the whole
+  change in 0–65% of commits, so the planned lease check on edits is not
+  built (docs/benchmarks/lease-study-2026-10.md).
 - The router no longer reads a ruled-out change ("do not change anything
   yet", "without editing") as a request for one, finds a question after a
   scene-setting clause ("In package txtar, how does …"), and no longer
