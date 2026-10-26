@@ -30,6 +30,8 @@
 |---|---|
 | [Evaluation overview](benchmarks/README.md) | What was measured, how to read it, and its limits |
 | [Comparative evaluation (2026-10)](../benchmarks/comparative-2026-10/report.md) | BoundedCode vs. the same agent and model without it: protocol, results, deviations |
+| [Direct-mode suite (2026-10)](benchmarks/direct-mode-suite-2026-10.md) | The everyday agent on 13 tasks and 2 sessions with the local model: pass rate, tool calls, cache hits, time, per change |
+| [Lease study](benchmarks/lease-study-2026-10.md) · [trail study](benchmarks/trail-study-2026-10.md) | Whether a request's text, or a repository's history, predicts what a change touches; measured on real commits before building on it |
 | [Evidence demo](../demo/evidence/README.md) | The README demo: reproducible scenario, recordings, what it does and does not show |
 | [Second (held-out) validation](benchmarks/second-independent-validation-2026-10.md) | 6 screened public tasks, 5 of 6 `TASK_VERIFIED` |
 | [Initial validation](benchmarks/small-real-world-validation-2026-10.md) | 8 public tasks, 0/8 then 1/8, with the failures |

@@ -2,8 +2,9 @@
 
 ## Unreleased: direct mode, an everyday coding agent in your checkout
 
-Experimental (ADR-0011, [design](docs/design/everyday-agent.md)). Not yet
-used on real work or measured.
+Experimental (ADR-0011, [design](docs/design/everyday-agent.md)). Measured
+on its own suite (docs/benchmarks/direct-mode-suite-2026-10.md), not yet
+used on real work.
 
 ### Fast and lean on a small local model
 
@@ -83,7 +84,7 @@ used on real work or measured.
 ### Measuring the everyday agent
 
 - `bcode bench direct` runs the direct-mode suite (`benchmarks/direct`,
-  twelve everyday tasks: explain, locate, diagnose, small fix, add a
+  thirteen everyday tasks: explain, locate, diagnose, small fix, add a
   test, refactor, feature, and the same kinds on `golang.org/x/tools`),
   each as one message to a fresh direct session in a copy of the fixture,
   routed as the chat routes it, judged by hidden checks in the checkout or

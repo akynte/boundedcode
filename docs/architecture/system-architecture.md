@@ -80,6 +80,13 @@ and budgets are shared with bounded mode), with `policy.CheckCommand` and
 the secret-path mask applied before approval, approval modes (`ask`,
 `edits`, `auto`), JSONL sessions and model-made compaction. It is reached
 from the chat (its default mode) and from `bcode chat -p` / `bcode -p`.
+The router (`router.go`, ADR-0012) sends each message to chat, code or
+verify. Before each model call the history is held to a working-set budget
+by setting older tool results aside (`workingset.go`, the `recall` tool
+brings one back); after each edit a cheap check runs (`check.go`) and, in
+a git repository, the files its history usually changes with the edited
+one are named (`cochange.go`). The answer streams through the gateway,
+which folds the stream into one metered response.
 It has no container; bounded mode (tasks) keeps the sandbox, the checks and
 the evidence gate.
 

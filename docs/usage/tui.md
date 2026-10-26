@@ -72,7 +72,10 @@ What happens to your files:
 
 Each conversation is a **session**, stored per project. `/sessions` lists
 them, `/resume [ID]` continues one, `/new` starts another. When the
-conversation nears the model's context limit it is summarised automatically
+history outgrows the working set (`direct.working_set_tokens`, 32K tokens
+for a local model), the oldest tool results the model has already seen are
+set aside behind a one-line placeholder, and the `recall` tool brings one
+back; only when that is not enough is the conversation summarised
 (`/compact` does it on request). `esc` interrupts a run; what was done so
 far is kept, and messages typed during a run are queued.
 
@@ -87,6 +90,19 @@ ask_user (a dialog opens), plan mode, sub-agents (`task`), skills,
 save_memory, language-server symbols when Serena is enabled, and the tools
 of configured MCP servers. The full matrix against Pi, Qwen Code and
 Claude Code is in [tool coverage](../design/tool-coverage.md).
+
+To keep a small local model fast and on track, direct mode also:
+- keeps the system prompt identical from turn to turn, so the model
+  server's prompt cache holds across turns;
+- looks up the names a message mentions before the first model call, and
+  sends a project map with a session's first message;
+- answers as it is generated (`direct.stream`);
+- checks every file change right away (a Go build of the package, syntax
+  checks for other languages) and puts the verdict in the tool result;
+- in a git repository, names the files that its history usually changes
+  together with the edited file (`direct.history_notes`).
+
+See [configuration](configuration.md) for each setting.
 
 Direct mode needs only the configuration and the model: no Docker, no
 repository tools, and the folder need not be a git repository. When a

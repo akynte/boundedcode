@@ -105,7 +105,7 @@ commit; the maintainer decides when to push and release.
 | Phase | Goal | Exit criteria |
 |---|---|---|
 | **17** (done, experimental) | Direct mode foundation | `internal/direct`: loop, 7 tools, approval modes, policy, path confinement, sessions, compaction, project instructions; `bcode chat` headless and `bcode -p`; the TUI chat defaults to direct mode with `/task`, `/mode`, `/approval`, `/compact`, `/sessions`, `/resume`; unit tests for every tool and for the TUI; one CLI test against a fake OpenAI server; metering under `source=direct` and audit events |
-| 18 | Streaming and the transcript | token streaming through the gateway for the local server and every cloud upstream (SSE translation for Anthropic and Gemini); the TUI renders assistant text as it arrives; markdown rendering (code blocks, lists) in the transcript; a diff preview for `edit`/`write` before approval in `ask` mode; `/undo` of the last file change (direct mode keeps a per-session shadow copy of each file it edits) |
+| 18 (streaming done, 2026-10-26) | Streaming and the transcript | token streaming through the gateway for the local server and every cloud upstream (SSE translation for Anthropic and Gemini); the TUI renders assistant text as it arrives; markdown rendering (code blocks, lists) in the transcript; a diff preview for `edit`/`write` before approval in `ask` mode; `/undo` of the last file change (direct mode keeps a per-session shadow copy of each file it edits) |
 | 19 | Extensibility | project and user **commands** (`.boundedcode/commands/*.md`, `/name args`); **skills** (`.boundedcode/skills/<name>/SKILL.md`, loaded on demand into the prompt); **MCP tools** (stdio servers from `config.yaml` or `.boundedcode/mcp.json`, reusing the MCP client from `internal/repointel`); **hooks** (pre-tool, post-tool, on-turn-end shell hooks with a JSON payload and an allow/deny result) |
 | 20 | Repository intelligence in direct mode | opt-in `search_symbols`, `references` and `impact` tools backed by codebase-memory-mcp and Serena when the workspace is indexed; a measured comparison on 10 everyday tasks: tool calls, tokens and time with and without |
 | 21 | The hand-off | `/task` without arguments turns the current direct session into a task: the session summary and the files touched become the task's context pack; the task's result links back to the session; the agent's "this deserves bounded mode" suggestion is based on the diff (protected paths, contract files, change size), not only on words in the request |
@@ -199,7 +199,8 @@ into the task pack), 22 and 23 stand.
 ### What was deliberately left out
 
 - Streaming (phase 18). A turn shows tool activity live but the answer
-  arrives whole; the gateway strips `stream` today.
+  arrives whole; the gateway strips `stream` today. (Since built: every
+  provider streams, `direct.stream`.)
 - Sub-agents, plan mode, commands, skills, MCP, hooks (phase 19).
 - Any claim about quality. Direct mode has only been smoke-tested on a toy
   fixture (see Evidence).

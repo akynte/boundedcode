@@ -67,6 +67,13 @@ The agent's tools match what Pi, Qwen Code and Claude Code offer (files,
 shell with background jobs, search, web, notebooks, task list, questions,
 plan mode, sub-agents, skills, memory, MCP servers, hooks, `@file`, `!cmd`,
 undo); see the [coverage matrix](docs/design/tool-coverage.md).
+Direct mode is built to stay fast on a small local model: a prompt prefix
+that the server's cache reuses across turns, a working-set budget that sets
+older tool results aside (the `recall` tool brings one back), the request's
+names looked up before the first model call, a build or syntax check after
+every edit, and, in a git repository, a note naming the files its history
+usually changes with the edited one. A suite of everyday tasks measures
+the result ([direct-mode results](#direct-mode)).
 
 **Bounded mode** (verify; also `/task` or `bcode task create`) is for
 changes that must be trusted. It does not implement a new agent loop. It wraps an existing
@@ -246,6 +253,22 @@ How to read these numbers:
   them the issue allowed another reading, or the hidden test required
   details the issue did not state.
 
+### Direct mode
+
+Direct mode is measured separately, by its own suite of everyday tasks
+(`bcode bench direct`) and by studies on real repositories' commits that
+need no model. The suite ran with Qwen3.6-35B-A3B on the reference laptop.
+
+| Measurement | Result | Record |
+|---|---|---|
+| Direct-mode suite: 13 everyday tasks (explain, locate, diagnose, fix, test, refactor, feature, two on golang.org/x/tools), five runs, each adding one change | **11 → 12–13 of 13** passed; tool calls per task 6.7 → 5.3–5.6; 85–89% of prompt tokens served from the server's cache; about 30 s per task. Two runs of one build differ by one task, so smaller differences are noise | [suite series](docs/benchmarks/direct-mode-suite-2026-10.md) |
+| Session tasks: several messages in one conversation, one of them six messages on golang.org/x/tools | pass, also with a 16K working set that set 5 results aside (prompt tokens 295K → 220K) | [suite series](docs/benchmarks/direct-mode-suite-2026-10.md#sessions-second-series-same-day) |
+| Lease study: can a request's text say which code it will change? 663 commits of x/tools, cobra and BoundedCode | symbol precision 33–55%; the whole change inside the lease in 0–65% of commits. The planned edit check on leases was **not built** | [lease study](docs/benchmarks/lease-study-2026-10.md) |
+| Trail study: does a repository's history predict the files a change needs? Pass bars fixed before each run | after an edit, on commits not used to pick the rule: 70–81% of the files named were changed by the same commit, and a note fired on 2–7% of single-file commits, so the **history note was built**. Co-changed files added at request time did **not** pass and were not built. The note's effect on the agent is not measured yet | [trail study](docs/benchmarks/trail-study-2026-10.md) |
+
+Direct mode has not been used on real work, and no cloud model has run
+the suite.
+
 The [evaluation overview](docs/benchmarks/README.md) gives the full method,
 the caveats and the raw data.
 
@@ -296,9 +319,10 @@ pinned dependencies (no forks, no vendored source).
 | Model gateway (metering, tunnelled agent calls) and llama.cpp supervision | `internal/inference` |
 | Frontier escalation policy, packet building and sanitization | `internal/frontier` |
 | Process management for codebase-memory-mcp and Serena | `internal/repointel` |
+| Direct mode: agent loop and tools, routing between chat, code and verify, working set and recall, checks after edits, history notes | `internal/direct` |
 | Terminal interface and chat; guided set-up; applying results to a checkout | `internal/tui`, `internal/cli` |
 | OpenHands adapter: JSON-RPC bridge to the agent SDK | `adapters/openhands/python` |
-| CLI, `doctor`, benchmark harness | `internal/cli`, `internal/benchmark` |
+| CLI, `doctor`, benchmark harness (bounded tasks, direct-mode suite, lease and trail studies) | `internal/cli`, `internal/benchmark`, `internal/lease` |
 
 **Integrated from upstream** (pinned; licenses in
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)):
@@ -482,10 +506,14 @@ See [ADR-0009](docs/architecture/adr/0009-frontier-escalation.md).
    - No baseline was run on the held-out set.
 9. **Terminal only.** There is the CLI and the full-screen `bcode`
    interface, but no daemon or GUI.
-10. **Direct mode is new and unmeasured.** It has unit, interface and
-    headless tests, but has not been used on real work. Answers arrive
-    whole (no streaming), and there are no commands, skills, MCP tools or
-    hooks yet ([plan](docs/design/everyday-agent.md#3-phases)).
+10. **Direct mode is new and measured only on its own suite.**
+    - It passes 12–13 of 13 suite tasks with the local model
+      ([results](#direct-mode)), but it has not been used on real work.
+    - The routing between chat, code and verify is not measured on real
+      requests.
+    - Streaming from Anthropic and Gemini is tested against recorded event
+      sequences, not live; no cloud model has run the suite.
+    - The history note's effect on the agent has not been measured.
 
 ## Reference hardware
 

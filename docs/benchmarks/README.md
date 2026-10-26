@@ -135,6 +135,30 @@ without BoundedCode's control plane.
 denied the baseline's agent its build environment. That baseline arm was
 re-run, and both arms are published.
 
+## Direct mode (2026-10)
+
+Direct mode, the everyday agent, is measured apart from bounded tasks.
+These runs and studies are development evidence on one machine and one
+model, not a held-out validation.
+
+- **[Direct-mode suite](direct-mode-suite-2026-10.md)** (`bcode bench
+  direct`, [tasks](../../benchmarks/direct/README.md)): 13 everyday tasks
+  with hidden checks or expected answers, and 2 multi-turn sessions. Five
+  runs, each adding one change: 11 → 12–13 of 13 passed, tool calls per
+  task 6.7 → 5.3–5.6, 85–89% prompt-cache hits, about 30 s per task. Two
+  runs of the same build differ by one task.
+- **[Lease study](lease-study-2026-10.md)** (`bcode bench lease`, no
+  model): on 663 commits, a lease derived from the commit message has
+  33–55% symbol precision and holds the whole change in 0–65% of commits.
+  The planned lease check on edits was not built.
+- **[Trail study](trail-study-2026-10.md)** (`bcode bench trail`, no
+  model, pass bars fixed before each run): files named after an edit from
+  the repository's history were changed by the same commit 70–81% of the
+  time on commits not used to choose the rule, and a note fired on 2–7% of
+  single-file commits (cobra missed the coverage bar). The note was built
+  (`direct.history_notes`); request-time suggestions failed and were not.
+  Its effect on the agent is not measured yet.
+
 ## External results
 
 Results from other machines, models and task sets can be submitted; see
