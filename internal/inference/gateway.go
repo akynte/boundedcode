@@ -34,6 +34,7 @@ type Gateway struct {
 	used      int // processed tokens: uncached prompt + completion
 	generated int // completion tokens
 	cached    int // prompt tokens served from the server's prompt cache
+	calls     int // requests forwarded
 }
 
 // Stats returns processed, generated and cached token counts.
@@ -41,6 +42,13 @@ func (g *Gateway) Stats() (processed, generated, cached int) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	return g.used, g.generated, g.cached
+}
+
+// Calls is how many requests were forwarded.
+func (g *Gateway) Calls() int {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	return g.calls
 }
 
 // ErrBudgetExhausted is returned when the token budget is spent.
@@ -98,6 +106,7 @@ func (g *Gateway) Forward(ctx context.Context, path string, body map[string]any)
 		cached = parsed.Usage.Details.Cached
 	}
 	g.mu.Lock()
+	g.calls++
 	g.used += max(parsed.Usage.PromptTokens-cached, 0) + parsed.Usage.CompletionTokens
 	g.generated += parsed.Usage.CompletionTokens
 	g.cached += cached

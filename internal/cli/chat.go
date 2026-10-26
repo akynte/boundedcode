@@ -119,10 +119,33 @@ func (a *App) directRunner(ctx context.Context, dir, sessionID, modelOverride, a
 		}
 	}
 	rec := telemetry.New(a.st.DB, a.Log)
+	r := &direct.Runner{Gateway: ep.newGateway(sess.ID), Session: sess, Opts: a.directOptions(root, cwd, approval, ep.ctxSize)}
+	if nav, _ := a.serenaNavigator(ctx, a.Paths); nav != nil {
+		r.Nav = nav
+	}
+	// The audit log records what ran, never file contents or outputs.
+	r.Sink = func(e direct.Event) {
+		switch e.Kind {
+		case direct.EventToolStart:
+			rec.Emit(ctx, sess.ID, "direct.tool", map[string]any{"tool": e.Tool, "summary": telemetry.Redact(e.Summary)})
+		case direct.EventDenied:
+			rec.Emit(ctx, sess.ID, "direct.denied", map[string]any{"tool": e.Tool, "summary": telemetry.Redact(e.Summary), "reason": e.Err})
+		case direct.EventCompact:
+			rec.Emit(ctx, sess.ID, "direct.compact", nil)
+		}
+	}
+	return r, nil
+}
+
+// directOptions are the runner options for a checkout at root with working
+// directory dir, from the configuration: the project's and the user's
+// instruction files, skills, agents, commands, hooks, MCP servers and
+// checkpoints.
+func (a *App) directOptions(root, dir, approval string, ctxSize int) direct.Options {
 	dc := a.Config.Direct
 	opts := direct.Options{
-		Root: root, Dir: cwd, Approval: approval, MaxTurns: dc.MaxTurns,
-		CommandTimeout: dc.CommandTimeout.D(), ContextTokens: ep.ctxSize,
+		Root: root, Dir: dir, Approval: approval, MaxTurns: dc.MaxTurns,
+		CommandTimeout: dc.CommandTimeout.D(), ContextTokens: ctxSize,
 		WorkingSetTokens: dc.WorkingSetTokens, MaxToolOutput: dc.MaxToolOutput, NoChecks: !dc.ChecksOn(),
 		MaxOutputTokens: a.Config.Agent.MaxOutputTokens, Instructions: dc.Instructions,
 		UserInstructions: a.userInstructionsFile(),
@@ -141,22 +164,7 @@ func (a *App) directRunner(ctx context.Context, dir, sessionID, modelOverride, a
 	if dc.CheckpointsOn() {
 		opts.CheckpointDir = filepath.Join(a.sessionsDir(), ".checkpoints", direct.ProjectKey(root))
 	}
-	r := &direct.Runner{Gateway: ep.newGateway(sess.ID), Session: sess, Opts: opts}
-	if nav, _ := a.serenaNavigator(ctx, a.Paths); nav != nil {
-		r.Nav = nav
-	}
-	// The audit log records what ran, never file contents or outputs.
-	r.Sink = func(e direct.Event) {
-		switch e.Kind {
-		case direct.EventToolStart:
-			rec.Emit(ctx, sess.ID, "direct.tool", map[string]any{"tool": e.Tool, "summary": telemetry.Redact(e.Summary)})
-		case direct.EventDenied:
-			rec.Emit(ctx, sess.ID, "direct.denied", map[string]any{"tool": e.Tool, "summary": telemetry.Redact(e.Summary), "reason": e.Err})
-		case direct.EventCompact:
-			rec.Emit(ctx, sess.ID, "direct.compact", nil)
-		}
-	}
-	return r, nil
+	return opts
 }
 
 // riskRules builds the router's risk rules from the escalation keyword

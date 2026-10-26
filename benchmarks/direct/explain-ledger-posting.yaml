@@ -1,0 +1,12 @@
+id: explain-ledger-posting
+category: explain
+fixture: payment-platform
+repos: [ledger-service]
+request: >-
+  What does HandlePaymentCharged in ledger-service do, and which account
+  receives the debit side of a charge?
+expect:
+  - settlement
+  - "credit|debit"
+  - "balanced|two entries|pair"
+timeout: 10m

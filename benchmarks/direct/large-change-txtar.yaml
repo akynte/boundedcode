@@ -1,0 +1,39 @@
+id: large-change-txtar
+category: large-change
+sources:
+  x-tools: gomod:golang.org/x/tools@v0.50.0
+repos: [x-tools]
+request: >-
+  In package txtar (directory txtar), add a method `func (a *Archive) Lookup(name
+  string) (*File, bool)` that returns a pointer to the file with that exact name
+  and true, or nil and false when the archive has no such file. Document it like
+  the neighbouring code, add a test for both outcomes in archive_test.go, and run
+  the package's tests.
+hidden:
+  - repo: x-tools
+    path: txtar/hidden_lookup_test.go
+    content: |
+      package txtar
+
+      import "testing"
+
+      func TestHiddenLookup(t *testing.T) {
+      	a := Parse([]byte("comment\n-- a.txt --\nA\n-- dir/b.txt --\nB\n"))
+      	f, ok := a.Lookup("dir/b.txt")
+      	if !ok || f == nil || string(f.Data) != "B\n" {
+      		t.Fatalf("lookup dir/b.txt = %v %v", f, ok)
+      	}
+      	if f, ok := a.Lookup("c.txt"); ok || f != nil {
+      		t.Fatalf("lookup c.txt = %v %v", f, ok)
+      	}
+      	f.Data = []byte("changed")
+      	if string(a.Files[1].Data) != "changed" {
+      		t.Fatal("Lookup must return a pointer into the archive")
+      	}
+      }
+checks:
+  - repo: x-tools
+    run: [go, test, ./txtar/]
+  - repo: x-tools
+    run: [sh, -c, "grep -q 'func TestLookup\\|Lookup(' txtar/archive_test.go"]
+timeout: 25m

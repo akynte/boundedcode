@@ -1,0 +1,17 @@
+id: add-balance-test
+category: add-test
+fixture: payment-platform
+repos: [ledger-service]
+request: >-
+  Add a unit test for Ledger.Balance in ledger-service's internal/ledger
+  package, in a new file balance_test.go: post a credit of 300 and a debit of
+  100 to the same account (balanced against another account) and check the
+  balance is 200. Run the tests.
+checks:
+  - repo: ledger-service
+    run: [go, test, ./...]
+  - repo: ledger-service
+    run: [sh, -c, "grep -q 'func Test' internal/ledger/balance_test.go && grep -q 'Balance(' internal/ledger/balance_test.go"]
+  - repo: ledger-service
+    run: [sh, -c, "git diff --exit-code HEAD -- internal/ledger/ledger.go internal/consumer"]
+timeout: 20m

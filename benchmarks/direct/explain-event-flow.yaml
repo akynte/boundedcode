@@ -1,0 +1,14 @@
+id: explain-event-flow
+category: explain
+fixture: payment-platform
+repos: [payment-service]
+request: >-
+  Trace what happens after POST /v1/payments succeeds in payment-service:
+  which function publishes the event, on which topic, and which fields the
+  event payload carries.
+expect:
+  - "payments\\.charged"
+  - "Publisher|PaymentCharged"
+  - "amount_cents|AmountCents"
+  - "account_id|AccountID"
+timeout: 10m

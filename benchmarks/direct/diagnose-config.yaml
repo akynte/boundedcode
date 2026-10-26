@@ -1,0 +1,12 @@
+id: diagnose-config
+category: diagnose
+fixture: payment-platform
+repos: [payment-service]
+request: >-
+  Starting payment-service fails with "PAYMENT_DB_DSN is required". Which
+  file enforces that, and which other environment variables does it read?
+expect:
+  - "internal/config/config\\.go"
+  - KAFKA_BROKERS
+  - LISTEN_ADDR
+timeout: 10m

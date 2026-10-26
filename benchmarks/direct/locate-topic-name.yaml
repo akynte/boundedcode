@@ -1,0 +1,11 @@
+id: locate-topic-name
+category: locate
+fixture: payment-platform
+repos: [payment-service]
+request: >-
+  Where is the Kafka topic name for charged payments defined in
+  payment-service? Give the file path and the name of the constant.
+expect:
+  - "internal/events/kafka\\.go"
+  - TopicPaymentCharged
+timeout: 10m

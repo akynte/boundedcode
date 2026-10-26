@@ -31,6 +31,19 @@ used on real work or measured.
   YAML parsing. The verdict is appended to the tool result, so a
   misplaced brace costs a sub-second check instead of a test run.
 
+### Measuring the everyday agent
+
+- `bcode bench direct` runs the direct-mode suite (`benchmarks/direct`,
+  twelve everyday tasks: explain, locate, diagnose, small fix, add a
+  test, refactor, feature, and the same kinds on `golang.org/x/tools`),
+  each as one message to a fresh direct session in a copy of the fixture,
+  routed as the chat routes it, judged by hidden checks in the checkout or
+  by what the answer must say (`expect`). The report records model calls,
+  tool calls by name, prompt tokens and the server's cache hits, generated
+  tokens, tool-result bytes, results set aside and recalled, summaries,
+  broken edits caught by the check, mode switches and wall time, per task
+  and per category.
+
 ### Automatic modes: chat, code, verify (ADR-0012)
 
 - Every message is routed automatically: **chat** answers without changing

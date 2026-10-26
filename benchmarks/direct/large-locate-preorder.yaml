@@ -1,0 +1,17 @@
+id: large-locate-preorder
+category: large-locate
+# golang.org/x/tools v0.50.0 (BSD-3-Clause, about 1,300 Go files and 240K
+# lines), copied from the Go module cache: `go mod download
+# golang.org/x/tools@v0.50.0` once. Its own dependencies must be in the
+# cache too (they are after `go mod download` in the module).
+sources:
+  x-tools: gomod:golang.org/x/tools@v0.50.0
+repos: [x-tools]
+request: >-
+  In this repository, which file defines the Preorder method of the Inspector
+  type in package go/ast/inspector, and in which order does it visit nodes
+  relative to their children? Give the file path.
+expect:
+  - "go/ast/inspector/inspector\\.go"
+  - "before|pre-?order|depth-first"
+timeout: 15m

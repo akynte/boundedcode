@@ -16,6 +16,7 @@ import (
 	"github.com/akynte/boundedcode/internal/benchmark"
 	"github.com/akynte/boundedcode/internal/buildinfo"
 	"github.com/akynte/boundedcode/internal/config"
+	"github.com/akynte/boundedcode/internal/direct"
 	"github.com/akynte/boundedcode/internal/orchestrator"
 	"github.com/akynte/boundedcode/internal/repointel/cbm"
 	"github.com/akynte/boundedcode/internal/repointel/serena"
@@ -24,7 +25,7 @@ import (
 
 func newBenchCmd(app *App) *cobra.Command {
 	cmd := &cobra.Command{Use: "bench", Short: "Run reproducible benchmarks"}
-	cmd.AddCommand(newBenchInfraCmd(app), newBenchTasksCmd(app), newBenchIntelCmd(app))
+	cmd.AddCommand(newBenchInfraCmd(app), newBenchTasksCmd(app), newBenchDirectCmd(app), newBenchIntelCmd(app))
 	return cmd
 }
 
@@ -254,6 +255,107 @@ func newBenchTasksCmd(app *App) *cobra.Command {
 	f.BoolVar(&baseline, "baseline", false, "run the plain agent runtime with the same model and no control plane (comparison baseline)")
 	f.StringVar(&screenGold, "screen-gold", "", "validate tasks instead of running them: acceptance must fail on base and pass with DIR/<id>.patch applied")
 	addRunFlags(cmd, &rf)
+	return cmd
+}
+
+func newBenchDirectCmd(app *App) *cobra.Command {
+	var (
+		dirs                     []string
+		out, fixtures, modelName string
+		approval                 string
+		only                     []string
+		timeout                  time.Duration
+	)
+	cmd := &cobra.Command{
+		Use:   "direct",
+		Short: "Run the everyday-development suite with the direct-mode agent (in the checkout, on this machine)",
+		Long: `Each task is one message to a fresh direct-mode session in a copy of a
+fixture, routed as the chat routes it, with bounded mode unavailable. Hidden
+checks run in the checkout afterwards; a question is judged by what its
+answer must say. The report records pass or fail, model calls, tool calls,
+prompt tokens and the server's cache hits, generated tokens, results set
+aside and recalled, summaries, broken edits caught by the check, and time.`,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			ctx := cmd.Context()
+			var tasks []benchmark.TaskSpec
+			for _, d := range dirs {
+				ts, err := benchmark.LoadTasks(d)
+				if err != nil {
+					return err
+				}
+				tasks = append(tasks, ts...)
+			}
+			if len(only) > 0 {
+				var sel []benchmark.TaskSpec
+				for _, t := range tasks {
+					if contains(only, t.ID) || contains(only, t.Category) {
+						sel = append(sel, t)
+					}
+				}
+				tasks = sel
+			}
+			if len(tasks) == 0 {
+				return fmt.Errorf("no tasks selected")
+			}
+			switch approval {
+			case direct.ApprovalAsk, direct.ApprovalEdits, direct.ApprovalAuto:
+			default:
+				return fmt.Errorf("approval %q is not ask|edits|auto", approval)
+			}
+			ep, err := app.directEndpoint(ctx, modelName)
+			if err != nil {
+				return err
+			}
+			work := filepath.Join(app.Paths.Cache, "bench-direct")
+			if err := os.MkdirAll(work, 0o700); err != nil {
+				return err
+			}
+			stamp := time.Now().UTC().Format("20060102T150405Z")
+			if out == "" {
+				out = filepath.Join("benchmarks", "reports", fmt.Sprintf("%s-direct-%s.json", stamp, ep.model))
+			}
+			dc := app.Config.Direct
+			dr := &benchmark.DirectRunner{FixturesDir: fixtures, WorkRoot: work, Rules: app.riskRules(), Timeout: timeout,
+				Settings: map[string]any{"approval": approval, "working_set_tokens": dc.WorkingSetTokens, "max_tool_output": dc.MaxToolOutput, "checks": dc.ChecksOn(), "context_tokens": ep.ctxSize, "provider": ep.provider},
+				Progress: func(s string) { fmt.Fprintf(app.Err, "%s %s\n", time.Now().Format("15:04:05"), s) },
+				NewRunner: func(ctx context.Context, root, stateDir string) (*direct.Runner, func(), error) {
+					sess, err := direct.NewSession(filepath.Join(stateDir, "sessions"), root, ep.provider, ep.model)
+					if err != nil {
+						return nil, nil, err
+					}
+					opts := app.directOptions(root, root, approval, ep.ctxSize)
+					// A benchmark is the project and the model alone: no
+					// personal instructions, notes, commands, hooks or servers.
+					opts.UserInstructions, opts.MemoryFile, opts.UserDir = "", "", ""
+					opts.Hooks, opts.MCP = nil, nil
+					opts.SkillDirs = opts.SkillDirs[:len(opts.SkillDirs)-1]
+					opts.AgentDirs = opts.AgentDirs[:len(opts.AgentDirs)-1]
+					opts.CheckpointDir = filepath.Join(stateDir, "checkpoints")
+					r := &direct.Runner{Gateway: ep.newGateway(sess.ID), Session: sess, Opts: opts}
+					return r, func() { r.Close() }, nil
+				}}
+			rep, err := dr.Run(ctx, ep.model, tasks, out)
+			if rep != nil {
+				md := strings.TrimSuffix(out, ".json") + ".md"
+				var b bytes.Buffer
+				_ = benchmark.WriteDirectMarkdown(&b, rep)
+				_ = os.WriteFile(md, b.Bytes(), 0o644)
+				_ = recordBenchmark(cmd, app, rep.ID, "direct", ep.model, dr.Settings, rep)
+				s := rep.Summary
+				app.printf("passed %d/%d (%.0f%%), %.1f model calls and %.1f tool calls per task, %.0f prompt tokens per task (%.0f%% from the cache), %.0fs/task\nreport: %s\n",
+					s.Passed, s.Tasks, 100*s.PassRate, s.MeanCalls, s.MeanToolCalls, s.MeanPrompt, 100*s.CacheHitRate, s.MeanWallSeconds, md)
+			}
+			return err
+		},
+	}
+	f := cmd.Flags()
+	f.StringSliceVar(&dirs, "tasks", []string{"benchmarks/direct"}, "task definition directories")
+	f.StringVar(&fixtures, "fixtures", "benchmarks/fixtures", "fixtures directory")
+	f.StringSliceVar(&only, "only", nil, "task ids or categories to run")
+	f.StringVar(&out, "out", "", "report path (.json; .md written alongside)")
+	f.StringVarP(&modelName, "model", "m", "", "model profile (local) or model (cloud)")
+	f.StringVar(&approval, "approval", direct.ApprovalAuto, "approval mode for the agent: ask|edits|auto")
+	f.DurationVar(&timeout, "timeout", 20*time.Minute, "time limit per task when the task sets none")
 	return cmd
 }
 

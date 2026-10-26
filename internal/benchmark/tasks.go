@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"sort"
 	"strings"
@@ -40,8 +41,12 @@ type TaskSpec struct {
 	Request  string            `yaml:"request"`
 	Criteria []string          `yaml:"criteria"`
 	// Hidden files are written after the agent finishes, then Checks run.
-	Hidden  []File          `yaml:"hidden"`
-	Checks  []Check         `yaml:"checks"`
+	Hidden []File  `yaml:"hidden"`
+	Checks []Check `yaml:"checks"`
+	// Expect lists regular expressions (case-insensitive) the agent's final
+	// answer must match; for questions in the direct-mode suite, where the
+	// answer is the deliverable. A task needs checks or expect, or both.
+	Expect  []string        `yaml:"expect,omitempty"`
 	Timeout config.Duration `yaml:"timeout"`
 	// InterruptAfter cancels the run after this long, then resumes the same
 	// task with a freshly built runner (context-continuity evidence).
@@ -89,8 +94,13 @@ func LoadTasks(dir string) ([]TaskSpec, error) {
 		if err := config.DecodeStrict(b, &t); err != nil {
 			return fmt.Errorf("%s: %w", p, err)
 		}
-		if t.ID == "" || t.Request == "" || len(t.Checks) == 0 || (t.Fixture == "" && len(t.Sources) == 0) {
-			return fmt.Errorf("%s: id, fixture (or sources), request and checks are required", p)
+		if t.ID == "" || t.Request == "" || (len(t.Checks) == 0 && len(t.Expect) == 0) || (t.Fixture == "" && len(t.Sources) == 0) {
+			return fmt.Errorf("%s: id, fixture (or sources), request and checks (or expect) are required", p)
+		}
+		for _, e := range t.Expect {
+			if _, err := regexp.Compile("(?is)" + e); err != nil {
+				return fmt.Errorf("%s: expect %q: %w", p, e, err)
+			}
 		}
 		out = append(out, t)
 		return nil

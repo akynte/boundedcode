@@ -1,0 +1,33 @@
+id: rename-entries
+category: refactor
+fixture: payment-platform
+repos: [ledger-service]
+request: >-
+  In ledger-service, rename the Ledger method Entries to Postings and update
+  every caller, including tests, so the module still builds and the tests
+  pass.
+hidden:
+  - repo: ledger-service
+    path: internal/ledger/hidden_accept_test.go
+    content: |
+      package ledger
+
+      import "testing"
+
+      func TestHiddenPostings(t *testing.T) {
+      	l := &Ledger{}
+      	if err := l.Post(Entry{AccountID: "a", AmountCents: 5}, Entry{AccountID: "b", AmountCents: -5}); err != nil {
+      		t.Fatal(err)
+      	}
+      	if got := l.Postings(); len(got) != 2 {
+      		t.Fatalf("postings = %d", len(got))
+      	}
+      }
+checks:
+  - repo: ledger-service
+    run: [go, vet, ./...]
+  - repo: ledger-service
+    run: [go, test, ./...]
+  - repo: ledger-service
+    run: [sh, -c, "! grep -rq 'func (l \\*Ledger) Entries' internal/"]
+timeout: 20m
