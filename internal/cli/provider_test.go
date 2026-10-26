@@ -16,6 +16,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/akynte/boundedcode/internal/config"
+	"github.com/akynte/boundedcode/internal/inference"
 	"github.com/akynte/boundedcode/internal/model"
 )
 
@@ -273,5 +275,42 @@ func TestWorkspaceFromCurrentRepository(t *testing.T) {
 	t.Chdir(t.TempDir())
 	if _, err := app.resolveWorkspace(ctx, ""); err == nil || !strings.Contains(err.Error(), "workspace use NAME") {
 		t.Fatalf("outside any repository: %v", err)
+	}
+}
+
+// The effort reaches the provider whether the answer is streamed or not.
+func TestOpenAIEffortOnStreamedRequests(t *testing.T) {
+	var bodies []map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var b map[string]any
+		_ = json.NewDecoder(r.Body).Decode(&b)
+		bodies = append(bodies, b)
+		if b["stream"] == true {
+			w.Header().Set("Content-Type", "text/event-stream")
+			fmt.Fprint(w, "data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"hi\"},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n")
+			return
+		}
+		fmt.Fprint(w, `{"choices":[{"index":0,"message":{"role":"assistant","content":"hi"},"finish_reason":"stop"}]}`)
+	}))
+	defer srv.Close()
+	up, err := upstreamFor(inference.ProviderOpenAI, config.ProviderConfig{BaseURL: srv.URL, Model: "gpt-x", Effort: "high"}, "sk-test", nil, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := func() map[string]any {
+		return map[string]any{"model": "gpt-x", "messages": []any{map[string]any{"role": "user", "content": "hi"}}}
+	}
+	if _, _, err := up.Complete(context.Background(), body()); err != nil {
+		t.Fatal(err)
+	}
+	s, ok := up.(inference.Streamer)
+	if !ok {
+		t.Fatal("the OpenAI upstream must stream")
+	}
+	if _, _, err := s.Stream(context.Background(), body(), nil); err != nil {
+		t.Fatal(err)
+	}
+	if len(bodies) != 2 || bodies[0]["reasoning_effort"] != "high" || bodies[1]["reasoning_effort"] != "high" || bodies[1]["stream"] != true {
+		t.Fatalf("requests: %v", bodies)
 	}
 }

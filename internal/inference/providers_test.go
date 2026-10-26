@@ -41,7 +41,9 @@ func (rc *recorder) server(t *testing.T) *httptest.Server {
 		for k, v := range h {
 			w.Header()[k] = v
 		}
-		w.Header().Set("Content-Type", "application/json")
+		if w.Header().Get("Content-Type") == "" {
+			w.Header().Set("Content-Type", "application/json")
+		}
 		w.WriteHeader(status)
 		_, _ = io.WriteString(w, resp)
 	}))

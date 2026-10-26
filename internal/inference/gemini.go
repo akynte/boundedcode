@@ -5,7 +5,9 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -99,6 +101,51 @@ func (u *GeminiUpstream) Complete(ctx context.Context, body map[string]any) (int
 	if status != http.StatusOK {
 		return status, errorBody(errMessage(resp), "upstream_error"), nil
 	}
+	return u.answer(resp)
+}
+
+// Stream implements Streamer: streamGenerateContent with server-sent
+// events, each a partial generateContent response. The parts are joined
+// (consecutive text of the same kind merged, function calls and thought
+// signatures kept as sent) into one response that is then handled exactly
+// as Complete handles the whole answer.
+func (u *GeminiUpstream) Stream(ctx context.Context, body map[string]any, onDelta func(Delta)) (int, []byte, error) {
+	u.init()
+	req, err := parseOARequest(body)
+	if err != nil {
+		return http.StatusBadRequest, errorBody(err.Error(), "invalid_request_error"), nil
+	}
+	raw, err := json.Marshal(u.translate(req))
+	if err != nil {
+		return 0, nil, err
+	}
+	var resp *http.Response
+	var last error
+	status, err := u.Retry.Do(ctx, func() (int, error) {
+		resp, last = u.client.RawStream(ctx, u.modelPath()+":streamGenerateContent?alt=sse", raw) //nolint:bodyclose // closed after the fold below
+		return statusOf(last)
+	})
+	if err != nil {
+		return 0, nil, err
+	}
+	if resp == nil {
+		var he *HTTPError
+		if errors.As(last, &he) {
+			return status, errorBody(errMessage([]byte(he.Body)), "upstream_error"), nil
+		}
+		return status, errorBody("no answer", "upstream_error"), nil
+	}
+	whole, err := foldGemini(resp.Body, onDelta)
+	resp.Body.Close()
+	if err != nil {
+		return 0, nil, err
+	}
+	return u.answer(whole)
+}
+
+// answer turns a whole generateContent response into the OpenAI shape and
+// stores the model turn for replay.
+func (u *GeminiUpstream) answer(resp []byte) (int, []byte, error) {
 	res, turn, err := u.parse(resp)
 	if err != nil {
 		return http.StatusBadGateway, errorBody(err.Error(), "upstream_error"), nil
@@ -109,6 +156,122 @@ func (u *GeminiUpstream) Complete(ctx context.Context, body map[string]any) (int
 		}
 	}
 	return http.StatusOK, res.marshal(), nil
+}
+
+// foldGemini joins streamed generateContent chunks into one response.
+func foldGemini(r io.Reader, onDelta func(Delta)) ([]byte, error) {
+	out := map[string]any{}
+	var parts []map[string]any
+	var finish, finishMsg any
+	err := sseData(r, func(data []byte) (bool, error) {
+		var ch struct {
+			Candidates []struct {
+				Content struct {
+					Parts []map[string]any `json:"parts"`
+				} `json:"content"`
+				FinishReason  string `json:"finishReason"`
+				FinishMessage string `json:"finishMessage"`
+			} `json:"candidates"`
+			PromptFeedback json.RawMessage `json:"promptFeedback"`
+			Usage          json.RawMessage `json:"usageMetadata"`
+			ModelVersion   string          `json:"modelVersion"`
+			ResponseID     string          `json:"responseId"`
+			Error          json.RawMessage `json:"error"`
+		}
+		if err := json.Unmarshal(data, &ch); err != nil {
+			return false, fmt.Errorf("decode gemini stream chunk: %w", err)
+		}
+		if len(ch.Error) > 0 {
+			return false, fmt.Errorf("gemini stream error: %s", trunc(string(ch.Error), 500))
+		}
+		if len(ch.PromptFeedback) > 0 {
+			out["promptFeedback"] = ch.PromptFeedback
+		}
+		if len(ch.Usage) > 0 {
+			out["usageMetadata"] = ch.Usage // cumulative: the last one counts
+		}
+		if ch.ModelVersion != "" {
+			out["modelVersion"] = ch.ModelVersion
+		}
+		if ch.ResponseID != "" {
+			out["responseId"] = ch.ResponseID
+		}
+		if len(ch.Candidates) == 0 {
+			return true, nil
+		}
+		c := ch.Candidates[0]
+		if c.FinishReason != "" {
+			finish = c.FinishReason
+		}
+		if c.FinishMessage != "" {
+			finishMsg = c.FinishMessage
+		}
+		for _, p := range c.Content.Parts {
+			text, isText := p["text"].(string)
+			thought, _ := p["thought"].(bool)
+			if isText && onDelta != nil && text != "" {
+				if thought {
+					onDelta(Delta{Reasoning: text})
+				} else {
+					onDelta(Delta{Text: text})
+				}
+			}
+			parts = mergeGeminiPart(parts, p)
+		}
+		return true, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	if parts != nil || finish != nil {
+		cand := map[string]any{"content": map[string]any{"role": "model", "parts": parts}}
+		if finish != nil {
+			cand["finishReason"] = finish
+		}
+		if finishMsg != nil {
+			cand["finishMessage"] = finishMsg
+		}
+		out["candidates"] = []any{cand}
+	}
+	return json.Marshal(out)
+}
+
+// mergeGeminiPart appends p, joining it to the previous part when both
+// are plain text of the same kind (answer or thought) and at most one of
+// them carries a thought signature, which the joined part keeps.
+func mergeGeminiPart(parts []map[string]any, p map[string]any) []map[string]any {
+	if len(parts) > 0 {
+		prev := parts[len(parts)-1]
+		pt, ok1 := prev["text"].(string)
+		nt, ok2 := p["text"].(string)
+		pthought, _ := prev["thought"].(bool)
+		nthought, _ := p["thought"].(bool)
+		_, psig := prev["thoughtSignature"]
+		_, nsig := p["thoughtSignature"]
+		if ok1 && ok2 && pthought == nthought && (!psig || !nsig) && plainText(prev) && plainText(p) {
+			prev["text"] = pt + nt
+			if nsig {
+				prev["thoughtSignature"] = p["thoughtSignature"]
+			}
+			return parts
+		}
+	}
+	cp := make(map[string]any, len(p))
+	for k, v := range p {
+		cp[k] = v
+	}
+	return append(parts, cp)
+}
+
+// plainText reports a part that is only text (with its thought flag and
+// signature).
+func plainText(p map[string]any) bool {
+	for k := range p {
+		if k != "text" && k != "thought" && k != "thoughtSignature" {
+			return false
+		}
+	}
+	return true
 }
 
 // translate builds the generateContent body.

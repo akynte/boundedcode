@@ -159,7 +159,7 @@ Further keys under `direct` (see the [tool coverage](../design/tool-coverage.md)
 | `working_set_tokens` | `0` (32K local, 96K cloud) | The history budget the model is asked to attend to. Before each model call the oldest tool results the model has already seen are set aside (a one-line placeholder; the `recall` tool brings one back), and only if that is not enough is the history summarised. Never above three quarters of the context window. |
 | `max_tool_output` | `0` (16 KiB local, 48 KiB cloud) | Cap on one tool result in bytes; longer results keep their head and tail. |
 | `seed_pack` | `true` | Before the first model call of a message, look up the names it mentions (identifiers, paths, quoted errors) in the project and send the places found with the message, definitions first, so the model starts at the right file instead of searching. A session's first message also carries a project map: build system and test command, top-level directories with source-file counts, top-level files. |
-| `stream` | `true` | Show the answer as it is generated when the provider streams (llama.cpp, OpenAI and OpenAI-compatible services); Anthropic and Gemini answers arrive whole. |
+| `stream` | `true` | Show the answer as it is generated (llama.cpp, OpenAI, OpenAI-compatible services, Anthropic and Gemini). |
 | `checks` | `true` | After every file change, run the cheapest check for its language (a Go parse and `go build` of the package, `python3`/`node`/`bash`/`ruby`/`php` syntax checks when installed, JSON and YAML parsing) and tell the model the result. |
 
 Project files direct mode reads: `.boundedcode/skills/<name>/SKILL.md`

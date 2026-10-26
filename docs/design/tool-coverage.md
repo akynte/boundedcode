@@ -50,7 +50,7 @@ benchmark (design phase 23) has measured it.
 | `@file` references | yes | `@file` | `@file` | `@path` attaches text files (and images) from the project |
 | `!command` shell passthrough | `!cmd`, `!!cmd` | `!cmd` | `!cmd` | `!cmd` (the agent is told), `!!cmd` (it is not) |
 | Custom slash commands / prompt templates | prompt templates | custom commands | `.claude/commands`, skills | `.boundedcode/commands/*.md` (also `.claude/commands`, user `<config>/commands`), `$ARGUMENTS`, `$1…`, `` !`cmd` `` injection |
-| Streaming output | yes | yes | yes | the answer shows as it is generated in the TUI and `bcode chat -p` (llama.cpp, OpenAI, OpenAI-compatible); `--events` carries `text_delta` events |
+| Streaming output | yes | yes | yes | the answer shows as it is generated in the TUI and `bcode chat -p` (llama.cpp, OpenAI, OpenAI-compatible, Anthropic, Gemini); `--events` carries `text_delta` events |
 | Queue messages while working | yes | – | – | yes |
 | Interrupt | Escape | Esc | Esc | esc |
 | Sessions: resume, list | `/resume`, `--continue` | session management | `--continue`, `--resume` | `/resume`, `/sessions`, `--continue`, `--resume ID` |

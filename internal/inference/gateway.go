@@ -35,6 +35,7 @@ type Gateway struct {
 	generated int // completion tokens
 	cached    int // prompt tokens served from the server's prompt cache
 	calls     int // requests forwarded
+	peak      int // the largest prompt of one request, cached tokens included
 }
 
 // Stats returns processed, generated and cached token counts.
@@ -49,6 +50,14 @@ func (g *Gateway) Calls() int {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	return g.calls
+}
+
+// PeakPrompt is the largest prompt one request sent, in tokens (cached
+// tokens included): how much history the model was given at most.
+func (g *Gateway) PeakPrompt() int {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	return g.peak
 }
 
 // ErrBudgetExhausted is returned when the token budget is spent.
@@ -114,6 +123,7 @@ func (g *Gateway) account(ctx context.Context, status int, resp []byte, total ti
 	g.used += max(parsed.Usage.PromptTokens-cached, 0) + parsed.Usage.CompletionTokens
 	g.generated += parsed.Usage.CompletionTokens
 	g.cached += cached
+	g.peak = max(g.peak, parsed.Usage.PromptTokens)
 	g.mu.Unlock()
 	st := "ok"
 	if status != http.StatusOK {

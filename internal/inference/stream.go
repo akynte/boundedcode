@@ -147,27 +147,15 @@ func foldSSE(r io.Reader, onDelta func(Delta)) ([]byte, error) {
 		usage, timings     json.RawMessage
 		model              string
 	)
-	sc := bufio.NewScanner(r)
-	sc.Buffer(make([]byte, 64<<10), 16<<20)
-	for sc.Scan() {
-		line := strings.TrimSpace(sc.Text())
-		if line == "" || strings.HasPrefix(line, ":") {
-			continue
-		}
-		data, ok := strings.CutPrefix(line, "data:")
-		if !ok {
-			continue
-		}
-		data = strings.TrimSpace(data)
-		if data == "[DONE]" {
-			break
-		}
+	var failed []byte
+	err := sseData(r, func(data []byte) (bool, error) {
 		var ch sseChunk
-		if err := json.Unmarshal([]byte(data), &ch); err != nil {
-			return nil, fmt.Errorf("decode stream chunk: %w", err)
+		if err := json.Unmarshal(data, &ch); err != nil {
+			return false, fmt.Errorf("decode stream chunk: %w", err)
 		}
 		if ch.Error != nil {
-			return []byte(`{"error":` + string(*ch.Error) + `}`), nil
+			failed = []byte(`{"error":` + string(*ch.Error) + `}`)
+			return false, nil
 		}
 		if ch.Model != "" {
 			model = ch.Model
@@ -211,9 +199,13 @@ func foldSSE(r io.Reader, onDelta func(Delta)) ([]byte, error) {
 				finish = *c.FinishReason
 			}
 		}
+		return true, nil
+	})
+	if err != nil {
+		return nil, err
 	}
-	if err := sc.Err(); err != nil {
-		return nil, fmt.Errorf("read stream: %w", err)
+	if failed != nil {
+		return failed, nil
 	}
 	msg := map[string]any{"role": "assistant", "content": content.String()}
 	if reasoning.Len() > 0 {
@@ -246,6 +238,55 @@ func foldSSE(r io.Reader, onDelta func(Delta)) ([]byte, error) {
 		out["timings"] = timings
 	}
 	return json.Marshal(out)
+}
+
+// sseData calls fn with the data of each server-sent event until fn
+// returns false, the stream sends [DONE], or the body ends. Events whose
+// data spans several lines are joined as the specification says.
+func sseData(r io.Reader, fn func(data []byte) (more bool, err error)) error {
+	sc := bufio.NewScanner(r)
+	sc.Buffer(make([]byte, 64<<10), 16<<20)
+	var data []string
+	flush := func() (bool, error) {
+		if len(data) == 0 {
+			return true, nil
+		}
+		d := strings.Join(data, "\n")
+		data = data[:0]
+		if strings.TrimSpace(d) == "[DONE]" {
+			return false, nil
+		}
+		return fn([]byte(d))
+	}
+	for sc.Scan() {
+		line := strings.TrimRight(sc.Text(), "\r")
+		if line == "" {
+			more, err := flush()
+			if err != nil || !more {
+				return err
+			}
+			continue
+		}
+		if strings.HasPrefix(line, ":") {
+			continue
+		}
+		if d, ok := strings.CutPrefix(line, "data:"); ok {
+			// A server that omits the blank line between events: a
+			// complete JSON value already buffered is an event of its own.
+			if len(data) > 0 && json.Valid([]byte(strings.Join(data, "\n"))) {
+				more, err := flush()
+				if err != nil || !more {
+					return err
+				}
+			}
+			data = append(data, strings.TrimPrefix(d, " "))
+		}
+	}
+	if err := sc.Err(); err != nil {
+		return fmt.Errorf("read stream: %w", err)
+	}
+	_, err := flush()
+	return err
 }
 
 // Stream forwards a chat-completions request and streams the answer's

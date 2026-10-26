@@ -72,12 +72,23 @@ type openAIEffortUpstream struct {
 }
 
 func (u *openAIEffortUpstream) Complete(ctx context.Context, body map[string]any) (int, []byte, error) {
+	u.setEffort(body)
+	return u.OpenAIUpstream.Complete(ctx, body)
+}
+
+// Stream must be wrapped too: the embedded adapter's own Stream would
+// send the request without the effort.
+func (u *openAIEffortUpstream) Stream(ctx context.Context, body map[string]any, onDelta func(inference.Delta)) (int, []byte, error) {
+	u.setEffort(body)
+	return u.OpenAIUpstream.Stream(ctx, body, onDelta)
+}
+
+func (u *openAIEffortUpstream) setEffort(body map[string]any) {
 	if u.effort != "" {
 		if _, set := body["reasoning_effort"]; !set {
 			body["reasoning_effort"] = u.effort
 		}
 	}
-	return u.OpenAIUpstream.Complete(ctx, body)
 }
 
 // anthropicEffort maps the shared effort scale to Anthropic's levels.

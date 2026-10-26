@@ -107,6 +107,21 @@ func (u *AnthropicUpstream) Models(ctx context.Context) ([]ModelLimits, error) {
 
 // Complete implements Upstream.
 func (u *AnthropicUpstream) Complete(ctx context.Context, body map[string]any) (int, []byte, error) {
+	return u.complete(ctx, body, u.send)
+}
+
+// Stream implements Streamer: the same request with "stream": true, its
+// events folded into one Messages API response (foldAnthropic) that is
+// then handled exactly as Complete handles the whole answer.
+func (u *AnthropicUpstream) Stream(ctx context.Context, body map[string]any, onDelta func(Delta)) (int, []byte, error) {
+	return u.complete(ctx, body, func(ctx context.Context, payload map[string]any, betas []string) (int, []byte, error) {
+		return u.sendStream(ctx, payload, betas, onDelta)
+	})
+}
+
+type anthropicSend func(ctx context.Context, payload map[string]any, betas []string) (int, []byte, error)
+
+func (u *AnthropicUpstream) complete(ctx context.Context, body map[string]any, send anthropicSend) (int, []byte, error) {
 	u.init()
 	req, err := parseOARequest(body)
 	if err != nil {
@@ -114,12 +129,12 @@ func (u *AnthropicUpstream) Complete(ctx context.Context, body map[string]any) (
 	}
 	_, _ = u.Limits(ctx) // unknown limits only mean no thinking config is sent
 	payload, betas := u.translate(req)
-	status, resp, err := u.send(ctx, payload, betas)
+	status, resp, err := send(ctx, payload, betas)
 	if err == nil && status == http.StatusBadRequest && bindingRejected(resp) {
 		// A model that rejected replayed thinking blocks (no binding
 		// control on this request): drop them all, once.
 		stripThinking(payload)
-		status, resp, err = u.send(ctx, payload, betas)
+		status, resp, err = send(ctx, payload, betas)
 	}
 	if err != nil || status != http.StatusOK {
 		return status, resp, err
@@ -139,26 +154,183 @@ func (u *AnthropicUpstream) send(ctx context.Context, payload map[string]any, be
 	if err != nil {
 		return 0, nil, err
 	}
+	var out []byte
+	opts := append(u.requestOptions(raw, betas), option.WithResponseBodyInto(&out))
+	_, err = u.client.Beta.Messages.New(ctx, anthropic.BetaMessageNewParams{}, opts...)
+	if err == nil {
+		return http.StatusOK, out, nil
+	}
+	return anthropicFailure(err)
+}
+
+// sendStream sends the request streamed and folds the events into the
+// response body send would have returned.
+func (u *AnthropicUpstream) sendStream(ctx context.Context, payload map[string]any, betas []string, onDelta func(Delta)) (int, []byte, error) {
+	payload["stream"] = true
+	raw, err := json.Marshal(payload)
+	delete(payload, "stream")
+	if err != nil {
+		return 0, nil, err
+	}
+	stream := u.client.Beta.Messages.NewStreaming(ctx, anthropic.BetaMessageNewParams{}, u.requestOptions(raw, betas)...)
+	defer stream.Close()
+	var acc anthropicFold
+	for stream.Next() {
+		if err := acc.add([]byte(stream.Current().RawJSON()), onDelta); err != nil {
+			return http.StatusBadGateway, errorBody(err.Error(), "upstream_error"), nil
+		}
+	}
+	if err := stream.Err(); err != nil {
+		return anthropicFailure(err)
+	}
+	out, err := acc.message()
+	if err != nil {
+		return http.StatusBadGateway, errorBody(err.Error(), "upstream_error"), nil
+	}
+	return http.StatusOK, out, nil
+}
+
+func (u *AnthropicUpstream) requestOptions(raw []byte, betas []string) []option.RequestOption {
 	timeout := u.Timeout
 	if timeout <= 0 {
 		timeout = 10 * time.Minute
 	}
-	var out []byte
-	opts := []option.RequestOption{option.WithRequestBody("application/json", raw), option.WithResponseBodyInto(&out),
-		option.WithRequestTimeout(timeout)}
+	opts := []option.RequestOption{option.WithRequestBody("application/json", raw), option.WithRequestTimeout(timeout)}
 	for _, b := range betas {
 		opts = append(opts, option.WithHeaderAdd("anthropic-beta", b))
 	}
-	_, err = u.client.Beta.Messages.New(ctx, anthropic.BetaMessageNewParams{}, opts...)
+	return opts
+}
+
+// anthropicFailure turns an API error into an OpenAI-style error answer;
+// anything else (the transport) stays an error.
+func anthropicFailure(err error) (int, []byte, error) {
 	var apierr *anthropic.Error
-	switch {
-	case err == nil:
-		return http.StatusOK, out, nil
-	case errors.As(err, &apierr):
+	if errors.As(err, &apierr) {
 		return apierr.StatusCode, errorBody(anthropicMessage(apierr), string(apierr.Type())), nil
-	default:
-		return 0, nil, err
 	}
+	return 0, nil, err
+}
+
+// anthropicFold rebuilds a Messages API response from its stream events:
+// message_start carries the message and the input usage, each content
+// block is opened, extended by deltas (text, thinking, its signature, the
+// tool input as partial JSON) and closed, and message_delta carries the
+// stop reason and the output usage. Thinking blocks come out exactly as a
+// whole answer returns them, so they replay the same way.
+type anthropicFold struct {
+	msg     map[string]any
+	blocks  []map[string]any
+	partial map[int]*strings.Builder
+}
+
+func (a *anthropicFold) add(raw []byte, onDelta func(Delta)) error {
+	var ev struct {
+		Type         string          `json:"type"`
+		Message      map[string]any  `json:"message"`
+		Index        int             `json:"index"`
+		ContentBlock map[string]any  `json:"content_block"`
+		Delta        map[string]any  `json:"delta"`
+		Usage        map[string]any  `json:"usage"`
+		Error        json.RawMessage `json:"error"`
+	}
+	if err := json.Unmarshal(raw, &ev); err != nil {
+		return fmt.Errorf("decode anthropic stream event: %w", err)
+	}
+	switch ev.Type {
+	case "message_start":
+		a.msg = ev.Message
+	case "content_block_start":
+		for len(a.blocks) <= ev.Index {
+			a.blocks = append(a.blocks, map[string]any{})
+		}
+		if ev.ContentBlock != nil {
+			a.blocks[ev.Index] = ev.ContentBlock
+		}
+	case "content_block_delta":
+		if ev.Index < 0 || ev.Index >= len(a.blocks) {
+			return fmt.Errorf("anthropic stream: delta for block %d before it started", ev.Index)
+		}
+		b := a.blocks[ev.Index]
+		str := func(k string) string { s, _ := ev.Delta[k].(string); return s }
+		switch ev.Delta["type"] {
+		case "text_delta":
+			t := str("text")
+			b["text"] = asString(b["text"]) + t
+			if onDelta != nil && t != "" {
+				onDelta(Delta{Text: t})
+			}
+		case "thinking_delta":
+			t := str("thinking")
+			b["thinking"] = asString(b["thinking"]) + t
+			if onDelta != nil && t != "" {
+				onDelta(Delta{Reasoning: t})
+			}
+		case "signature_delta":
+			b["signature"] = asString(b["signature"]) + str("signature")
+		case "input_json_delta":
+			if a.partial == nil {
+				a.partial = map[int]*strings.Builder{}
+			}
+			if a.partial[ev.Index] == nil {
+				a.partial[ev.Index] = &strings.Builder{}
+			}
+			a.partial[ev.Index].WriteString(str("partial_json"))
+		case "citations_delta":
+			cites, _ := b["citations"].([]any)
+			b["citations"] = append(cites, ev.Delta["citation"])
+		}
+	case "content_block_stop":
+		if p := a.partial[ev.Index]; p != nil && ev.Index < len(a.blocks) {
+			input := map[string]any{}
+			if s := strings.TrimSpace(p.String()); s != "" {
+				if err := json.Unmarshal([]byte(s), &input); err != nil {
+					return fmt.Errorf("anthropic stream: tool input of block %d: %w", ev.Index, err)
+				}
+			}
+			a.blocks[ev.Index]["input"] = input
+			delete(a.partial, ev.Index)
+		}
+	case "message_delta":
+		if a.msg == nil {
+			a.msg = map[string]any{}
+		}
+		for k, v := range ev.Delta {
+			a.msg[k] = v
+		}
+		if len(ev.Usage) > 0 {
+			usage, _ := a.msg["usage"].(map[string]any)
+			if usage == nil {
+				usage = map[string]any{}
+			}
+			for k, v := range ev.Usage {
+				if v != nil {
+					usage[k] = v
+				}
+			}
+			a.msg["usage"] = usage
+		}
+	case "error":
+		return fmt.Errorf("anthropic stream error: %s", trunc(string(ev.Error), 500))
+	}
+	return nil
+}
+
+func (a *anthropicFold) message() ([]byte, error) {
+	if a.msg == nil {
+		return nil, errors.New("anthropic stream ended without a message")
+	}
+	blocks := make([]any, 0, len(a.blocks))
+	for _, b := range a.blocks {
+		blocks = append(blocks, b)
+	}
+	a.msg["content"] = blocks
+	return json.Marshal(a.msg)
+}
+
+func asString(v any) string {
+	s, _ := v.(string)
+	return s
 }
 
 func anthropicMessage(e *anthropic.Error) string {
