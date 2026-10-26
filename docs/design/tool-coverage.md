@@ -50,6 +50,7 @@ benchmark (design phase 23) has measured it.
 | `@file` references | yes | `@file` | `@file` | `@path` attaches text files (and images) from the project |
 | `!command` shell passthrough | `!cmd`, `!!cmd` | `!cmd` | `!cmd` | `!cmd` (the agent is told), `!!cmd` (it is not) |
 | Custom slash commands / prompt templates | prompt templates | custom commands | `.claude/commands`, skills | `.boundedcode/commands/*.md` (also `.claude/commands`, user `<config>/commands`), `$ARGUMENTS`, `$1…`, `` !`cmd` `` injection |
+| Streaming output | yes | yes | yes | the answer shows as it is generated in the TUI and `bcode chat -p` (llama.cpp, OpenAI, OpenAI-compatible); `--events` carries `text_delta` events |
 | Queue messages while working | yes | – | – | yes |
 | Interrupt | Escape | Esc | Esc | esc |
 | Sessions: resume, list | `/resume`, `--continue` | session management | `--continue`, `--resume` | `/resume`, `/sessions`, `--continue`, `--resume ID` |
@@ -74,7 +75,6 @@ benchmark (design phase 23) has measured it.
 | Session tree, fork, clone, share to a gist (Pi) | Pi | sessions are linear files; `/resume` of an older session is the fork; `/export` writes a Markdown transcript, publishing it is not planned |
 | Agent teams, arena, computer use | Qwen Code | not planned (design document §3) |
 | Hosted provider logins (`/login`) | all three | BoundedCode uses API keys in the OS keychain and the Codex subscription for frontier escalation (ADR-0009, ADR-0010) |
-| Streaming output | all three | design phase 18 |
 | Themes | Pi | one adaptive theme |
 | Background sub-agents (Claude Code) | Claude Code | `task` runs to completion inside the turn; background shells exist for commands |
 

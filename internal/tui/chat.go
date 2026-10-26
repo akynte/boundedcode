@@ -72,6 +72,7 @@ type directRun struct {
 	id         int
 	activity   []directActivity
 	text       string
+	partial    string // streamed text of the model call in progress
 	notes      []string
 	done       bool
 	err        error
@@ -1457,7 +1458,10 @@ func (r *directRun) apply(e direct.Event) {
 		}
 	case direct.EventDenied:
 		r.activity = append(r.activity, directActivity{summary: e.Summary, err: e.Err, denied: true})
+	case direct.EventTextDelta:
+		r.partial += e.Text
 	case direct.EventText:
+		r.partial = ""
 		if r.text != "" {
 			r.text += "\n\n"
 		}
@@ -1491,7 +1495,7 @@ func (r *directRun) lines(m *Model, w int) []string {
 	if r.done {
 		n++
 	}
-	if r.cacheW == w && r.cacheN == n && r.cacheText == r.text && !r.hasRunning() {
+	if r.cacheW == w && r.cacheN == n && r.cacheText == r.text && r.partial == "" && !r.hasRunning() {
 		return r.cache
 	}
 	var out []string
@@ -1521,11 +1525,18 @@ func (r *directRun) lines(m *Model, w int) []string {
 			out = append(out, "  "+mark.Render(trunc(l, w-4)))
 		}
 	}
-	if r.text != "" {
+	text := r.text
+	if r.partial != "" {
+		if text != "" {
+			text += "\n\n"
+		}
+		text += r.partial
+	}
+	if text != "" {
 		if len(out) > 0 {
 			out = append(out, "")
 		}
-		for i, l := range strings.Split(wrap(r.text, w-4), "\n") {
+		for i, l := range strings.Split(wrap(text, w-4), "\n") {
 			mark := "  "
 			if i == 0 {
 				mark = sAccent.Render("◆ ")
@@ -1535,7 +1546,7 @@ func (r *directRun) lines(m *Model, w int) []string {
 	}
 	switch {
 	case !r.done:
-		if len(r.activity) == 0 && r.text == "" {
+		if len(r.activity) == 0 && text == "" {
 			out = append(out, "  "+m.spin.View()+sMuted.Render(" thinking…"))
 		}
 	case r.err != nil:

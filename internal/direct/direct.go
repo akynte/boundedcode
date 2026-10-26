@@ -88,6 +88,11 @@ const (
 	EventTodos     EventKind = "todos"      // the task list changed (Text: rendered list)
 	EventQuestion  EventKind = "question"   // the agent asked the user (Text: question, Output: answer)
 	EventSubagent  EventKind = "subagent"   // a sub-agent's event (Tool: agent name, Text: nested kind)
+	// EventTextDelta and EventReasoningDelta carry the answer as it is
+	// generated when the provider streams; the whole text follows as
+	// EventText (or EventReasoning) when the model call ends.
+	EventTextDelta      EventKind = "text_delta"
+	EventReasoningDelta EventKind = "reasoning_delta"
 )
 
 // Event is what a Sink receives while a message is processed.
@@ -158,6 +163,11 @@ type Options struct {
 	MaxToolOutput int
 	// NoChecks disables the syntax and build check after a file change.
 	NoChecks bool
+	// NoSeedPack disables the lookup of the request's names that travels
+	// with the user message (direct.seed_pack).
+	NoSeedPack bool
+	// NoStream disables streaming: the answer is delivered whole.
+	NoStream bool
 	// MaxOutputTokens caps one completion (0 = provider default).
 	MaxOutputTokens int
 	// Instructions lists project instruction files tried at Root, in order.
@@ -309,6 +319,9 @@ func (r *Runner) Send(ctx context.Context, text string) (string, error) {
 	}
 	um := r.attach(text)
 	um.Context = r.turnContext()
+	if sp := r.seedPack(ctx, text); sp != "" {
+		um.Context += "\n\n" + sp
+	}
 	if err := r.Session.Append(um); err != nil {
 		return "", err
 	}
@@ -444,7 +457,21 @@ func (r *Runner) complete(ctx context.Context, tools []Tool) (Message, error) {
 	if r.Opts.MaxOutputTokens > 0 {
 		body["max_tokens"] = r.Opts.MaxOutputTokens
 	}
-	status, resp, err := r.Gateway.Forward(ctx, "/v1/chat/completions", body)
+	var status int
+	var resp any
+	var err error
+	if r.Opts.NoStream || r.Sink == nil {
+		status, resp, err = r.Gateway.Forward(ctx, "/v1/chat/completions", body)
+	} else {
+		status, resp, err = r.Gateway.Stream(ctx, "/v1/chat/completions", body, func(d inference.Delta) {
+			if d.Text != "" {
+				r.emit(Event{Kind: EventTextDelta, Text: d.Text})
+			}
+			if d.Reasoning != "" {
+				r.emit(Event{Kind: EventReasoningDelta, Text: d.Reasoning})
+			}
+		})
+	}
 	if err != nil {
 		if errors.Is(err, inference.ErrBudgetExhausted) {
 			return Message{}, fmt.Errorf("the session's token budget is spent (direct.max_tokens); start a new session")

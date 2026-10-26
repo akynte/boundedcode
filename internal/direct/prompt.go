@@ -96,12 +96,21 @@ func (r *Runner) reframeTurn() {
 		if m.Role != "user" || m.Context == "" {
 			continue
 		}
-		if idx := strings.Index(m.Context, "\n\nThis message was classified"); idx >= 0 {
-			m.Context = m.Context[:idx]
+		// The context is: environment, framing, then the places found for
+		// the request; only the framing changes.
+		env, rest, _ := strings.Cut(m.Context, "\n\nThis message was classified")
+		places := ""
+		if i := strings.Index(rest, "\n\n"); rest != "" && i >= 0 {
+			places = rest[i:]
+		} else if rest == "" && strings.Contains(env, "\n\nLikely relevant places") {
+			i := strings.Index(env, "\n\nLikely relevant places")
+			env, places = env[:i], env[i:]
 		}
+		m.Context = env
 		if f := modeFraming(r.Opts.Mode); f != "" {
 			m.Context += "\n\n" + f
 		}
+		m.Context += places
 		return
 	}
 }

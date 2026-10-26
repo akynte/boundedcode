@@ -84,9 +84,13 @@ type DirectResult struct {
 	Answer       string   `json:"answer,omitempty"`
 	FailedChecks []string `json:"failed_checks,omitempty"`
 	Error        string   `json:"error,omitempty"`
-	AgentPatch   string   `json:"agent_patch,omitempty"`
-	SessionID    string   `json:"session_id,omitempty"`
+	// AgentPatch is the agent's change against the base commit (capped).
+	AgentPatch string `json:"agent_patch,omitempty"`
+	SessionID  string `json:"session_id,omitempty"`
 }
+
+// maxPatchBytes caps the patch kept in a report.
+const maxPatchBytes = 24 << 10
 
 // DirectReport aggregates a run of the direct-mode suite.
 type DirectReport struct {
@@ -286,7 +290,14 @@ func (d *DirectRunner) runOne(ctx context.Context, model string, spec TaskSpec) 
 	case sendErr != nil:
 		res.Error = sendErr.Error()
 	}
-	res.AgentPatch = saveAgentPatch(ctx, dir, spec.Repos[0], root, base)
+	if p := saveAgentPatch(ctx, dir, spec.Repos[0], root, base); p != "" {
+		if b, err := os.ReadFile(p); err == nil {
+			res.AgentPatch = string(b)
+			if len(res.AgentPatch) > maxPatchBytes {
+				res.AgentPatch = res.AgentPatch[:maxPatchBytes] + "\n… (patch cut)\n"
+			}
+		}
+	}
 	if st, err := gitops.Run(ctx, root, "status", "--porcelain", "--untracked-files=all"); err == nil {
 		for _, l := range strings.Split(strings.TrimRight(st, "\n"), "\n") {
 			if len(l) > 3 {
@@ -328,7 +339,30 @@ func (d *DirectRunner) runOne(ctx context.Context, model string, spec TaskSpec) 
 			res.FailedChecks = append(res.FailedChecks, "answer does not match /"+e+"/")
 		}
 	}
+	// Reports are kept in the repository: no machine-specific paths.
+	redact := newRedactor(dir, d.WorkRoot)
+	res.Answer = redact(res.Answer)
+	res.Error = redact(res.Error)
+	res.AgentPatch = redact(res.AgentPatch)
+	for i := range res.FailedChecks {
+		res.FailedChecks[i] = redact(res.FailedChecks[i])
+	}
 	return res
+}
+
+// newRedactor replaces the task's scratch directory, the work root and the
+// home directory in report text.
+func newRedactor(dir, work string) func(string) string {
+	home, _ := os.UserHomeDir()
+	pairs := [][2]string{{dir, "<task>"}, {work, "<work>"}, {home, "~"}}
+	return func(s string) string {
+		for _, p := range pairs {
+			if p[0] != "" && p[0] != "/" {
+				s = strings.ReplaceAll(s, p[0], p[1])
+			}
+		}
+		return s
+	}
 }
 
 // hostCheck runs one acceptance command in the checkout, as direct mode's
@@ -443,4 +477,69 @@ func WriteDirectMarkdown(w io.Writer, r *DirectReport) error {
 			t.ID, t.Category, t.Mode, verdict, t.Calls, t.ToolCalls, t.PromptTokens, t.CachedTokens, t.GeneratedTokens, t.Elided, t.ChecksCaught, t.WallSeconds, note)
 	}
 	return nil
+}
+
+// LoadDirectReport reads a saved direct-mode report.
+func LoadDirectReport(path string) (*DirectReport, error) {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var r DirectReport
+	if err := json.Unmarshal(b, &r); err != nil {
+		return nil, fmt.Errorf("%s: %w", path, err)
+	}
+	return &r, nil
+}
+
+// CompareDirect renders two runs side by side: the summary figures and,
+// per task, what changed. Tasks present in only one run are listed.
+func CompareDirect(w io.Writer, a, b *DirectReport) {
+	fmt.Fprintf(w, "# %s vs %s\n\n", a.ID, b.ID)
+	fmt.Fprintf(w, "| | %s | %s |\n|---|---|---|\n", a.ID, b.ID)
+	row := func(name string, fa, fb float64, format string) {
+		fmt.Fprintf(w, "| %s | "+format+" | "+format+" |\n", name, fa, fb)
+	}
+	sa, sb := a.Summary, b.Summary
+	row("passed", float64(sa.Passed), float64(sb.Passed), "%.0f")
+	row("pass rate", 100*sa.PassRate, 100*sb.PassRate, "%.0f%%")
+	row("model calls per task", sa.MeanCalls, sb.MeanCalls, "%.1f")
+	row("tool calls per task", sa.MeanToolCalls, sb.MeanToolCalls, "%.1f")
+	row("prompt tokens per task", sa.MeanPrompt, sb.MeanPrompt, "%.0f")
+	row("prompt-cache hit rate", 100*sa.CacheHitRate, 100*sb.CacheHitRate, "%.0f%%")
+	row("generated tokens per task", sa.MeanGenerated, sb.MeanGenerated, "%.0f")
+	row("tool-result KB per task", sa.MeanResultBytes/1024, sb.MeanResultBytes/1024, "%.1f")
+	row("seconds per task", sa.MeanWallSeconds, sb.MeanWallSeconds, "%.0f")
+	row("results set aside", float64(sa.Elided), float64(sb.Elided), "%.0f")
+	row("summaries", float64(sa.Compactions), float64(sb.Compactions), "%.0f")
+	row("checks caught", float64(sa.ChecksCaught), float64(sb.ChecksCaught), "%.0f")
+	fmt.Fprintln(w)
+	byID := map[string]DirectResult{}
+	for _, r := range b.Results {
+		byID[r.ID] = r
+	}
+	fmt.Fprintf(w, "| Task | Result | Calls | Tools | Prompt tok | Gen tok | s |\n|---|---|---|---|---|---|---|\n")
+	seen := map[string]bool{}
+	for _, ra := range a.Results {
+		seen[ra.ID] = true
+		rb, ok := byID[ra.ID]
+		if !ok {
+			fmt.Fprintf(w, "| %s | only in %s | | | | | |\n", ra.ID, a.ID)
+			continue
+		}
+		fmt.Fprintf(w, "| %s | %s → %s | %d → %d | %d → %d | %d → %d | %d → %d | %.0f → %.0f |\n",
+			ra.ID, verdict(ra), verdict(rb), ra.Calls, rb.Calls, ra.ToolCalls, rb.ToolCalls, ra.PromptTokens, rb.PromptTokens, ra.GeneratedTokens, rb.GeneratedTokens, ra.WallSeconds, rb.WallSeconds)
+	}
+	for _, rb := range b.Results {
+		if !seen[rb.ID] {
+			fmt.Fprintf(w, "| %s | only in %s | | | | | |\n", rb.ID, b.ID)
+		}
+	}
+}
+
+func verdict(r DirectResult) string {
+	if r.Success {
+		return "pass"
+	}
+	return "FAIL"
 }

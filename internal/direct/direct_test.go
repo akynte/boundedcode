@@ -41,6 +41,29 @@ type call struct {
 
 func (s *scripted) Provider() string { return "local" }
 
+// Stream answers like Complete and delivers the text in two pieces, so
+// every test runs through the streaming path.
+func (s *scripted) Stream(ctx context.Context, body map[string]any, onDelta func(inference.Delta)) (int, []byte, error) {
+	status, resp, err := s.Complete(ctx, body)
+	if err != nil || status != http.StatusOK {
+		return status, resp, err
+	}
+	var r struct {
+		Choices []struct {
+			Message struct {
+				Content string `json:"content"`
+			} `json:"message"`
+		} `json:"choices"`
+	}
+	if json.Unmarshal(resp, &r) == nil && len(r.Choices) == 1 && r.Choices[0].Message.Content != "" {
+		text := r.Choices[0].Message.Content
+		half := len(text) / 2
+		onDelta(inference.Delta{Text: text[:half]})
+		onDelta(inference.Delta{Text: text[half:]})
+	}
+	return status, resp, nil
+}
+
 func (s *scripted) Complete(_ context.Context, body map[string]any) (int, []byte, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -98,9 +121,14 @@ func newRunner(t *testing.T, up *scripted, approval string) (*Runner, string, *[
 	return r, root, &events
 }
 
+// kinds lists the event kinds, without the streaming deltas (they are a
+// rendering detail; TestAnswerStreamsAsDeltas covers them).
 func kinds(evs []Event) []string {
 	var out []string
 	for _, e := range evs {
+		if e.Kind == EventTextDelta || e.Kind == EventReasoningDelta {
+			continue
+		}
 		out = append(out, string(e.Kind))
 	}
 	return out

@@ -86,6 +86,12 @@ func (g *Gateway) Forward(ctx context.Context, path string, body map[string]any)
 		g.record(ctx, 0, 0, 0, nil, total, "transport_error")
 		return http.StatusBadGateway, map[string]any{"error": map[string]any{"message": err.Error()}}, nil //nolint:nilerr // see above
 	}
+	return g.account(ctx, status, resp, total), g.decode(resp), nil
+}
+
+// account meters an answer (tokens, cache hits, timings) and records the
+// call; it returns the status unchanged.
+func (g *Gateway) account(ctx context.Context, status int, resp []byte, total time.Duration) int {
 	var parsed struct {
 		Usage struct {
 			Usage
@@ -95,8 +101,6 @@ func (g *Gateway) Forward(ctx context.Context, path string, body map[string]any)
 		} `json:"usage"`
 		Timings *Timings `json:"timings"`
 	}
-	var out any
-	_ = json.Unmarshal(resp, &out)
 	_ = json.Unmarshal(resp, &parsed)
 	cached := 0
 	switch {
@@ -116,10 +120,17 @@ func (g *Gateway) Forward(ctx context.Context, path string, body map[string]any)
 		st = fmt.Sprintf("http_%d", status)
 	}
 	g.record(ctx, parsed.Usage.PromptTokens, parsed.Usage.CompletionTokens, cached, parsed.Timings, total, st)
-	if out == nil {
-		out = map[string]any{"error": map[string]any{"message": string(resp)}}
+	return status
+}
+
+// decode returns the answer as generic JSON, or an error body when it is
+// not JSON.
+func (g *Gateway) decode(resp []byte) any {
+	var out any
+	if json.Unmarshal(resp, &out) != nil || out == nil {
+		return map[string]any{"error": map[string]any{"message": string(resp)}}
 	}
-	return status, out, nil
+	return out
 }
 
 func (g *Gateway) upstream() Upstream {

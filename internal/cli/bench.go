@@ -263,7 +263,7 @@ func newBenchDirectCmd(app *App) *cobra.Command {
 		dirs                     []string
 		out, fixtures, modelName string
 		approval                 string
-		only                     []string
+		only, compare            []string
 		timeout                  time.Duration
 	)
 	cmd := &cobra.Command{
@@ -277,6 +277,23 @@ prompt tokens and the server's cache hits, generated tokens, results set
 aside and recalled, summaries, broken edits caught by the check, and time.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx := cmd.Context()
+			if len(compare) > 0 {
+				if len(compare) != 2 {
+					return fmt.Errorf("--compare takes two report paths")
+				}
+				a, err := benchmark.LoadDirectReport(compare[0])
+				if err != nil {
+					return err
+				}
+				b, err := benchmark.LoadDirectReport(compare[1])
+				if err != nil {
+					return err
+				}
+				var buf bytes.Buffer
+				benchmark.CompareDirect(&buf, a, b)
+				app.printf("%s", buf.String())
+				return nil
+			}
 			var tasks []benchmark.TaskSpec
 			for _, d := range dirs {
 				ts, err := benchmark.LoadTasks(d)
@@ -316,7 +333,7 @@ aside and recalled, summaries, broken edits caught by the check, and time.`,
 			}
 			dc := app.Config.Direct
 			dr := &benchmark.DirectRunner{FixturesDir: fixtures, WorkRoot: work, Rules: app.riskRules(), Timeout: timeout,
-				Settings: map[string]any{"approval": approval, "working_set_tokens": dc.WorkingSetTokens, "max_tool_output": dc.MaxToolOutput, "checks": dc.ChecksOn(), "context_tokens": ep.ctxSize, "provider": ep.provider},
+				Settings: map[string]any{"approval": approval, "working_set_tokens": dc.WorkingSetTokens, "max_tool_output": dc.MaxToolOutput, "checks": dc.ChecksOn(), "seed_pack": dc.SeedPackOn(), "context_tokens": ep.ctxSize, "provider": ep.provider},
 				Progress: func(s string) { fmt.Fprintf(app.Err, "%s %s\n", time.Now().Format("15:04:05"), s) },
 				NewRunner: func(ctx context.Context, root, stateDir string) (*direct.Runner, func(), error) {
 					sess, err := direct.NewSession(filepath.Join(stateDir, "sessions"), root, ep.provider, ep.model)
@@ -356,6 +373,7 @@ aside and recalled, summaries, broken edits caught by the check, and time.`,
 	f.StringVarP(&modelName, "model", "m", "", "model profile (local) or model (cloud)")
 	f.StringVar(&approval, "approval", direct.ApprovalAuto, "approval mode for the agent: ask|edits|auto")
 	f.DurationVar(&timeout, "timeout", 20*time.Minute, "time limit per task when the task sets none")
+	f.StringSliceVar(&compare, "compare", nil, "compare two saved reports (OLD.json,NEW.json) instead of running")
 	return cmd
 }
 

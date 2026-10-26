@@ -146,7 +146,7 @@ func (a *App) directOptions(root, dir, approval string, ctxSize int) direct.Opti
 	opts := direct.Options{
 		Root: root, Dir: dir, Approval: approval, MaxTurns: dc.MaxTurns,
 		CommandTimeout: dc.CommandTimeout.D(), ContextTokens: ctxSize,
-		WorkingSetTokens: dc.WorkingSetTokens, MaxToolOutput: dc.MaxToolOutput, NoChecks: !dc.ChecksOn(),
+		WorkingSetTokens: dc.WorkingSetTokens, MaxToolOutput: dc.MaxToolOutput, NoChecks: !dc.ChecksOn(), NoSeedPack: !dc.SeedPackOn(), NoStream: !dc.StreamOn(),
 		MaxOutputTokens: a.Config.Agent.MaxOutputTokens, Instructions: dc.Instructions,
 		UserInstructions: a.userInstructionsFile(),
 		Web:              direct.WebOptions{AllowHosts: dc.Web.AllowHosts, SearchURL: dc.Web.SearchURL},
@@ -565,6 +565,7 @@ func (a *App) runChat(ctx context.Context, o chatOptions) error {
 	defer r.Close()
 	audit := r.Sink
 	enc := json.NewEncoder(a.Out)
+	streamed := false
 	r.Sink = func(e direct.Event) {
 		audit(e)
 		if o.jsonEvents {
@@ -572,6 +573,9 @@ func (a *App) runChat(ctx context.Context, o chatOptions) error {
 			return
 		}
 		switch e.Kind {
+		case direct.EventTextDelta:
+			streamed = true
+			fmt.Fprint(a.Out, e.Text)
 		case direct.EventToolStart:
 			fmt.Fprintf(a.Err, "⚙ %s\n", e.Summary)
 		case direct.EventToolEnd:
@@ -593,6 +597,12 @@ func (a *App) runChat(ctx context.Context, o chatOptions) error {
 				fmt.Fprintf(a.Err, "  ↳ %s: %s\n", e.Tool, e.Summary)
 			}
 		case direct.EventText:
+			if streamed {
+				// Already printed as it arrived.
+				streamed = false
+				fmt.Fprintln(a.Out)
+				break
+			}
 			fmt.Fprintln(a.Out, e.Text)
 		case direct.EventDone:
 			switch {

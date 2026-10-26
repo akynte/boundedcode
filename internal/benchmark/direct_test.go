@@ -90,8 +90,12 @@ func TestDirectSuiteScoresAnswersAndChanges(t *testing.T) {
 	if !mk.Success || mk.Mode != direct.ModeCode || mk.Calls != 2 || mk.Tools["write"] != 1 || len(mk.FilesChanged) != 1 || mk.FilesChanged[0] != "hello.txt" || mk.AgentPatch == "" {
 		t.Fatalf("make: %+v", mk)
 	}
-	if b, err := os.ReadFile(mk.AgentPatch); err != nil || !strings.Contains(string(b), "+hi") {
-		t.Fatalf("agent patch: %v %s", err, b)
+	if !strings.Contains(mk.AgentPatch, "+hi") {
+		t.Fatalf("agent patch: %q", mk.AgentPatch)
+	}
+	home, _ := os.UserHomeDir()
+	if b, _ := os.ReadFile(out); strings.Contains(string(b), home) || strings.Contains(string(b), dr.WorkRoot) {
+		t.Fatal("the report must not contain machine-specific paths")
 	}
 	if w := byID["wrong"]; w.Success || len(w.FailedChecks) != 1 || !strings.Contains(w.FailedChecks[0], "does not match") {
 		t.Fatalf("wrong: %+v", w)
@@ -109,6 +113,18 @@ func TestDirectSuiteScoresAnswersAndChanges(t *testing.T) {
 	for _, want := range []string{"**2/3 passed (67%)**", "| ask | explain | chat | pass |", "| wrong | explain | chat | FAIL |", "does not match", "approval=auto"} {
 		if !strings.Contains(md.String(), want) {
 			t.Fatalf("markdown lacks %q:\n%s", want, md.String())
+		}
+	}
+	// Saved reports compare side by side.
+	saved, err := LoadDirectReport(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var cmp bytes.Buffer
+	CompareDirect(&cmp, saved, rep)
+	for _, want := range []string{"| passed | 2 | 2 |", "| ask | pass → pass |", "| wrong | FAIL → FAIL |"} {
+		if !strings.Contains(cmp.String(), want) {
+			t.Fatalf("comparison lacks %q:\n%s", want, cmp.String())
 		}
 	}
 	// A task needs checks or expect; a bad expect pattern is refused.

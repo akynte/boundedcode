@@ -59,6 +59,7 @@ func (r *Runner) subagent(kind string) (*Runner, error) {
 	opts := r.Opts
 	opts.Mode = ModeCode
 	opts.NoSubagents = true
+	opts.NoStream = true                      // a sub-agent's answer is reported whole
 	opts.CheckpointDir = r.Opts.CheckpointDir // edits by sub-agents are undoable too
 	extra := ""
 	switch kind {

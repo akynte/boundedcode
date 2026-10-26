@@ -265,3 +265,96 @@ func roles(ms []Message) []string {
 	}
 	return out
 }
+
+// The names a request mentions are looked up before the first model call
+// and the places found travel with the message.
+func TestSeedPackFindsTheNamedCode(t *testing.T) {
+	up := &scripted{replies: []reply{{text: "ok"}}}
+	r, root, _ := newRunner(t, up, ApprovalAuto)
+	if err := os.MkdirAll(filepath.Join(root, "internal/ledger"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	src := "package ledger\n\n// Post records entries.\nfunc (l *Ledger) Post(entries ...Entry) error {\n\treturn nil\n}\n\nfunc (l *Ledger) Balance(id string) int64 { return 0 }\n"
+	if err := os.WriteFile(filepath.Join(root, "internal/ledger/ledger.go"), []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "internal/ledger/ledger_test.go"), []byte("package ledger\n\nfunc TestPost(t *testing.T) { _ = (&Ledger{}).Post() }\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.Send(context.Background(), "Why does `Post` return nil, and where is internal/ledger/ledger.go used by Balance()?"); err != nil {
+		t.Fatal(err)
+	}
+	um := up.lastMessages(t)[1]["content"].(string)
+	for _, want := range []string{"Likely relevant places", "- Post: internal/ledger/ledger.go:4 (func (l *Ledger) Post(entries ...Entry) error {)", "internal/ledger/ledger_test.go:3", "- internal/ledger/ledger.go: ", "- Balance: internal/ledger/ledger.go:8 (func (l *Ledger) Balance"} {
+		if !strings.Contains(um, want) {
+			t.Fatalf("missing %q in:\n%s", want, um)
+		}
+	}
+	if !strings.Contains(r.Session.Messages[0].Context, "Likely relevant places") {
+		t.Fatal("the places must be stored with the message (stable prefix)")
+	}
+	// A name nobody uses, or that is everywhere, adds nothing.
+	r.Opts.NoSeedPack = false
+	if sp := r.seedPack(context.Background(), "What about `Nonexistent`?"); sp != "" {
+		t.Fatalf("unknown name: %q", sp)
+	}
+	r.Opts.NoSeedPack = true
+	if sp := r.seedPack(context.Background(), "Where is `Post`?"); sp != "" {
+		t.Fatalf("disabled: %q", sp)
+	}
+	// A mode switch keeps the places and swaps only the framing.
+	r.Opts.NoSeedPack = false
+	r.Opts.Mode = ModeChat
+	r.Session.Messages = nil
+	up.replies = []reply{{text: "ok"}}
+	if _, err := r.Send(context.Background(), "Where is `Post` defined?"); err != nil {
+		t.Fatal(err)
+	}
+	r.Opts.Mode = ModeCode
+	r.reframeTurn()
+	c := r.Session.Messages[0].Context
+	framing, places, _ := strings.Cut(c, "\n\nLikely relevant places")
+	if !strings.Contains(framing, "classified as a request for a direct change") || strings.Contains(framing, "question or discussion") || !strings.Contains(places, "- Post: internal/ledger/ledger.go:4") {
+		t.Fatalf("reframed context:\n%s", c)
+	}
+}
+
+// The answer streams as it is generated: text deltas precede the whole
+// text, and they add up to it. Sub-agents report whole.
+func TestAnswerStreamsAsDeltas(t *testing.T) {
+	up := &scripted{replies: []reply{{text: "Hello there, world"}}}
+	r, _, evs := newRunner(t, up, ApprovalAuto)
+	if _, err := r.Send(context.Background(), "hi"); err != nil {
+		t.Fatal(err)
+	}
+	var streamed string
+	seenText := false
+	for _, e := range *evs {
+		switch e.Kind {
+		case EventTextDelta:
+			if seenText {
+				t.Fatal("a delta after the whole text")
+			}
+			streamed += e.Text
+		case EventText:
+			seenText = true
+			if e.Text != "Hello there, world" {
+				t.Fatalf("text: %q", e.Text)
+			}
+		}
+	}
+	if streamed != "Hello there, world" {
+		t.Fatalf("deltas add up to %q", streamed)
+	}
+	r.Opts.NoStream = true
+	up.replies = []reply{{text: "again"}}
+	*evs = nil
+	if _, err := r.Send(context.Background(), "hi"); err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range *evs {
+		if e.Kind == EventTextDelta {
+			t.Fatal("deltas while streaming is off")
+		}
+	}
+}

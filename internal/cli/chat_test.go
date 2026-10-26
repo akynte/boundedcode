@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -48,6 +49,34 @@ func fakeOpenAI(t *testing.T) (*httptest.Server, *[]map[string]any) {
 			msg = map[string]any{"role": "assistant", "content": "", "tool_calls": []any{map[string]any{"id": "c1", "type": "function", "function": map[string]any{"name": "read", "arguments": `{"path":"../README.md"}`}}}}
 		} else {
 			msg = map[string]any{"role": "assistant", "content": "continued"}
+		}
+		if body["stream"] == true {
+			// Stream the answer: text in two pieces, tool calls whole, usage last.
+			w.Header().Set("Content-Type", "text/event-stream")
+			content, _ := msg["content"].(string)
+			delta := map[string]any{"role": "assistant"}
+			if tcs, ok := msg["tool_calls"]; ok {
+				var withIndex []any
+				for i, tc := range tcs.([]any) {
+					m := tc.(map[string]any)
+					m["index"] = i
+					withIndex = append(withIndex, m)
+				}
+				delta["tool_calls"] = withIndex
+			}
+			for i, piece := range []string{content[:len(content)/2], content[len(content)/2:]} {
+				d := map[string]any{"content": piece}
+				if i == 0 {
+					for k, v := range delta {
+						d[k] = v
+					}
+				}
+				b, _ := json.Marshal(map[string]any{"choices": []any{map[string]any{"index": 0, "delta": d}}})
+				fmt.Fprintf(w, "data: %s\n\n", b)
+			}
+			b, _ := json.Marshal(map[string]any{"choices": []any{}, "usage": map[string]any{"prompt_tokens": 50, "completion_tokens": 7}})
+			fmt.Fprintf(w, "data: %s\n\ndata: [DONE]\n\n", b)
+			return
 		}
 		_ = json.NewEncoder(w).Encode(map[string]any{"choices": []any{map[string]any{"message": msg, "finish_reason": "stop"}}, "usage": map[string]any{"prompt_tokens": 50, "completion_tokens": 7}})
 	}))
@@ -98,6 +127,9 @@ func TestChatHeadless(t *testing.T) {
 		if !strings.Contains(out, want) {
 			t.Fatalf("missing %q in:\n%s", want, out)
 		}
+	}
+	if strings.Count(out, "The README says") != 1 {
+		t.Fatalf("a streamed answer must be printed once:\n%s", out)
 	}
 	if len(*reqs) != 2 {
 		t.Fatalf("%d model calls", len(*reqs))

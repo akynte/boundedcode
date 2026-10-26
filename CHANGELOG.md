@@ -25,6 +25,18 @@ used on real work or measured.
   (Go parsed, other languages by pattern, headings for prose) when the
   file has more than 400 lines and no range was asked for; `grep` with
   too many matches returns the count per file instead of a cut dump.
+- Streaming (`direct.stream`): the answer shows as it is generated in the
+  TUI and in `bcode chat -p`; `--events` carries `text_delta` and
+  `reasoning_delta` events before the whole `text`. llama.cpp, OpenAI and
+  OpenAI-compatible servers stream (server-sent events folded into one
+  answer in the gateway, metered like any call); Anthropic and Gemini
+  answers still arrive whole.
+- The names a message mentions (identifiers, paths, quoted errors, ranked
+  by the context planner's seed rules) are looked up in the project before
+  the first model call and the places found travel with the message,
+  definitions first (`direct.seed_pack`). A deterministic lookup costs
+  milliseconds; the grep and read turns it replaces cost seconds each on a
+  local model.
 - Every file change is checked right away (`direct.checks`): a Go parse
   and `go build` of the package (`go vet` for a test file), `python3`,
   `node`, `bash`, `ruby` and `php` syntax checks when installed, JSON and

@@ -92,6 +92,13 @@ type DirectConfig struct {
 	// Checks runs a syntax check (and for Go a build of the package) after
 	// every file change and tells the model the result (default true).
 	Checks *bool `yaml:"checks,omitempty"`
+	// SeedPack looks up the names a message mentions (identifiers, paths,
+	// quoted errors) in the project before the first model call and sends
+	// the places found with the message (default true).
+	SeedPack *bool `yaml:"seed_pack,omitempty"`
+	// Stream shows the answer as it is generated when the provider can
+	// stream (default true).
+	Stream *bool `yaml:"stream,omitempty"`
 }
 
 // WebConfig configures the web tools.
@@ -132,6 +139,12 @@ func (d DirectConfig) CheckpointsOn() bool { return d.Checkpoints == nil || *d.C
 
 // ChecksOn reports whether post-change checks are enabled (default true).
 func (d DirectConfig) ChecksOn() bool { return d.Checks == nil || *d.Checks }
+
+// SeedPackOn reports whether the request lookup is enabled (default true).
+func (d DirectConfig) SeedPackOn() bool { return d.SeedPack == nil || *d.SeedPack }
+
+// StreamOn reports whether streaming is enabled (default true).
+func (d DirectConfig) StreamOn() bool { return d.Stream == nil || *d.Stream }
 
 // TaskConfig configures how requests are read before implementation.
 type TaskConfig struct {
