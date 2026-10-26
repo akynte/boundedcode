@@ -31,6 +31,15 @@ func TestRouteRules(t *testing.T) {
 		{"refactor the client, with tests", ModeVerify},
 		{"make the change across all services", ModeVerify},
 		{"", ModeChat},
+		// A ruled-out change is not a request for one.
+		{"Run the tests in ledger-service and tell me which test fails and why. Do not change anything yet.", ModeChat},
+		{"Without editing any code, tell me why the build fails", ModeChat},
+		// A question after a scene-setting clause, with dotted names.
+		{"In go/ast/astutil, what can Apply do that ast.Inspect cannot, and which file defines Apply?", ModeChat},
+		{"In package txtar, how does Parse recognise a file marker?", ModeChat},
+		{"Back in go/ast/inspector: add a method Len to Inspector and test it.", ModeCode},
+		{"Now add a unit test for Total in cart_test.go and run the tests.", ModeCode},
+		{"what does ast.Inspect do? then fix the nil check in walk.go", ModeChat},
 	}
 	for _, c := range cases {
 		if got := Route(c.req, rules, caps); got.Mode != c.mode {

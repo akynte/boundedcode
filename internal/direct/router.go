@@ -56,15 +56,25 @@ type RiskRules struct {
 }
 
 var (
-	questionLead  = regexp.MustCompile(`^(what|why|how|where|which|who|when|is|are|does|do|can|could|should|explain|describe|show|tell|summari[sz]e|list|find|walk me|help me understand|compare)\b`)
-	changeVerb    = regexp.MustCompile(`\b(fix|add|implement|create|write|change|update|refactor|rename|remove|delete|move|extract|replace|convert|migrate|upgrade|introduce|make|wire|hook up|clean up|cleanup|optimi[sz]e|improve|rewrite|generate|bump|support|handle|apply|revert|split|merge|inline|port)\b`)
-	verifyAsk     = regexp.MustCompile(`\b(verif(y|ied|ication)|with (a )?tests?|test-backed|evidence|prove|in a sandbox|isolated|bounded mode|safely|carefully|production|prod\b|release)\b`)
-	runVerb       = regexp.MustCompile(`\b(run|execute|build|compile|lint|check|test)\b`)
-	codeFence     = regexp.MustCompile("```")
-	filePathLike  = regexp.MustCompile(`[\w./-]+\.(go|ts|tsx|js|jsx|py|rs|java|kt|rb|php|c|cc|cpp|h|hpp|cs|swift|sql|proto|ya?ml|json|toml|md|sh)\b`)
-	riskyPathRe   = regexp.MustCompile(`(?i)(^|/)(auth|authn|authz|oauth|sso|login|session|password|secret|crypto|payment|billing|checkout|ledger|account|wallet|iam|rbac|permission|migrations?|schema|proto|openapi|swagger|contracts?|api/v\d|terraform|helm|k8s|kubernetes|deploy|infra)(/|[._-]|$)`)
-	riskyFileRe   = regexp.MustCompile(`(?i)\.(proto|sql|tf|tfvars)$|(^|/)(openapi|swagger)[^/]*\.(ya?ml|json)$|(^|/)(migrations?|db/migrate)/`)
-	politeLead    = regexp.MustCompile(`^(can|could|would|will|please)\b`)
+	questionLead = regexp.MustCompile(`^(what|why|how|where|which|who|when|is|are|does|do|can|could|should|explain|describe|show|tell|summari[sz]e|list|find|walk me|help me understand|compare)\b`)
+	changeVerb   = regexp.MustCompile(`\b(fix|add|implement|create|write|change|update|refactor|rename|remove|delete|move|extract|replace|convert|migrate|upgrade|introduce|make|wire|hook up|clean up|cleanup|optimi[sz]e|improve|rewrite|generate|bump|support|handle|apply|revert|split|merge|inline|port)\b`)
+	verifyAsk    = regexp.MustCompile(`\b(verif(y|ied|ication)|with (a )?tests?|test-backed|evidence|prove|in a sandbox|isolated|bounded mode|safely|carefully|production|prod\b|release)\b`)
+	runVerb      = regexp.MustCompile(`\b(run|execute|build|compile|lint|check|test)\b`)
+	codeFence    = regexp.MustCompile("```")
+	filePathLike = regexp.MustCompile(`[\w./-]+\.(go|ts|tsx|js|jsx|py|rs|java|kt|rb|php|c|cc|cpp|h|hpp|cs|swift|sql|proto|ya?ml|json|toml|md|sh)\b`)
+	riskyPathRe  = regexp.MustCompile(`(?i)(^|/)(auth|authn|authz|oauth|sso|login|session|password|secret|crypto|payment|billing|checkout|ledger|account|wallet|iam|rbac|permission|migrations?|schema|proto|openapi|swagger|contracts?|api/v\d|terraform|helm|k8s|kubernetes|deploy|infra)(/|[._-]|$)`)
+	riskyFileRe  = regexp.MustCompile(`(?i)\.(proto|sql|tf|tfvars)$|(^|/)(openapi|swagger)[^/]*\.(ya?ml|json)$|(^|/)(migrations?|db/migrate)/`)
+	politeLead   = regexp.MustCompile(`^(can|could|would|will|please)\b`)
+	// negatedChange is a change verb the request rules out ("do not change
+	// anything yet", "without editing the code"): not a request to change.
+	negatedChange = regexp.MustCompile(`\b(do not|don't|dont|never|without|no need to)\s+(\w+\s+){0,2}?(fix|chang|modif|edit|touch|writ|updat|delet|remov)\w*\b`)
+	// leadClause is an opening that sets the scene before the request
+	// proper ("In package txtar, how does…", "Back in foo: add…", "Now add…").
+	leadClause = regexp.MustCompile(`^((back |now |so |ok |okay )?(in|inside|within|for|about|regarding)\b[^,:?]{0,80}[,:]\s*|(now|ok|okay|so|also|then|next)\b[,:]?\s+)`)
+	// firstStop ends a sentence: a full stop, question or exclamation
+	// mark before a space or the end (not the dot in ast.Inspect or a
+	// file name), or a line break.
+	firstStop     = regexp.MustCompile(`[.?!](\s|$)|\n`)
 	multiRepoHint = regexp.MustCompile(`\b(across|both|all|every|each)\s+(services?|repos?|repositories|packages|modules|microservices)\b|\b(service|repo|repository)s?\s+and\s+(service|repo|repository)`)
 )
 
@@ -117,8 +127,8 @@ func route(request string, rules RiskRules) Decision {
 	if t == "" {
 		return Decision{Mode: ModeChat, Reason: "empty message", Confidence: "high"}
 	}
-	first := firstSentence(t)
-	hasChange := changeVerb.MatchString(t)
+	first := firstSentence(leadClause.ReplaceAllString(t, ""))
+	hasChange := changeVerb.MatchString(negatedChange.ReplaceAllString(t, " "))
 	isQuestion := questionLead.MatchString(first) || strings.HasSuffix(first, "?")
 	polite := politeLead.MatchString(first) // "can you add…" is a request, not a question
 	// A genuine question is answered, whatever it is about: nothing changes
@@ -161,8 +171,8 @@ func route(request string, rules RiskRules) Decision {
 }
 
 func firstSentence(t string) string {
-	if i := strings.IndexAny(t, ".?!\n"); i > 0 {
-		return strings.TrimSpace(t[:i+1])
+	if loc := firstStop.FindStringIndex(t); loc != nil && loc[0] > 0 {
+		return strings.TrimSpace(t[:loc[0]+1])
 	}
 	return t
 }
