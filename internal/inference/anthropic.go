@@ -246,6 +246,9 @@ func (a *anthropicFold) add(raw []byte, onDelta func(Delta)) error {
 		}
 		if ev.ContentBlock != nil {
 			a.blocks[ev.Index] = ev.ContentBlock
+			if ev.ContentBlock["type"] == "tool_use" && onDelta != nil {
+				onDelta(Delta{ToolCall: true})
+			}
 		}
 	case "content_block_delta":
 		if ev.Index < 0 || ev.Index >= len(a.blocks) {

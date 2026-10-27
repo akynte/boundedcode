@@ -1,0 +1,66 @@
+id: multi-feature-discount
+category: multi-language-feature
+language: multi
+fixture: polyglot
+repos: [shop-mono]
+request: >-
+  In shop-mono, order summaries should also report the discount. In the Go API,
+  add DiscountCents to Summary (JSON field discount_cents): the discount actually
+  applied, so never more than the subtotal. In the web client, parseSummary must
+  read it into a discountCents field, and describe must show a non-zero discount
+  as "<id>: <total> (saved <discount>)", for example "o1: 5.00 (saved 1.00)".
+  Add the field to contracts/summary.schema.json too, then run both test suites.
+criteria:
+  - The API summary has discount_cents, never above the subtotal
+  - The web client reads discountCents and shows a non-zero discount
+  - The schema lists discount_cents
+hidden:
+  - repo: shop-mono
+    path: api/hidden_test.go
+    content: |
+      package api
+
+      import (
+      	"encoding/json"
+      	"strings"
+      	"testing"
+      )
+
+      func TestHiddenDiscount(t *testing.T) {
+      	s := Summarize(Order{ID: "o1", Lines: []Line{{PriceCents: 1000, Qty: 1}}, DiscountCents: 300})
+      	if s.DiscountCents != 300 || s.TotalCents != 700 {
+      		t.Fatalf("%+v", s)
+      	}
+      	if s := Summarize(Order{ID: "o2", Lines: []Line{{PriceCents: 1000, Qty: 1}}, DiscountCents: 5000}); s.DiscountCents != 1000 || s.TotalCents != 0 {
+      		t.Fatalf("discount above the subtotal: %+v", s)
+      	}
+      	b, _ := json.Marshal(s)
+      	if !strings.Contains(string(b), `"discount_cents":300`) {
+      		t.Fatalf("json: %s", b)
+      	}
+      }
+  - repo: shop-mono
+    path: web/test/hidden.test.ts
+    content: |
+      import { test } from "node:test";
+      import assert from "node:assert/strict";
+      import { describe, parseSummary } from "../src/summary.ts";
+
+      test("discount is read and shown", () => {
+        const s = parseSummary('{"id":"o1","subtotal_cents":600,"total_cents":500,"discount_cents":100}');
+        assert.equal(s.discountCents, 100);
+        assert.equal(describe(s), "o1: 5.00 (saved 1.00)");
+      });
+
+      test("no discount, no note", () => {
+        const s = parseSummary('{"id":"o2","subtotal_cents":600,"total_cents":600,"discount_cents":0}');
+        assert.equal(describe(s), "o2: 6.00");
+      });
+checks:
+  - repo: shop-mono
+    run: [go, -C, api, test, ./...]
+  - repo: shop-mono
+    run: [sh, -c, "cd web && node --test"]
+  - repo: shop-mono
+    run: [grep, -q, discount_cents, contracts/summary.schema.json]
+timeout: 45m

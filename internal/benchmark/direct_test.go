@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -102,6 +103,22 @@ func TestDirectSuiteScoresAnswersAndChanges(t *testing.T) {
 	}
 	if s := rep.Summary; s.CacheHitRate < 0.8 || s.MeanCalls < 1.3 {
 		t.Fatalf("rates: %+v", s)
+	}
+	// Where the time and tokens went.
+	if len(mk.CallLog) != 2 || mk.CallStats.Calls != 2 || mk.AgentSeconds <= 0 || mk.ToolTimes["write"].Calls != 1 || mk.ToolSeconds <= 0 {
+		t.Fatalf("attribution: %+v", mk)
+	}
+	if c := mk.Context; c == nil || c.Counting != "estimate" || c.Sections["system"].Tokens == 0 || c.Sections["tool_schemas"].Bytes == 0 || c.PromptTokens != mk.CallLog[c.Call].Prompt {
+		t.Fatalf("context breakdown: %+v", mk.Context)
+	}
+	if w := byID["wrong"]; w.FailureClass != "model" || mk.FailureClass != "" {
+		t.Fatalf("failure classes: %q %q", w.FailureClass, mk.FailureClass)
+	}
+	if s := rep.Summary; s.Failures["model"] != 1 || s.MeanAgentSeconds <= 0 || s.FailedSeconds <= 0 || s.PassedSeconds <= 0 {
+		t.Fatalf("summary attribution: %+v", s)
+	}
+	if rep.Environment.OS == "" || rep.Environment.CPUs == 0 || rep.Environment.Toolchains["go"] == "" {
+		t.Fatalf("environment: %+v", rep.Environment)
 	}
 	if b, err := os.ReadFile(out); err != nil || !bytes.Contains(b, []byte(`"pass_rate"`)) {
 		t.Fatalf("report file: %v", err)
@@ -223,16 +240,38 @@ func TestDirectSuiteRunsSessionTurns(t *testing.T) {
 	}
 }
 
-// A run whose check commands are missing is refused before any task.
-func TestDirectSuiteRefusesMissingCheckCommands(t *testing.T) {
+// A task whose check commands are not installed is skipped and reported
+// as an environment gap; a run where no task can run is refused.
+func TestDirectSuiteSkipsTasksWithoutTheirToolchain(t *testing.T) {
 	dr := &DirectRunner{NewRunner: func(context.Context, string, string) (*direct.Runner, func(), error) {
 		t.Fatal("no task may run")
 		return nil, nil, nil
 	}}
 	tasks := []TaskSpec{{ID: "a", Checks: []Check{{Run: []string{"no-such-command-xyz", "test"}}}}, {ID: "b", Checks: []Check{{Run: []string{"no-such-command-xyz"}}}}}
-	_, err := dr.Run(context.Background(), "m", tasks, "")
-	if err == nil || err.Error() != "not on PATH: no-such-command-xyz (needed by a, b)" {
+	if _, err := dr.Run(context.Background(), "m", tasks, ""); err == nil || err.Error() != "no task can run here: no-such-command-xyz not on PATH" {
 		t.Fatalf("err = %v", err)
+	}
+
+	dr.NewRunner = func(context.Context, string, string) (*direct.Runner, func(), error) {
+		return nil, nil, errors.New("no model here")
+	}
+	tasks = append(tasks, TaskSpec{ID: "c", Language: "go", Repos: []string{"app"}, Checks: []Check{{Run: []string{"go", "version"}}}})
+	rep, err := dr.Run(context.Background(), "m", tasks, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	a, c := rep.Results[0], rep.Results[2]
+	if a.Skipped != "no-such-command-xyz not on PATH" || a.FailureClass != "environment" {
+		t.Fatalf("skipped task: %+v", a)
+	}
+	if c.Skipped != "" || c.Success || c.FailureClass == "" {
+		t.Fatalf("runnable task: %+v", c)
+	}
+	if s := rep.Summary; s.Tasks != 1 || s.Skipped != 2 || s.Failures["environment (skipped)"] != 2 {
+		t.Fatalf("summary: %+v", s)
+	}
+	if len(rep.ByLanguage) != 1 || rep.ByLanguage[0].Language != "go" {
+		t.Fatalf("by language: %+v", rep.ByLanguage)
 	}
 }
 
@@ -245,7 +284,7 @@ func TestDirectSuiteDefinitions(t *testing.T) {
 	if len(tasks) < 12 {
 		t.Fatalf("%d tasks", len(tasks))
 	}
-	cats := map[string]int{}
+	cats, langs := map[string]int{}, map[string]int{}
 	for _, task := range tasks {
 		if len(task.Repos) != 1 {
 			t.Errorf("%s: %d repos", task.ID, len(task.Repos))
@@ -254,6 +293,16 @@ func TestDirectSuiteDefinitions(t *testing.T) {
 			t.Errorf("%s: category and timeout are required", task.ID)
 		}
 		cats[task.Category]++
+		langs[task.Language]++
+	}
+	// Every language with a fixture has a change and a question.
+	for _, l := range []string{"go", "python", "typescript", "rust", "java", "multi"} {
+		if langs[l] < 2 {
+			t.Errorf("%s: %d tasks", l, langs[l])
+		}
+	}
+	if langs[""] > 0 {
+		t.Errorf("%d tasks without a language", langs[""])
 	}
 	for _, c := range []string{"explain", "locate", "diagnose", "small-fix", "add-test", "refactor", "feature", "large-locate", "large-change", "session"} {
 		if cats[c] == 0 {

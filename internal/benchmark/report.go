@@ -97,8 +97,50 @@ func WriteSuiteMarkdown(w io.Writer, r *SuiteReport) error {
 		fmt.Fprintf(&b, "| %s | %d | %d | %d | %d (%d) | %.0f | %d | %.0f | %d/%d | %d | %d |\n", t.ID, m.Packs, m.PackTokens, m.CodeTokens,
 			m.NavCalls, m.NavErrors, m.NavMillis, m.GraphCalls, m.GraphMillis, m.NavSymbols, m.GraphSymbols, m.Fallbacks, m.AgentToolCalls)
 	}
+	b.WriteString("\nWhere the time went, and why a task failed:\n\n" +
+		"| task | language | model calls | model s | prefill s | decode s | verification runs (passed) | verification s | cache invalidations | peak sandbox MiB | peak server MiB | failure | stalls |\n" +
+		"|---|---|---|---|---|---|---|---|---|---|---|---|---|\n")
+	for _, t := range r.Results {
+		passed := 0
+		for _, v := range t.VerifyRuns {
+			if v.Passed {
+				passed++
+			}
+		}
+		failure := t.FailureClass
+		if t.VerificationMissed {
+			failure = strings.TrimSpace(failure + " verification missed")
+		}
+		fmt.Fprintf(&b, "| %s | %s | %d | %.0f | %.0f | %.0f | %d (%d) | %.0f | %d | %.0f | %.0f | %s | %s |\n", t.ID, orDash(t.Language), t.Calls.Calls,
+			t.Calls.InferenceSeconds, t.Calls.PrefillSeconds, t.Calls.DecodeSeconds, len(t.VerifyRuns), passed, t.VerifySeconds, t.Calls.Invalidations,
+			t.Resources.ContainerMemMiB, t.Resources.ServerRSSMiB, orDash(failure), orDash(strings.ReplaceAll(strings.Join(t.Stalls, "; "), "|", "/")))
+	}
+	if e := r.Environment; e.OS != "" {
+		fmt.Fprintf(&b, "\n%s\n", environmentLine(e))
+	}
 	_, err := io.WriteString(w, b.String())
 	return err
+}
+
+// environmentLine renders a run's environment in one paragraph.
+func environmentLine(e Environment) string {
+	var parts []string
+	parts = append(parts, "build "+orDash(e.Build), e.OS, fmt.Sprintf("%s (%d threads, %d MiB)", orDash(e.CPU), e.CPUs, e.MemMiB))
+	if e.GPU != "" {
+		parts = append(parts, "GPU "+e.GPU)
+	}
+	if e.Server != "" {
+		parts = append(parts, "server "+e.Server)
+	}
+	if f, ok := e.Model["file"]; ok {
+		parts = append(parts, fmt.Sprintf("model %v (sha256 %v)", f, e.Model["sha256"]))
+	} else if m, ok := e.Model["model"]; ok {
+		parts = append(parts, fmt.Sprintf("model %v via %v", m, e.Model["provider"]))
+	}
+	if e.TasksHash != "" {
+		parts = append(parts, "tasks "+e.TasksHash)
+	}
+	return "Environment: " + strings.Join(parts, "; ") + "."
 }
 
 func orDash(s string) string {

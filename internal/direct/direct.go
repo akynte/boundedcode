@@ -263,6 +263,10 @@ type Runner struct {
 	// seen is how many messages of the history have been sent to the
 	// model; a tool result is only set aside once the model has seen it.
 	seen int
+	// OnRequest, when set, receives what each request of the loop is made
+	// of (requestSections) just before it is sent; benchmarks use it.
+	OnRequest func(sections map[string]string)
+	phases    phaseClock
 }
 
 // ErrInterrupted is returned when ctx ended while a message was processed;
@@ -327,13 +331,17 @@ func (r *Runner) Send(ctx context.Context, text string) (string, error) {
 	um := r.attach(text)
 	um.Context = r.turnContext()
 	if len(r.Session.Messages) == 0 && !r.Opts.NoSeedPack && r.Depth == 0 {
+		t0 := time.Now()
 		if pm := r.projectMap(); pm != "" {
 			um.Context += "\n\n" + pm
 		}
+		r.phase(PhaseProjectMap, t0)
 	}
+	t0 := time.Now()
 	if sp := r.seedPack(ctx, text); sp != "" {
 		um.Context += "\n\n" + sp
 	}
+	r.phase(PhaseSeedPack, t0)
 	if err := r.Session.Append(um); err != nil {
 		return "", err
 	}
@@ -353,7 +361,9 @@ func (r *Runner) Send(ctx context.Context, text string) (string, error) {
 		if err := ctx.Err(); err != nil {
 			return final, ErrInterrupted
 		}
+		t0 := time.Now()
 		r.elideIfNeeded()
+		r.phase(PhaseWorkingSet, t0)
 		if err := r.compactIfNeeded(ctx); err != nil {
 			return final, err
 		}
@@ -468,6 +478,9 @@ func (r *Runner) complete(ctx context.Context, tools []Tool) (Message, error) {
 	}
 	if r.Opts.MaxOutputTokens > 0 {
 		body["max_tokens"] = r.Opts.MaxOutputTokens
+	}
+	if r.OnRequest != nil {
+		r.OnRequest(r.requestSections(tools))
 	}
 	var status int
 	var resp any

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"go.yaml.in/yaml/v3"
 
 	"github.com/akynte/boundedcode/internal/buildinfo"
 	"github.com/akynte/boundedcode/internal/inference"
@@ -269,4 +270,31 @@ func (a *App) modelRows() []modelRow {
 			Fit: fits[n].Level, FitDetail: fits[n].Detail, Recommended: n == rec.Best.Profile})
 	}
 	return rows
+}
+
+// modelPin identifies a local model for benchmark reports: the profile,
+// the weights (file, revision, checksum) and the server and sampling
+// settings, under their configuration names.
+func modelPin(p model.Profile) map[string]any {
+	asMap := func(v any) map[string]any {
+		b, err := yaml.Marshal(v)
+		if err != nil {
+			return nil
+		}
+		var m map[string]any
+		_ = yaml.Unmarshal(b, &m)
+		return m
+	}
+	return map[string]any{"provider": inference.ProviderLocal, "profile": p.Name, "file": p.File, "repo": p.Source.Repo,
+		"revision": p.Source.Revision, "sha256": p.Source.SHA256, "size_bytes": p.Source.SizeBytes,
+		"server": asMap(p.Server), "sampling": asMap(p.Sampling)}
+}
+
+// serverBinary is the managed llama-server binary ("" for an external
+// server, whose version is not known here).
+func (a *App) serverBinary() string {
+	if a.Config.Inference.Mode == "external" {
+		return ""
+	}
+	return a.Config.Inference.ServerBinary
 }

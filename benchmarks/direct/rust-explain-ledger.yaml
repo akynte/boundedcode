@@ -1,0 +1,13 @@
+id: rust-explain-ledger
+category: explain
+language: rust
+fixture: polyglot
+repos: [rust-ledger]
+request: >-
+  In rust-ledger, what does Ledger::transfer return when the amount is zero or
+  negative, and what is the balance of an account that was never used? Answer
+  briefly; do not change any files.
+expect:
+  - "NonPositiveAmount"
+  - "(\\b0\\b|zero)"
+timeout: 10m

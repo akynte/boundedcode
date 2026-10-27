@@ -201,6 +201,7 @@ type oaResult struct {
 	Prompt       int    // all prompt tokens, cached ones included
 	Cached       int    // prompt tokens read from the provider's cache
 	Completion   int    // output tokens, thinking included
+	Reasoning    int    // thinking tokens, when the provider counts them apart
 }
 
 func (r oaResult) marshal() []byte {
@@ -211,13 +212,17 @@ func (r oaResult) marshal() []byte {
 	if len(r.ToolCalls) > 0 {
 		msg["tool_calls"] = r.ToolCalls
 	}
+	usage := map[string]any{
+		"prompt_tokens": r.Prompt, "completion_tokens": r.Completion, "total_tokens": r.Prompt + r.Completion,
+		"prompt_tokens_details": map[string]any{"cached_tokens": r.Cached},
+	}
+	if r.Reasoning > 0 {
+		usage["completion_tokens_details"] = map[string]any{"reasoning_tokens": r.Reasoning}
+	}
 	b, _ := json.Marshal(map[string]any{
 		"id": r.ID, "object": "chat.completion", "created": time.Now().Unix(), "model": r.Model,
 		"choices": []any{map[string]any{"index": 0, "message": msg, "finish_reason": r.FinishReason}},
-		"usage": map[string]any{
-			"prompt_tokens": r.Prompt, "completion_tokens": r.Completion, "total_tokens": r.Prompt + r.Completion,
-			"prompt_tokens_details": map[string]any{"cached_tokens": r.Cached},
-		},
+		"usage":   usage,
 	})
 	return b
 }

@@ -1,0 +1,42 @@
+id: ts-bugfix-cart-discount
+category: typescript-bugfix
+language: typescript
+fixture: polyglot
+repos: [ts-cart]
+setup:
+  - repo: ts-cart
+    file: src/cart.ts
+    old: "    this.discountPercent = pct;\n"
+    new: "    this.discountPercent += pct;\n"
+request: >-
+  In ts-cart, applying a second discount code adds the two percentages together:
+  SAVE10 then SAVE25 takes 35% off. Only the last code applied should count. Fix
+  it and run the tests.
+criteria:
+  - Only the last discount code applied counts
+hidden:
+  - repo: ts-cart
+    path: test/hidden.test.ts
+    content: |
+      import { test } from "node:test";
+      import assert from "node:assert/strict";
+      import { Cart } from "../src/cart.ts";
+
+      test("the last code applied counts", () => {
+        const c = new Cart();
+        c.add("a", 1000);
+        c.applyCode("SAVE10");
+        c.applyCode("save25");
+        assert.equal(c.total(), 750);
+      });
+
+      test("one code", () => {
+        const c = new Cart();
+        c.add("a", 999);
+        c.applyCode("SAVE10");
+        assert.equal(c.total(), 900);
+      });
+checks:
+  - repo: ts-cart
+    run: [node, --test]
+timeout: 45m

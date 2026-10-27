@@ -152,3 +152,23 @@ func TestSaveAgentPatch(t *testing.T) {
 		t.Fatalf("patch %q: %v\n%s", p, err, b)
 	}
 }
+
+// The shipped bounded suite loads, and every task names its language.
+func TestBoundedSuiteDefinitions(t *testing.T) {
+	tasks, err := LoadTasks(filepath.Join("..", "..", "benchmarks", "tasks"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	langs := map[string]int{}
+	for _, task := range tasks {
+		if task.Language == "" {
+			t.Errorf("%s: no language", task.ID)
+		}
+		langs[task.Language]++
+	}
+	for _, l := range []string{"go", "python", "typescript", "rust", "java", "multi"} {
+		if langs[l] == 0 {
+			t.Errorf("no %s task", l)
+		}
+	}
+}

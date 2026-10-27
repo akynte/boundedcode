@@ -37,6 +37,10 @@ type directEndpoint struct {
 	provider, model string
 	ctxSize         int
 	newGateway      func(sessionID string) *inference.Gateway
+	// pin identifies the model for benchmark reports; tokenize counts
+	// tokens with the local server's tokenizer (nil for a cloud provider).
+	pin      map[string]any
+	tokenize func(context.Context, string) (int, error)
 }
 
 func (a *App) directEndpoint(ctx context.Context, modelOverride string) (*directEndpoint, error) {
@@ -53,6 +57,7 @@ func (a *App) directEndpoint(ctx context.Context, modelOverride string) (*direct
 			return nil, err
 		}
 		return &directEndpoint{provider: cloud.provider, model: cloud.model, ctxSize: cloud.ctxSize,
+			pin: map[string]any{"provider": cloud.provider, "model": cloud.model, "context_tokens": cloud.ctxSize},
 			newGateway: func(id string) *inference.Gateway {
 				return &inference.Gateway{Model: cloud.model, Upstream: cloud.upstream(filepath.Join(a.sessionsDir(), ".replay", id)), DB: db, TaskID: id, Source: "direct", MaxTokens: maxTokens}
 			}}, nil
@@ -73,6 +78,7 @@ func (a *App) directEndpoint(ctx context.Context, modelOverride string) (*direct
 		}
 	}
 	return &directEndpoint{provider: inference.ProviderLocal, model: ep.Model, ctxSize: p.Server.CtxSize,
+		pin: modelPin(p), tokenize: inference.NewClient(ep.BaseURL, timeout).Tokenize,
 		newGateway: func(id string) *inference.Gateway {
 			return &inference.Gateway{Model: ep.Model, Client: inference.NewClient(ep.BaseURL, timeout), DB: db, TaskID: id, Source: "direct", MaxTokens: maxTokens}
 		}}, nil

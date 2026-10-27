@@ -1,0 +1,12 @@
+id: ts-locate-discount
+category: locate
+language: typescript
+fixture: polyglot
+repos: [ts-cart]
+request: >-
+  In ts-cart, where is a discount code's percentage looked up, and how is the
+  discount rounded? Answer briefly; do not change any files.
+expect:
+  - "DISCOUNTS"
+  - "(floor|round(ed|s|ing)? down)"
+timeout: 10m

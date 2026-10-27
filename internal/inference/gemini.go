@@ -216,6 +216,9 @@ func foldGemini(r io.Reader, onDelta func(Delta)) ([]byte, error) {
 					onDelta(Delta{Text: text})
 				}
 			}
+			if _, call := p["functionCall"]; call && onDelta != nil {
+				onDelta(Delta{ToolCall: true})
+			}
 			parts = mergeGeminiPart(parts, p)
 		}
 		return true, nil
@@ -435,7 +438,7 @@ func (u *GeminiUpstream) parse(resp []byte) (oaResult, geminiTurn, error) {
 		return oaResult{}, geminiTurn{}, fmt.Errorf("decode gemini response: %w", err)
 	}
 	res := oaResult{ID: g.ResponseID, Model: g.ModelVersion, Prompt: g.Usage.Prompt + g.Usage.ToolPrompt,
-		Cached: g.Usage.Cached, Completion: g.Usage.Candidates + g.Usage.Thoughts}
+		Cached: g.Usage.Cached, Completion: g.Usage.Candidates + g.Usage.Thoughts, Reasoning: g.Usage.Thoughts}
 	if res.ID == "" {
 		res.ID = "gemini-" + randomID()
 	}

@@ -229,21 +229,25 @@ hooks:
 	r.emit(Event{Kind: EventToolStart, Tool: t.Name, CallID: call.ID, Summary: summary, Args: args})
 	start := time.Now()
 	out, err := t.Run(ctx, r, args)
-	el := time.Since(start)
 	if err == nil && t.Mutates && t.Name != "bash" {
 		if abs, rel, rerr := r.resolve(str(args, "path")); rerr == nil {
 			if !r.Opts.NoChecks {
+				t0 := time.Now()
 				if diag := r.checkFile(ctx, abs, rel, before); diag != "" {
 					out += "\n" + diag
 				}
+				r.phase(PhaseChecks, t0)
 			}
 			if !r.Opts.NoHistoryNotes {
+				t0 := time.Now()
 				if note := r.coChangeNote(r.rootRel(abs)); note != "" {
 					out += "\n" + note
 				}
+				r.phase(PhaseHistoryNotes, t0)
 			}
 		}
 	}
+	el := time.Since(start) // the tool, its check and history note
 	if res := r.runHooks(ctx, HookPostTool, HookInput{Tool: t.Name, Args: args, Result: r.clip(out), Error: errString(err)}); res.Extra != "" {
 		out += "\n\n[hook] " + res.Extra
 	}

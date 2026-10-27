@@ -1,0 +1,13 @@
+id: py-explain-reorder
+category: explain
+language: python
+fixture: polyglot
+repos: [py-inventory]
+request: >-
+  In the inventory project, how does reorder_plan decide how many units of a SKU
+  to order, and which SKUs does it leave out of the plan? Answer briefly; do not
+  change any files.
+expect:
+  - "target"
+  - "(at or above|already|at least|not below|>=|reach|meets?|equal)"
+timeout: 10m

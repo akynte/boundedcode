@@ -1,0 +1,47 @@
+id: py-bugfix-inventory
+category: python-bugfix
+language: python
+fixture: polyglot
+repos: [py-inventory]
+setup:
+  - repo: py-inventory
+    file: inventory.py
+    old: "        if have < qty:\n"
+    new: "        if have < 0:\n"
+request: >-
+  In the inventory project, removing more units than a SKU has in stock does not
+  raise InsufficientStock: the stock goes negative. Fix Inventory.remove so it
+  raises and leaves the stock unchanged, then run the tests.
+criteria:
+  - Removing more units than are in stock raises InsufficientStock
+  - The stock is unchanged after a refused removal
+hidden:
+  - repo: py-inventory
+    path: tests/test_hidden_remove.py
+    content: |
+      import unittest
+
+      from inventory import InsufficientStock, Inventory
+
+
+      class HiddenRemove(unittest.TestCase):
+          def test_overdraw_raises_and_keeps_stock(self):
+              inv = Inventory()
+              inv.add("a", 3)
+              with self.assertRaises(InsufficientStock):
+                  inv.remove("a", 5)
+              self.assertEqual(inv.quantity("a"), 3)
+
+          def test_exact_removal(self):
+              inv = Inventory()
+              inv.add("a", 3)
+              inv.remove("a", 3)
+              self.assertEqual(inv.quantity("a"), 0)
+
+          def test_unknown_sku(self):
+              with self.assertRaises(InsufficientStock):
+                  Inventory().remove("zz", 1)
+checks:
+  - repo: py-inventory
+    run: [python3, -m, unittest, -q]
+timeout: 45m

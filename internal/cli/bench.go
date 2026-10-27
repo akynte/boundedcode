@@ -17,6 +17,7 @@ import (
 	"github.com/akynte/boundedcode/internal/buildinfo"
 	"github.com/akynte/boundedcode/internal/config"
 	"github.com/akynte/boundedcode/internal/direct"
+	"github.com/akynte/boundedcode/internal/inference"
 	"github.com/akynte/boundedcode/internal/orchestrator"
 	"github.com/akynte/boundedcode/internal/repointel/cbm"
 	"github.com/akynte/boundedcode/internal/repointel/serena"
@@ -25,7 +26,7 @@ import (
 
 func newBenchCmd(app *App) *cobra.Command {
 	cmd := &cobra.Command{Use: "bench", Short: "Run reproducible benchmarks"}
-	cmd.AddCommand(newBenchInfraCmd(app), newBenchTasksCmd(app), newBenchDirectCmd(app), newBenchIntelCmd(app), newBenchLeaseCmd(app), newBenchTrailCmd(app))
+	cmd.AddCommand(newBenchInfraCmd(app), newBenchTasksCmd(app), newBenchDirectCmd(app), newBenchIntelCmd(app), newBenchLeaseCmd(app), newBenchTrailCmd(app), newBenchCompareCmd(app))
 	return cmd
 }
 
@@ -211,6 +212,7 @@ func newBenchTasksCmd(app *App) *cobra.Command {
 				out = filepath.Join("benchmarks", "reports", fmt.Sprintf("%s-tasks-%s.json", stamp, p.Name))
 			}
 			sr := &benchmark.SuiteRunner{FixturesDir: fixtures, WorkRoot: work, Sandbox: sb,
+				Model: modelPin(p), ServerBinary: app.serverBinary(), TaskDirs: []string{dir},
 				Progress: func(s string) { fmt.Fprintf(app.Err, "%s %s\n", time.Now().Format("15:04:05"), s) },
 				NewRunner: func(ctx context.Context, stateDir string) (*orchestrator.Runner, func(), error) {
 					paths := config.Paths{Runtime: app.Paths.Runtime, Config: app.Paths.Config, Data: filepath.Join(stateDir, "data"), Cache: filepath.Join(stateDir, "cache"), State: filepath.Join(stateDir, "state")}
@@ -345,6 +347,7 @@ aside and recalled, summaries, broken edits caught by the check, and time.`,
 				dc.HistoryNotes = &off
 			}
 			dr := &benchmark.DirectRunner{FixturesDir: fixtures, WorkRoot: work, Rules: app.riskRules(), Timeout: timeout,
+				Tokenize: ep.tokenize, Model: ep.pin, TaskDirs: dirs,
 				Settings: map[string]any{"approval": approval, "working_set_tokens": dc.WorkingSetTokens, "max_tool_output": dc.MaxToolOutput, "checks": dc.ChecksOn(), "seed_pack": dc.SeedPackOn(), "history_notes": dc.HistoryNotesOn(), "context_tokens": ep.ctxSize, "provider": ep.provider},
 				Progress: func(s string) { fmt.Fprintf(app.Err, "%s %s\n", time.Now().Format("15:04:05"), s) },
 				NewRunner: func(ctx context.Context, root, stateDir string) (*direct.Runner, func(), error) {
@@ -367,6 +370,9 @@ aside and recalled, summaries, broken edits caught by the check, and time.`,
 					r := &direct.Runner{Gateway: ep.newGateway(sess.ID), Session: sess, Opts: opts}
 					return r, func() { r.Close() }, nil
 				}}
+			if ep.provider == inference.ProviderLocal {
+				dr.ServerBinary = app.serverBinary()
+			}
 			rep, err := dr.Run(ctx, ep.model, tasks, out)
 			if rep != nil {
 				md := strings.TrimSuffix(out, ".json") + ".md"
@@ -573,5 +579,56 @@ is involved.`,
 	f.IntVar(&history, "history", 1000, "earlier commits that form each commit's trail")
 	f.IntVar(&maxFiles, "max-files", 30, "skip commits that change more non-test files than this")
 	f.StringVar(&out, "out", "", "report path (.json; .md written alongside)")
+	return cmd
+}
+
+func newBenchCompareCmd(app *App) *cobra.Command {
+	var base, cand []string
+	cmd := &cobra.Command{
+		Use:   "compare",
+		Short: "Compare candidate runs of a suite with baseline runs (direct or bounded reports)",
+		Long: `Each side is one or more saved reports of the same suite (bench direct or
+bench tasks). A metric is called better or worse only when the candidate's
+mean lies outside the range of the baseline's own runs; with one baseline run
+the noise is unknown and nothing is called a difference. Per task, passes are
+counted on each side.`,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if len(base) == 0 || len(cand) == 0 {
+				return fmt.Errorf("--base and --candidate each need at least one report")
+			}
+			load := func(paths []string) ([]*benchmark.Run, error) {
+				var out []*benchmark.Run
+				for _, p := range paths {
+					r, err := benchmark.LoadRun(p)
+					if err != nil {
+						return nil, err
+					}
+					if len(out) > 0 && out[0].Kind != r.Kind {
+						return nil, fmt.Errorf("%s is a %s report; %s is %s", p, r.Kind, paths[0], out[0].Kind)
+					}
+					out = append(out, r)
+				}
+				return out, nil
+			}
+			b, err := load(base)
+			if err != nil {
+				return err
+			}
+			c, err := load(cand)
+			if err != nil {
+				return err
+			}
+			if b[0].Kind != c[0].Kind {
+				return fmt.Errorf("the baseline is %s and the candidate %s", b[0].Kind, c[0].Kind)
+			}
+			var buf bytes.Buffer
+			benchmark.Compare(&buf, b, c)
+			app.printf("%s", buf.String())
+			return nil
+		},
+	}
+	f := cmd.Flags()
+	f.StringSliceVar(&base, "base", nil, "baseline report (repeatable)")
+	f.StringSliceVar(&cand, "candidate", nil, "candidate report (repeatable)")
 	return cmd
 }

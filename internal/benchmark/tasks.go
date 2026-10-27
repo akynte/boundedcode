@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -19,6 +20,7 @@ import (
 	"github.com/akynte/boundedcode/internal/config"
 	"github.com/akynte/boundedcode/internal/contextplan"
 	"github.com/akynte/boundedcode/internal/gitops"
+	"github.com/akynte/boundedcode/internal/inference"
 	"github.com/akynte/boundedcode/internal/orchestrator"
 	"github.com/akynte/boundedcode/internal/sandbox"
 	"github.com/akynte/boundedcode/internal/task"
@@ -29,6 +31,10 @@ import (
 type TaskSpec struct {
 	ID       string `yaml:"id"`
 	Category string `yaml:"category"`
+	// Language is what the task's code is written in ("go", "python",
+	// "typescript", "rust", "java", "multi" for several); reports are
+	// summarised per language.
+	Language string `yaml:"language"`
 	Fixture  string `yaml:"fixture"` // directory under benchmarks/fixtures
 	// Sources adds repositories copied from elsewhere, by name. Supported:
 	// "gomod:<module>@<version>" copies a module from the Go module cache
@@ -45,6 +51,10 @@ type TaskSpec struct {
 	// Hidden files are written after the agent finishes, then Checks run.
 	Hidden []File  `yaml:"hidden"`
 	Checks []Check `yaml:"checks"`
+	// Requires lists the executables the checks need besides their own
+	// first word (a check run through sh -c); a task whose requirements
+	// are not installed is skipped in the direct-mode suite.
+	Requires []string `yaml:"requires,omitempty"`
 	// Expect lists regular expressions (case-insensitive) the agent's final
 	// answer must match; for questions in the direct-mode suite, where the
 	// answer is the deliverable. A task needs checks or expect, or both.
@@ -160,6 +170,33 @@ type TaskResult struct {
 	// Intel summarizes repository intelligence and agent tool use, from the
 	// task's audit events.
 	Intel IntelMetrics `json:"intel"`
+
+	Language string `json:"language,omitempty"`
+	// Calls attributes the model calls (from the task's ledger: the
+	// adapter's calls are not streamed, so there is no time to first
+	// token; history rewrites by the agent's condenser are not marked).
+	Calls CallSummary `json:"calls"`
+	// VerifySeconds is the time in verification runs; VerifyRuns each
+	// run's scope, outcome and duration.
+	VerifySeconds float64     `json:"verify_seconds"`
+	VerifyRuns    []VerifyRun `json:"verify_runs,omitempty"`
+	// Stalls: the strategy governor stopped an attempt, the agent reported
+	// itself stuck, the task was blocked (with its reason).
+	Stalls []string `json:"stalls,omitempty"`
+	// FailureClass: "" (passed), "model", "verification_false_pass" (self-
+	// verified, hidden checks failed), "timeout", "environment", "harness".
+	// VerificationMissed marks a pass the gate did not verify.
+	FailureClass       string        `json:"failure_class,omitempty"`
+	VerificationMissed bool          `json:"verification_missed,omitempty"`
+	Resources          ResourcePeaks `json:"resources"`
+}
+
+// VerifyRun is one verification run of a task.
+type VerifyRun struct {
+	Repo    string  `json:"repo"`
+	Scope   string  `json:"scope"`
+	Passed  bool    `json:"passed"`
+	Seconds float64 `json:"seconds"`
 }
 
 // IntelMetrics are per-task repository-intelligence measurements.
@@ -188,6 +225,8 @@ type SuiteReport struct {
 	Results  []TaskResult `json:"results"`
 	Summary  Summary      `json:"summary"`
 	Notes    []string     `json:"notes,omitempty"`
+
+	Environment Environment `json:"environment"`
 }
 
 // Summary holds the product KPIs (docs/product-spec.md §4.11).
@@ -212,6 +251,10 @@ type SuiteRunner struct {
 	// NewRunner builds an orchestrator bound to a fresh state dir.
 	NewRunner func(ctx context.Context, stateDir string) (*orchestrator.Runner, func(), error)
 	Progress  func(string)
+	// Model, ServerBinary and TaskDirs pin the run's environment.
+	Model        map[string]any
+	ServerBinary string
+	TaskDirs     []string
 }
 
 // Run executes the given tasks sequentially.
@@ -225,7 +268,8 @@ func (s *SuiteRunner) RunBaselines(ctx context.Context, model string, tasks []Ta
 }
 
 func (s *SuiteRunner) run(ctx context.Context, model string, tasks []TaskSpec, out string, one func(context.Context, string, TaskSpec) TaskResult) (*SuiteReport, error) {
-	rep := &SuiteReport{ID: "suite-" + time.Now().UTC().Format("20060102T150405Z"), Model: model, Started: time.Now().UTC()}
+	rep := &SuiteReport{ID: "suite-" + time.Now().UTC().Format("20060102T150405Z"), Model: model, Started: time.Now().UTC(),
+		Environment: captureEnvironment(ctx, s.Model, s.ServerBinary, tasks, s.TaskDirs, s.FixturesDir)}
 	save := func() {
 		rep.Summary = summarize(rep.Results)
 		if out != "" {
@@ -256,9 +300,16 @@ func (s *SuiteRunner) progress(format string, args ...any) {
 }
 
 func (s *SuiteRunner) runOne(ctx context.Context, model string, spec TaskSpec) (res TaskResult) {
-	res = TaskResult{ID: spec.ID, Category: spec.Category, Model: model}
+	res = TaskResult{ID: spec.ID, Category: spec.Category, Language: spec.Language, Model: model}
 	start := time.Now()
-	defer func() { res.WallSeconds = time.Since(start).Seconds() }()
+	stopSampling := sampleResources(ctx, true)
+	defer func() {
+		res.WallSeconds = time.Since(start).Seconds()
+		if res.Resources.Samples == 0 {
+			res.Resources = stopSampling()
+		}
+		res.FailureClass, res.VerificationMissed = boundedFailure(res)
+	}()
 	dir := filepath.Join(s.WorkRoot, fmt.Sprintf("%s-%d", spec.ID, time.Now().UnixNano()))
 	fixture := ""
 	if spec.Fixture != "" {
@@ -346,9 +397,14 @@ func (s *SuiteRunner) runOne(ctx context.Context, model string, spec TaskSpec) (
 		res.Condensations = final.Budget.Condensations
 		res.Resumes = final.Budget.SessionsResumed
 	}
+	res.Resources = stopSampling()
 	if runErr != nil && !errors.Is(runErr, context.DeadlineExceeded) {
 		res.Error = runErr.Error()
 	}
+	if errors.Is(runErr, context.DeadlineExceeded) || tctx.Err() != nil {
+		res.Stalls = append(res.Stalls, "timeout")
+	}
+	collectRun(ctx, r.DB, tk.ID, &res)
 	wts, err := r.Ledger.Worktrees(ctx, tk.ID)
 	if err != nil {
 		res.Error = err.Error()
@@ -412,6 +468,82 @@ func (s *SuiteRunner) runOne(ctx context.Context, model string, spec TaskSpec) (
 	res.LocalOnly = res.Success && res.Escalations == 0
 	res.Intel = collectIntel(ctx, r.DB, tk.ID)
 	return res
+}
+
+// collectRun reads a task's model calls, verification runs and stalls
+// from its ledger.
+func collectRun(ctx context.Context, db *sql.DB, taskID string, res *TaskResult) {
+	var log []inference.CallStat
+	if rows, err := db.QueryContext(ctx, `SELECT prompt_tokens, cached_tokens, completion_tokens, reasoning_tokens, prompt_ms, decode_ms, total_ms, ttft_ms, status
+		FROM model_calls WHERE task_id = ? ORDER BY id`, taskID); err == nil {
+		for rows.Next() {
+			var c inference.CallStat
+			if rows.Scan(&c.Prompt, &c.Cached, &c.Completion, &c.Reasoning, &c.PrefillMS, &c.DecodeMS, &c.TotalMS, &c.TTFTMS, &c.Status) == nil {
+				if c.Reasoning > 0 {
+					c.ReasoningSource = "provider"
+				}
+				log = append(log, c)
+			}
+		}
+		rows.Close()
+	}
+	res.Calls = summarizeCalls(log, nil)
+	for _, c := range log {
+		res.Calls.PromptTokens += c.Prompt
+	}
+	if rows, err := db.QueryContext(ctx, `SELECT repository, scope, passed, duration_ms FROM verification_runs WHERE task_id = ? ORDER BY id`, taskID); err == nil {
+		for rows.Next() {
+			var v VerifyRun
+			var ms int64
+			if rows.Scan(&v.Repo, &v.Scope, &v.Passed, &ms) == nil {
+				v.Seconds = float64(ms) / 1000
+				res.VerifySeconds += v.Seconds
+				res.VerifyRuns = append(res.VerifyRuns, v)
+			}
+		}
+		rows.Close()
+	}
+	if rows, err := db.QueryContext(ctx, `SELECT kind, data FROM events WHERE task_id = ? AND kind IN ('strategy.stopped', 'agent.turn', 'task.blocked') ORDER BY id`, taskID); err == nil {
+		for rows.Next() {
+			var kind, data string
+			if rows.Scan(&kind, &data) != nil {
+				continue
+			}
+			var e struct {
+				Reason string `json:"reason"`
+				Stuck  bool   `json:"stuck"`
+			}
+			_ = json.Unmarshal([]byte(data), &e)
+			switch {
+			case kind == "strategy.stopped":
+				res.Stalls = append(res.Stalls, "governor: "+tailStr(e.Reason, 80))
+			case kind == "agent.turn" && e.Stuck:
+				res.Stalls = append(res.Stalls, "agent stuck")
+			case kind == "task.blocked":
+				res.Stalls = append(res.Stalls, "blocked: "+tailStr(e.Reason, 80))
+			}
+		}
+		rows.Close()
+	}
+}
+
+// boundedFailure classifies a bounded task's outcome.
+func boundedFailure(r TaskResult) (class string, missed bool) {
+	missed = r.Success && !r.SelfVerified
+	switch {
+	case r.Success:
+		return "", missed
+	case r.SelfVerified:
+		return "verification_false_pass", missed
+	case slices.Contains(r.Stalls, "timeout"):
+		return "timeout", missed
+	case strings.HasPrefix(r.Error, "materialize"), strings.HasPrefix(r.Error, "runner:"), strings.Contains(r.Error, "sandbox"),
+		strings.Contains(r.Error, "docker"), strings.Contains(r.Error, "image"):
+		return "environment", missed
+	case r.Error != "":
+		return "harness", missed
+	}
+	return "model", missed
 }
 
 // collectIntel aggregates context-pack and agent-tool events of a task.

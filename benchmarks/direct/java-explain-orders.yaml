@@ -1,0 +1,12 @@
+id: java-explain-orders
+category: explain
+language: java
+fixture: polyglot
+repos: [java-orders]
+request: >-
+  In java-orders, what happens when OrderBook.cancel is called on a paid order,
+  and on an id that does not exist? Answer briefly; do not change any files.
+expect:
+  - "IllegalStateException"
+  - "NoSuchElementException"
+timeout: 10m

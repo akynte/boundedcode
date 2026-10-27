@@ -208,4 +208,10 @@ CREATE TABLE compat_results (
 CREATE INDEX compat_results_link ON compat_results(task_id, link_id, commits);
 CREATE INDEX compat_results_eval ON compat_results(evaluation_id);
 `,
+	// 7: model calls record reasoning tokens (when the provider reports
+	// them) and the time to the first streamed token.
+	`
+ALTER TABLE model_calls ADD COLUMN reasoning_tokens INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE model_calls ADD COLUMN ttft_ms REAL NOT NULL DEFAULT 0;
+`,
 }

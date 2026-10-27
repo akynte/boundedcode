@@ -29,6 +29,9 @@ type Gateway struct {
 	// MaxTokens bounds prompt+completion tokens across the gateway's life
 	// (0 = unlimited).
 	MaxTokens int
+	// KeepLog keeps every call's figures in memory (CallLog), for
+	// benchmarks; the ledger gets them either way.
+	KeepLog bool
 
 	mu        sync.Mutex
 	used      int // processed tokens: uncached prompt + completion
@@ -36,6 +39,38 @@ type Gateway struct {
 	cached    int // prompt tokens served from the server's prompt cache
 	calls     int // requests forwarded
 	peak      int // the largest prompt of one request, cached tokens included
+	log       []CallStat
+}
+
+// CallStat is one model call as the gateway measured it.
+type CallStat struct {
+	Prompt     int `json:"prompt_tokens"` // all prompt tokens, cached ones included
+	Cached     int `json:"cached_tokens"`
+	Completion int `json:"completion_tokens"` // output tokens, reasoning included
+	// Reasoning is the reasoning (thinking) part of Completion, and
+	// ReasoningSource where the count came from: "provider" when the
+	// response reported it. A caller may count ReasoningText itself and
+	// set "tokenizer" (exact) or "estimate".
+	Reasoning       int    `json:"reasoning_tokens,omitempty"`
+	ReasoningSource string `json:"reasoning_source,omitempty"`
+	ReasoningText   string `json:"-"`
+	// TTFTMS is the time from the request to the first streamed delta
+	// (text, reasoning or a tool call); 0 when the call was not streamed.
+	TTFTMS float64 `json:"ttft_ms,omitempty"`
+	// PrefillMS and DecodeMS are the server's own prompt-processing and
+	// generation times (llama.cpp timings); 0 when it reports none.
+	PrefillMS float64 `json:"prefill_ms,omitempty"`
+	DecodeMS  float64 `json:"decode_ms,omitempty"`
+	TotalMS   float64 `json:"total_ms"` // request to complete answer
+	Status    string  `json:"status"`
+	Streamed  bool    `json:"streamed,omitempty"`
+}
+
+// CallLog returns the calls so far (KeepLog only).
+func (g *Gateway) CallLog() []CallStat {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	return append([]CallStat(nil), g.log...)
 }
 
 // Stats returns processed, generated and cached token counts.
@@ -92,23 +127,35 @@ func (g *Gateway) Forward(ctx context.Context, path string, body map[string]any)
 	total := time.Since(start)
 	if err != nil {
 		// Transport errors become a 502 for the agent, not a Go error.
-		g.record(ctx, 0, 0, 0, nil, total, "transport_error")
+		g.record(ctx, CallStat{TotalMS: ms(total), Status: "transport_error"})
 		return http.StatusBadGateway, map[string]any{"error": map[string]any{"message": err.Error()}}, nil //nolint:nilerr // see above
 	}
-	return g.account(ctx, status, resp, total), g.decode(resp), nil
+	return g.account(ctx, status, resp, CallStat{TotalMS: ms(total)}), g.decode(resp), nil
 }
 
+func ms(d time.Duration) float64 { return float64(d) / float64(time.Millisecond) }
+
 // account meters an answer (tokens, cache hits, timings) and records the
-// call; it returns the status unchanged.
-func (g *Gateway) account(ctx context.Context, status int, resp []byte, total time.Duration) int {
+// call; it returns the status unchanged. cs carries what the caller
+// measured (total time, time to first token).
+func (g *Gateway) account(ctx context.Context, status int, resp []byte, cs CallStat) int {
 	var parsed struct {
 		Usage struct {
 			Usage
 			Details *struct {
 				Cached int `json:"cached_tokens"`
 			} `json:"prompt_tokens_details"`
+			Completion *struct {
+				Reasoning int `json:"reasoning_tokens"`
+			} `json:"completion_tokens_details"`
 		} `json:"usage"`
 		Timings *Timings `json:"timings"`
+		Choices []struct {
+			Message struct {
+				ReasoningContent string `json:"reasoning_content"`
+				Reasoning        string `json:"reasoning"`
+			} `json:"message"`
+		} `json:"choices"`
 	}
 	_ = json.Unmarshal(resp, &parsed)
 	cached := 0
@@ -125,11 +172,24 @@ func (g *Gateway) account(ctx context.Context, status int, resp []byte, total ti
 	g.cached += cached
 	g.peak = max(g.peak, parsed.Usage.PromptTokens)
 	g.mu.Unlock()
-	st := "ok"
+	cs.Status = "ok"
 	if status != http.StatusOK {
-		st = fmt.Sprintf("http_%d", status)
+		cs.Status = fmt.Sprintf("http_%d", status)
 	}
-	g.record(ctx, parsed.Usage.PromptTokens, parsed.Usage.CompletionTokens, cached, parsed.Timings, total, st)
+	cs.Prompt, cs.Completion, cs.Cached = parsed.Usage.PromptTokens, parsed.Usage.CompletionTokens, cached
+	if parsed.Timings != nil {
+		cs.PrefillMS, cs.DecodeMS = parsed.Timings.PromptMS, parsed.Timings.PredictedMS
+	}
+	if c := parsed.Usage.Completion; c != nil && c.Reasoning > 0 {
+		cs.Reasoning, cs.ReasoningSource = c.Reasoning, "provider"
+	} else if len(parsed.Choices) > 0 && g.KeepLog {
+		m := parsed.Choices[0].Message
+		cs.ReasoningText = m.ReasoningContent
+		if cs.ReasoningText == "" {
+			cs.ReasoningText = m.Reasoning
+		}
+	}
+	g.record(ctx, cs)
 	return status
 }
 
@@ -153,15 +213,16 @@ func (g *Gateway) upstream() Upstream {
 // Provider names the gateway's provider.
 func (g *Gateway) Provider() string { return g.upstream().Provider() }
 
-func (g *Gateway) record(ctx context.Context, prompt, completion, cached int, t *Timings, total time.Duration, status string) {
+func (g *Gateway) record(ctx context.Context, cs CallStat) {
+	if g.KeepLog {
+		g.mu.Lock()
+		g.log = append(g.log, cs)
+		g.mu.Unlock()
+	}
 	if g.DB == nil {
 		return
 	}
-	var pms, dms float64
-	if t != nil {
-		pms, dms = t.PromptMS, t.PredictedMS
-	}
-	_, _ = g.DB.ExecContext(context.WithoutCancel(ctx), `INSERT INTO model_calls(task_id, source, model, provider, prompt_tokens, completion_tokens, cached_tokens, prompt_ms, decode_ms, total_ms, status, created_at)
-		VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`, g.TaskID, g.Source, g.Model, g.Provider(), prompt, completion, cached, pms, dms,
-		float64(total)/float64(time.Millisecond), status, store.Now())
+	_, _ = g.DB.ExecContext(context.WithoutCancel(ctx), `INSERT INTO model_calls(task_id, source, model, provider, prompt_tokens, completion_tokens, cached_tokens, reasoning_tokens, prompt_ms, decode_ms, total_ms, ttft_ms, status, created_at)
+		VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, g.TaskID, g.Source, g.Model, g.Provider(), cs.Prompt, cs.Completion, cs.Cached, cs.Reasoning,
+		cs.PrefillMS, cs.DecodeMS, cs.TotalMS, cs.TTFTMS, cs.Status, store.Now())
 }

@@ -1,0 +1,41 @@
+id: rust-fix-transfer
+category: small-fix
+language: rust
+fixture: polyglot
+repos: [rust-ledger]
+setup:
+  - repo: rust-ledger
+    file: src/lib.rs
+    old: "        if balance < cents {\n"
+    new: "        if balance < 0 {\n"
+request: >-
+  In rust-ledger, Ledger::transfer lets an account go below zero: moving more
+  cents than the source account holds succeeds. It must fail with
+  InsufficientFunds and change neither balance. Fix it and run the tests.
+hidden:
+  - repo: rust-ledger
+    path: tests/hidden_transfer.rs
+    content: |
+      use ledger::{Ledger, LedgerError};
+
+      #[test]
+      fn overdraw_is_refused_and_changes_nothing() {
+          let mut l = Ledger::new();
+          l.deposit("a", 300).unwrap();
+          let err = l.transfer("a", "b", 500).unwrap_err();
+          assert_eq!(err, LedgerError::InsufficientFunds { account: "a".into(), balance: 300, needed: 500 });
+          assert_eq!(l.balance("a"), 300);
+          assert_eq!(l.balance("b"), 0);
+      }
+
+      #[test]
+      fn exact_transfer() {
+          let mut l = Ledger::new();
+          l.deposit("a", 300).unwrap();
+          l.transfer("a", "b", 300).unwrap();
+          assert_eq!((l.balance("a"), l.balance("b")), (0, 300));
+      }
+checks:
+  - repo: rust-ledger
+    run: [cargo, test, --offline, -q]
+timeout: 20m

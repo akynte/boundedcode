@@ -13,10 +13,13 @@ import (
 	"time"
 )
 
-// Delta is one piece of a streamed answer.
+// Delta is one piece of a streamed answer. ToolCall marks the start or a
+// piece of a tool call (no text): it times the first token of an answer
+// that is only tool calls, and is not passed on to Gateway.Stream callers.
 type Delta struct {
 	Text      string
 	Reasoning string
+	ToolCall  bool
 }
 
 // Streamer is an Upstream that can stream a completion. The callback
@@ -179,6 +182,9 @@ func foldSSE(r io.Reader, onDelta func(Delta)) ([]byte, error) {
 			if (d.Text != "" || d.Reasoning != "") && onDelta != nil {
 				onDelta(d)
 			}
+			if len(c.Delta.ToolCalls) > 0 && onDelta != nil {
+				onDelta(Delta{ToolCall: true})
+			}
 			for _, tc := range c.Delta.ToolCalls {
 				for len(calls) <= tc.Index {
 					calls = append(calls, &toolCall{})
@@ -311,11 +317,19 @@ func (g *Gateway) Stream(ctx context.Context, path string, body map[string]any, 
 	delete(body, "stream")
 	delete(body, "stream_options")
 	start := time.Now()
-	status, resp, err := s.Stream(ctx, body, onDelta)
+	var first time.Duration
+	status, resp, err := s.Stream(ctx, body, func(d Delta) {
+		if first == 0 {
+			first = max(time.Since(start), time.Nanosecond)
+		}
+		if onDelta != nil && (d.Text != "" || d.Reasoning != "") {
+			onDelta(d)
+		}
+	})
 	total := time.Since(start)
 	if err != nil {
-		g.record(ctx, 0, 0, 0, nil, total, "transport_error")
+		g.record(ctx, CallStat{TotalMS: ms(total), TTFTMS: ms(first), Streamed: true, Status: "transport_error"})
 		return http.StatusBadGateway, map[string]any{"error": map[string]any{"message": err.Error()}}, nil //nolint:nilerr // transport errors become a 502 for the caller
 	}
-	return g.account(ctx, status, resp, total), g.decode(resp), nil
+	return g.account(ctx, status, resp, CallStat{TotalMS: ms(total), TTFTMS: ms(first), Streamed: true}), g.decode(resp), nil
 }

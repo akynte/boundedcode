@@ -1,0 +1,13 @@
+id: multi-locate-mapping
+category: locate
+language: multi
+fixture: polyglot
+repos: [shop-mono]
+request: >-
+  In shop-mono, which function turns the API's JSON field names into the web
+  client's field names, and in which file is it? Answer briefly; do not change
+  any files.
+expect:
+  - "parseSummary"
+  - "summary\\.ts"
+timeout: 10m

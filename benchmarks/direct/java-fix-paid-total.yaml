@@ -1,0 +1,41 @@
+id: java-fix-paid-total
+category: small-fix
+language: java
+fixture: polyglot
+repos: [java-orders]
+setup:
+  - repo: java-orders
+    file: src/orders/OrderBook.java
+    old: "            if (o.customer().equals(customer) && o.status() == Order.Status.PAID) {\n"
+    new: "            if (o.customer().equals(customer)) {\n"
+request: >-
+  In java-orders, OrderBook.paidTotal counts every order of the customer, open
+  and cancelled ones too; it must count only paid orders. Fix it and run the
+  tests.
+hidden:
+  - repo: java-orders
+    path: src/orders/HiddenPaidTotalTest.java
+    content: |
+      package orders;
+
+      public final class HiddenPaidTotalTest {
+          public static void main(String[] args) {
+              OrderBook b = new OrderBook();
+              b.add(new Order("o1", "ann", 1000, Order.Status.PAID));
+              b.add(new Order("o2", "ann", 300, Order.Status.OPEN));
+              b.add(new Order("o3", "ann", 50, Order.Status.CANCELLED));
+              b.add(new Order("o4", "bob", 700, Order.Status.PAID));
+              if (b.paidTotal("ann") != 1000) {
+                  throw new AssertionError("paidTotal(ann) = " + b.paidTotal("ann"));
+              }
+              if (b.paidTotal("cat") != 0) {
+                  throw new AssertionError("paidTotal(cat) = " + b.paidTotal("cat"));
+              }
+              System.out.println("HiddenPaidTotalTest: ok");
+          }
+      }
+checks:
+  - repo: java-orders
+    run: [make, test]
+requires: [javac, java]
+timeout: 20m
