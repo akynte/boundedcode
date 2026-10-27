@@ -405,6 +405,7 @@ example by prompt injection in repository content.
 | Host reads | Context building never follows symlinks out of a worktree. |
 | Frontier | Packets are sanitized, and the gate fails closed. |
 | Direct mode | Sensitive operations need a permission rule, your own words or your approval, in every approval mode. These are reading credentials, network transfers, installing named packages, changing agent instructions or memory, git hooks and execution config, privilege and CI configuration. Repository files, tool output, web and MCP content, summaries and the model's own claims cannot authorize them. A request that deserves verification is not silently made directly when verification is unavailable (`direct.verify_fallback`). Project MCP servers start only once trusted, and tool definitions are pinned. See the [security policy](docs/usage/security-policy.md). |
+| Direct-mode sandbox | On Linux with bubblewrap, commands run in their own namespaces. The host is read-only; home directories, `/run`, project secrets and git hooks are protected. There is no network except approved hosts and package registries, through an allowlisting proxy. Every process ends with its command. Landlock gives partial containment. macOS and Windows get no OS sandbox, and that is reported, not claimed. With anything weaker than strong containment, running commands needs your authorization (`direct.sandbox.fallback`). See [the command sandbox](docs/usage/direct-sandbox.md). |
 
 > [!WARNING]
 > A container is not a perfect boundary. Running an autonomous coding agent

@@ -45,6 +45,23 @@ limited validation or unstable interfaces), **planned**.
 - One guard refusal in 46 tasks: a `web_search` the model tried during a code question, refused because no one could be asked. The model answered from the code and the task passed.
 
 Not used on real work. Adversarial tests use a scripted model, not a real injected one. The race detector was not run locally (no C toolchain); CI runs it. |
+| Direct-mode command sandbox (`internal/execbox`): bubblewrap (strong), Landlock (partial), none; allowlisting network proxy; per-session fallback authorization | experimental | [Command sandbox](../usage/direct-sandbox.md). Adversarial integration tests on Linux, Ubuntu 26.04, kernel 7.0, bwrap 0.11, Landlock ABI 8 (`internal/execbox/execbox_linux_test.go`, `internal/direct/sandbox_linux_test.go`):
+- unauthorized reads of home credentials, project secrets, other processes' environment and session sockets;
+- writes outside the project, and symlink escapes;
+- git hook and config tampering;
+- network egress: direct, proxy bypass, UDP, `/dev/tcp`, DNS, loopback through the proxy;
+- environment inheritance;
+- background, `setsid` and `nohup` processes surviving a command, a timeout, cancellation or the session;
+- a repository script stealing a key and phoning home.
+
+Real downloads through the proxy from the Go module proxy, PyPI and npm (`BOUNDEDCODE_NET_TESTS=1`).
+
+Overhead:
+- per command about 8 ms (bwrap) and 2 ms (Landlock);
+- direct-mode suite, two runs against the baseline (`benchmarks/reports/20261028-direct-sandbox-r{1,2}`): task time and tokens within noise, tool time +0.02 s per task, no refusals.
+- `fix-balance-query`, a pitfall task, failed both runs because of a wrong model fix. It also failed in the Phase 00 fix-check run, before any prompt or sandbox change: 5 of 10 recorded runs pass.
+
+**macOS and Windows have no OS sandbox** (reported as "none"). The Windows job-object code is compiled, not run. Not used on real work. |
 | Daemon, GUI | planned | |
 | Release packaging, SBOM | implemented | `make dist` (binaries and SBOMs for linux, darwin and windows on amd64 and arm64, reproducible licenses archive, checksums), `scripts/sbom`; published as v0.1.0-alpha.1 (source), v0.1.0-alpha.2 (linux/amd64 binary) v0.1.0-alpha.3 (six binaries with SBOMs), v0.1.0-alpha.4 (the same, adding the cross-repository gate), v0.1.0-alpha.5 (built and attested by the `release` workflow from the tag; SBOMs reproducible) and v0.1.0-alpha.6 (licenses archive reproducible regardless of umask). The workflow only drafts a release; publishing needs maintainer approval. |
 | Local escalation tier (switch to a stronger local model before frontier) | planned | motivated by the 4/4 vs 1/4 result in ADR-0007 |

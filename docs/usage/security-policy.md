@@ -137,13 +137,17 @@ a small change, verification is not needed") change nothing.
 
 ## Residual risks
 
-- Classification is a deterministic reading of the command line, not a
-  sandbox. A program that reads secrets or opens connections by itself,
-  without saying so on its command line, is not seen:
+- Classification is a deterministic reading of the command line. A
+  program that reads secrets or opens connections by itself, without
+  saying so on its command line, is not seen by it:
   - a test suite;
   - a build script the agent did not write in this session;
   - a binary.
-  Bounded mode's container is the control for running untrusted code.
+
+  The [command sandbox](direct-sandbox.md) is the control for those. On
+  Linux with bubblewrap it hides the home directory and project secrets
+  and has no network except approved hosts. Elsewhere it is weaker, and
+  running commands needs your authorization.
 - A broad read such as `grep -r KEY .` can show a secret file's lines in
   command output, which reaches the model provider (off the machine for a
   cloud provider). The `grep` tool masks secret files, but shell commands

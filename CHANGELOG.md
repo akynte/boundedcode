@@ -197,6 +197,54 @@ used on real work.
   verification counts) extends `ecosystem.IsTest` (what history notes
   count).
 
+### Direct-mode command sandbox
+
+- Commands direct mode runs now run in an operating-system sandbox
+  (`internal/execbox`). This covers bash, background shells, template
+  commands and post-edit checks. See
+  [the command sandbox](docs/usage/direct-sandbox.md).
+  - **Linux with bubblewrap (strong).** Mount, pid, network, ipc and uts
+    namespaces:
+    - the host is read-only;
+    - home directories, `/run`, `/mnt` and other users are hidden, except
+      toolchains and package caches;
+    - project secret files are masked;
+    - `.git/hooks`, `.git/config` and `.git/info/attributes` are read-only;
+    - every process ends with the command.
+    - There is no network except through an allowlisting proxy reached
+      over a Unix socket, so ignoring the proxy settings gives no network
+      at all. The proxy admits only allowed hosts, the package registries
+      of the project's ecosystems, and hosts you authorized. It never
+      connects to loopback, private or link-local addresses.
+  - **Linux with Landlock only (partial).** Filesystem confinement.
+  - **macOS and Windows: none.** Nothing is claimed. Process trees end
+    through process groups or job objects.
+- Secret-looking environment variables and agent sockets are not passed
+  to commands (`direct.sandbox.env` passes named ones through).
+- **Changed behaviour:** with containment weaker than strong, commands
+  beyond read-only utilities need your authorization once per session
+  (`direct.sandbox.fallback`: `ask`, `refuse`, `allow`). Choosing a weaker
+  setting in the configuration is that authorization.
+- **Changed behaviour:** under the sandbox, background processes started
+  with `&`, `nohup` or `setsid` end with their command; use
+  `run_in_background`.
+- Fixes:
+  - Windows timeouts and cancels now end the whole process tree (job
+    objects; before, only the shell);
+  - template `` !`cmd` `` commands get the command timeout and a
+    process-tree kill;
+  - BoundedCode's own `git status/log` disable `core.fsmonitor`, hooks
+    and external diff.
+- `bcode doctor` reports the containment per resource. Each session
+  reports it before its first command. Refused connections are audited
+  (`direct.sandbox`) and named to the model.
+- Measured against the Phase 00 baseline (two runs of the direct-mode
+  suite):
+  - task time, model calls and tokens are within noise;
+  - tool time rose by about 0.02 s per task; about 8 ms per command
+    under bubblewrap and 2 ms under Landlock (`BenchmarkCommand`);
+  - no command or connection was refused.
+
 ### Security policy and prompt-injection defense
 
 - Sensitive operations are authorized only by you, in every approval mode
