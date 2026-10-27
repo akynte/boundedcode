@@ -84,7 +84,10 @@ func (r *Runner) compact(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	summary := Message{Role: "user", Content: "[Earlier conversation, summarised to save context]\n\n" + strings.TrimSpace(m.Content) + "\n\n[End of summary. The conversation continues below.]"}
+	// A summary is derived from everything before it, tool output
+	// included: it is data, never the user's words.
+	summary := Message{Role: "user", Content: "[Earlier conversation, summarised to save context]\n\n" + strings.TrimSpace(m.Content) + "\n\n[End of summary. The conversation continues below.]",
+		Provenance: untrusted(SourceSummary, "")}
 	if err := r.Session.replace(summary, append([]Message(nil), tail...)); err != nil {
 		return err
 	}

@@ -251,11 +251,12 @@ func TestChatRoutesToVerification(t *testing.T) {
 	if out, err = runCLI(t, "", "chat", "-C", proj, "--mode", "code", "-p", "add retries to the payment client"); err != nil || !strings.Contains(out, "· mode: code (requested)") || len(bounded) != 1 {
 		t.Fatalf("forced: %v\n%s", err, out)
 	}
-	// Verification unavailable: the risky request runs directly, with a reason.
+	// Verification unavailable: the request is answered in code mode, but
+	// a change needs the user's go-ahead (direct.verify_fallback).
 	capabilitiesFn = func(context.Context, *App, string) direct.Capabilities {
 		return direct.Capabilities{BoundedReason: "no sandbox"}
 	}
-	if out, err = runCLI(t, "", "chat", "-C", proj, "-p", "add retries to the payment client"); err != nil || !strings.Contains(out, "· mode: code (the change concerns payment; no sandbox, so the change is made directly)") {
+	if out, err = runCLI(t, "", "chat", "-C", proj, "-p", "add retries to the payment client"); err != nil || !strings.Contains(out, "· mode: code (the change concerns payment; verification is unavailable (no sandbox), so a change needs your go-ahead (direct.verify_fallback))") {
 		t.Fatalf("fallback: %v\n%s", err, out)
 	}
 	if len(bounded) != 1 {

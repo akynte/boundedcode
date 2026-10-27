@@ -136,6 +136,11 @@ func (a *App) directRunner(ctx context.Context, dir, sessionID, modelOverride, a
 			rec.Emit(ctx, sess.ID, "direct.tool", map[string]any{"tool": e.Tool, "summary": telemetry.Redact(e.Summary)})
 		case direct.EventDenied:
 			rec.Emit(ctx, sess.ID, "direct.denied", map[string]any{"tool": e.Tool, "summary": telemetry.Redact(e.Summary), "reason": e.Err})
+		case direct.EventGuard:
+			// Subjects are hosts, packages, paths and git keys: redacted
+			// like summaries, never contents.
+			rec.Emit(ctx, sess.ID, "direct.guard", map[string]any{"tool": e.Tool, "category": e.Args["category"],
+				"subject": telemetry.Redact(fmt.Sprint(e.Args["subject"])), "decision": e.Args["decision"], "by": e.Args["by"]})
 		case direct.EventCompact:
 			rec.Emit(ctx, sess.ID, "direct.compact", nil)
 		}
@@ -157,6 +162,7 @@ func (a *App) directOptions(root, dir, approval string, ctxSize int) direct.Opti
 		UserInstructions: a.userInstructionsFile(),
 		Web:              direct.WebOptions{AllowHosts: dc.Web.AllowHosts, SearchURL: dc.Web.SearchURL},
 		Permissions:      direct.Rules{Allow: dc.Permissions.Allow, Deny: dc.Permissions.Deny},
+		VerifyFallback:   dc.VerifyFallback,
 		MemoryFile:       a.userInstructionsFile(),
 		SkillDirs: []string{filepath.Join(root, ".boundedcode", "skills"), filepath.Join(root, ".agents", "skills"), filepath.Join(root, ".claude", "skills"),
 			filepath.Join(a.Paths.Config, "skills")},
@@ -167,10 +173,26 @@ func (a *App) directOptions(root, dir, approval string, ctxSize int) direct.Opti
 		opts.Hooks = append(opts.Hooks, direct.Hook{Event: h.Event, Matcher: h.Matcher, Command: h.Command, Timeout: h.Timeout.D()})
 	}
 	opts.MCP = a.mcpServers(root)
+	opts.MCPTrust = &direct.MCPTrust{Path: filepath.Join(a.Paths.Data, "mcp-trust.json")}
 	if dc.CheckpointsOn() {
 		opts.CheckpointDir = filepath.Join(a.sessionsDir(), ".checkpoints", direct.ProjectKey(root))
 	}
 	return opts
+}
+
+// applyVerifyFallback tells a runner what verification it could not have:
+// a change that deserved it, or a risky path, is then decided by
+// direct.verify_fallback instead of being made directly (fail closed).
+func applyVerifyFallback(o *direct.Options, d direct.Decision, caps direct.Capabilities) {
+	if !caps.BoundedAvailable {
+		o.VerifyUnavailable = caps.BoundedReason
+		if o.VerifyUnavailable == "" {
+			o.VerifyUnavailable = "bounded mode is not available here"
+		}
+	}
+	if d.Fallback == direct.ModeVerify {
+		o.VerifyDeserved = d.Reason
+	}
 }
 
 // riskRules builds the router's risk rules from the escalation keyword
@@ -249,7 +271,7 @@ func (a *App) mcpServers(root string) []direct.MCPServer {
 			if cwd == "" {
 				cwd = root
 			}
-			out = append(out, direct.MCPServer{Name: name, Command: m.Command, Args: m.Args, Env: m.Env, Cwd: cwd})
+			out = append(out, direct.MCPServer{Name: name, Command: m.Command, Args: m.Args, Env: m.Env, Cwd: cwd, Project: root})
 		}
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
@@ -523,7 +545,8 @@ func (a *App) runChat(ctx context.Context, o chatOptions) error {
 			return runBounded(ctx, a, o.dir, prompt, o.model)
 		}
 	}
-	r.Opts.Mode, r.Opts.AllowRisky = d.Mode, !caps.BoundedAvailable
+	r.Opts.Mode = d.Mode
+	applyVerifyFallback(&r.Opts, d, caps)
 	if !o.jsonEvents {
 		fmt.Fprintf(a.Err, "· mode: %s (%s)\n", d.Mode, d.Reason)
 	}

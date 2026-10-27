@@ -1356,7 +1356,8 @@ func TestChatAutoRoutesCodeAndVerify(t *testing.T) {
 	if len(be.chats) != 1 {
 		t.Fatal("a verify-routed message went to direct mode")
 	}
-	// Verification unavailable: routed to code with AllowRisky.
+	// Verification unavailable: routed to code, carrying the decision so
+	// that a change is decided by verify_fallback, not made silently.
 	be.route = func(string) direct.Decision {
 		return direct.Route("add retries to the payment client", direct.RiskRules{Keywords: []string{"payment"}}, direct.Capabilities{BoundedReason: "no sandbox"})
 	}
@@ -1365,7 +1366,7 @@ func TestChatAutoRoutesCodeAndVerify(t *testing.T) {
 	hn.say("add retries to the payment client")
 	hn.drain()
 	hn.mustSee("verification unavailable")
-	if req := be.lastChat(); !req.AllowRisky || req.Mode != direct.ModeCode {
+	if req := be.lastChat(); req.Decision == nil || req.Decision.Fallback != direct.ModeVerify || req.Mode != direct.ModeCode {
 		t.Fatalf("fallback request = %+v", req)
 	}
 }

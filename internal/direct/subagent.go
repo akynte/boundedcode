@@ -85,6 +85,20 @@ func (r *Runner) subagent(kind string) (*Runner, error) {
 	child := &Runner{Gateway: r.Gateway, Opts: opts, Approve: r.Approve, Asker: r.Asker, Nav: r.Nav, Depth: r.Depth + 1,
 		Session: &Session{ID: r.Session.ID + "/" + kind}, ExtraSystem: extra, skills: r.skills, agents: r.agents}
 	child.cp = r.cp
+	// The sub-agent's prompt is the model's: only the user's words of this
+	// turn authorize, so it inherits them (provenance.go).
+	child.authText = r.authText
+	child.directOK = r.directOK
+	for p := range r.riskyOK { // a copy: sub-agents may run side by side
+		if child.riskyOK == nil {
+			child.riskyOK = map[string]bool{}
+		}
+		child.riskyOK[p] = true
+	}
+	child.writtenBy = r
+	if r.writtenBy != nil {
+		child.writtenBy = r.writtenBy
+	}
 	child.loadOnce.Do(func() {})
 	// The parent's MCP servers are reused rather than started again.
 	child.mcp, child.sharedMCP = r.mcp, true

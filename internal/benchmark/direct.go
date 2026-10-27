@@ -98,6 +98,9 @@ type DirectResult struct {
 	// CheckNotes counts notes about code that compiles but is probably
 	// wrong (a pointer to a range loop's copy).
 	CheckNotes int `json:"check_notes,omitempty"`
+	// GuardRefusals counts sensitive operations the guard refused (no one
+	// is asked in a benchmark); on ordinary tasks it should stay 0.
+	GuardRefusals int `json:"guard_refusals,omitempty"`
 	// HistoryNotes counts notes naming files the repository's history
 	// changes together with a changed file.
 	HistoryNotes int `json:"history_notes,omitempty"`
@@ -191,6 +194,7 @@ type DirectSummary struct {
 	Compactions     int     `json:"compactions"`
 	ChecksCaught    int     `json:"checks_caught"`
 	CheckNotes      int     `json:"check_notes"`
+	GuardRefusals   int     `json:"guard_refusals,omitempty"`
 	HistoryNotes    int     `json:"history_notes"`
 	Errors          int     `json:"errors"`
 
@@ -427,6 +431,10 @@ func (d *DirectRunner) runOne(ctx context.Context, model string, spec TaskSpec) 
 			res.ToolSeconds += e.Elapsed.Seconds()
 			if strings.Contains(e.Output, "Fix this before going on") {
 				res.ChecksCaught++
+			}
+		case direct.EventGuard:
+			if e.Args["decision"] == "refused" {
+				res.GuardRefusals++
 			}
 			if strings.Contains(e.Output, "check note (") {
 				res.CheckNotes++
@@ -753,6 +761,7 @@ func summarizeDirect(category string, rs []DirectResult) DirectSummary {
 		s.Compactions += r.Compactions
 		s.ChecksCaught += r.ChecksCaught
 		s.CheckNotes += r.CheckNotes
+		s.GuardRefusals += r.GuardRefusals
 		s.HistoryNotes += r.HistoryNotes
 		s.PeakPrompt = max(s.PeakPrompt, r.PeakPrompt)
 	}

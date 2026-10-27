@@ -220,7 +220,14 @@ var deniedCommands = []commandRule{
 	{regexp.MustCompile(`\b(aws|gcloud|az)\s+\S+\s+(create|delete|put|update|terminate|deploy)`), "cloud CLI mutation"},
 	{regexp.MustCompile(`\brm\s+-[a-z]*r[a-z]*f?\s+(/|~|\$HOME)(\s|$)`), "recursive delete of root or home"},
 	{regexp.MustCompile(`\b(npm|pnpm|yarn)\s+publish\b|\bgoreleaser\b|\bgh\s+release\b|\bdocker\s+push\b|\btwine\s+upload\b`), "publishing artifacts"},
-	{regexp.MustCompile(`(curl|wget)[^|]*\|\s*(sh|bash)\b`), "piping remote scripts into a shell"},
+	{regexp.MustCompile(`(?i)\b(curl|wget|iwr|irm|invoke-webrequest|invoke-restmethod)\b[^|]*\|\s*(sudo\s+)?(sh|bash|zsh|dash|ksh|python3?|perl|ruby|node|php|iex|invoke-expression)\b`), "piping a download into an interpreter"},
+	{regexp.MustCompile(`\b(sh|bash|zsh|dash|ksh|python3?|perl|ruby|node|source|\.)\s+<\(\s*(curl|wget)\b`), "running a download through process substitution"},
+	{regexp.MustCompile(`\b(eval|source|\.)\s+["']?\$\(\s*(curl|wget)\b|\beval\s+["']?` + "`" + `\s*(curl|wget)\b`), "evaluating a download"},
+	{regexp.MustCompile(`\bbase64\s+(-d|--decode|-D)\b[^|]*\|\s*(sudo\s+)?(sh|bash|zsh|dash|python3?|perl)\b`), "running a decoded payload"},
+	{regexp.MustCompile(`(?i)\b(iex|invoke-expression)\b.*\b(downloadstring|invoke-webrequest|iwr|irm|invoke-restmethod|net\.webclient)\b`), "evaluating a download"},
+	{regexp.MustCompile(`:\(\)\s*\{\s*:\s*\|\s*:\s*&\s*\}\s*;\s*:`), "a fork bomb"},
+	{regexp.MustCompile(`\bmkfs(\.\w+)?\b|\bdd\b[^|;&]*\bof=/dev/(sd|nvme|hd|disk|mmcblk|xvd)`), "overwriting a disk"},
+	{regexp.MustCompile(`\bchmod\s+(-R\s+)?[0-7]*777\s+/(\s|$)`), "opening permissions on the root"},
 }
 
 // CheckCommand returns an error if argv matches a denied pattern. The raw

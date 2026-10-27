@@ -117,7 +117,7 @@ func applyCaps(d Decision, caps Capabilities) Decision {
 		if why == "" {
 			why = "bounded mode is not available here"
 		}
-		d.Reason += "; " + why + ", so the change is made directly"
+		d.Reason += "; verification is unavailable (" + why + "), so a change needs your go-ahead (direct.verify_fallback)"
 	}
 	return d
 }

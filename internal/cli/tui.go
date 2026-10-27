@@ -172,7 +172,11 @@ func (b *tuiBackend) Chat(ctx context.Context, req tui.ChatRequest, sink func(di
 	if req.Mode != "" {
 		r.Opts.Mode = req.Mode
 	}
-	r.Opts.AllowRisky = req.AllowRisky
+	if req.Decision != nil {
+		applyVerifyFallback(&r.Opts, *req.Decision, a.capabilities(ctx, req.Dir))
+	} else if caps := a.capabilities(ctx, req.Dir); !caps.BoundedAvailable {
+		applyVerifyFallback(&r.Opts, direct.Decision{}, caps)
+	}
 	if req.Compact {
 		err = r.Compact(ctx)
 	} else {

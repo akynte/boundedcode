@@ -71,5 +71,5 @@ func imagePart(mime string, data []byte) map[string]any {
 // message after the tool results, since tool results are text.
 func (r *Runner) attachImage(rel, mime string, data []byte) {
 	r.pendingImages = append(r.pendingImages, Message{Role: "user", Parts: []map[string]any{
-		{"type": "text", "text": "The image " + rel + " read by the tool:"}, imagePart(mime, data)}})
+		{"type": "text", "text": "The image " + rel + " read by the tool:"}, imagePart(mime, data)}, Provenance: untrusted(SourceRepository, rel)})
 }

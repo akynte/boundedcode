@@ -23,6 +23,9 @@ type MCPServer struct {
 	Env     map[string]string
 	Cwd     string
 	Timeout time.Duration // per call (0 = 60 s)
+	// Project is the project root when a project file defines the server
+	// ("" for the user's configuration): it then needs trust (mcptrust.go).
+	Project string
 }
 
 type mcpClient struct {
@@ -44,9 +47,17 @@ type mcpTool struct {
 // mcpTools starts the configured servers once and returns their tools.
 func (r *Runner) mcpTools() []Tool {
 	r.mcpOnce.Do(func() {
+		ctx := context.Background()
 		for _, s := range r.Opts.MCP {
 			c := &mcpClient{srv: s}
-			c.start()
+			if ok, why := r.trustServer(ctx, s); !ok {
+				c.err = fmt.Errorf("not started: %s", why)
+			} else {
+				c.start()
+			}
+			if c.err == nil {
+				c.tools = r.pinTools(ctx, s, c.tools)
+			}
 			r.mcp = append(r.mcp, c)
 			if c.err != nil {
 				r.emit(Event{Kind: EventNote, Text: fmt.Sprintf("MCP server %s unavailable: %v", s.Name, c.err)})

@@ -340,16 +340,20 @@ func TestMutationConsentModes(t *testing.T) {
 	if _, need := w.Consent(r, map[string]any{"path": "x.go", "content": "x"}); need {
 		t.Error("edits mode asked for a plain file")
 	}
-	if _, need := w.Consent(r, map[string]any{"path": ".github/workflows/ci.yml", "content": "x"}); !need {
-		t.Error("edits mode did not ask for a protected path")
-	}
 	r.Opts.Approval = ApprovalAsk
 	if _, need := w.Consent(r, map[string]any{"path": "x.go", "content": "x"}); !need {
 		t.Error("ask mode did not ask")
 	}
-	r.Opts.Approval = ApprovalAuto
-	if _, need := w.Consent(r, map[string]any{"path": ".github/workflows/ci.yml", "content": "x"}); need {
-		t.Error("auto mode asked")
+	// A protected path is the guard's, in every mode, auto included.
+	for _, mode := range []string{ApprovalEdits, ApprovalAuto} {
+		r.Opts.Approval = mode
+		fs := r.findings(w, map[string]any{"path": ".github/workflows/ci.yml", "content": "x"})
+		if len(fs) != 1 || fs[0].Category != "protected" {
+			t.Errorf("%s: findings %+v", mode, fs)
+		}
+		if ok, _, _ := r.guard(context.Background(), "write", "write ci.yml", fs); ok {
+			t.Errorf("%s: a protected path was written without authorization", mode)
+		}
 	}
 }
 

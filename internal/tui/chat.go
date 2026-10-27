@@ -69,23 +69,23 @@ const (
 
 // directRun is one direct-mode turn: its activity, answer and outcome.
 type directRun struct {
-	id         int
-	activity   []directActivity
-	text       string
-	partial    string // streamed text of the model call in progress
-	notes      []string
-	done       bool
-	err        error
-	cancel     context.CancelFunc
-	allowRisky bool
-	start      time.Time
-	end        time.Time
-	usage      *direct.Usage
-	changed    []string
-	inGit      bool
-	mode       string // the mode the turn runs in (chat or code)
-	request    string
-	todos      string
+	id       int
+	activity []directActivity
+	text     string
+	partial  string // streamed text of the model call in progress
+	notes    []string
+	done     bool
+	err      error
+	cancel   context.CancelFunc
+	decision *direct.Decision
+	start    time.Time
+	end      time.Time
+	usage    *direct.Usage
+	changed  []string
+	inGit    bool
+	mode     string // the mode the turn runs in (chat or code)
+	request  string
+	todos    string
 	// render cache
 	cacheW, cacheN int
 	cacheText      string
@@ -543,7 +543,7 @@ func (v *chatView) update(m *Model, msg tea.Msg) tea.Cmd {
 			if msg.err != nil {
 				text += "\n(" + msg.err.Error() + ")"
 			}
-			return v.sendDirect(m, text, direct.ModeChat, false)
+			return v.sendDirect(m, text, direct.ModeChat)
 		}
 		return nil
 	case sessionsMsg:
@@ -813,7 +813,7 @@ func (v *chatView) send(m *Model, text string) tea.Cmd {
 		if mode == modeDirect {
 			mode = direct.ModeCode
 		}
-		return v.sendDirect(m, text, mode, false)
+		return v.sendDirect(m, text, mode)
 	}
 	if v.running(m) {
 		v.queue = append(v.queue, text)
@@ -837,12 +837,18 @@ func (v *chatView) dispatch(m *Model, text string, d direct.Decision) tea.Cmd {
 	if d.Mode == direct.ModeVerify {
 		return v.sendBounded(m, text)
 	}
-	return v.sendDirect(m, text, d.Mode, d.Fallback != "")
+	return v.sendDirectRouted(m, text, d)
 }
 
 // sendDirect sends a message to the native agent loop in this checkout,
 // in mode direct.ModeChat or direct.ModeCode.
-func (v *chatView) sendDirect(m *Model, text, mode string, allowRisky bool) tea.Cmd {
+func (v *chatView) sendDirect(m *Model, text, mode string) tea.Cmd {
+	return v.sendDirectRouted(m, text, direct.Decision{Mode: mode})
+}
+
+// sendDirectRouted sends a message with the router's decision.
+func (v *chatView) sendDirectRouted(m *Model, text string, d direct.Decision) tea.Cmd {
+	mode := d.Mode
 	if ok, why := v.readyDirect(); !ok {
 		v.fail("Can't send: " + why)
 		return nil
@@ -854,7 +860,8 @@ func (v *chatView) sendDirect(m *Model, text, mode string, allowRisky bool) tea.
 	}
 	v.nextRun++
 	ctx, cancel := context.WithCancel(m.ctx)
-	r := &directRun{id: v.nextRun, cancel: cancel, start: time.Now(), mode: mode, request: text, allowRisky: allowRisky}
+	dec := d
+	r := &directRun{id: v.nextRun, cancel: cancel, start: time.Now(), mode: mode, request: text, decision: &dec}
 	v.direct = r
 	v.entries = append(v.entries, chatEntry{kind: entryDirect, run: r})
 	v.scroll.follow = true
@@ -862,7 +869,7 @@ func (v *chatView) sendDirect(m *Model, text, mode string, allowRisky bool) tea.
 	dir, session, model, approval := v.projectDir(m), v.session, v.model, v.approval
 	return tea.Batch(func() tea.Msg {
 		defer cancel()
-		req := ChatRequest{Dir: dir, SessionID: session, Message: text, Model: model, Approval: approval, Mode: mode, AllowRisky: r.allowRisky}
+		req := ChatRequest{Dir: dir, SessionID: session, Message: text, Model: model, Approval: approval, Mode: mode, Decision: r.decision}
 		res, err := be.Chat(ctx, req, func(e direct.Event) { send(directEventMsg{r.id, e}) })
 		return directDoneMsg{r.id, res, err}
 	}, m.spinTick())
@@ -991,13 +998,13 @@ func (v *chatView) slash(m *Model, text string) tea.Cmd {
 			v.note("Usage: " + name + " MESSAGE — makes the change directly in your checkout, whatever the router would pick.")
 			return nil
 		}
-		return v.sendDirect(m, strings.TrimSpace(strings.TrimPrefix(text, name)), direct.ModeCode, false)
+		return v.sendDirect(m, strings.TrimSpace(strings.TrimPrefix(text, name)), direct.ModeCode)
 	case "/chat":
 		if len(rest) == 0 {
 			v.note("Usage: /chat MESSAGE — answers without changing files.")
 			return nil
 		}
-		return v.sendDirect(m, strings.TrimSpace(strings.TrimPrefix(text, name)), direct.ModeChat, false)
+		return v.sendDirect(m, strings.TrimSpace(strings.TrimPrefix(text, name)), direct.ModeChat)
 	case "/mode":
 		if len(rest) == 0 {
 			v.note("Mode: " + v.mode + ". auto picks chat, code or verify per message from its intent and risk; /mode chat|code|verify forces one.")
@@ -1209,7 +1216,7 @@ func (v *chatView) slash(m *Model, text string) tea.Cmd {
 		}
 		v.entries = append(v.entries, chatEntry{kind: entryBlock, lines: ls})
 	case "/init":
-		return v.sendDirect(m, "Study this project (layout, languages, build and test commands, conventions, anything an agent must know) and write an AGENTS.md at the project root for coding agents: concise, factual, under 150 lines. If one exists, improve it instead of replacing it. Show what you wrote.", direct.ModeCode, false)
+		return v.sendDirect(m, "Study this project (layout, languages, build and test commands, conventions, anything an agent must know) and write an AGENTS.md at the project root for coding agents: concise, factual, under 150 lines. If one exists, improve it instead of replacing it. Show what you wrote.", direct.ModeCode)
 	default:
 		// A project or user command template: /name args.
 		be, ctx, dir := m.be, m.ctx, v.projectDir(m)

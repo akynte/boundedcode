@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"github.com/akynte/boundedcode/internal/policy"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -195,7 +196,7 @@ func skillTool() Tool {
 			}
 			// A command template (.boundedcode/commands/NAME.md) works the
 			// same way for the model as /NAME does for the user.
-			prompt, ok, err := r.ExpandCommand(ctx, r.Opts.UserDir, name, str(a, "args"))
+			prompt, ok, err := r.expandCommand(ctx, r.Opts.UserDir, name, str(a, "args"), true)
 			if err != nil {
 				return "", err
 			}
@@ -297,6 +298,14 @@ func (r *Runner) Commands(userDir string) []Command {
 // the project (their output replaces them). ok is false when no command
 // has that name.
 func (r *Runner) ExpandCommand(ctx context.Context, userDir, name, args string) (prompt string, ok bool, err error) {
+	return r.expandCommand(ctx, userDir, name, args, false)
+}
+
+// expandCommand expands a template; byModel is set when the model asked
+// for it (the skill tool) rather than the user (/name). Either way its
+// shell injections pass the policy and the guard; the model's also need
+// the approval a bash command would.
+func (r *Runner) expandCommand(ctx context.Context, userDir, name, args string, byModel bool) (prompt string, ok bool, err error) {
 	for _, c := range r.Commands(userDir) {
 		if c.Name != name {
 			continue
@@ -309,7 +318,7 @@ func (r *Runner) ExpandCommand(ctx context.Context, userDir, name, args string) 
 		body = strings.ReplaceAll(body, "${PROJECT_DIR}", r.Opts.Root)
 		template := body
 		body = substituteArgs(body, args)
-		body, err = r.injectShell(ctx, body)
+		body, err = r.injectShell(ctx, body, byModel)
 		if err != nil {
 			return "", true, err
 		}
@@ -369,7 +378,7 @@ func splitArgs(s string) []string {
 	return out
 }
 
-func (r *Runner) injectShell(ctx context.Context, body string) (string, error) {
+func (r *Runner) injectShell(ctx context.Context, body string, byModel bool) (string, error) {
 	var firstErr error
 	out := shellInject.ReplaceAllStringFunc(body, func(m string) string {
 		sub := shellInject.FindStringSubmatch(m)
@@ -378,6 +387,24 @@ func (r *Runner) injectShell(ctx context.Context, body string) (string, error) {
 		if err := policyCheck(argv); err != nil {
 			firstErr = err
 			return m
+		}
+		if firstErr != nil {
+			return m
+		}
+		// The template may come from the repository: its commands are
+		// judged like the bash tool's.
+		ok, approved, refusal := r.guard(ctx, "skill", "$ "+cmd, policy.ClassifyCommand(cmd, r.commandContext()))
+		if !ok {
+			firstErr = fmt.Errorf("command %q in the template: %s", cmd, refusal)
+			return m
+		}
+		if byModel && !approved && r.Opts.Approval != ApprovalAuto && !(r.Opts.Approval == ApprovalEdits && isSafeCommand(cmd)) &&
+			!r.Opts.Permissions.Allowed("bash("+cmd+")") {
+			if r.Approve == nil || !r.Approve(ctx, ApprovalRequest{Tool: "skill", Summary: "$ " + cmd,
+				Detail: "A command template the model invoked runs, in " + r.cwd() + ":\n\n  " + cmd}) {
+				firstErr = fmt.Errorf("command %q in the template was not approved", cmd)
+				return m
+			}
 		}
 		c := exec.CommandContext(ctx, argv[0], argv[1:]...)
 		c.Dir = r.cwd()

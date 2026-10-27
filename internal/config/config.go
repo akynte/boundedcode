@@ -103,6 +103,11 @@ type DirectConfig struct {
 	// Stream shows the answer as it is generated when the provider can
 	// stream (default true).
 	Stream *bool `yaml:"stream,omitempty"`
+	// VerifyFallback is what happens to a change that deserves a verified
+	// task when bounded mode cannot run here: "ask" (default: the user
+	// decides, and without someone to ask it is refused), "refuse", or
+	// "allow" (make it directly; audited).
+	VerifyFallback string `yaml:"verify_fallback,omitempty"`
 }
 
 // WebConfig configures the web tools.
@@ -482,6 +487,11 @@ func (c Config) Validate() error {
 	}
 	if c.Direct.MaxToolOutput < 0 {
 		errs = append(errs, errors.New("direct.max_tool_output: must not be negative"))
+	}
+	switch c.Direct.VerifyFallback {
+	case "", "ask", "refuse", "allow":
+	default:
+		errs = append(errs, fmt.Errorf("direct.verify_fallback: %q is not ask|refuse|allow", c.Direct.VerifyFallback))
 	}
 	switch c.Direct.Mode {
 	case "auto", "chat", "code", "verify":

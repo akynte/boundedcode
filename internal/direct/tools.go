@@ -196,11 +196,16 @@ func (r *Runner) runTool(ctx context.Context, call ToolCall) string {
 			if err == nil {
 				rel = r.rootRel(abs)
 			}
-		} else if r.Opts.Mode != ModeChat || isSafeCommand(str(args, "command")) {
-			// a safe command is not a change; an unsafe one in chat mode is
+		} else if isSafeCommand(str(args, "command")) || r.Opts.Mode != ModeChat && (r.Opts.VerifyDeserved == "" || r.directOK) {
+			// A safe command is not a change; an unsafe one is, in chat
+			// mode or in a turn that deserved verification.
 			goto hooks
 		}
-		if !r.mutating(t.Name, rel) {
+		if ok, refusal := r.mutating(ctx, t.Name, rel); !ok {
+			if r.handoff == nil {
+				r.emit(Event{Kind: EventDenied, Tool: t.Name, CallID: call.ID, Summary: summary, Err: refusal})
+				return "error: " + refusal
+			}
 			r.emit(Event{Kind: EventDenied, Tool: t.Name, CallID: call.ID, Summary: summary, Err: "handed off to verification"})
 			return "This change is being handed off to a verified task; stop here."
 		}
@@ -210,7 +215,12 @@ hooks:
 		r.emit(Event{Kind: EventDenied, Tool: t.Name, CallID: call.ID, Summary: summary, Err: "blocked by a hook: " + res.Reason})
 		return "error: blocked by a hook: " + res.Reason
 	}
-	if t.Consent != nil && !r.Opts.Permissions.Allowed(spec) {
+	ok, approved, refusal := r.guard(ctx, t.Name, summary, r.findings(t, args))
+	if !ok {
+		r.emit(Event{Kind: EventDenied, Tool: t.Name, CallID: call.ID, Summary: summary, Err: refusal})
+		return "error: " + refusal
+	}
+	if t.Consent != nil && !approved && !r.Opts.Permissions.Allowed(spec) {
 		if detail, needed := t.Consent(r, args); needed {
 			if r.Approve == nil || !r.Approve(ctx, ApprovalRequest{Tool: t.Name, Summary: summary, Detail: detail}) {
 				r.emit(Event{Kind: EventDenied, Tool: t.Name, CallID: call.ID, Summary: summary, Err: "not approved"})
@@ -232,6 +242,7 @@ hooks:
 	out, err := t.Run(ctx, r, args)
 	if err == nil && t.Mutates && t.Name != "bash" {
 		if abs, rel, rerr := r.resolve(str(args, "path")); rerr == nil {
+			r.noteWritten(abs)
 			if !r.Opts.NoChecks {
 				t0 := time.Now()
 				if diag := r.checkFile(ctx, abs, rel, before); diag != "" {
@@ -609,24 +620,10 @@ func editTool() Tool {
 // protected paths (CI, verification config, ...).
 func mutationConsent(detail func(a map[string]any) string) func(r *Runner, a map[string]any) (string, bool) {
 	return func(r *Runner, a map[string]any) (string, bool) {
-		switch r.Opts.Approval {
-		case ApprovalAuto:
-			return "", false
-		case ApprovalAsk:
+		// Protected paths, instruction files and git hooks are the guard's
+		// (guard.go): it asks for them in every mode.
+		if r.Opts.Approval == ApprovalAsk {
 			return detail(a), true
-		}
-		abs, _, err := r.resolve(str(a, "path"))
-		if err != nil {
-			return "", false // the run will fail with the reason
-		}
-		rel := abs
-		if root, err := filepath.EvalSymlinks(r.Opts.Root); err == nil {
-			if rr, err := filepath.Rel(root, abs); err == nil {
-				rel = rr
-			}
-		}
-		if policy.IsProtectedPath(rel) {
-			return detail(a) + "\n\n(" + rel + " is a protected path: CI, verification or repository configuration.)", true
 		}
 		return "", false
 	}
@@ -740,7 +737,7 @@ func bashTool() Tool {
 			}
 			d := "Run in " + r.cwd() + ":\n\n  " + strings.ReplaceAll(cmd, "\n", "\n  ")
 			if why := str(a, "description"); why != "" {
-				d += "\n\n" + why
+				d += "\n\nThe model's description (unverified): " + why
 			}
 			return d, true
 		},

@@ -123,10 +123,11 @@ type ChatRequest struct {
 	Approval  string // "" = configured
 	// Compact summarises the history instead of sending a message.
 	Compact bool
-	// Mode is direct.ModeChat or direct.ModeCode ("" = code); AllowRisky
-	// lets risky paths be edited (verification unavailable).
-	Mode       string
-	AllowRisky bool
+	// Mode is direct.ModeChat or direct.ModeCode ("" = code). Decision is
+	// the router's, when it routed the message (a change that deserved
+	// verification it cannot have is then decided by verify_fallback).
+	Mode     string
+	Decision *direct.Decision
 }
 
 // ChatResult is what a direct-mode turn produced.
