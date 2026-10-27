@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/akynte/boundedcode/internal/execbox"
 	"io"
 	"os"
 	"path/filepath"
@@ -141,6 +142,8 @@ func (a *App) directRunner(ctx context.Context, dir, sessionID, modelOverride, a
 			// like summaries, never contents.
 			rec.Emit(ctx, sess.ID, "direct.guard", map[string]any{"tool": e.Tool, "category": e.Args["category"],
 				"subject": telemetry.Redact(fmt.Sprint(e.Args["subject"])), "decision": e.Args["decision"], "by": e.Args["by"]})
+		case direct.EventSandbox:
+			rec.Emit(ctx, sess.ID, "direct.sandbox", e.Args)
 		case direct.EventCompact:
 			rec.Emit(ctx, sess.ID, "direct.compact", nil)
 		}
@@ -173,11 +176,25 @@ func (a *App) directOptions(root, dir, approval string, ctxSize int) direct.Opti
 		opts.Hooks = append(opts.Hooks, direct.Hook{Event: h.Event, Matcher: h.Matcher, Command: h.Command, Timeout: h.Timeout.D()})
 	}
 	opts.MCP = a.mcpServers(root)
+	opts.Sandbox, opts.SandboxFallback = a.sandboxBox(root), dc.Sandbox.Fallback
 	opts.MCPTrust = &direct.MCPTrust{Path: filepath.Join(a.Paths.Data, "mcp-trust.json")}
 	if dc.CheckpointsOn() {
 		opts.CheckpointDir = filepath.Join(a.sessionsDir(), ".checkpoints", direct.ProjectKey(root))
 	}
 	return opts
+}
+
+// sandboxBox is the containment for one session's commands, with its
+// /tmp and proxy sockets in a fresh directory under the data directory.
+func (a *App) sandboxBox(root string) *execbox.Box {
+	sc := a.Config.Direct.Sandbox
+	base := filepath.Join(a.Paths.Data, "sandbox")
+	state := ""
+	if err := os.MkdirAll(base, 0o700); err == nil {
+		state, _ = os.MkdirTemp(base, "s-")
+	}
+	return execbox.New(root, execbox.Config{Mode: sc.Mode, Backend: sc.Backend, Network: sc.Network, AllowHosts: sc.AllowHosts,
+		Registries: sc.RegistriesOn(), ReadPaths: sc.ReadPaths, WritePaths: sc.WritePaths, EnvAllow: sc.Env, StateDir: state})
 }
 
 // applyVerifyFallback tells a runner what verification it could not have:
@@ -615,6 +632,10 @@ func (a *App) runChat(ctx context.Context, o chatOptions) error {
 			fmt.Fprintf(a.Err, "✘ %s: %s\n", e.Summary, e.Err)
 		case direct.EventCompact, direct.EventNote:
 			fmt.Fprintf(a.Err, "· %s\n", e.Text)
+		case direct.EventSandbox:
+			if e.Args["level"] != nil || e.Args["allowed"] == false {
+				fmt.Fprintf(a.Err, "· %s\n", e.Summary)
+			}
 		case direct.EventMode:
 			fmt.Fprintf(a.Err, "· mode: %s (%s)\n", e.Text, e.Summary)
 		case direct.EventTodos:

@@ -3,6 +3,7 @@ package direct
 import (
 	"context"
 	"fmt"
+	"github.com/akynte/boundedcode/internal/execbox"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -160,7 +161,7 @@ func (r *Runner) environment() map[string]string {
 }
 
 func gitOutput(dir string, args ...string) string {
-	c := exec.CommandContext(context.Background(), "git", args...)
+	c := exec.CommandContext(context.Background(), "git", append(append([]string{}, execbox.SafeGitArgs...), args...)...)
 	c.Dir = dir
 	c.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0")
 	out, err := c.Output()

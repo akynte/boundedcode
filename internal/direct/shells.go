@@ -5,7 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
+	"github.com/akynte/boundedcode/internal/execbox"
 	"os/exec"
 	"sort"
 	"strings"
@@ -22,7 +22,7 @@ type shells struct {
 
 type shell struct {
 	id, desc string
-	cmd      *exec.Cmd
+	cmd      *execbox.Cmd
 	out      bytes.Buffer
 	read     int // bytes already returned
 	done     bool
@@ -38,17 +38,13 @@ func (r *Runner) shells() *shells {
 	return r.bg
 }
 
-func (s *shells) start(argv []string, dir, desc string) (string, error) {
+func (s *shells) start(c *execbox.Cmd, line, desc string) (string, error) {
 	s.mu.Lock()
 	s.next++
 	id := fmt.Sprintf("shell-%d", s.next)
 	s.mu.Unlock()
-	c := exec.CommandContext(context.Background(), argv[0], argv[1:]...)
-	c.Dir = dir
-	c.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "CI=1", "NO_COLOR=1", "TERM=dumb", "PAGER=cat")
 	sh := &shell{id: id, desc: desc, cmd: c, started: time.Now()}
 	c.Stdout, c.Stderr = &lockedWriter{sh}, &lockedWriter{sh}
-	setProcessGroup(c)
 	if err := c.Start(); err != nil {
 		return "", err
 	}
@@ -61,7 +57,7 @@ func (s *shells) start(argv []string, dir, desc string) (string, error) {
 		sh.done, sh.err = true, err
 		sh.mu.Unlock()
 	}()
-	return fmt.Sprintf("started %s in the background (%s); read its output with bash_output, stop it with kill_shell", id, oneLine(strings.Join(argv[2:], " "), 80)), nil
+	return fmt.Sprintf("started %s in the background (%s); read its output with bash_output, stop it with kill_shell", id, oneLine(line, 80)), nil
 }
 
 type lockedWriter struct{ s *shell }
@@ -121,11 +117,7 @@ func (sh *shell) kill() string {
 	if done {
 		return sh.id + " had already exited"
 	}
-	if sh.cmd.Cancel != nil {
-		_ = sh.cmd.Cancel()
-	} else if sh.cmd.Process != nil {
-		_ = sh.cmd.Process.Kill()
-	}
+	sh.cmd.Kill()
 	return "killed " + sh.id
 }
 

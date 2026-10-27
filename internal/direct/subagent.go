@@ -95,6 +95,7 @@ func (r *Runner) subagent(kind string) (*Runner, error) {
 		}
 		child.riskyOK[p] = true
 	}
+	child.sbx = r.sbxState()
 	child.writtenBy = r
 	if r.writtenBy != nil {
 		child.writtenBy = r.writtenBy
@@ -132,6 +133,9 @@ func agentNames(defs []AgentDef) []string {
 // Close releases what a runner holds: background shells and MCP servers.
 func (r *Runner) Close() {
 	r.bg.Close()
+	if r.Depth == 0 && r.Opts.Sandbox != nil {
+		defer r.Opts.Sandbox.Close()
+	}
 	if r.sharedMCP {
 		return
 	}

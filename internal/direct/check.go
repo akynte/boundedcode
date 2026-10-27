@@ -154,12 +154,13 @@ func (r *Runner) buildGo(ctx context.Context, abs string) string {
 // runCheck runs a check command and returns its trimmed output (stdout and
 // stderr, capped) and whether it failed.
 func (r *Runner) runCheck(ctx context.Context, dir, bin string, args ...string) (string, error) {
-	c := exec.CommandContext(ctx, bin, args...)
-	c.Dir = dir
-	c.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0")
+	c, err := r.command(ctx, append([]string{bin}, args...), dir, []string{"GIT_TERMINAL_PROMPT=0"}, "")
+	if err != nil {
+		return err.Error(), err
+	}
 	var buf bytes.Buffer
 	c.Stdout, c.Stderr = &buf, &buf
-	err := c.Run()
+	err = c.Run()
 	if ctx.Err() != nil {
 		return "", ctx.Err()
 	}

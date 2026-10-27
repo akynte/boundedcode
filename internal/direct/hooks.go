@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/akynte/boundedcode/internal/execbox"
 	"os"
 	"os/exec"
 	"regexp"
@@ -96,14 +97,13 @@ func (r *Runner) execHook(ctx context.Context, h Hook, in HookInput) (stdout, st
 	cctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	argv := shellArgv(h.Command)
-	c := exec.CommandContext(cctx, argv[0], argv[1:]...)
-	c.Dir = r.cwd()
-	c.Env = append(os.Environ(), "BOUNDEDCODE_HOOK_EVENT="+in.Event, "BOUNDEDCODE_PROJECT_DIR="+r.Opts.Root)
+	// Hooks are the user's own configuration: they run outside the
+	// sandbox, but end with their whole process tree.
+	c := execbox.Plain(cctx, argv, r.cwd(), append(os.Environ(), "BOUNDEDCODE_HOOK_EVENT="+in.Event, "BOUNDEDCODE_PROJECT_DIR="+r.Opts.Root))
 	b, _ := json.Marshal(in)
 	c.Stdin = bytes.NewReader(b)
 	var o, e bytes.Buffer
 	c.Stdout, c.Stderr = &o, &e
-	setProcessGroup(c)
 	err := c.Run()
 	if err != nil {
 		var ee *exec.ExitError

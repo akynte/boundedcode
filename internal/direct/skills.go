@@ -2,16 +2,17 @@ package direct
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"fmt"
 	"github.com/akynte/boundedcode/internal/policy"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // Skill is a folder with a SKILL.md: instructions the model loads on
@@ -406,14 +407,27 @@ func (r *Runner) injectShell(ctx context.Context, body string, byModel bool) (st
 				return m
 			}
 		}
-		c := exec.CommandContext(ctx, argv[0], argv[1:]...)
-		c.Dir = r.cwd()
-		c.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "NO_COLOR=1")
-		b, err := c.CombinedOutput()
-		if err != nil && firstErr == nil {
+		if ok, refusal := r.containment(ctx, cmd); !ok {
+			firstErr = fmt.Errorf("command %q in the template: %s", cmd, refusal)
+			return m
+		}
+		timeout := r.Opts.CommandTimeout
+		if timeout <= 0 {
+			timeout = 3 * time.Minute
+		}
+		cctx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		c, err := r.command(cctx, argv, r.cwd(), []string{"GIT_TERMINAL_PROMPT=0", "NO_COLOR=1"}, cmd)
+		if err != nil {
+			firstErr = err
+			return m
+		}
+		var b bytes.Buffer
+		c.Stdout, c.Stderr = &b, &b
+		if err := c.Run(); err != nil && firstErr == nil {
 			firstErr = fmt.Errorf("command %q in the template failed: %w", cmd, err)
 		}
-		return sub[1] + strings.TrimRight(string(b), "\n")
+		return sub[1] + strings.TrimRight(b.String(), "\n")
 	})
 	if firstErr != nil {
 		return "", firstErr

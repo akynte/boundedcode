@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/akynte/boundedcode/internal/execbox"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -133,7 +134,31 @@ func runDoctor(ctx context.Context, app *App) []check {
 		add(imageCheck(ctx, cfg.Sandbox.Engine, cfg.Agent.Image, engineErr))
 	}
 	add(frontierCheck(ctx, app))
+	add(directSandboxCheck(app))
 	return out
+}
+
+// directSandboxCheck reports the containment direct mode's commands get
+// here, resource by resource; anything weaker than strong is a warning.
+func directSandboxCheck(app *App) check {
+	dir, _ := os.Getwd()
+	sc := app.Config.Direct.Sandbox
+	rep := execbox.New(dir, execbox.Config{Mode: sc.Mode, Backend: sc.Backend, Network: sc.Network, Registries: sc.RegistriesOn(),
+		StateDir: filepath.Join(os.TempDir(), "boundedcode-doctor")}).Report()
+	detail := strings.ReplaceAll(rep.String(), "\n", "\n"+strings.Repeat(" ", 30))
+	switch rep.Level {
+	case execbox.LevelStrong:
+		return check{"direct-mode sandbox", statusOK, detail, ""}
+	case execbox.LevelOff:
+		return check{"direct-mode sandbox", statusWarn, detail, "direct.sandbox.mode is off: commands run on the host unconfined"}
+	}
+	hint := "commands beyond read-only utilities ask once per session (direct.sandbox.fallback)"
+	if runtime.GOOS == "linux" {
+		hint = "install bubblewrap (bwrap) and allow it unprivileged user namespaces for strong containment; " + hint
+	} else {
+		hint = "use bounded mode (/task) for untrusted code: it runs in a container; " + hint
+	}
+	return check{"direct-mode sandbox", statusWarn, detail, hint}
 }
 
 // minGitVersion is the oldest git with the worktree commands tasks use

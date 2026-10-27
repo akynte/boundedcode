@@ -101,6 +101,10 @@ type DirectResult struct {
 	// GuardRefusals counts sensitive operations the guard refused (no one
 	// is asked in a benchmark); on ordinary tasks it should stay 0.
 	GuardRefusals int `json:"guard_refusals,omitempty"`
+	// Sandbox is the containment commands ran with; NetRefused counts
+	// connections its proxy refused.
+	Sandbox    string `json:"sandbox,omitempty"`
+	NetRefused int    `json:"net_refused,omitempty"`
 	// HistoryNotes counts notes naming files the repository's history
 	// changes together with a changed file.
 	HistoryNotes int `json:"history_notes,omitempty"`
@@ -435,6 +439,13 @@ func (d *DirectRunner) runOne(ctx context.Context, model string, spec TaskSpec) 
 		case direct.EventGuard:
 			if e.Args["decision"] == "refused" {
 				res.GuardRefusals++
+			}
+		case direct.EventSandbox:
+			if lv, ok := e.Args["level"].(string); ok {
+				res.Sandbox = fmt.Sprintf("%s (%v)", lv, e.Args["backend"])
+			}
+			if e.Args["allowed"] == false {
+				res.NetRefused++
 			}
 			if strings.Contains(e.Output, "check note (") {
 				res.CheckNotes++

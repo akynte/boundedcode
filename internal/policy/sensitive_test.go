@@ -246,3 +246,27 @@ func TestClassifyPath(t *testing.T) {
 		}
 	}
 }
+
+func TestInert(t *testing.T) {
+	for line, want := range map[string]bool{
+		"ls -la": true, "cat main.go | grep x | wc -l": true, "find . -name '*.go'": true, "mkdir -p out && cp a out/": true,
+		"echo $(cat VERSION)": true, "git status": false, "go test ./...": false, "bash -c 'ls'": false, "./run.sh": false,
+		"find . -exec sh -c x +": false, "echo $(./x)": false, "python3 -c 1": false, "make": false, "awk 1 f": false,
+		"sed -n 1p f": false, "": false, "X=1 ls": true, "env ls": false, "bin/ls": false,
+	} {
+		if got := Inert(line); got != want {
+			t.Errorf("Inert(%q) = %v", line, got)
+		}
+	}
+}
+
+func TestCommandTools(t *testing.T) {
+	for line, want := range map[string]string{
+		"go test ./... && npm ci": "go npm", "env CGO_ENABLED=0 timeout 60 cargo build": "cargo", "sh -c 'pip install -r r.txt'": "sh pip",
+		"echo $(git rev-parse HEAD)": "git echo", "sudo -u x mvn -q test": "mvn",
+	} {
+		if got := strings.Join(CommandTools(line), " "); got != want {
+			t.Errorf("CommandTools(%q) = %q, want %q", line, got, want)
+		}
+	}
+}

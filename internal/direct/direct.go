@@ -15,6 +15,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/akynte/boundedcode/internal/execbox"
 	"github.com/akynte/boundedcode/internal/policy"
 	"net/http"
 	"os"
@@ -218,6 +219,12 @@ type Options struct {
 	Hooks []Hook
 	// MCP servers whose tools are offered to the model.
 	MCP []MCPServer
+	// Sandbox contains the commands the agent runs (nil: none, as for
+	// tests and embedding; the CLI always sets one, possibly "off").
+	Sandbox *execbox.Box
+	// SandboxFallback is what happens when the sandbox's containment is
+	// weaker than strong: "ask" (default), "refuse" or "allow".
+	SandboxFallback string
 	// MCPTrust records trusted project servers and pinned tool
 	// definitions (nil: project servers are asked about every session and
 	// definitions are not pinned).
@@ -299,6 +306,7 @@ type Runner struct {
 	written   map[string]bool
 	writtenMu sync.Mutex
 	writtenBy *Runner
+	sbx       *sandboxState
 	// directOK: the user approved making this turn's change directly
 	// although it was meant for verification (verify_fallback ask).
 	directOK bool
@@ -769,7 +777,7 @@ var sentenceEnd = regexp.MustCompile(`[.!?]+\s+|\n+`)
 // gitState is the working tree's status per path (nil outside git).
 func (r *Runner) gitState() map[string]string {
 	// Not gitOutput: a leading space in the first status line is significant.
-	c := exec.CommandContext(context.Background(), "git", "status", "--porcelain", "--untracked-files=all")
+	c := exec.CommandContext(context.Background(), "git", append(append([]string{}, execbox.SafeGitArgs...), "status", "--porcelain", "--untracked-files=all")...)
 	c.Dir = r.Opts.Root
 	c.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0")
 	raw, err := c.Output()

@@ -1475,6 +1475,10 @@ func (r *directRun) apply(e direct.Event) {
 		r.text += e.Text
 	case direct.EventCompact, direct.EventNote:
 		r.notes = append(r.notes, e.Text)
+	case direct.EventSandbox:
+		if e.Args["level"] != nil || e.Args["allowed"] == false {
+			r.notes = append(r.notes, e.Summary)
+		}
 	case direct.EventMode:
 		r.mode = e.Text
 		r.notes = append(r.notes, "◇ "+e.Text+" · "+e.Summary)

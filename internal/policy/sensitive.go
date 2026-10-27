@@ -1221,3 +1221,109 @@ func isDigits(s string) bool {
 	}
 	return true
 }
+
+// inertTools run no program but themselves and read or arrange files.
+var inertTools = map[string]bool{"cat": true, "head": true, "tail": true, "wc": true, "ls": true, "tree": true, "grep": true, "egrep": true,
+	"fgrep": true, "rg": true, "diff": true, "cmp": true, "stat": true, "file": true, "sort": true, "uniq": true, "cut": true, "nl": true,
+	"od": true, "xxd": true, "hexdump": true, "strings": true, "sha256sum": true, "sha1sum": true, "md5sum": true, "shasum": true,
+	"echo": true, "printf": true, "pwd": true, "which": true, "type": true, "realpath": true, "readlink": true, "dirname": true,
+	"basename": true, "test": true, "[": true, "true": true, "false": true, "date": true, "jq": true, "tr": true, "tee": true,
+	"mkdir": true, "touch": true, "cp": true, "mv": true, "rm": true, "ln": true, "column": true, "fold": true, "rev": true,
+	"comm": true, "join": true, "paste": true, "expand": true, "unexpand": true, "du": true, "df": true, "find": true, "cd": true}
+
+// Inert reports whether a command line runs only read-only and file
+// utilities: no shell, interpreter, build tool or program from the project.
+// Such a line needs no operating-system containment to be safe to run.
+func Inert(line string) bool {
+	if strings.TrimSpace(line) == "" {
+		return false
+	}
+	cmds, nested := lexShell(line)
+	for _, n := range nested {
+		if !Inert(n) {
+			return false
+		}
+	}
+	for _, ws := range cmds {
+		var args []string
+		for _, w := range ws {
+			if w.redirect == 0 {
+				args = append(args, w.text)
+			}
+		}
+		for len(args) > 0 && assignWord.MatchString(args[0]) {
+			args = args[1:]
+		}
+		if len(args) == 0 {
+			continue
+		}
+		if strings.Contains(args[0], "/") || !inertTools[toolName(args[0])] {
+			return false // a path is a program; anything else may run one
+		}
+		if toolName(args[0]) == "find" {
+			for _, a := range args[1:] {
+				if a == "-exec" || a == "-execdir" || a == "-ok" || a == "-okdir" {
+					return false
+				}
+			}
+		}
+	}
+	return true
+}
+
+// CommandTools returns the programs a command line runs, wrappers
+// (env, timeout, sudo, …) and sh -c bodies seen through.
+func CommandTools(line string) []string {
+	seen := map[string]bool{}
+	var out []string
+	var walk func(string, int)
+	walk = func(line string, depth int) {
+		if depth > maxDepth {
+			return
+		}
+		cmds, nested := lexShell(line)
+		for _, n := range nested {
+			walk(n, depth+1)
+		}
+		for _, ws := range cmds {
+			var args []string
+			for _, w := range ws {
+				if w.redirect == 0 {
+					args = append(args, w.text)
+				}
+			}
+			for len(args) > 0 {
+				t := toolName(args[0])
+				if assignWord.MatchString(args[0]) {
+					args = args[1:]
+					continue
+				}
+				if !shellWrappers[t] && !privilegeTools[t] {
+					break
+				}
+				args = args[1:]
+				for len(args) > 0 && (strings.HasPrefix(args[0], "-") || durationArg.MatchString(args[0]) || assignWord.MatchString(args[0])) {
+					if flagTakesValue(t, args[0]) && len(args) > 1 {
+						args = args[1:]
+					}
+					args = args[1:]
+				}
+			}
+			if len(args) == 0 {
+				continue
+			}
+			t := toolName(args[0])
+			if !seen[t] {
+				seen[t] = true
+				out = append(out, t)
+			}
+			if shells[t] {
+				if code, ok := flagValue(args[1:], "-c"); ok {
+					walk(code, depth+1)
+				}
+			}
+		}
+	}
+	walk(line, 0)
+	return out
+}

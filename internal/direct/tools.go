@@ -754,20 +754,29 @@ func bashTool() Tool {
 			if s := num(a, "timeout"); s > 0 {
 				timeout = time.Duration(s) * time.Second
 			}
+			if ok, refusal := r.containment(ctx, cmd); !ok {
+				return "", errors.New(strings.TrimPrefix(refusal, "refused: "))
+			}
+			env := []string{"GIT_TERMINAL_PROMPT=0", "CI=1", "NO_COLOR=1", "TERM=dumb", "PAGER=cat", "GIT_PAGER=cat"}
 			if boolean(a, "run_in_background") {
-				return r.shells().start(argv, r.cwd(), str(a, "description"))
+				c, err := r.command(context.Background(), argv, r.cwd(), env, cmd)
+				if err != nil {
+					return "", err
+				}
+				return r.shells().start(c, cmd, str(a, "description"))
 			}
 			cctx, cancel := context.WithTimeout(ctx, timeout)
 			defer cancel()
-			c := exec.CommandContext(cctx, argv[0], argv[1:]...)
-			c.Dir = r.cwd()
-			c.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "CI=1", "NO_COLOR=1", "TERM=dumb", "PAGER=cat", "GIT_PAGER=cat")
+			var refused netRefusals
+			c, err := r.command(cctx, argv, r.cwd(), env, cmd, &refused)
+			if err != nil {
+				return "", err
+			}
 			c.Stdin = nil
 			var out bytes.Buffer
 			c.Stdout, c.Stderr = &out, &out
-			setProcessGroup(c)
-			err := c.Run()
-			res := out.String()
+			err = c.Run()
+			res := out.String() + refused.note()
 			if cctx.Err() == context.DeadlineExceeded {
 				return res, fmt.Errorf("command killed after %s", timeout)
 			}

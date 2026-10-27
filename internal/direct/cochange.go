@@ -3,6 +3,7 @@ package direct
 import (
 	"context"
 	"fmt"
+	"github.com/akynte/boundedcode/internal/execbox"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -59,8 +60,8 @@ func (r *Runner) coChangeIndex() *coChange {
 func (co *coChange) load(root string) {
 	ctx, cancel := context.WithTimeout(context.Background(), coChangeTimeout)
 	defer cancel()
-	c := exec.CommandContext(ctx, "git", "log", "--no-merges", "--no-renames", "--relative", "--format=%x00", "--name-only",
-		"-n", strconv.Itoa(coChangeHistory), "HEAD")
+	c := exec.CommandContext(ctx, "git", append(append([]string{}, execbox.SafeGitArgs...), "log", "--no-merges", "--no-renames", "--relative", "--format=%x00", "--name-only",
+		"-n", strconv.Itoa(coChangeHistory), "HEAD")...)
 	c.Dir = root
 	c.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0")
 	out, err := c.Output()

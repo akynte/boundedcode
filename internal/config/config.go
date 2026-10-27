@@ -108,6 +108,8 @@ type DirectConfig struct {
 	// decides, and without someone to ask it is refused), "refuse", or
 	// "allow" (make it directly; audited).
 	VerifyFallback string `yaml:"verify_fallback,omitempty"`
+	// Sandbox contains the commands direct mode runs (internal/execbox).
+	Sandbox DirectSandboxConfig `yaml:"sandbox,omitempty"`
 }
 
 // WebConfig configures the web tools.
@@ -157,6 +159,38 @@ func (d DirectConfig) HistoryNotesOn() bool { return d.HistoryNotes == nil || *d
 
 // StreamOn reports whether streaming is enabled (default true).
 func (d DirectConfig) StreamOn() bool { return d.Stream == nil || *d.Stream }
+
+// DirectSandboxConfig configures operating-system containment of the commands
+// direct mode runs. Only the user's configuration sets it: a workspace or
+// repository cannot weaken it.
+type DirectSandboxConfig struct {
+	// Mode is "auto" (default: the strongest available backend) or "off".
+	Mode string `yaml:"mode,omitempty"`
+	// Backend forces "bwrap", "landlock" or "none" ("" picks).
+	Backend string `yaml:"backend,omitempty"`
+	// Fallback is what happens when containment is weaker than strong:
+	// "ask" (default; refused when no one can be asked), "refuse" or
+	// "allow".
+	Fallback string `yaml:"fallback,omitempty"`
+	// Network is "proxy" (default: no network except allowed hosts through
+	// an allowlisting proxy), "none" or "host" (not confined).
+	Network string `yaml:"network,omitempty"`
+	// AllowHosts may always be reached ("docs.example.com", ".example.com").
+	AllowHosts []string `yaml:"allow_hosts,omitempty"`
+	// Registries lets commands reach the package registries of the
+	// project's ecosystems (default true).
+	Registries *bool `yaml:"registries,omitempty"`
+	// ReadPaths and WritePaths expose further host paths.
+	ReadPaths  []string `yaml:"read_paths,omitempty"`
+	WritePaths []string `yaml:"write_paths,omitempty"`
+	// Env names environment variables passed through although they look
+	// secret (GH_TOKEN for gh, for example).
+	Env []string `yaml:"env,omitempty"`
+}
+
+// RegistriesOn reports whether package registries are reachable (default
+// true).
+func (s DirectSandboxConfig) RegistriesOn() bool { return s.Registries == nil || *s.Registries }
 
 // TaskConfig configures how requests are read before implementation.
 type TaskConfig struct {
@@ -487,6 +521,13 @@ func (c Config) Validate() error {
 	}
 	if c.Direct.MaxToolOutput < 0 {
 		errs = append(errs, errors.New("direct.max_tool_output: must not be negative"))
+	}
+	sb := c.Direct.Sandbox
+	for _, v := range []struct{ key, val, ok string }{{"mode", sb.Mode, "|auto|off|"}, {"backend", sb.Backend, "|bwrap|landlock|none|"},
+		{"fallback", sb.Fallback, "|ask|refuse|allow|"}, {"network", sb.Network, "|proxy|none|host|"}} {
+		if v.val != "" && !strings.Contains(v.ok, "|"+v.val+"|") {
+			errs = append(errs, fmt.Errorf("direct.sandbox.%s: %q is not %s", v.key, v.val, strings.Trim(v.ok, "|")))
+		}
 	}
 	switch c.Direct.VerifyFallback {
 	case "", "ask", "refuse", "allow":
