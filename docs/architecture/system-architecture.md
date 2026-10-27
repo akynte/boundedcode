@@ -138,6 +138,7 @@ Interfaces exist only where replacement is plausible:
 | `inference.ReplayStore` **[exp]** | `internal/inference` | file-backed store of provider reasoning blocks for verbatim replay |
 | `agent.Runtime` | `internal/agent` | `openhands` (adapter) and `scripted` (deterministic, for tests) |
 | — (concrete) **[exp]** | `internal/direct` | the direct-mode loop and its tools (ADR-0011); sessions as JSONL files |
+| — (concrete) **[exp]** | `internal/ecosystem` | projects in any language found in a tree (build system, commands, package manager, missing tools, CI) and test files by each language's conventions; used by direct mode's project map and history notes |
 | `repointel.Intelligence` | `internal/repointel` | `cbm` (codebase-memory-mcp) |
 | — (concrete) | `internal/stats` | success metrics from the ledger (`boundedcode stats`) |
 | `repointel.Navigator` | `internal/repointel` | `serena` (Serena v1.7.0 over language servers; keyed by checkout root) |

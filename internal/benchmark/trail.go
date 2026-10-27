@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/akynte/boundedcode/internal/ecosystem"
 	"github.com/akynte/boundedcode/internal/lease"
 )
 
@@ -200,7 +201,7 @@ func parseNameLog(raw string, maxFiles int) []logCommit {
 		}
 		for _, p := range lines[1:] {
 			p = strings.TrimSpace(p)
-			if p == "" || lease.Skipped(p) || strings.HasSuffix(p, "_test.go") {
+			if p == "" || lease.Skipped(p) || ecosystem.IsTest(p) {
 				continue
 			}
 			c.files = append(c.files, p)
@@ -239,7 +240,7 @@ func (s *TrailStudy) score(g *gitReader, c logCommit, window []logCommit, cache 
 	tc.Changed = len(changed)
 	named := map[string]bool{}
 	for f := range lease.Derive(ix, prefixRE.ReplaceAllString(msg, "")).Files {
-		if !strings.HasSuffix(f, "_test.go") {
+		if !ecosystem.IsTest(f) {
 			named[f] = true
 		}
 	}
@@ -274,7 +275,7 @@ func (s *TrailStudy) score(g *gitReader, c logCommit, window []logCommit, cache 
 			}
 		}
 	}
-	exists := func(f string) bool { return ix.Files[f] && !strings.HasSuffix(f, "_test.go") }
+	exists := func(f string) bool { return ix.Files[f] && !ecosystem.IsTest(f) }
 	hits := func(set map[string]bool) Hits {
 		h := Hits{Size: len(set)}
 		for f := range set {

@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/akynte/boundedcode/internal/ecosystem"
 	"github.com/akynte/boundedcode/internal/lease"
 )
 
@@ -92,7 +93,7 @@ func parseCoChangeLog(raw string) ([][]string, map[string][]int) {
 
 // coChangeCounted: the study scored project files outside tests.
 func coChangeCounted(p string) bool {
-	return !lease.Skipped(p) && !strings.HasSuffix(p, "_test.go")
+	return !lease.Skipped(p) && !ecosystem.IsTest(p)
 }
 
 // coChangeNote returns the note for a change to rel (slash-separated,

@@ -1,21 +1,23 @@
 package direct
 
 import (
-	"bufio"
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	"sort"
 	"strings"
+
+	"github.com/akynte/boundedcode/internal/ecosystem"
 )
 
-// The first message of a session carries a short map of the project:
-// what it is (module, package, build files), its top-level layout with
-// source-file counts per directory, and how to build and test it. A
-// model otherwise spends its first calls on ls, glob and reading the
-// README to learn the same things; the map is deterministic, costs
-// milliseconds and a few hundred tokens, and stays in the stable prefix.
+// The first message of a session carries a short map of the project: the
+// projects in it, in any language and in the top directory levels
+// (internal/ecosystem), with how each is built and tested and which tools
+// are missing; its top-level layout with source-file counts per
+// directory; and its CI configuration. A model otherwise spends its first
+// calls on ls, glob and reading the README to learn the same things; the
+// map is deterministic, costs milliseconds and a few hundred tokens, and
+// stays in the stable prefix.
 
 const (
 	projectMapDirs    = 24  // top-level entries listed
@@ -41,7 +43,7 @@ func (r *Runner) projectMap() string {
 	}
 	var b strings.Builder
 	b.WriteString("Project map (top-level layout, source files per directory):\n")
-	for _, l := range buildLines(root) {
+	for _, l := range projectLines(root) {
 		b.WriteString("- " + l + "\n")
 	}
 	type dirInfo struct {
@@ -117,107 +119,31 @@ func (r *Runner) projectMap() string {
 	return strings.TrimRight(b.String(), "\n")
 }
 
-var (
-	goModuleRE  = regexp.MustCompile(`(?m)^module\s+(\S+)`)
-	pkgNameRE   = regexp.MustCompile(`"name"\s*:\s*"([^"]+)"`)
-	pkgScriptRE = regexp.MustCompile(`"(test|build|lint)"\s*:\s*"([^"]{1,80})"`)
-	cargoNameRE = regexp.MustCompile(`(?m)^name\s*=\s*"([^"]+)"`)
-	pyNameRE    = regexp.MustCompile(`(?m)^name\s*=\s*"([^"]+)"`)
-	makeTarget  = regexp.MustCompile(`^([A-Za-z][\w-]*):`)
-)
-
-// buildLines names the build system(s) found at root and how to test.
-func buildLines(root string) []string {
+// projectLines lists the projects found under root (in any language,
+// nested ones included), how each is built and tested, the tools that are
+// missing, and the CI configuration.
+func projectLines(root string) []string {
+	rep := ecosystem.Detect(root, ecosystem.Options{})
 	var out []string
-	read := func(name string) string {
-		b, err := os.ReadFile(filepath.Join(root, name))
-		if err != nil {
-			return ""
+	for _, p := range rep.Projects {
+		l := p.Describe()
+		if p.Dir != "." {
+			l = p.Dir + "/: " + l
 		}
-		if len(b) > 64<<10 {
-			b = b[:64<<10]
-		}
-		return string(b)
+		out = append(out, l)
 	}
-	if s := read("go.mod"); s != "" {
-		mod := "?"
-		if m := goModuleRE.FindStringSubmatch(s); m != nil {
-			mod = m[1]
-		}
-		out = append(out, fmt.Sprintf("Go module %s (build: go build ./..., test: go test ./...)", mod))
+	if rep.More > 0 {
+		out = append(out, fmt.Sprintf("… %d more projects", rep.More))
 	}
-	if s := read("package.json"); s != "" {
-		line := "Node package"
-		if m := pkgNameRE.FindStringSubmatch(s); m != nil {
-			line += " " + m[1]
+	if len(rep.CI) > 0 {
+		ci := rep.CI
+		if len(ci) > 4 {
+			ci = append(ci[:4:4], fmt.Sprintf("… %d more", len(rep.CI)-4))
 		}
-		var scripts []string
-		for _, m := range pkgScriptRE.FindAllStringSubmatch(s, -1) {
-			scripts = append(scripts, m[1]+": "+m[2])
-		}
-		if len(scripts) > 0 {
-			line += " (scripts " + strings.Join(scripts, "; ") + ")"
-		}
-		out = append(out, line)
+		out = append(out, "CI configuration (how the project is built and tested): "+strings.Join(ci, ", "))
 	}
-	if s := read("Cargo.toml"); s != "" {
-		line := "Rust crate"
-		if m := cargoNameRE.FindStringSubmatch(s); m != nil {
-			line += " " + m[1]
-		}
-		out = append(out, line+" (test: cargo test)")
-	}
-	if s := read("pyproject.toml"); s != "" {
-		line := "Python project"
-		if m := pyNameRE.FindStringSubmatch(s); m != nil {
-			line += " " + m[1]
-		}
-		test := "pytest"
-		if !strings.Contains(s, "pytest") {
-			test = "python -m unittest"
-		}
-		out = append(out, line+" (test: "+test+")")
-	} else if read("setup.py") != "" || read("requirements.txt") != "" {
-		out = append(out, "Python project (test: pytest or python -m unittest)")
-	}
-	for _, name := range []string{"pom.xml", "build.gradle", "build.gradle.kts", "Gemfile", "composer.json", "CMakeLists.txt", "Makefile"} {
-		if read(name) == "" {
-			continue
-		}
-		switch name {
-		case "pom.xml":
-			out = append(out, "Maven project (test: mvn test)")
-		case "build.gradle", "build.gradle.kts":
-			out = append(out, "Gradle project (test: gradle test)")
-		case "Gemfile":
-			out = append(out, "Ruby project (test: bundle exec rake test or rspec)")
-		case "composer.json":
-			out = append(out, "PHP project (test: vendor/bin/phpunit)")
-		case "CMakeLists.txt":
-			out = append(out, "CMake project")
-		case "Makefile":
-			out = append(out, "Makefile targets: "+makeTargets(filepath.Join(root, name)))
-		}
+	if len(rep.Projects) == 0 {
+		out = append(out, "no build system recognised in the top directory levels; the README or the CI configuration says how to build and test")
 	}
 	return out
-}
-
-// makeTargets lists the first targets of a Makefile.
-func makeTargets(path string) string {
-	f, err := os.Open(path)
-	if err != nil {
-		return "?"
-	}
-	defer f.Close()
-	var targets []string
-	sc := bufio.NewScanner(f)
-	for sc.Scan() && len(targets) < 12 {
-		if m := makeTarget.FindStringSubmatch(sc.Text()); m != nil && !strings.HasPrefix(m[1], ".") {
-			targets = append(targets, m[1])
-		}
-	}
-	if len(targets) == 0 {
-		return "none found"
-	}
-	return strings.Join(targets, ", ")
 }

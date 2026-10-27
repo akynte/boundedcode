@@ -95,7 +95,10 @@ To keep a small local model fast and on track, direct mode also:
 - keeps the system prompt identical from turn to turn, so the model
   server's prompt cache holds across turns;
 - looks up the names a message mentions before the first model call, and
-  sends a project map with a session's first message;
+  sends a project map with a session's first message: the projects it
+  finds in any language (a Go service, a pnpm workspace, a Cargo
+  workspace, a Maven build, …), how each is built and tested, which tools
+  are not installed, and the CI configuration;
 - answers as it is generated (`direct.stream`);
 - checks every file change right away (a Go build of the package, syntax
   checks for other languages) and puts the verdict in the tool result;

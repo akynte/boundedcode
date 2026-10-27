@@ -371,6 +371,9 @@ func TestProjectMapOnFirstMessage(t *testing.T) {
 		"internal/cart/cart_test.go": "package cart\n",
 		"cmd/shop/main.go":           "package main\n",
 		"web/app.ts":                 "export {}\n",
+		"web/package.json":           `{"name":"shop-web","scripts":{"test":"vitest run"}}`,
+		"web/package-lock.json":      "{}",
+		".github/workflows/ci.yml":   "",
 		"node_modules/x/index.js":    "",
 	} {
 		if err := os.MkdirAll(filepath.Dir(filepath.Join(root, f)), 0o755); err != nil {
@@ -384,7 +387,7 @@ func TestProjectMapOnFirstMessage(t *testing.T) {
 		t.Fatal(err)
 	}
 	um := up.lastMessages(t)[1]["content"].(string)
-	for _, want := range []string{"Project map", "- Go module example.com/shop (build: go build ./..., test: go test ./...)", "- Makefile targets: build, test", "- internal/: 2 source files (Go 2)", "- cmd/: 1 source files (Go 1)", "- web/: 1 source files (TypeScript 1)", "- top-level files: Makefile, README.md, go.mod"} {
+	for _, want := range []string{"Project map", "- Go module example.com/shop (build: go build ./..., test: go test ./...)", "- Makefile targets: build, test", "- web/: Node package shop-web (test: npm test (vitest run))", "- CI configuration (how the project is built and tested): .github/workflows/ci.yml", "- internal/: 2 source files (Go 2)", "- cmd/: 1 source files (Go 1)", "- web/: 1 source files (TypeScript 1)", "- top-level files: Makefile, README.md, go.mod"} {
 		if !strings.Contains(um, want) {
 			t.Fatalf("missing %q in:\n%s", want, um)
 		}

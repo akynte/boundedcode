@@ -158,6 +158,10 @@ model, not a held-out validation.
   single-file commits (cobra missed the coverage bar). The note was built
   (`direct.history_notes`); request-time suggestions failed and were not.
   Its effect on the agent is not measured yet.
+- **[Project detection](ecosystem-detection-2026-10.md)** (no model): the
+  project map's detection of projects in any language, checked by hand on
+  12 public repositories across ecosystems in 0.1–17 ms each. The commands
+  it reports were not run.
 
 ## External results
 

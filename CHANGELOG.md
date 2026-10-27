@@ -69,6 +69,23 @@ used on real work.
   command, top-level directories with source-file counts, top-level
   files), so the model does not spend its first calls on ls, glob and the
   README.
+- The project map finds projects in any language, not only at the root:
+  every project in the top four directory levels, of 27 kinds (Go, Node
+  with npm, pnpm, yarn or bun, Deno, Python with uv, poetry, pdm, pipenv
+  or pip, Rust, Maven, Gradle, sbt, .NET, Ruby, PHP, Elixir, Swift, Dart,
+  Flutter, Zig, Haskell, OCaml, Clojure, Bazel, CMake, Meson, Autotools,
+  Make, just, Terraform, Helm). For each it gives the build and test
+  commands, the package manager from the lockfile, workspace members
+  counted under their root, and the tool when it is not installed. It
+  also names the CI configuration, which is the fallback when nothing is
+  recognised (`internal/ecosystem`).
+  - Checked on 12 public repositories across these ecosystems, plus
+    BoundedCode and golang.org/x/tools, in 0.1–17 ms each. The commands
+    were not run (docs/benchmarks/ecosystem-detection-2026-10.md).
+- History notes leave out test files by each language's conventions
+  (Python, JavaScript and TypeScript, JVM, Rust, Ruby, PHP, .NET, Swift,
+  Elixir, Dart, C and C++), not only Go's `_test.go`. Go's rule is
+  unchanged: the held-out trail study gives identical results.
 - The names a message mentions (identifiers, paths, quoted errors, ranked
   by the context planner's seed rules) are looked up in the project before
   the first model call and the places found travel with the message,
