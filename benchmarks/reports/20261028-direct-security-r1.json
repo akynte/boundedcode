@@ -1,0 +1,5579 @@
+{
+  "id": "direct-20261027T211808Z",
+  "model": "qwen3.6-35b-a3b",
+  "started": "2026-10-27T21:18:08.952554776Z",
+  "finished": "2026-10-27T21:33:33.779267767Z",
+  "results": [
+    {
+      "id": "add-balance-test",
+      "category": "add-test",
+      "model": "qwen3.6-35b-a3b",
+      "success": true,
+      "mode": "code",
+      "routed": "the change concerns ledger; verification is unavailable (benchmark: direct mode only), so a change needs your go-ahead (direct.verify_fallback) (verify)",
+      "turns": 1,
+      "model_calls": 6,
+      "tool_calls": 6,
+      "tools": {
+        "bash": 1,
+        "ls": 2,
+        "read": 2,
+        "write": 1
+      },
+      "prompt_tokens": 26164,
+      "cached_prompt_tokens": 20983,
+      "generated_tokens": 1093,
+      "peak_prompt_tokens": 5161,
+      "tool_result_bytes": 2131,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 0,
+      "wall_seconds": 44.187458981,
+      "files_changed": [
+        "internal/ledger/balance_test.go"
+      ],
+      "answer": "Test created and passing. The test posts three entries in a single balanced `Post` call:\n\n- Account \"A\" receives a +300 credit and a -100 debit (net +200)\n- Account \"B\" receives a -200 debit to balance the set\n\nThen it asserts `l.Balance(\"A\") == 200`.",
+      "agent_patch": "\ndiff --git a/internal/ledger/balance_test.go b/internal/ledger/balance_test.go\nnew file mode 100644\nindex 0000000..41a6e16\n--- /dev/null\n+++ b/internal/ledger/balance_test.go\n@@ -0,0 +1,24 @@\n+package ledger\n+\n+import \"testing\"\n+\n+func TestBalance(t *testing.T) {\n+\tl := \u0026Ledger{}\n+\n+\t// Post a balanced set of three entries:\n+\t//   Account \"A\": credit 300, debit 100 → net +200\n+\t//   Account \"B\": debit 200 (offset)\n+\terr := l.Post(\n+\t\tEntry{PaymentID: \"p1\", AccountID: \"A\", AmountCents: 300, Currency: \"USD\"},\n+\t\tEntry{PaymentID: \"p1\", AccountID: \"A\", AmountCents: -100, Currency: \"USD\"},\n+\t\tEntry{PaymentID: \"p1\", AccountID: \"B\", AmountCents: -200, Currency: \"USD\"},\n+\t)\n+\tif err != nil {\n+\t\tt.Fatalf(\"Post: %v\", err)\n+\t}\n+\n+\tgot := l.Balance(\"A\")\n+\tif got != 200 {\n+\t\tt.Errorf(\"Balance(\\\"A\\\") = %d, want 200\", got)\n+\t}\n+}\n",
+      "session_id": "20261027-211809-17f8",
+      "language": "go",
+      "agent_seconds": 44.006983348,
+      "tool_seconds": 0.150299134,
+      "harness_seconds": 0.01698141799999403,
+      "phase_seconds": {
+        "checks": 0.03753653,
+        "history_notes": 0.001622118,
+        "project_map": 0.000122792,
+        "seed_pack": 0.000053237,
+        "working_set": 0.000078773
+      },
+      "tool_times": {
+        "bash": {
+          "calls": 1,
+          "seconds": 0.110707535,
+          "max_seconds": 0.110707535,
+          "result_bytes": 112
+        },
+        "ls": {
+          "calls": 2,
+          "seconds": 0.000110071,
+          "max_seconds": 0.000068667,
+          "result_bytes": 26
+        },
+        "read": {
+          "calls": 2,
+          "seconds": 0.000164907,
+          "max_seconds": 0.000118859,
+          "result_bytes": 1895
+        },
+        "write": {
+          "calls": 1,
+          "seconds": 0.039316621,
+          "max_seconds": 0.039316621,
+          "result_bytes": 98
+        }
+      },
+      "call_stats": {
+        "calls": 6,
+        "inference_seconds": 43.839702796000005,
+        "prefill_seconds": 13.597726000000002,
+        "decode_seconds": 28.033287,
+        "ttft_median_ms": 1813.543092,
+        "ttft_max_ms": 8332.406502,
+        "reasoning_tokens": 328,
+        "reasoning_count": "tokenizer",
+        "cache_invalidations": 0,
+        "cache_invalidations_after_rewrite": 0,
+        "recomputed_prompt_tokens": 0,
+        "peak_call": 5
+      },
+      "call_log": [
+        {
+          "prompt_tokens": 3616,
+          "cached_tokens": 0,
+          "completion_tokens": 149,
+          "reasoning_tokens": 19,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 8332.406502,
+          "prefill_ms": 6209.182,
+          "decode_ms": 3813.465,
+          "total_ms": 12145.978624,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 3792,
+          "cached_tokens": 3612,
+          "completion_tokens": 68,
+          "ttft_ms": 1605.906,
+          "prefill_ms": 1352.984,
+          "decode_ms": 1742.251,
+          "total_ms": 3109.778661,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 3877,
+          "cached_tokens": 3788,
+          "completion_tokens": 85,
+          "reasoning_tokens": 15,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1181.9798,
+          "prefill_ms": 1164.95,
+          "decode_ms": 2158.448,
+          "total_ms": 3340.725227,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 4647,
+          "cached_tokens": 3873,
+          "completion_tokens": 645,
+          "reasoning_tokens": 267,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1979.418635,
+          "prefill_ms": 1962.659,
+          "decode_ms": 16606.414,
+          "total_ms": 18585.934575,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 5071,
+          "cached_tokens": 4643,
+          "completion_tokens": 51,
+          "reasoning_tokens": 15,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1813.543092,
+          "prefill_ms": 1795.997,
+          "decode_ms": 1286.283,
+          "total_ms": 3100.085862,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 5161,
+          "cached_tokens": 5067,
+          "completion_tokens": 95,
+          "reasoning_tokens": 12,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1130.467728,
+          "prefill_ms": 1111.954,
+          "decode_ms": 2426.426,
+          "total_ms": 3557.199847,
+          "status": "ok",
+          "streamed": true
+        }
+      ],
+      "context": {
+        "call": 5,
+        "prompt_tokens": 5161,
+        "counting": "tokenizer",
+        "sections": {
+          "assistant": {
+            "bytes": 167,
+            "tokens": 48
+          },
+          "environment": {
+            "bytes": 696,
+            "tokens": 200
+          },
+          "project_map": {
+            "bytes": 242,
+            "tokens": 68
+          },
+          "system": {
+            "bytes": 2586,
+            "tokens": 537
+          },
+          "tool:bash": {
+            "bytes": 112,
+            "tokens": 40
+          },
+          "tool:ls": {
+            "bytes": 26,
+            "tokens": 7
+          },
+          "tool:read": {
+            "bytes": 1895,
+            "tokens": 712
+          },
+          "tool:write": {
+            "bytes": 98,
+            "tokens": 31
+          },
+          "tool_calls": {
+            "bytes": 1409,
+            "tokens": 524
+          },
+          "tool_schemas": {
+            "bytes": 9515,
+            "tokens": 1992
+          },
+          "user": {
+            "bytes": 250,
+            "tokens": 65
+          }
+        },
+        "framing_tokens": 937
+      },
+      "resources": {
+        "harness_rss_mib": 28.28515625,
+        "model_server_rss_mib": 29336.3203125,
+        "gpu_mem_used_mib": 7155,
+        "samples": 46
+      }
+    },
+    {
+      "id": "diagnose-config",
+      "category": "diagnose",
+      "model": "qwen3.6-35b-a3b",
+      "success": true,
+      "mode": "chat",
+      "routed": "no change requested",
+      "turns": 1,
+      "model_calls": 3,
+      "tool_calls": 3,
+      "tools": {
+        "grep": 2,
+        "read": 1
+      },
+      "prompt_tokens": 12050,
+      "cached_prompt_tokens": 10905,
+      "generated_tokens": 412,
+      "peak_prompt_tokens": 4407,
+      "tool_result_bytes": 1518,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 0,
+      "wall_seconds": 15.538890333,
+      "answer": "The error is enforced in **`internal/config/config.go`** (line 25).\n\nThe `Load()` function reads **three** environment variables:\n\n| Variable | Purpose | Required? |\n|---|---|---|\n| `PAYMENT_DB_DSN` | Database connection string | **Yes** (returns error if empty) |\n| `KAFKA_BROKERS` | Comma-separated list of Kafka broker addresses | No (empty string splits to `[\"\"]`) |\n| `LISTEN_ADDR` | HTTP listen address | No (defaults to `:8080` if empty) |",
+      "session_id": "20261027-211853-ff6e",
+      "language": "go",
+      "agent_seconds": 15.491872904,
+      "tool_seconds": 0.001385795,
+      "harness_seconds": 0.010260233999999558,
+      "phase_seconds": {
+        "project_map": 0.000335488,
+        "seed_pack": 0.000056524,
+        "working_set": 0.000046229
+      },
+      "tool_times": {
+        "grep": {
+          "calls": 2,
+          "seconds": 0.001332957,
+          "max_seconds": 0.0008874,
+          "result_bytes": 638
+        },
+        "read": {
+          "calls": 1,
+          "seconds": 0.000052838,
+          "max_seconds": 0.000052838,
+          "result_bytes": 880
+        }
+      },
+      "call_stats": {
+        "calls": 3,
+        "inference_seconds": 15.480226875,
+        "prefill_seconds": 4.906375,
+        "decode_seconds": 10.530408,
+        "ttft_median_ms": 1694.105033,
+        "ttft_max_ms": 1851.581181,
+        "reasoning_tokens": 77,
+        "reasoning_count": "tokenizer",
+        "cache_invalidations": 0,
+        "cache_invalidations_after_rewrite": 0,
+        "recomputed_prompt_tokens": 0,
+        "peak_call": 2
+      },
+      "call_log": [
+        {
+          "prompt_tokens": 3632,
+          "cached_tokens": 3270,
+          "completion_tokens": 210,
+          "reasoning_tokens": 39,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1618.170553,
+          "prefill_ms": 1605.782,
+          "decode_ms": 5414.25,
+          "total_ms": 7032.686887,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 4011,
+          "cached_tokens": 3628,
+          "completion_tokens": 29,
+          "ttft_ms": 1851.581181,
+          "prefill_ms": 1622.019,
+          "decode_ms": 720.624,
+          "total_ms": 2357.560416,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 4407,
+          "cached_tokens": 4007,
+          "completion_tokens": 173,
+          "reasoning_tokens": 38,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1694.105033,
+          "prefill_ms": 1678.574,
+          "decode_ms": 4395.534,
+          "total_ms": 6089.979572,
+          "status": "ok",
+          "streamed": true
+        }
+      ],
+      "context": {
+        "call": 2,
+        "prompt_tokens": 4407,
+        "counting": "tokenizer",
+        "sections": {
+          "environment": {
+            "bytes": 663,
+            "tokens": 199
+          },
+          "project_map": {
+            "bytes": 409,
+            "tokens": 121
+          },
+          "system": {
+            "bytes": 2586,
+            "tokens": 537
+          },
+          "tool:grep": {
+            "bytes": 638,
+            "tokens": 188
+          },
+          "tool:read": {
+            "bytes": 880,
+            "tokens": 355
+          },
+          "tool_calls": {
+            "bytes": 356,
+            "tokens": 124
+          },
+          "tool_schemas": {
+            "bytes": 9515,
+            "tokens": 1992
+          },
+          "user": {
+            "bytes": 143,
+            "tokens": 29
+          }
+        },
+        "framing_tokens": 862
+      },
+      "resources": {
+        "harness_rss_mib": 28.31640625,
+        "model_server_rss_mib": 19884.765625,
+        "gpu_mem_used_mib": 7155,
+        "samples": 17
+      }
+    },
+    {
+      "id": "diagnose-failing-test",
+      "category": "diagnose",
+      "model": "qwen3.6-35b-a3b",
+      "success": true,
+      "mode": "chat",
+      "routed": "a request to run or check something",
+      "switched": "code",
+      "turns": 1,
+      "model_calls": 3,
+      "tool_calls": 5,
+      "tools": {
+        "bash": 1,
+        "read": 4
+      },
+      "prompt_tokens": 13075,
+      "cached_prompt_tokens": 10318,
+      "generated_tokens": 1176,
+      "peak_prompt_tokens": 5708,
+      "tool_result_bytes": 5131,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 0,
+      "wall_seconds": 36.678993232,
+      "answer": "## Failing Tests\n\nTwo tests fail:\n\n1. **`TestBalance`** in `internal/ledger/ledger_test.go` — `balance(a) = -100, want 100`\n2. **`TestHandlePaymentCharged`** in `internal/consumer/consumer_test.go` — `balance = -500` (for account \"a1\", expecting 500)\n\nBoth failures trace back to the same bug in `internal/ledger/ledger.go`, line 49 in the `Balance` method:\n\n```go\nif e.AccountID != accountID || e.Currency == \"\" {\n    b += e.AmountCents\n}\n```\n\n### Root Cause\n\nThe condition is inverted. It currently **adds** entries whose `AccountID` does **not** match the requested account (or whose `Currency` is empty). It should only add entries whose `AccountID` **matches** the requested account.\n\nFor `Balance(\"a\")` after posting `{AccountID: \"a\", AmountCents: 100}` and `{AccountID: \"b\", AmountCents: -100}`:\n\n| Entry | `e.AccountID != \"a\"` | `e.Currency == \"\"` | Condition result | Added? |\n|---|---|---|---|---|\n| a, +100 | false | false | false | no |\n| b, -100 | true | false | true | **yes** |\n\nSo it sums to **-100** instead of **100**. The same logic applies to the consumer test — it adds the settlement entry (-500) instead of the account entry (+500).\n\n### Fix\n\nThe condition on line 49 should be:\n\n```go\nif e.AccountID == accountID {\n```\n\nThis is the only bug in production code. The `|| e.Currency == \"\"` part is also incorrect — it's a spurious check that would cause entries with an empty `Currency` field to be included regardless of account, which is not the intended behavior.",
+      "session_id": "20261027-211908-61ae",
+      "language": "go",
+      "agent_seconds": 36.624044984,
+      "tool_seconds": 0.118172115,
+      "harness_seconds": 0.012451843999997575,
+      "phase_seconds": {
+        "project_map": 0.000208662,
+        "seed_pack": 0.000036716,
+        "working_set": 0.000034843
+      },
+      "tool_times": {
+        "bash": {
+          "calls": 1,
+          "seconds": 0.117926537,
+          "max_seconds": 0.117926537,
+          "result_bytes": 291
+        },
+        "read": {
+          "calls": 4,
+          "seconds": 0.000245578,
+          "max_seconds": 0.000125909,
+          "result_bytes": 4840
+        }
+      },
+      "call_stats": {
+        "calls": 3,
+        "inference_seconds": 36.493421025,
+        "prefill_seconds": 5.843844,
+        "decode_seconds": 30.604007999999997,
+        "ttft_median_ms": 1776.183346,
+        "ttft_max_ms": 2551.279234,
+        "reasoning_tokens": 539,
+        "reasoning_count": "tokenizer",
+        "cache_invalidations": 1,
+        "cache_invalidations_after_rewrite": 0,
+        "recomputed_prompt_tokens": 315,
+        "peak_call": 2
+      },
+      "call_log": [
+        {
+          "prompt_tokens": 3585,
+          "cached_tokens": 3270,
+          "completion_tokens": 87,
+          "reasoning_tokens": 21,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1561.210623,
+          "prefill_ms": 1548.486,
+          "decode_ms": 2203.889,
+          "total_ms": 3765.288613,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 3782,
+          "cached_tokens": 3270,
+          "completion_tokens": 138,
+          "reasoning_tokens": 18,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1776.183346,
+          "prefill_ms": 1761.369,
+          "decode_ms": 3513.91,
+          "total_ms": 5290.144749,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 5708,
+          "cached_tokens": 3778,
+          "completion_tokens": 951,
+          "reasoning_tokens": 500,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2551.279234,
+          "prefill_ms": 2533.989,
+          "decode_ms": 24886.209,
+          "total_ms": 27437.987663,
+          "status": "ok",
+          "streamed": true
+        }
+      ],
+      "context": {
+        "call": 2,
+        "prompt_tokens": 5708,
+        "counting": "tokenizer",
+        "sections": {
+          "environment": {
+            "bytes": 706,
+            "tokens": 206
+          },
+          "project_map": {
+            "bytes": 242,
+            "tokens": 68
+          },
+          "system": {
+            "bytes": 2586,
+            "tokens": 537
+          },
+          "tool:bash": {
+            "bytes": 312,
+            "tokens": 115
+          },
+          "tool:read": {
+            "bytes": 4840,
+            "tokens": 1788
+          },
+          "tool_calls": {
+            "bytes": 276,
+            "tokens": 74
+          },
+          "tool_schemas": {
+            "bytes": 9515,
+            "tokens": 1992
+          },
+          "user": {
+            "bytes": 139,
+            "tokens": 29
+          }
+        },
+        "framing_tokens": 899
+      },
+      "resources": {
+        "harness_rss_mib": 29.1640625,
+        "model_server_rss_mib": 19696.33203125,
+        "gpu_mem_used_mib": 7157,
+        "samples": 38
+      }
+    },
+    {
+      "id": "explain-event-flow",
+      "category": "explain",
+      "model": "qwen3.6-35b-a3b",
+      "success": true,
+      "mode": "chat",
+      "routed": "no change requested",
+      "turns": 1,
+      "model_calls": 3,
+      "tool_calls": 4,
+      "tools": {
+        "glob": 2,
+        "read": 2
+      },
+      "prompt_tokens": 12866,
+      "cached_prompt_tokens": 10640,
+      "generated_tokens": 675,
+      "peak_prompt_tokens": 5488,
+      "tool_result_bytes": 4870,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 0,
+      "wall_seconds": 22.853866556,
+      "answer": "Here's the full trace after `POST /v1/payments` succeeds:\n\n1. **Handler** — `Handler.CreatePayment` (`internal/api/handler.go`, line 34) inserts the payment into the store and then calls:\n\n2. **Publishing function** — `events.Publisher.PaymentCharged` (`internal/events/kafka.go`, line 37). This is invoked on line 49 of the handler:\n   ```go\n   h.Events.PaymentCharged(events.PaymentCharged{\n       PaymentID:   p.ID,\n       AccountID:   p.AccountID,\n       AmountCents: p.AmountCents,\n       Currency:    p.Currency,\n   })\n   ```\n\n3. **Topic** — `\"payments.charged\"` (constant `TopicPaymentCharged` in `internal/events/kafka.go`, line 11). The message is sent via `Producer.SendMessage` on that topic, keyed by `AccountID`.\n\n4. **Event payload fields** (`events.PaymentCharged` struct, `internal/events/kafka.go`, lines 26–31):\n\n| Field          | JSON tag      | Type   |\n|----------------|---------------|--------|\n| `PaymentID`    | `payment_id`  | string |\n| `AccountID`    | `account_id`  | string |\n| `AmountCents`  | `amount_cents`| int64  |\n| `Currency`     | `currency`    | string |\n\nThe struct is JSON-marshalled and sent as the message `Value` to Kafka.",
+      "session_id": "20261027-211945-5a17",
+      "language": "go",
+      "agent_seconds": 22.802745635,
+      "tool_seconds": 0.0007867179999999999,
+      "harness_seconds": 0.009708605000000666,
+      "phase_seconds": {
+        "project_map": 0.000193797,
+        "seed_pack": 0.000038031,
+        "working_set": 0.000039522
+      },
+      "tool_times": {
+        "glob": {
+          "calls": 2,
+          "seconds": 0.000641757,
+          "max_seconds": 0.000354673,
+          "result_bytes": 145
+        },
+        "read": {
+          "calls": 2,
+          "seconds": 0.00014496099999999998,
+          "max_seconds": 0.000088122,
+          "result_bytes": 4725
+        }
+      },
+      "call_stats": {
+        "calls": 3,
+        "inference_seconds": 22.792250312,
+        "prefill_seconds": 5.048966,
+        "decode_seconds": 17.56268,
+        "ttft_median_ms": 1737.479044,
+        "ttft_max_ms": 2453.124637,
+        "reasoning_tokens": 217,
+        "reasoning_count": "tokenizer",
+        "cache_invalidations": 0,
+        "cache_invalidations_after_rewrite": 0,
+        "recomputed_prompt_tokens": 0,
+        "peak_call": 2
+      },
+      "call_log": [
+        {
+          "prompt_tokens": 3634,
+          "cached_tokens": 3270,
+          "completion_tokens": 124,
+          "reasoning_tokens": 66,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1737.479044,
+          "prefill_ms": 1590.308,
+          "decode_ms": 3174.135,
+          "total_ms": 4911.715762,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 3744,
+          "cached_tokens": 3630,
+          "completion_tokens": 89,
+          "reasoning_tokens": 31,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1038.193235,
+          "prefill_ms": 1023.349,
+          "decode_ms": 2315.838,
+          "total_ms": 3354.38598,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 5488,
+          "cached_tokens": 3740,
+          "completion_tokens": 462,
+          "reasoning_tokens": 120,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2453.124637,
+          "prefill_ms": 2435.309,
+          "decode_ms": 12072.707,
+          "total_ms": 14526.14857,
+          "status": "ok",
+          "streamed": true
+        }
+      ],
+      "context": {
+        "call": 2,
+        "prompt_tokens": 5488,
+        "counting": "tokenizer",
+        "sections": {
+          "environment": {
+            "bytes": 669,
+            "tokens": 197
+          },
+          "project_map": {
+            "bytes": 409,
+            "tokens": 121
+          },
+          "system": {
+            "bytes": 2586,
+            "tokens": 537
+          },
+          "tool:glob": {
+            "bytes": 145,
+            "tokens": 33
+          },
+          "tool:read": {
+            "bytes": 4725,
+            "tokens": 1672
+          },
+          "tool_calls": {
+            "bytes": 140,
+            "tokens": 36
+          },
+          "tool_schemas": {
+            "bytes": 9515,
+            "tokens": 1992
+          },
+          "user": {
+            "bytes": 167,
+            "tokens": 33
+          }
+        },
+        "framing_tokens": 867
+      },
+      "resources": {
+        "harness_rss_mib": 29.21875,
+        "model_server_rss_mib": 20079.6484375,
+        "gpu_mem_used_mib": 7157,
+        "samples": 24
+      }
+    },
+    {
+      "id": "explain-ledger-posting",
+      "category": "explain",
+      "model": "qwen3.6-35b-a3b",
+      "success": true,
+      "mode": "chat",
+      "routed": "a question",
+      "turns": 1,
+      "model_calls": 2,
+      "tool_calls": 2,
+      "tools": {
+        "read": 2
+      },
+      "prompt_tokens": 8296,
+      "cached_prompt_tokens": 6921,
+      "generated_tokens": 237,
+      "peak_prompt_tokens": 4641,
+      "tool_result_bytes": 2558,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 0,
+      "wall_seconds": 9.863191649000001,
+      "answer": "`HandlePaymentCharged` processes a `payments.charged` Kafka event and posts a **balanced double-entry** to the ledger via `c.Ledger.Post(...)`. It does two things in a single posting:\n\n1. **Credits** the customer's account (`ev.AccountID`) with a positive `AmountCents`.\n2. **Debits** the **settlement** account (`SettlementAccount = \"settlement\"`) with a negative `AmountCents` (i.e., the debit side).\n\nSo the **debit side** of every charge goes to the **`settlement`** account.",
+      "session_id": "20261027-212008-fe97",
+      "language": "go",
+      "agent_seconds": 9.814092929,
+      "tool_seconds": 0.000122675,
+      "harness_seconds": 0.009150181999999136,
+      "phase_seconds": {
+        "project_map": 0.000381637,
+        "seed_pack": 0.000381665,
+        "working_set": 0.000034865
+      },
+      "tool_times": {
+        "read": {
+          "calls": 2,
+          "seconds": 0.000122675,
+          "max_seconds": 0.000076642,
+          "result_bytes": 2558
+        }
+      },
+      "call_stats": {
+        "calls": 2,
+        "inference_seconds": 9.804820072,
+        "prefill_seconds": 3.67247,
+        "decode_seconds": 6.102931,
+        "ttft_median_ms": 2054.33082,
+        "ttft_max_ms": 2054.33082,
+        "reasoning_tokens": 46,
+        "reasoning_count": "tokenizer",
+        "cache_invalidations": 0,
+        "cache_invalidations_after_rewrite": 0,
+        "recomputed_prompt_tokens": 0,
+        "peak_call": 1
+      },
+      "call_log": [
+        {
+          "prompt_tokens": 3655,
+          "cached_tokens": 3270,
+          "completion_tokens": 94,
+          "reasoning_tokens": 33,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1646.920834,
+          "prefill_ms": 1634.42,
+          "decode_ms": 2408.175,
+          "total_ms": 4055.530441,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 4641,
+          "cached_tokens": 3651,
+          "completion_tokens": 143,
+          "reasoning_tokens": 13,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2054.33082,
+          "prefill_ms": 2038.05,
+          "decode_ms": 3694.756,
+          "total_ms": 5749.289631,
+          "status": "ok",
+          "streamed": true
+        }
+      ],
+      "context": {
+        "call": 1,
+        "prompt_tokens": 4641,
+        "counting": "tokenizer",
+        "sections": {
+          "environment": {
+            "bytes": 675,
+            "tokens": 203
+          },
+          "project_map": {
+            "bytes": 242,
+            "tokens": 68
+          },
+          "seed_pack": {
+            "bytes": 318,
+            "tokens": 78
+          },
+          "system": {
+            "bytes": 2586,
+            "tokens": 537
+          },
+          "tool:read": {
+            "bytes": 2558,
+            "tokens": 911
+          },
+          "tool_calls": {
+            "bytes": 93,
+            "tokens": 23
+          },
+          "tool_schemas": {
+            "bytes": 9515,
+            "tokens": 1992
+          },
+          "user": {
+            "bytes": 107,
+            "tokens": 22
+          }
+        },
+        "framing_tokens": 807
+      },
+      "resources": {
+        "harness_rss_mib": 29.1484375,
+        "model_server_rss_mib": 20079.6484375,
+        "gpu_mem_used_mib": 7157,
+        "samples": 11
+      }
+    },
+    {
+      "id": "feature-currency",
+      "category": "feature",
+      "model": "qwen3.6-35b-a3b",
+      "success": true,
+      "mode": "code",
+      "routed": "the change concerns payment; verification is unavailable (benchmark: direct mode only), so a change needs your go-ahead (direct.verify_fallback) (verify)",
+      "turns": 1,
+      "model_calls": 7,
+      "tool_calls": 7,
+      "tools": {
+        "bash": 2,
+        "edit": 3,
+        "read": 1,
+        "read_many": 1
+      },
+      "prompt_tokens": 49345,
+      "cached_prompt_tokens": 43811,
+      "generated_tokens": 1429,
+      "peak_prompt_tokens": 8780,
+      "tool_result_bytes": 11518,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 1,
+      "wall_seconds": 52.942405192,
+      "files_changed": [
+        "internal/api/handler.go",
+        "internal/api/handler_test.go"
+      ],
+      "answer": "All tests pass. Here's what I did:\n\n**`internal/api/handler.go`**:\n- Replaced the `len(req.Currency) != 3` check with `!isValidCurrency(req.Currency)` — this ensures only exact uppercase `EUR`, `USD`, or `GBP` are accepted. Lowercase (`eur`, `usd`, `gbp`) and other three-letter codes (`JPY`, `ABC`) are rejected with HTTP 422.\n- Added the `isValidCurrency` helper function.\n\n**`internal/api/handler_test.go`**:\n- Added `TestCreatePaymentCurrencyValidation` which tests that `EUR`, `USD`, `GBP` succeed (201) and that `JPY`, `eur`, `usd`, `gbp`, `EURR`, `EU`, `ABC` all fail with 422.",
+      "agent_patch": "diff --git a/internal/api/handler.go b/internal/api/handler.go\nindex c40cfdc..bbf2e90 100644\n--- a/internal/api/handler.go\n+++ b/internal/api/handler.go\n@@ -37,7 +37,7 @@ func (h *Handler) CreatePayment(w http.ResponseWriter, r *http.Request) {\n \t\thttp.Error(w, \"invalid JSON\", http.StatusBadRequest)\n \t\treturn\n \t}\n-\tif req.AccountID == \"\" || req.AmountCents \u003c= 0 || len(req.Currency) != 3 {\n+\tif req.AccountID == \"\" || req.AmountCents \u003c= 0 || !isValidCurrency(req.Currency) {\n \t\thttp.Error(w, \"invalid payment\", http.StatusUnprocessableEntity)\n \t\treturn\n \t}\n@@ -65,6 +65,11 @@ func (h *Handler) GetPayment(w http.ResponseWriter, r *http.Request) {\n \t_ = json.NewEncoder(w).Encode(p)\n }\n \n+// isValidCurrency returns true only for the supported currencies.\n+func isValidCurrency(c string) bool {\n+\treturn c == \"EUR\" || c == \"USD\" || c == \"GBP\"\n+}\n+\n func newID() string {\n \tvar b [8]byte\n \t_, _ = rand.Read(b[:])\ndiff --git a/internal/api/handler_test.go b/internal/api/handler_test.go\nindex 4ea8bc1..8bc544a 100644\n--- a/internal/api/handler_test.go\n+++ b/internal/api/handler_test.go\n@@ -40,3 +40,23 @@ func TestCreatePaymentValidation(t *testing.T) {\n \t\t}\n \t}\n }\n+\n+func TestCreatePaymentCurrencyValidation(t *testing.T) {\n+\tmux, _ := newTestServer()\n+\t// Supported currencies should succeed\n+\tfor _, currency := range []string{\"EUR\", \"USD\", \"GBP\"} {\n+\t\trec := httptest.NewRecorder()\n+\t\tmux.ServeHTTP(rec, httptest.NewRequest(\"POST\", \"/v1/payments\", strings.NewReader(`{\"account_id\":\"acc_1\",\"amount_cents\":500,\"currency\":\"`+currency+`\"}`)))\n+\t\tif rec.Code != http.StatusCreated {\n+\t\t\tt.Errorf(\"currency %s: status = %d, want %d\", currency, rec.Code, http.StatusCreated)\n+\t\t}\n+\t}\n+\t// Unsupported currencies should be rejected with 422\n+\tfor _, currency := range []string{\"JPY\", \"eur\", \"usd\", \"gbp\", \"EURR\", \"EU\", \"ABC\"} {\n+\t\trec := httptest.NewRecorder()\n+\t\tmux.ServeHTTP(rec, httptest.NewRequest(\"POST\", \"/v1/payments\", strings.NewReader(`{\"account_id\":\"acc_1\",\"amount_cents\":500,\"currency\":\"`+currency+`\"}`)))\n+\t\tif rec.Code != http.StatusUnprocessableEntity {\n+\t\t\tt.Errorf(\"currency %s: status = %d, want %d\", currency, rec.Code, http.StatusUnprocessableEntity)\n+\t\t}\n+\t}\n+}\n",
+      "session_id": "20261027-212018-bf22",
+      "language": "go",
+      "agent_seconds": 52.717855217,
+      "tool_seconds": 0.324988374,
+      "harness_seconds": 0.010786255000006517,
+      "phase_seconds": {
+        "checks": 0.146283437,
+        "history_notes": 0.0010791,
+        "project_map": 0.000559048,
+        "seed_pack": 0.000052848,
+        "working_set": 0.000090308
+      },
+      "tool_times": {
+        "bash": {
+          "calls": 2,
+          "seconds": 0.176602179,
+          "max_seconds": 0.170049651,
+          "result_bytes": 2408
+        },
+        "edit": {
+          "calls": 3,
+          "seconds": 0.147707574,
+          "max_seconds": 0.055675238,
+          "result_bytes": 388
+        },
+        "read": {
+          "calls": 1,
+          "seconds": 0.000039658,
+          "max_seconds": 0.000039658,
+          "result_bytes": 65
+        },
+        "read_many": {
+          "calls": 1,
+          "seconds": 0.000638963,
+          "max_seconds": 0.000638963,
+          "result_bytes": 8657
+        }
+      },
+      "call_stats": {
+        "calls": 7,
+        "inference_seconds": 52.382080587999994,
+        "prefill_seconds": 14.396997,
+        "decode_seconds": 37.84789,
+        "ttft_median_ms": 1651.832172,
+        "ttft_max_ms": 4257.882668,
+        "reasoning_tokens": 110,
+        "reasoning_count": "tokenizer",
+        "cache_invalidations": 0,
+        "cache_invalidations_after_rewrite": 0,
+        "recomputed_prompt_tokens": 0,
+        "peak_call": 6
+      },
+      "call_log": [
+        {
+          "prompt_tokens": 3657,
+          "cached_tokens": 3270,
+          "completion_tokens": 100,
+          "reasoning_tokens": 21,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1630.246772,
+          "prefill_ms": 1617.238,
+          "decode_ms": 2575.245,
+          "total_ms": 4205.739526,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 4959,
+          "cached_tokens": 3653,
+          "completion_tokens": 77,
+          "reasoning_tokens": 23,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2208.567388,
+          "prefill_ms": 2193.693,
+          "decode_ms": 1986.378,
+          "total_ms": 4195.014219,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 7540,
+          "cached_tokens": 4955,
+          "completion_tokens": 206,
+          "reasoning_tokens": 2,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 4257.882668,
+          "prefill_ms": 4239.712,
+          "decode_ms": 5409.28,
+          "total_ms": 9667.462073,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 7812,
+          "cached_tokens": 7536,
+          "completion_tokens": 130,
+          "reasoning_tokens": 22,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1651.832172,
+          "prefill_ms": 1632.054,
+          "decode_ms": 3440.785,
+          "total_ms": 5093.00695,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 7957,
+          "cached_tokens": 7808,
+          "completion_tokens": 671,
+          "reasoning_tokens": 26,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1443.867039,
+          "prefill_ms": 1422.78,
+          "decode_ms": 17901.987,
+          "total_ms": 19346.401995,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 8640,
+          "cached_tokens": 7953,
+          "completion_tokens": 45,
+          "ttft_ms": 2250.070521,
+          "prefill_ms": 1981.448,
+          "decode_ms": 1183.806,
+          "total_ms": 3188.860024,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 8780,
+          "cached_tokens": 8636,
+          "completion_tokens": 200,
+          "reasoning_tokens": 16,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1334.818758,
+          "prefill_ms": 1310.072,
+          "decode_ms": 5350.409,
+          "total_ms": 6685.595801,
+          "status": "ok",
+          "streamed": true
+        }
+      ],
+      "context": {
+        "call": 6,
+        "prompt_tokens": 8780,
+        "counting": "tokenizer",
+        "sections": {
+          "assistant": {
+            "bytes": 301,
+            "tokens": 72
+          },
+          "environment": {
+            "bytes": 698,
+            "tokens": 198
+          },
+          "project_map": {
+            "bytes": 409,
+            "tokens": 121
+          },
+          "system": {
+            "bytes": 2586,
+            "tokens": 537
+          },
+          "tool:bash": {
+            "bytes": 2408,
+            "tokens": 1265
+          },
+          "tool:edit": {
+            "bytes": 388,
+            "tokens": 98
+          },
+          "tool:read": {
+            "bytes": 65,
+            "tokens": 23
+          },
+          "tool:read_many": {
+            "bytes": 8657,
+            "tokens": 2513
+          },
+          "tool_calls": {
+            "bytes": 3085,
+            "tokens": 901
+          },
+          "tool_schemas": {
+            "bytes": 9515,
+            "tokens": 1992
+          },
+          "user": {
+            "bytes": 252,
+            "tokens": 55
+          }
+        },
+        "framing_tokens": 1005
+      },
+      "resources": {
+        "harness_rss_mib": 29.65234375,
+        "model_server_rss_mib": 20393.73046875,
+        "gpu_mem_used_mib": 7161,
+        "samples": 54
+      }
+    },
+    {
+      "id": "fix-balance-query",
+      "category": "small-fix",
+      "model": "qwen3.6-35b-a3b",
+      "success": false,
+      "mode": "code",
+      "routed": "the change concerns ledger; verification is unavailable (benchmark: direct mode only), so a change needs your go-ahead (direct.verify_fallback) (verify)",
+      "turns": 1,
+      "model_calls": 5,
+      "tool_calls": 5,
+      "tools": {
+        "bash": 2,
+        "edit": 1,
+        "read": 2
+      },
+      "prompt_tokens": 23232,
+      "cached_prompt_tokens": 21312,
+      "generated_tokens": 773,
+      "peak_prompt_tokens": 5174,
+      "tool_result_bytes": 2775,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 0,
+      "wall_seconds": 29.004252138,
+      "files_changed": [
+        "internal/ledger/ledger.go"
+      ],
+      "answer": "**Root cause:** In `Balance()` (ledger.go:49), the filter condition was inverted. It was skipping entries that matched the requested account (`e.AccountID != accountID`) and including entries with no currency. This caused the balance to sum *all* entries instead of just the specified account's entries.\n\n**Fix:** Changed the condition from `e.AccountID != accountID || e.Currency == \"\"` to `e.AccountID == accountID \u0026\u0026 e.Currency != \"\"`, so only entries for the requested account with a non-empty currency are summed.",
+      "failed_checks": [
+        "go test ./...: ok  \texample.com/ledger-service/internal/consumer\t(cached)\n--- FAIL: TestHiddenBalanceMulti (0.00s)\n    hidden_accept_test.go:10: x=30 y=-30 z=0\nFAIL\nFAIL\texample.com/ledger-service/internal/ledger\t0.002s\nFAIL\n"
+      ],
+      "agent_patch": "diff --git a/internal/ledger/ledger.go b/internal/ledger/ledger.go\nindex 5f31c1d..f03bb84 100644\n--- a/internal/ledger/ledger.go\n+++ b/internal/ledger/ledger.go\n@@ -46,7 +46,7 @@ func (l *Ledger) Balance(accountID string) int64 {\n \tdefer l.mu.Unlock()\n \tvar b int64\n \tfor _, e := range l.entries {\n-\t\tif e.AccountID != accountID || e.Currency == \"\" {\n+\t\tif e.AccountID == accountID \u0026\u0026 e.Currency != \"\" {\n \t\t\tb += e.AmountCents\n \t\t}\n \t}\n",
+      "session_id": "20261027-212111-269f",
+      "language": "go",
+      "failure_class": "model",
+      "agent_seconds": 28.841552535,
+      "tool_seconds": 0.26507010200000003,
+      "harness_seconds": 0.009665553000004157,
+      "phase_seconds": {
+        "checks": 0.027370551,
+        "history_notes": 0.001532639,
+        "project_map": 0.0001167,
+        "seed_pack": 0.000418387,
+        "working_set": 0.000068269
+      },
+      "tool_times": {
+        "bash": {
+          "calls": 2,
+          "seconds": 0.235960053,
+          "max_seconds": 0.125787602,
+          "result_bytes": 403
+        },
+        "edit": {
+          "calls": 1,
+          "seconds": 0.029011827,
+          "max_seconds": 0.029011827,
+          "result_bytes": 90
+        },
+        "read": {
+          "calls": 2,
+          "seconds": 0.000098222,
+          "max_seconds": 0.000057155,
+          "result_bytes": 2282
+        }
+      },
+      "call_stats": {
+        "calls": 5,
+        "inference_seconds": 28.566816879999998,
+        "prefill_seconds": 8.143374,
+        "decode_seconds": 20.084397000000003,
+        "ttft_median_ms": 1601.803741,
+        "ttft_max_ms": 2058.226339,
+        "reasoning_tokens": 230,
+        "reasoning_count": "tokenizer",
+        "cache_invalidations": 0,
+        "cache_invalidations_after_rewrite": 0,
+        "recomputed_prompt_tokens": 0,
+        "peak_call": 4
+      },
+      "call_log": [
+        {
+          "prompt_tokens": 3634,
+          "cached_tokens": 3270,
+          "completion_tokens": 75,
+          "reasoning_tokens": 14,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1896.089757,
+          "prefill_ms": 1623.668,
+          "decode_ms": 1928.381,
+          "total_ms": 3824.733678,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 4586,
+          "cached_tokens": 3630,
+          "completion_tokens": 263,
+          "reasoning_tokens": 176,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2058.226339,
+          "prefill_ms": 2043.44,
+          "decode_ms": 6842.768,
+          "total_ms": 8901.235659,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 4805,
+          "cached_tokens": 4582,
+          "completion_tokens": 191,
+          "reasoning_tokens": 2,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1539.747376,
+          "prefill_ms": 1523.778,
+          "decode_ms": 5006.259,
+          "total_ms": 6546.158792,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 5033,
+          "cached_tokens": 4801,
+          "completion_tokens": 113,
+          "reasoning_tokens": 24,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1601.803741,
+          "prefill_ms": 1584.786,
+          "decode_ms": 2906.323,
+          "total_ms": 4508.397776,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 5174,
+          "cached_tokens": 5029,
+          "completion_tokens": 131,
+          "reasoning_tokens": 14,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1385.33171,
+          "prefill_ms": 1367.702,
+          "decode_ms": 3400.666,
+          "total_ms": 4786.290975,
+          "status": "ok",
+          "streamed": true
+        }
+      ],
+      "context": {
+        "call": 4,
+        "prompt_tokens": 5174,
+        "counting": "tokenizer",
+        "sections": {
+          "assistant": {
+            "bytes": 301,
+            "tokens": 82
+          },
+          "environment": {
+            "bytes": 698,
+            "tokens": 202
+          },
+          "project_map": {
+            "bytes": 242,
+            "tokens": 68
+          },
+          "seed_pack": {
+            "bytes": 199,
+            "tokens": 48
+          },
+          "system": {
+            "bytes": 2586,
+            "tokens": 537
+          },
+          "tool:bash": {
+            "bytes": 424,
+            "tokens": 153
+          },
+          "tool:edit": {
+            "bytes": 90,
+            "tokens": 24
+          },
+          "tool:read": {
+            "bytes": 2282,
+            "tokens": 877
+          },
+          "tool_calls": {
+            "bytes": 682,
+            "tokens": 222
+          },
+          "tool_schemas": {
+            "bytes": 9515,
+            "tokens": 1992
+          },
+          "user": {
+            "bytes": 147,
+            "tokens": 32
+          }
+        },
+        "framing_tokens": 937
+      },
+      "resources": {
+        "harness_rss_mib": 29.515625,
+        "model_server_rss_mib": 20989.6328125,
+        "gpu_mem_used_mib": 7161,
+        "samples": 30
+      }
+    },
+    {
+      "id": "fix-ledger-balance",
+      "category": "small-fix",
+      "model": "qwen3.6-35b-a3b",
+      "success": true,
+      "mode": "code",
+      "routed": "the change concerns ledger; verification is unavailable (benchmark: direct mode only), so a change needs your go-ahead (direct.verify_fallback) (verify)",
+      "turns": 1,
+      "model_calls": 5,
+      "tool_calls": 5,
+      "tools": {
+        "bash": 1,
+        "edit": 1,
+        "read": 3
+      },
+      "prompt_tokens": 25215,
+      "cached_prompt_tokens": 22686,
+      "generated_tokens": 566,
+      "peak_prompt_tokens": 5783,
+      "tool_result_bytes": 4624,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 0,
+      "wall_seconds": 23.745952177,
+      "files_changed": [
+        "internal/consumer/consumer.go"
+      ],
+      "answer": "The fix is on line 47 of `consumer.go`: the settlement entry's `AmountCents` is now negated (`-ev.AmountCents`) so the two postings sum to zero — a credit of +500 to the customer account and a matching debit of -500 to the settlement account. Tests pass.",
+      "agent_patch": "diff --git a/internal/consumer/consumer.go b/internal/consumer/consumer.go\nindex c5bbc32..196e1bb 100644\n--- a/internal/consumer/consumer.go\n+++ b/internal/consumer/consumer.go\n@@ -43,6 +43,6 @@ func (c *Consumer) HandlePaymentCharged(msg *ConsumerMessage) error {\n \t}\n \treturn c.Ledger.Post(\n \t\tledger.Entry{PaymentID: ev.PaymentID, AccountID: ev.AccountID, AmountCents: ev.AmountCents, Currency: ev.Currency},\n-\t\tledger.Entry{PaymentID: ev.PaymentID, AccountID: SettlementAccount, AmountCents: ev.AmountCents, Currency: ev.Currency},\n+\t\tledger.Entry{PaymentID: ev.PaymentID, AccountID: SettlementAccount, AmountCents: -ev.AmountCents, Currency: ev.Currency},\n \t)\n }\n",
+      "session_id": "20261027-212140-2a55",
+      "language": "go",
+      "agent_seconds": 23.583594759,
+      "tool_seconds": 0.155088951,
+      "harness_seconds": 0.010060414000001322,
+      "phase_seconds": {
+        "checks": 0.033463409,
+        "history_notes": 0.001300265,
+        "project_map": 0.000122564,
+        "seed_pack": 0.000283671,
+        "working_set": 0.000056286
+      },
+      "tool_times": {
+        "bash": {
+          "calls": 1,
+          "seconds": 0.120027078,
+          "max_seconds": 0.120027078,
+          "result_bytes": 140
+        },
+        "edit": {
+          "calls": 1,
+          "seconds": 0.034879298,
+          "max_seconds": 0.034879298,
+          "result_bytes": 96
+        },
+        "read": {
+          "calls": 3,
+          "seconds": 0.000182575,
+          "max_seconds": 0.000070481,
+          "result_bytes": 4388
+        }
+      },
+      "call_stats": {
+        "calls": 5,
+        "inference_seconds": 23.418445394,
+        "prefill_seconds": 8.590843,
+        "decode_seconds": 14.737369000000001,
+        "ttft_median_ms": 1946.661915,
+        "ttft_max_ms": 2065.736122,
+        "reasoning_tokens": 120,
+        "reasoning_count": "tokenizer",
+        "cache_invalidations": 0,
+        "cache_invalidations_after_rewrite": 0,
+        "recomputed_prompt_tokens": 0,
+        "peak_call": 4
+      },
+      "call_log": [
+        {
+          "prompt_tokens": 3686,
+          "cached_tokens": 3270,
+          "completion_tokens": 80,
+          "reasoning_tokens": 19,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1676.018938,
+          "prefill_ms": 1663.372,
+          "decode_ms": 2030.663,
+          "total_ms": 3706.888,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 4671,
+          "cached_tokens": 3682,
+          "completion_tokens": 130,
+          "reasoning_tokens": 99,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2065.736122,
+          "prefill_ms": 2048.171,
+          "decode_ms": 3393.817,
+          "total_ms": 5459.761615,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 5402,
+          "cached_tokens": 4667,
+          "completion_tokens": 234,
+          "reasoning_tokens": 2,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1960.403912,
+          "prefill_ms": 1939.251,
+          "decode_ms": 6137.45,
+          "total_ms": 8098.179959,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 5673,
+          "cached_tokens": 5398,
+          "completion_tokens": 50,
+          "ttft_ms": 1946.661915,
+          "prefill_ms": 1684.101,
+          "decode_ms": 1313.364,
+          "total_ms": 3016.633992,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 5783,
+          "cached_tokens": 5669,
+          "completion_tokens": 72,
+          "ttft_ms": 1333.497321,
+          "prefill_ms": 1255.948,
+          "decode_ms": 1862.075,
+          "total_ms": 3136.981828,
+          "status": "ok",
+          "streamed": true
+        }
+      ],
+      "context": {
+        "call": 4,
+        "prompt_tokens": 5783,
+        "counting": "tokenizer",
+        "sections": {
+          "assistant": {
+            "bytes": 181,
+            "tokens": 44
+          },
+          "environment": {
+            "bytes": 700,
+            "tokens": 204
+          },
+          "project_map": {
+            "bytes": 242,
+            "tokens": 68
+          },
+          "seed_pack": {
+            "bytes": 318,
+            "tokens": 78
+          },
+          "system": {
+            "bytes": 2586,
+            "tokens": 537
+          },
+          "tool:bash": {
+            "bytes": 140,
+            "tokens": 46
+          },
+          "tool:edit": {
+            "bytes": 96,
+            "tokens": 24
+          },
+          "tool:read": {
+            "bytes": 4388,
+            "tokens": 1598
+          },
+          "tool_calls": {
+            "bytes": 784,
+            "tokens": 210
+          },
+          "tool_schemas": {
+            "bytes": 9515,
+            "tokens": 1992
+          },
+          "user": {
+            "bytes": 275,
+            "tokens": 52
+          }
+        },
+        "framing_tokens": 930
+      },
+      "resources": {
+        "harness_rss_mib": 29.59375,
+        "model_server_rss_mib": 20989.6328125,
+        "gpu_mem_used_mib": 7161,
+        "samples": 25
+      }
+    },
+    {
+      "id": "java-explain-orders",
+      "category": "explain",
+      "model": "qwen3.6-35b-a3b",
+      "success": true,
+      "mode": "chat",
+      "routed": "a question",
+      "turns": 1,
+      "model_calls": 2,
+      "tool_calls": 1,
+      "tools": {
+        "read": 1
+      },
+      "prompt_tokens": 7828,
+      "cached_prompt_tokens": 6887,
+      "generated_tokens": 125,
+      "peak_prompt_tokens": 4207,
+      "tool_result_bytes": 1786,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 0,
+      "wall_seconds": 6.721866888,
+      "answer": "Two cases:\n\n1. **Paid order** — throws `IllegalStateException` with message `\"order \u003cid\u003e is paid\"`. The order is not modified.\n2. **Non-existent id** — throws `NoSuchElementException` with message `\"no order \u003cid\u003e\"`.",
+      "session_id": "20261027-212203-afd9",
+      "language": "java",
+      "agent_seconds": 6.673368452,
+      "tool_seconds": 0.00005494,
+      "harness_seconds": 0.008924143999999915,
+      "phase_seconds": {
+        "project_map": 0.00010462,
+        "seed_pack": 0.000218666,
+        "working_set": 0.000021762
+      },
+      "tool_times": {
+        "read": {
+          "calls": 1,
+          "seconds": 0.00005494,
+          "max_seconds": 0.00005494,
+          "result_bytes": 1786
+        }
+      },
+      "call_stats": {
+        "calls": 2,
+        "inference_seconds": 6.664389368,
+        "prefill_seconds": 3.4182750000000004,
+        "decode_seconds": 3.219067,
+        "ttft_median_ms": 1892.779917,
+        "ttft_max_ms": 1892.779917,
+        "reasoning_tokens": 35,
+        "reasoning_count": "tokenizer",
+        "cache_invalidations": 0,
+        "cache_invalidations_after_rewrite": 0,
+        "recomputed_prompt_tokens": 0,
+        "peak_call": 1
+      },
+      "call_log": [
+        {
+          "prompt_tokens": 3621,
+          "cached_tokens": 3270,
+          "completion_tokens": 66,
+          "reasoning_tokens": 35,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1609.710123,
+          "prefill_ms": 1597.026,
+          "decode_ms": 1689.795,
+          "total_ms": 3299.7533,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 4207,
+          "cached_tokens": 3617,
+          "completion_tokens": 59,
+          "ttft_ms": 1892.779917,
+          "prefill_ms": 1821.249,
+          "decode_ms": 1529.272,
+          "total_ms": 3364.636068,
+          "status": "ok",
+          "streamed": true
+        }
+      ],
+      "context": {
+        "call": 1,
+        "prompt_tokens": 4207,
+        "counting": "tokenizer",
+        "sections": {
+          "environment": {
+            "bytes": 663,
+            "tokens": 197
+          },
+          "project_map": {
+            "bytes": 183,
+            "tokens": 51
+          },
+          "seed_pack": {
+            "bytes": 224,
+            "tokens": 54
+          },
+          "system": {
+            "bytes": 2586,
+            "tokens": 537
+          },
+          "tool:read": {
+            "bytes": 1786,
+            "tokens": 543
+          },
+          "tool_calls": {
+            "bytes": 40,
+            "tokens": 11
+          },
+          "tool_schemas": {
+            "bytes": 9515,
+            "tokens": 1992
+          },
+          "user": {
+            "bytes": 152,
+            "tokens": 35
+          }
+        },
+        "framing_tokens": 787
+      },
+      "resources": {
+        "harness_rss_mib": 29.48828125,
+        "model_server_rss_mib": 20989.6328125,
+        "gpu_mem_used_mib": 7161,
+        "samples": 8
+      }
+    },
+    {
+      "id": "java-fix-paid-total",
+      "category": "small-fix",
+      "model": "qwen3.6-35b-a3b",
+      "success": false,
+      "mode": "",
+      "routed": "",
+      "turns": 0,
+      "model_calls": 0,
+      "tool_calls": 0,
+      "prompt_tokens": 0,
+      "cached_prompt_tokens": 0,
+      "generated_tokens": 0,
+      "peak_prompt_tokens": 0,
+      "tool_result_bytes": 0,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 0,
+      "wall_seconds": 0,
+      "language": "java",
+      "skipped": "javac, java, make not on PATH",
+      "failure_class": "environment",
+      "agent_seconds": 0,
+      "tool_seconds": 0,
+      "harness_seconds": 0,
+      "call_stats": {
+        "calls": 0,
+        "inference_seconds": 0,
+        "reasoning_tokens": 0,
+        "cache_invalidations": 0,
+        "cache_invalidations_after_rewrite": 0,
+        "recomputed_prompt_tokens": 0,
+        "peak_call": 0
+      },
+      "resources": {
+        "harness_rss_mib": 0,
+        "samples": 0
+      }
+    },
+    {
+      "id": "large-change-txtar",
+      "category": "large-change",
+      "model": "qwen3.6-35b-a3b",
+      "success": true,
+      "mode": "code",
+      "routed": "a request for a change",
+      "turns": 1,
+      "model_calls": 6,
+      "tool_calls": 6,
+      "tools": {
+        "bash": 1,
+        "edit": 3,
+        "read": 2
+      },
+      "prompt_tokens": 43917,
+      "cached_prompt_tokens": 38736,
+      "generated_tokens": 1163,
+      "peak_prompt_tokens": 8431,
+      "tool_result_bytes": 9726,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 0,
+      "wall_seconds": 46.635916998,
+      "files_changed": [
+        "txtar/archive.go",
+        "txtar/archive_test.go"
+      ],
+      "answer": "Done. Here's what was added:\n\n**`txtar/archive.go`** — new method:\n\n```go\n// Lookup returns the file with the given name, or nil and false if no such file\n// exists in the archive.\nfunc (a *Archive) Lookup(name string) (*File, bool) {\n\tfor i, f := range a.Files {\n\t\tif f.Name == name {\n\t\t\treturn \u0026a.Files[i], true\n\t\t}\n\t}\n\treturn nil, false\n}\n```\n\n**`txtar/archive_test.go`** — new test `TestLookup` covering:\n- A file that exists (`foo.txt` → non-nil, `true`)\n- A file that doesn't exist (`nope` → `nil`, `false`)\n\nAll tests pass: `ok  golang.org/x/tools/txtar`",
+      "agent_patch": "diff --git a/txtar/archive.go b/txtar/archive.go\nindex 85e4dc4..f597ac7 100644\n--- a/txtar/archive.go\n+++ b/txtar/archive.go\n@@ -50,6 +50,17 @@ type File struct {\n \tData []byte // text content of file\n }\n \n+// Lookup returns the file with the given name, or nil and false if no such file\n+// exists in the archive.\n+func (a *Archive) Lookup(name string) (*File, bool) {\n+\tfor i, f := range a.Files {\n+\t\tif f.Name == name {\n+\t\t\treturn \u0026a.Files[i], true\n+\t\t}\n+\t}\n+\treturn nil, false\n+}\n+\n // Format returns the serialized form of an Archive.\n // It is assumed that the Archive data structure is well-formed:\n // a.Comment and all a.File[i].Data contain no file marker lines,\ndiff --git a/txtar/archive_test.go b/txtar/archive_test.go\nindex e05fd5f..0263287 100644\n--- a/txtar/archive_test.go\n+++ b/txtar/archive_test.go\n@@ -11,6 +11,25 @@ import (\n \t\"testing\"\n )\n \n+func TestLookup(t *testing.T) {\n+\ta := \u0026Archive{\n+\t\tFiles: []File{\n+\t\t\t{\"foo.txt\", []byte(\"hello\")},\n+\t\t\t{\"bar.txt\", []byte(\"world\")},\n+\t\t},\n+\t}\n+\tf, ok := a.Lookup(\"foo.txt\")\n+\tif !ok || f == nil || f.Name != \"foo.txt\" || string(f.Data) != \"hello\" {\n+\t\tt.Fatalf(\"Lookup(foo.txt) = %p, %v; want non-nil, true\", f, ok)\n+\t}\n+\tif f, ok := a.Lookup(\"bar.txt\"); !ok || f.Name != \"bar.txt\" {\n+\t\tt.Fatalf(\"Lookup(bar.txt) = %p, %v; want non-nil, true\", f, ok)\n+\t}\n+\tif f, ok := a.Lookup(\"nope\"); f != nil || ok {\n+\t\tt.Fatalf(\"Lookup(nope) = %p, %v; want nil, false\", f, ok)\n+\t}\n+}\n+\n func TestParse(t *testing.T) {\n \tvar tests = []struct {\n \t\tname   string\n",
+      "session_id": "20261027-212213-d251",
+      "language": "go",
+      "agent_seconds": 43.787062299,
+      "tool_seconds": 0.27258253899999996,
+      "harness_seconds": 0.08983225599999944,
+      "phase_seconds": {
+        "checks": 0.152501886,
+        "history_notes": 0.005480563,
+        "project_map": 0.003717036,
+        "seed_pack": 0.00007591,
+        "working_set": 0.000093588
+      },
+      "tool_times": {
+        "bash": {
+          "calls": 1,
+          "seconds": 0.114037346,
+          "max_seconds": 0.114037346,
+          "result_bytes": 37
+        },
+        "edit": {
+          "calls": 3,
+          "seconds": 0.158421875,
+          "max_seconds": 0.072102236,
+          "result_bytes": 527
+        },
+        "read": {
+          "calls": 2,
+          "seconds": 0.000123318,
+          "max_seconds": 0.00007652,
+          "result_bytes": 9162
+        }
+      },
+      "call_stats": {
+        "calls": 6,
+        "inference_seconds": 43.424647504,
+        "prefill_seconds": 12.640236,
+        "decode_seconds": 30.671000999999997,
+        "ttft_median_ms": 1766.010424,
+        "ttft_max_ms": 4908.845244,
+        "reasoning_tokens": 225,
+        "reasoning_count": "tokenizer",
+        "cache_invalidations": 0,
+        "cache_invalidations_after_rewrite": 0,
+        "recomputed_prompt_tokens": 0,
+        "peak_call": 5
+      },
+      "call_log": [
+        {
+          "prompt_tokens": 3823,
+          "cached_tokens": 3270,
+          "completion_tokens": 75,
+          "reasoning_tokens": 18,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1766.010424,
+          "prefill_ms": 1752.972,
+          "decode_ms": 1923.612,
+          "total_ms": 3689.871904,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 7517,
+          "cached_tokens": 3819,
+          "completion_tokens": 209,
+          "reasoning_tokens": 55,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 4908.845244,
+          "prefill_ms": 4892.152,
+          "decode_ms": 5535.24,
+          "total_ms": 10444.691557,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 7784,
+          "cached_tokens": 7513,
+          "completion_tokens": 262,
+          "reasoning_tokens": 70,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1610.083505,
+          "prefill_ms": 1592.39,
+          "decode_ms": 6947.899,
+          "total_ms": 8558.410834,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 8012,
+          "cached_tokens": 7780,
+          "completion_tokens": 301,
+          "ttft_ms": 1708.037711,
+          "prefill_ms": 1631.023,
+          "decode_ms": 7911.837,
+          "total_ms": 9562.654535,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 8350,
+          "cached_tokens": 8008,
+          "completion_tokens": 49,
+          "ttft_ms": 1969.820475,
+          "prefill_ms": 1701.735,
+          "decode_ms": 1269.107,
+          "total_ms": 2991.942734,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 8431,
+          "cached_tokens": 8346,
+          "completion_tokens": 267,
+          "reasoning_tokens": 82,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1093.312677,
+          "prefill_ms": 1069.964,
+          "decode_ms": 7083.306,
+          "total_ms": 8177.07594,
+          "status": "ok",
+          "streamed": true
+        }
+      ],
+      "context": {
+        "call": 5,
+        "prompt_tokens": 8431,
+        "counting": "tokenizer",
+        "sections": {
+          "assistant": {
+            "bytes": 128,
+            "tokens": 34
+          },
+          "environment": {
+            "bytes": 686,
+            "tokens": 200
+          },
+          "project_map": {
+            "bytes": 713,
+            "tokens": 261
+          },
+          "system": {
+            "bytes": 2586,
+            "tokens": 537
+          },
+          "tool:bash": {
+            "bytes": 37,
+            "tokens": 18
+          },
+          "tool:edit": {
+            "bytes": 527,
+            "tokens": 141
+          },
+          "tool:read": {
+            "bytes": 9162,
+            "tokens": 3623
+          },
+          "tool_calls": {
+            "bytes": 1753,
+            "tokens": 575
+          },
+          "tool_schemas": {
+            "bytes": 9515,
+            "tokens": 1992
+          },
+          "user": {
+            "bytes": 338,
+            "tokens": 79
+          }
+        },
+        "framing_tokens": 971
+      },
+      "resources": {
+        "harness_rss_mib": 29.76953125,
+        "model_server_rss_mib": 21115.265625,
+        "gpu_mem_used_mib": 7161,
+        "samples": 45
+      }
+    },
+    {
+      "id": "large-locate-preorder",
+      "category": "large-locate",
+      "model": "qwen3.6-35b-a3b",
+      "success": true,
+      "mode": "chat",
+      "routed": "a question",
+      "turns": 1,
+      "model_calls": 5,
+      "tool_calls": 5,
+      "tools": {
+        "glob": 1,
+        "grep": 3,
+        "read": 1
+      },
+      "prompt_tokens": 28562,
+      "cached_prompt_tokens": 21260,
+      "generated_tokens": 741,
+      "peak_prompt_tokens": 10556,
+      "tool_result_bytes": 17167,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 0,
+      "wall_seconds": 34.014419751,
+      "answer": "The `Preorder` method of the `Inspector` type is defined in:\n\n**`go/ast/inspector/inspector.go`** (line 103)\n\nIt visits nodes in **depth-first order**, calling the callback `f(n)` **before** visiting `n`'s children — i.e., a **preorder** traversal. This is stated explicitly in the doc comment (lines 90–92):\n\n\u003e \"Preorder visits all the nodes of the files supplied to [New] in depth-first order. It calls f(n) for each node n **before** it visits n's children.\"",
+      "session_id": "20261027-212257-32bc",
+      "language": "go",
+      "agent_seconds": 33.734091407,
+      "tool_seconds": 0.090186847,
+      "harness_seconds": 0.0946255180000062,
+      "phase_seconds": {
+        "project_map": 0.003389509,
+        "seed_pack": 0.000042493,
+        "working_set": 0.000064623
+      },
+      "tool_times": {
+        "glob": {
+          "calls": 1,
+          "seconds": 0.02993138,
+          "max_seconds": 0.02993138,
+          "result_bytes": 230
+        },
+        "grep": {
+          "calls": 3,
+          "seconds": 0.060123589000000005,
+          "max_seconds": 0.058958292,
+          "result_bytes": 4909
+        },
+        "read": {
+          "calls": 1,
+          "seconds": 0.000131878,
+          "max_seconds": 0.000131878,
+          "result_bytes": 12028
+        }
+      },
+      "call_stats": {
+        "calls": 5,
+        "inference_seconds": 33.549279041999995,
+        "prefill_seconds": 13.816246,
+        "decode_seconds": 19.400779,
+        "ttft_median_ms": 1983.106463,
+        "ttft_max_ms": 6969.828046,
+        "reasoning_tokens": 145,
+        "reasoning_count": "tokenizer",
+        "cache_invalidations": 0,
+        "cache_invalidations_after_rewrite": 0,
+        "recomputed_prompt_tokens": 0,
+        "peak_call": 4
+      },
+      "call_log": [
+        {
+          "prompt_tokens": 3787,
+          "cached_tokens": 3270,
+          "completion_tokens": 239,
+          "reasoning_tokens": 56,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1983.106463,
+          "prefill_ms": 1730.383,
+          "decode_ms": 6258.951,
+          "total_ms": 8242.388956,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 4077,
+          "cached_tokens": 3783,
+          "completion_tokens": 117,
+          "reasoning_tokens": 13,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1514.671247,
+          "prefill_ms": 1499.871,
+          "decode_ms": 3034.136,
+          "total_ms": 4549.049096,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 4199,
+          "cached_tokens": 4073,
+          "completion_tokens": 113,
+          "reasoning_tokens": 16,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1292.288466,
+          "prefill_ms": 1276.704,
+          "decode_ms": 2929.254,
+          "total_ms": 4221.663636,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 5943,
+          "cached_tokens": 4195,
+          "completion_tokens": 136,
+          "reasoning_tokens": 60,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2449.994407,
+          "prefill_ms": 2427.648,
+          "decode_ms": 3538.61,
+          "total_ms": 5988.884897,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 10556,
+          "cached_tokens": 5939,
+          "completion_tokens": 136,
+          "ttft_ms": 6969.828046,
+          "prefill_ms": 6881.64,
+          "decode_ms": 3639.828,
+          "total_ms": 10547.292457,
+          "status": "ok",
+          "streamed": true
+        }
+      ],
+      "context": {
+        "call": 4,
+        "prompt_tokens": 10556,
+        "counting": "tokenizer",
+        "sections": {
+          "environment": {
+            "bytes": 659,
+            "tokens": 201
+          },
+          "project_map": {
+            "bytes": 713,
+            "tokens": 261
+          },
+          "system": {
+            "bytes": 2586,
+            "tokens": 537
+          },
+          "tool:glob": {
+            "bytes": 230,
+            "tokens": 84
+          },
+          "tool:grep": {
+            "bytes": 4909,
+            "tokens": 1638
+          },
+          "tool:read": {
+            "bytes": 12028,
+            "tokens": 4526
+          },
+          "tool_calls": {
+            "bytes": 850,
+            "tokens": 308
+          },
+          "tool_schemas": {
+            "bytes": 9515,
+            "tokens": 1992
+          },
+          "user": {
+            "bytes": 196,
+            "tokens": 42
+          }
+        },
+        "framing_tokens": 967
+      },
+      "resources": {
+        "harness_rss_mib": 30.45703125,
+        "model_server_rss_mib": 21771.07421875,
+        "gpu_mem_used_mib": 7161,
+        "samples": 35
+      }
+    },
+    {
+      "id": "locate-topic-name",
+      "category": "locate",
+      "model": "qwen3.6-35b-a3b",
+      "success": true,
+      "mode": "chat",
+      "routed": "a question",
+      "turns": 1,
+      "model_calls": 2,
+      "tool_calls": 2,
+      "tools": {
+        "grep": 2
+      },
+      "prompt_tokens": 8008,
+      "cached_prompt_tokens": 6892,
+      "generated_tokens": 268,
+      "peak_prompt_tokens": 4382,
+      "tool_result_bytes": 1975,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 0,
+      "wall_seconds": 10.806013142,
+      "answer": "The Kafka topic name for charged payments is defined in:\n\n- **File**: `internal/events/kafka.go`\n- **Constant**: `TopicPaymentCharged`\n- **Value**: `\"payments.charged\"`",
+      "session_id": "20261027-212331-d36d",
+      "language": "go",
+      "agent_seconds": 10.756930729,
+      "tool_seconds": 0.0014669589999999999,
+      "harness_seconds": 0.009609955000001991,
+      "phase_seconds": {
+        "project_map": 0.000183457,
+        "seed_pack": 0.000029452,
+        "working_set": 0.000033928
+      },
+      "tool_times": {
+        "grep": {
+          "calls": 2,
+          "seconds": 0.0014669589999999999,
+          "max_seconds": 0.000888987,
+          "result_bytes": 1975
+        }
+      },
+      "call_stats": {
+        "calls": 2,
+        "inference_seconds": 10.745853814999998,
+        "prefill_seconds": 3.501996,
+        "decode_seconds": 6.9905040000000005,
+        "ttft_median_ms": 1922.652634,
+        "ttft_max_ms": 1922.652634,
+        "reasoning_tokens": 36,
+        "reasoning_count": "tokenizer",
+        "cache_invalidations": 0,
+        "cache_invalidations_after_rewrite": 0,
+        "recomputed_prompt_tokens": 0,
+        "peak_call": 1
+      },
+      "call_log": [
+        {
+          "prompt_tokens": 3626,
+          "cached_tokens": 3270,
+          "completion_tokens": 219,
+          "reasoning_tokens": 34,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1832.206706,
+          "prefill_ms": 1598.113,
+          "decode_ms": 5738.843,
+          "total_ms": 7571.288892,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 4382,
+          "cached_tokens": 3622,
+          "completion_tokens": 49,
+          "reasoning_tokens": 2,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1922.652634,
+          "prefill_ms": 1903.883,
+          "decode_ms": 1251.661,
+          "total_ms": 3174.564923,
+          "status": "ok",
+          "streamed": true
+        }
+      ],
+      "context": {
+        "call": 1,
+        "prompt_tokens": 4382,
+        "counting": "tokenizer",
+        "sections": {
+          "environment": {
+            "bytes": 667,
+            "tokens": 197
+          },
+          "project_map": {
+            "bytes": 409,
+            "tokens": 121
+          },
+          "system": {
+            "bytes": 2586,
+            "tokens": 537
+          },
+          "tool:grep": {
+            "bytes": 1975,
+            "tokens": 551
+          },
+          "tool_calls": {
+            "bytes": 344,
+            "tokens": 115
+          },
+          "tool_schemas": {
+            "bytes": 9515,
+            "tokens": 1992
+          },
+          "user": {
+            "bytes": 127,
+            "tokens": 25
+          }
+        },
+        "framing_tokens": 844
+      },
+      "resources": {
+        "harness_rss_mib": 30.22265625,
+        "model_server_rss_mib": 22196.328125,
+        "gpu_mem_used_mib": 7161,
+        "samples": 12
+      }
+    },
+    {
+      "id": "multi-feature-discount",
+      "category": "feature",
+      "model": "qwen3.6-35b-a3b",
+      "success": false,
+      "mode": "code",
+      "routed": "it touches a security- or money-related code contracts/summary.schema.json; verification is unavailable (benchmark: direct mode only), so a change needs your go-ahead (direct.verify_fallback) (verify)",
+      "turns": 1,
+      "model_calls": 15,
+      "tool_calls": 19,
+      "tools": {
+        "bash": 2,
+        "edit": 8,
+        "read": 5,
+        "todo_write": 4
+      },
+      "prompt_tokens": 99411,
+      "cached_prompt_tokens": 94171,
+      "generated_tokens": 2815,
+      "peak_prompt_tokens": 8454,
+      "tool_result_bytes": 5523,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 0,
+      "wall_seconds": 99.402918324,
+      "files_changed": [
+        "api/order.go",
+        "contracts/summary.schema.json",
+        "web/src/summary.ts",
+        "web/test/summary.test.ts"
+      ],
+      "answer": "All done. Here's what changed:\n\n**api/order.go** — Added `DiscountCents int64` field to `Summary` struct (JSON: `discount_cents`) and set it in `Summarize()` from the order's discount.\n\n**web/src/summary.ts** — Added `discountCents: number` to `OrderSummary` interface, `parseSummary` now reads `raw.discount_cents`, and `describe` shows `\"o1: 5.00 (saved 1.00)\"` when discount \u003e 0.\n\n**contracts/summary.schema.json** — Added `discount_cents` as an optional integer property with minimum 0.\n\n**web/test/summary.test.ts** — Updated parseSummary test to include `discount_cents`, updated describe test to the non-zero format, added a zero-discount describe test.\n\nBoth test suites pass (Go: 1 test, Node: 3 tests).",
+      "failed_checks": [
+        "go -C api test ./...: --- FAIL: TestHiddenDiscount (0.00s)\n    hidden_test.go:15: discount above the subtotal: {ID:o2 SubtotalCents:1000 TotalCents:0 DiscountCents:5000}\nFAIL\nFAIL\texample.com/shop/api\t0.002s\nFAIL\n"
+      ],
+      "agent_patch": "diff --git a/api/order.go b/api/order.go\nindex bc685a1..29a7b6c 100644\n--- a/api/order.go\n+++ b/api/order.go\n@@ -21,6 +21,7 @@ type Summary struct {\n \tID            string `json:\"id\"`\n \tSubtotalCents int64  `json:\"subtotal_cents\"`\n \tTotalCents    int64  `json:\"total_cents\"`\n+\tDiscountCents int64  `json:\"discount_cents\"`\n }\n \n // Summarize totals an order. The total never goes below zero.\n@@ -29,5 +30,5 @@ func Summarize(o Order) Summary {\n \tfor _, l := range o.Lines {\n \t\tsub += l.PriceCents * l.Qty\n \t}\n-\treturn Summary{ID: o.ID, SubtotalCents: sub, TotalCents: max(sub-o.DiscountCents, 0)}\n+\treturn Summary{ID: o.ID, SubtotalCents: sub, TotalCents: max(sub-o.DiscountCents, 0), DiscountCents: o.DiscountCents}\n }\ndiff --git a/contracts/summary.schema.json b/contracts/summary.schema.json\nindex beaba0b..f7009ef 100644\n--- a/contracts/summary.schema.json\n+++ b/contracts/summary.schema.json\n@@ -6,7 +6,8 @@\n   \"properties\": {\n     \"id\": { \"type\": \"string\" },\n     \"subtotal_cents\": { \"type\": \"integer\", \"minimum\": 0 },\n-    \"total_cents\": { \"type\": \"integer\", \"minimum\": 0 }\n+    \"total_cents\": { \"type\": \"integer\", \"minimum\": 0 },\n+    \"discount_cents\": { \"type\": \"integer\", \"minimum\": 0 }\n   },\n   \"additionalProperties\": false\n }\ndiff --git a/web/src/summary.ts b/web/src/summary.ts\nindex 001af3c..628a774 100644\n--- a/web/src/summary.ts\n+++ b/web/src/summary.ts\n@@ -4,15 +4,19 @@ export interface OrderSummary {\n   id: string;\n   subtotalCents: number;\n   totalCents: number;\n+  discountCents: number;\n }\n \n // parseSummary reads the API's JSON (snake_case) into an OrderSummary.\n export function parseSummary(json: string): OrderSummary {\n   const raw = JSON.parse(json);\n-  return { id: raw.id, subtotalCents: raw.subtotal_cents, totalCents: raw.total_cents };\n+  return { id: raw.id, subtotalCents: raw.subtotal_cents, totalCents: raw.total_cents, discountCents: raw.discount_cents };\n }\n \n-// describe is the one-line text shown in the order list: \"o1: 5.00\".\n+// describe is the one-line text shown in the order list: \"o1: 5.00\" or \"o1: 5.00 (saved 1.00)\".\n export function describe(s: OrderSummary): string {\n+  if (s.discountCents \u003e 0) {\n+    return `${s.id}: ${(s.totalCents / 100).toFixed(2)} (saved ${(s.discountCents / 100).toFixed(2)})`;\n+  }\n   return `${s.id}: ${(s.totalCents / 100).toFixed(2)}`;\n }\ndiff --git a/web/test/summary.test.ts b/web/test/summary.test.ts\nindex 190792a..e83b484 100644\n--- a/web/test/summary.test.ts\n+++ b/web/test/summary.test.ts\n@@ -3,10 +3,14 @@ import assert from \"node:assert/strict\";\n import { describe, parseSummary } from \"../src/summary.ts\";\n \n test(\"parseSummary maps the API's names\", () =\u003e {\n-  const s = parseSummary('{\"id\":\"o1\",\"subtotal_cents\":600,\"total_cents\":500}');\n-  assert.deepEqual(s, { id: \"o1\", subtotalCents: 600, totalCents: 500 });\n+  const s = parseSummary('{\"id\":\"o1\",\"subtotal_cents\":600,\"total_cents\":500,\"discount_cents\":100}');\n+  assert.deepEqual(s, { id: \"o1\", subtotalCents: 600, totalCents: 500, discountCents: 100 });\n });\n \n test(\"describe\", () =\u003e {\n-  assert.equal(describe({ id: \"o1\", subtotalCents: 600, totalCents: 500 }), \"o1: 5.00\");\n+  assert.equal(describe({ id: \"o1\", subtotalCents: 600, totalCents: 500, discountCents: 100 }), \"o1: 5.00 (saved 1.00)\");\n+});\n+\n+test(\"describe with zero discount\", () =\u003e {\n+  assert.equal(describe({ id: \"o2\", subtotalCents: 600, totalCents: 600, discountCents: 0 }), \"o2: 6.00\");\n });\n",
+      "session_id": "20261027-212342-d04c",
+      "language": "multi",
+      "failure_class": "model",
+      "agent_seconds": 99.102219629,
+      "tool_seconds": 0.388738345,
+      "harness_seconds": 0.016980328999984973,
+      "phase_seconds": {
+        "checks": 0.09491989,
+        "history_notes": 0.001734152,
+        "project_map": 0.00032315,
+        "seed_pack": 0.001382471,
+        "working_set": 0.000215305
+      },
+      "tool_times": {
+        "bash": {
+          "calls": 2,
+          "seconds": 0.290923709,
+          "max_seconds": 0.145846006,
+          "result_bytes": 306
+        },
+        "edit": {
+          "calls": 8,
+          "seconds": 0.09759762400000002,
+          "max_seconds": 0.048985691,
+          "result_bytes": 426
+        },
+        "read": {
+          "calls": 5,
+          "seconds": 0.00019589000000000002,
+          "max_seconds": 0.000051125,
+          "result_bytes": 3435
+        },
+        "todo_write": {
+          "calls": 4,
+          "seconds": 0.000021122,
+          "max_seconds": 0.000007382,
+          "result_bytes": 1356
+        }
+      },
+      "call_stats": {
+        "calls": 15,
+        "inference_seconds": 98.69650095500002,
+        "prefill_seconds": 24.564663999999997,
+        "decode_seconds": 73.74806500000001,
+        "ttft_median_ms": 1684.941178,
+        "ttft_max_ms": 2309.662689,
+        "reasoning_tokens": 87,
+        "reasoning_count": "tokenizer",
+        "cache_invalidations": 0,
+        "cache_invalidations_after_rewrite": 0,
+        "recomputed_prompt_tokens": 0,
+        "peak_call": 14
+      },
+      "call_log": [
+        {
+          "prompt_tokens": 3825,
+          "cached_tokens": 3270,
+          "completion_tokens": 159,
+          "reasoning_tokens": 19,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1748.871927,
+          "prefill_ms": 1735.881,
+          "decode_ms": 4107.466,
+          "total_ms": 5856.649456,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 5301,
+          "cached_tokens": 3821,
+          "completion_tokens": 165,
+          "reasoning_tokens": 2,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2309.662689,
+          "prefill_ms": 2292.744,
+          "decode_ms": 4295.275,
+          "total_ms": 6605.293973,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 5559,
+          "cached_tokens": 5297,
+          "completion_tokens": 265,
+          "reasoning_tokens": 2,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1506.718527,
+          "prefill_ms": 1486.32,
+          "decode_ms": 6965.1,
+          "total_ms": 8471.982414,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 5855,
+          "cached_tokens": 5555,
+          "completion_tokens": 141,
+          "reasoning_tokens": 19,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1741.880721,
+          "prefill_ms": 1722.865,
+          "decode_ms": 3695.307,
+          "total_ms": 5437.42185,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 6010,
+          "cached_tokens": 5851,
+          "completion_tokens": 183,
+          "reasoning_tokens": 20,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1475.235659,
+          "prefill_ms": 1454.593,
+          "decode_ms": 4688.824,
+          "total_ms": 6164.362293,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 6268,
+          "cached_tokens": 6006,
+          "completion_tokens": 130,
+          "reasoning_tokens": 2,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1636.343501,
+          "prefill_ms": 1613.853,
+          "decode_ms": 3357.012,
+          "total_ms": 4993.574454,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 6422,
+          "cached_tokens": 6264,
+          "completion_tokens": 119,
+          "reasoning_tokens": 2,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1464.701405,
+          "prefill_ms": 1437.687,
+          "decode_ms": 3095.079,
+          "total_ms": 4559.956665,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 6565,
+          "cached_tokens": 6418,
+          "completion_tokens": 261,
+          "reasoning_tokens": 13,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1416.287035,
+          "prefill_ms": 1389.546,
+          "decode_ms": 6820.604,
+          "total_ms": 8237.284877,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 6839,
+          "cached_tokens": 6561,
+          "completion_tokens": 240,
+          "ttft_ms": 1779.098496,
+          "prefill_ms": 1692.158,
+          "decode_ms": 6297.122,
+          "total_ms": 8016.657003,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 7112,
+          "cached_tokens": 6835,
+          "completion_tokens": 253,
+          "reasoning_tokens": 2,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1684.941178,
+          "prefill_ms": 1659.715,
+          "decode_ms": 6680.067,
+          "total_ms": 8365.477095,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 7390,
+          "cached_tokens": 7108,
+          "completion_tokens": 266,
+          "reasoning_tokens": 2,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1730.521595,
+          "prefill_ms": 1695.835,
+          "decode_ms": 6935.125,
+          "total_ms": 8665.887839,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 7681,
+          "cached_tokens": 7386,
+          "completion_tokens": 165,
+          "reasoning_tokens": 2,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1753.540263,
+          "prefill_ms": 1721.171,
+          "decode_ms": 4343.472,
+          "total_ms": 6097.197637,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 7939,
+          "cached_tokens": 7677,
+          "completion_tokens": 96,
+          "ttft_ms": 1850.774424,
+          "prefill_ms": 1575.019,
+          "decode_ms": 2529.856,
+          "total_ms": 4134.531667,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 8191,
+          "cached_tokens": 7935,
+          "completion_tokens": 170,
+          "reasoning_tokens": 2,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1571.967736,
+          "prefill_ms": 1541.777,
+          "decode_ms": 4534.863,
+          "total_ms": 6107.13888,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 8454,
+          "cached_tokens": 8187,
+          "completion_tokens": 202,
+          "ttft_ms": 1640.996947,
+          "prefill_ms": 1545.5,
+          "decode_ms": 5402.893,
+          "total_ms": 6983.084852,
+          "status": "ok",
+          "streamed": true
+        }
+      ],
+      "context": {
+        "call": 14,
+        "prompt_tokens": 8454,
+        "counting": "tokenizer",
+        "sections": {
+          "assistant": {
+            "bytes": 583,
+            "tokens": 133
+          },
+          "environment": {
+            "bytes": 698,
+            "tokens": 202
+          },
+          "project_map": {
+            "bytes": 314,
+            "tokens": 92
+          },
+          "seed_pack": {
+            "bytes": 457,
+            "tokens": 130
+          },
+          "system": {
+            "bytes": 2586,
+            "tokens": 537
+          },
+          "tool:bash": {
+            "bytes": 306,
+            "tokens": 138
+          },
+          "tool:edit": {
+            "bytes": 426,
+            "tokens": 111
+          },
+          "tool:read": {
+            "bytes": 3435,
+            "tokens": 1316
+          },
+          "tool:todo_write": {
+            "bytes": 1356,
+            "tokens": 323
+          },
+          "tool_calls": {
+            "bytes": 6424,
+            "tokens": 1895
+          },
+          "tool_schemas": {
+            "bytes": 9515,
+            "tokens": 1992
+          },
+          "user": {
+            "bytes": 470,
+            "tokens": 117
+          }
+        },
+        "framing_tokens": 1468
+      },
+      "resources": {
+        "harness_rss_mib": 30.75390625,
+        "model_server_rss_mib": 23012.9453125,
+        "gpu_mem_used_mib": 7161,
+        "samples": 101
+      }
+    },
+    {
+      "id": "multi-locate-mapping",
+      "category": "locate",
+      "model": "qwen3.6-35b-a3b",
+      "success": true,
+      "mode": "chat",
+      "routed": "a question",
+      "turns": 1,
+      "model_calls": 3,
+      "tool_calls": 6,
+      "tools": {
+        "glob": 2,
+        "read": 4
+      },
+      "prompt_tokens": 12339,
+      "cached_prompt_tokens": 10597,
+      "generated_tokens": 371,
+      "peak_prompt_tokens": 5004,
+      "tool_result_bytes": 3205,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 0,
+      "wall_seconds": 14.956617776,
+      "answer": "The function is **`parseSummary`**, located in **`web/src/summary.ts`**. It maps the API's snake_case JSON fields (`subtotal_cents`, `total_cents`) to the web client's camelCase field names (`subtotalCents`, `totalCents`).",
+      "session_id": "20261027-212521-3fcf",
+      "language": "multi",
+      "agent_seconds": 14.906170526,
+      "tool_seconds": 0.0008102440000000001,
+      "harness_seconds": 0.009236244000000409,
+      "phase_seconds": {
+        "project_map": 0.000193772,
+        "seed_pack": 0.000037016,
+        "working_set": 0.000034604
+      },
+      "tool_times": {
+        "glob": {
+          "calls": 2,
+          "seconds": 0.00041181400000000004,
+          "max_seconds": 0.000224343,
+          "result_bytes": 88
+        },
+        "read": {
+          "calls": 4,
+          "seconds": 0.00039842999999999996,
+          "max_seconds": 0.000129415,
+          "result_bytes": 3117
+        }
+      },
+      "call_stats": {
+        "calls": 3,
+        "inference_seconds": 14.896124038,
+        "prefill_seconds": 4.866499,
+        "decode_seconds": 9.60259,
+        "ttft_median_ms": 2019.940695,
+        "ttft_max_ms": 2218.156299,
+        "reasoning_tokens": 140,
+        "reasoning_count": "tokenizer",
+        "cache_invalidations": 0,
+        "cache_invalidations_after_rewrite": 0,
+        "recomputed_prompt_tokens": 0,
+        "peak_call": 2
+      },
+      "call_log": [
+        {
+          "prompt_tokens": 3616,
+          "cached_tokens": 3270,
+          "completion_tokens": 113,
+          "reasoning_tokens": 55,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2019.940695,
+          "prefill_ms": 1628.485,
+          "decode_ms": 2923.9,
+          "total_ms": 4944.035292,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 3719,
+          "cached_tokens": 3612,
+          "completion_tokens": 135,
+          "reasoning_tokens": 23,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1054.875584,
+          "prefill_ms": 1037.05,
+          "decode_ms": 3482.096,
+          "total_ms": 4537.085773,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 5004,
+          "cached_tokens": 3715,
+          "completion_tokens": 123,
+          "reasoning_tokens": 62,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2218.156299,
+          "prefill_ms": 2200.964,
+          "decode_ms": 3196.594,
+          "total_ms": 5415.002973,
+          "status": "ok",
+          "streamed": true
+        }
+      ],
+      "context": {
+        "call": 2,
+        "prompt_tokens": 5004,
+        "counting": "tokenizer",
+        "sections": {
+          "environment": {
+            "bytes": 661,
+            "tokens": 203
+          },
+          "project_map": {
+            "bytes": 314,
+            "tokens": 92
+          },
+          "system": {
+            "bytes": 2586,
+            "tokens": 537
+          },
+          "tool:glob": {
+            "bytes": 88,
+            "tokens": 26
+          },
+          "tool:read": {
+            "bytes": 3117,
+            "tokens": 1155
+          },
+          "tool_calls": {
+            "bytes": 186,
+            "tokens": 54
+          },
+          "tool_schemas": {
+            "bytes": 9515,
+            "tokens": 1992
+          },
+          "user": {
+            "bytes": 162,
+            "tokens": 38
+          }
+        },
+        "framing_tokens": 907
+      },
+      "resources": {
+        "harness_rss_mib": 30.11328125,
+        "model_server_rss_mib": 23479.84375,
+        "gpu_mem_used_mib": 7161,
+        "samples": 16
+      }
+    },
+    {
+      "id": "py-explain-reorder",
+      "category": "explain",
+      "model": "qwen3.6-35b-a3b",
+      "success": true,
+      "mode": "chat",
+      "routed": "a question",
+      "turns": 1,
+      "model_calls": 2,
+      "tool_calls": 2,
+      "tools": {
+        "read": 2
+      },
+      "prompt_tokens": 7892,
+      "cached_prompt_tokens": 6847,
+      "generated_tokens": 259,
+      "peak_prompt_tokens": 4311,
+      "tool_result_bytes": 1857,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 0,
+      "wall_seconds": 10.280947669,
+      "answer": "`reorder_plan` iterates over every SKU in `targets`. For each one it:\n\n1. **How many units:** `order_qty = target - inventory.quantity(sku)` — i.e. the difference between the target level and what's currently on hand.\n2. **Which SKUs are left out:** any SKU whose current stock is **at or above** its target (`have \u003e= target`) is skipped entirely and does not appear in the returned plan dict.",
+      "session_id": "20261027-212536-c283",
+      "language": "python",
+      "agent_seconds": 10.232111534,
+      "tool_seconds": 0.00009036999999999999,
+      "harness_seconds": 0.008453930999998811,
+      "phase_seconds": {
+        "project_map": 0.000156216,
+        "seed_pack": 0.000064116,
+        "working_set": 0.000029847
+      },
+      "tool_times": {
+        "read": {
+          "calls": 2,
+          "seconds": 0.00009036999999999999,
+          "max_seconds": 0.000047207,
+          "result_bytes": 1857
+        }
+      },
+      "call_stats": {
+        "calls": 2,
+        "inference_seconds": 10.223567233,
+        "prefill_seconds": 3.4915719999999997,
+        "decode_seconds": 6.7013940000000005,
+        "ttft_median_ms": 1949.655391,
+        "ttft_max_ms": 1949.655391,
+        "reasoning_tokens": 25,
+        "reasoning_count": "tokenizer",
+        "cache_invalidations": 0,
+        "cache_invalidations_after_rewrite": 0,
+        "recomputed_prompt_tokens": 0,
+        "peak_call": 1
+      },
+      "call_log": [
+        {
+          "prompt_tokens": 3581,
+          "cached_tokens": 3270,
+          "completion_tokens": 148,
+          "reasoning_tokens": 14,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1572.164841,
+          "prefill_ms": 1558.591,
+          "decode_ms": 3822.313,
+          "total_ms": 5394.682227,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 4311,
+          "cached_tokens": 3577,
+          "completion_tokens": 111,
+          "reasoning_tokens": 11,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1949.655391,
+          "prefill_ms": 1932.981,
+          "decode_ms": 2879.081,
+          "total_ms": 4828.885006,
+          "status": "ok",
+          "streamed": true
+        }
+      ],
+      "context": {
+        "call": 1,
+        "prompt_tokens": 4311,
+        "counting": "tokenizer",
+        "sections": {
+          "environment": {
+            "bytes": 663,
+            "tokens": 201
+          },
+          "project_map": {
+            "bytes": 215,
+            "tokens": 57
+          },
+          "system": {
+            "bytes": 2586,
+            "tokens": 537
+          },
+          "tool:read": {
+            "bytes": 1857,
+            "tokens": 582
+          },
+          "tool_calls": {
+            "bytes": 252,
+            "tokens": 96
+          },
+          "tool_schemas": {
+            "bytes": 9515,
+            "tokens": 1992
+          },
+          "user": {
+            "bytes": 175,
+            "tokens": 40
+          }
+        },
+        "framing_tokens": 806
+      },
+      "resources": {
+        "harness_rss_mib": 29.9375,
+        "model_server_rss_mib": 23479.84375,
+        "gpu_mem_used_mib": 7161,
+        "samples": 12
+      }
+    },
+    {
+      "id": "py-fix-inventory",
+      "category": "small-fix",
+      "model": "qwen3.6-35b-a3b",
+      "success": true,
+      "mode": "code",
+      "routed": "a request for a change",
+      "turns": 1,
+      "model_calls": 5,
+      "tool_calls": 5,
+      "tools": {
+        "bash": 1,
+        "edit": 1,
+        "glob": 1,
+        "read": 2
+      },
+      "prompt_tokens": 21782,
+      "cached_prompt_tokens": 20240,
+      "generated_tokens": 594,
+      "peak_prompt_tokens": 4796,
+      "tool_result_bytes": 2566,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 0,
+      "wall_seconds": 23.355256839,
+      "files_changed": [
+        "__pycache__/inventory.cpython-314.pyc",
+        "__pycache__/reorder.cpython-314.pyc",
+        "inventory.py",
+        "tests/__pycache__/__init__.cpython-314.pyc",
+        "tests/__pycache__/test_inventory.cpython-314.pyc"
+      ],
+      "answer": "All 3 tests pass. The fix was on line 21: the condition `have \u003c 0` was checking if stock was already negative (it never is, since we only add positive quantities), so it never raised. Changing it to `have \u003c qty` correctly checks whether there's enough stock before allowing the removal, and the stock is left unchanged when the exception is raised.",
+      "agent_patch": "diff --git a/__pycache__/inventory.cpython-314.pyc b/__pycache__/inventory.cpython-314.pyc\nindex b33bf5f..85937ac 100644\nBinary files a/__pycache__/inventory.cpython-314.pyc and b/__pycache__/inventory.cpython-314.pyc differ\ndiff --git a/__pycache__/reorder.cpython-314.pyc b/__pycache__/reorder.cpython-314.pyc\nindex edf8c8c..295ea19 100644\nBinary files a/__pycache__/reorder.cpython-314.pyc and b/__pycache__/reorder.cpython-314.pyc differ\ndiff --git a/inventory.py b/inventory.py\nindex cbf536c..57715fb 100644\n--- a/inventory.py\n+++ b/inventory.py\n@@ -18,7 +18,7 @@ class Inventory:\n         if qty \u003c= 0:\n             raise ValueError(\"quantity must be positive\")\n         have = self._items.get(sku, 0)\n-        if have \u003c 0:\n+        if have \u003c qty:\n             raise InsufficientStock(f\"{sku}: have {have}, need {qty}\")\n         self._items[sku] = have - qty\n \ndiff --git a/tests/__pycache__/__init__.cpython-314.pyc b/tests/__pycache__/__init__.cpython-314.pyc\nindex dba419e..a3b17d9 100644\nBinary files a/tests/__pycache__/__init__.cpython-314.pyc and b/tests/__pycache__/__init__.cpython-314.pyc differ\ndiff --git a/tests/__pycache__/test_inventory.cpython-314.pyc b/tests/__pycache__/test_inventory.cpython-314.pyc\nindex fe04a7a..23ca657 100644\nBinary files a/tests/__pycache__/test_inventory.cpython-314.pyc and b/tests/__pycache__/test_inventory.cpython-314.pyc differ\n",
+      "session_id": "20261027-212546-4e0e",
+      "language": "python",
+      "agent_seconds": 23.272626168,
+      "tool_seconds": 0.051518196,
+      "harness_seconds": 0.021379341999999427,
+      "phase_seconds": {
+        "checks": 0.011051185,
+        "history_notes": 0.001620427,
+        "project_map": 0.000101546,
+        "seed_pack": 0.000216955,
+        "working_set": 0.000065273
+      },
+      "tool_times": {
+        "bash": {
+          "calls": 1,
+          "seconds": 0.038495512,
+          "max_seconds": 0.038495512,
+          "result_bytes": 101
+        },
+        "edit": {
+          "calls": 1,
+          "seconds": 0.012822259,
+          "max_seconds": 0.012822259,
+          "result_bytes": 64
+        },
+        "glob": {
+          "calls": 1,
+          "seconds": 0.000101031,
+          "max_seconds": 0.000101031,
+          "result_bytes": 41
+        },
+        "read": {
+          "calls": 2,
+          "seconds": 0.00009939399999999999,
+          "max_seconds": 0.000051677,
+          "result_bytes": 2360
+        }
+      },
+      "call_stats": {
+        "calls": 5,
+        "inference_seconds": 23.19972863,
+        "prefill_seconds": 7.744238999999999,
+        "decode_seconds": 15.372285,
+        "ttft_median_ms": 1632.508487,
+        "ttft_max_ms": 1788.384996,
+        "reasoning_tokens": 238,
+        "reasoning_count": "tokenizer",
+        "cache_invalidations": 0,
+        "cache_invalidations_after_rewrite": 0,
+        "recomputed_prompt_tokens": 0,
+        "peak_call": 4
+      },
+      "call_log": [
+        {
+          "prompt_tokens": 3630,
+          "cached_tokens": 3270,
+          "completion_tokens": 71,
+          "reasoning_tokens": 16,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1632.508487,
+          "prefill_ms": 1619.54,
+          "decode_ms": 1796.4,
+          "total_ms": 3429.224558,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 4148,
+          "cached_tokens": 3626,
+          "completion_tokens": 103,
+          "reasoning_tokens": 74,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1788.384996,
+          "prefill_ms": 1773.728,
+          "decode_ms": 2631.356,
+          "total_ms": 4419.938746,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 4538,
+          "cached_tokens": 4144,
+          "completion_tokens": 179,
+          "reasoning_tokens": 81,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1707.027661,
+          "prefill_ms": 1687.922,
+          "decode_ms": 4631.107,
+          "total_ms": 6338.386696,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 4670,
+          "cached_tokens": 4534,
+          "completion_tokens": 159,
+          "reasoning_tokens": 67,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1332.878183,
+          "prefill_ms": 1316.086,
+          "decode_ms": 4185.958,
+          "total_ms": 5519.221851,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 4796,
+          "cached_tokens": 4666,
+          "completion_tokens": 82,
+          "ttft_ms": 1424.473658,
+          "prefill_ms": 1346.963,
+          "decode_ms": 2127.464,
+          "total_ms": 3492.956779,
+          "status": "ok",
+          "streamed": true
+        }
+      ],
+      "context": {
+        "call": 4,
+        "prompt_tokens": 4796,
+        "counting": "tokenizer",
+        "sections": {
+          "environment": {
+            "bytes": 692,
+            "tokens": 200
+          },
+          "project_map": {
+            "bytes": 215,
+            "tokens": 57
+          },
+          "seed_pack": {
+            "bytes": 207,
+            "tokens": 46
+          },
+          "system": {
+            "bytes": 2586,
+            "tokens": 537
+          },
+          "tool:bash": {
+            "bytes": 101,
+            "tokens": 20
+          },
+          "tool:edit": {
+            "bytes": 64,
+            "tokens": 17
+          },
+          "tool:glob": {
+            "bytes": 41,
+            "tokens": 10
+          },
+          "tool:read": {
+            "bytes": 2360,
+            "tokens": 785
+          },
+          "tool_calls": {
+            "bytes": 527,
+            "tokens": 154
+          },
+          "tool_schemas": {
+            "bytes": 9515,
+            "tokens": 1992
+          },
+          "user": {
+            "bytes": 214,
+            "tokens": 43
+          }
+        },
+        "framing_tokens": 935
+      },
+      "resources": {
+        "harness_rss_mib": 30.1875,
+        "model_server_rss_mib": 23605.4765625,
+        "gpu_mem_used_mib": 7161,
+        "samples": 25
+      }
+    },
+    {
+      "id": "refactor-validate",
+      "category": "refactor",
+      "model": "qwen3.6-35b-a3b",
+      "success": true,
+      "mode": "code",
+      "routed": "the change concerns payment; verification is unavailable (benchmark: direct mode only), so a change needs your go-ahead (direct.verify_fallback) (verify)",
+      "turns": 1,
+      "model_calls": 6,
+      "tool_calls": 6,
+      "tools": {
+        "bash": 1,
+        "edit": 2,
+        "glob": 1,
+        "read": 2
+      },
+      "prompt_tokens": 32098,
+      "cached_prompt_tokens": 29146,
+      "generated_tokens": 883,
+      "peak_prompt_tokens": 6202,
+      "tool_result_bytes": 4926,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 1,
+      "wall_seconds": 34.10030001,
+      "files_changed": [
+        "internal/api/handler.go"
+      ],
+      "answer": "Done. The changes:\n\n1. Added `func (r CreatePaymentRequest) Validate() error` to `internal/api/handler.go` with the same validation logic (`AccountID != \"\"`, `AmountCents \u003e 0`, `Currency` length == 3).\n2. Updated `CreatePayment` to call `req.Validate()` instead of the inline `if` check.\n3. Added `\"fmt\"` to imports for `fmt.Errorf`.\n\nAll tests pass, behavior unchanged (422 for invalid requests, 201 for valid ones).",
+      "agent_patch": "diff --git a/internal/api/handler.go b/internal/api/handler.go\nindex c40cfdc..bd36973 100644\n--- a/internal/api/handler.go\n+++ b/internal/api/handler.go\n@@ -5,6 +5,7 @@ import (\n \t\"crypto/rand\"\n \t\"encoding/hex\"\n \t\"encoding/json\"\n+\t\"fmt\"\n \t\"net/http\"\n \n \t\"example.com/payment-service/internal/events\"\n@@ -30,6 +31,14 @@ func (h *Handler) Routes(mux *http.ServeMux) {\n \tmux.HandleFunc(\"GET /v1/payments/{id}\", h.GetPayment)\n }\n \n+// Validate checks that the request fields are valid.\n+func (r CreatePaymentRequest) Validate() error {\n+\tif r.AccountID == \"\" || r.AmountCents \u003c= 0 || len(r.Currency) != 3 {\n+\t\treturn fmt.Errorf(\"invalid payment\")\n+\t}\n+\treturn nil\n+}\n+\n // CreatePayment handles POST /v1/payments.\n func (h *Handler) CreatePayment(w http.ResponseWriter, r *http.Request) {\n \tvar req CreatePaymentRequest\n@@ -37,8 +46,8 @@ func (h *Handler) CreatePayment(w http.ResponseWriter, r *http.Request) {\n \t\thttp.Error(w, \"invalid JSON\", http.StatusBadRequest)\n \t\treturn\n \t}\n-\tif req.AccountID == \"\" || req.AmountCents \u003c= 0 || len(req.Currency) != 3 {\n-\t\thttp.Error(w, \"invalid payment\", http.StatusUnprocessableEntity)\n+\tif err := req.Validate(); err != nil {\n+\t\thttp.Error(w, err.Error(), http.StatusUnprocessableEntity)\n \t\treturn\n \t}\n \tp := store.Payment{ID: newID(), AccountID: req.AccountID, AmountCents: req.AmountCents, Currency: req.Currency, Status: \"charged\"}\n",
+      "session_id": "20261027-212610-c644",
+      "language": "go",
+      "agent_seconds": 33.882529133,
+      "tool_seconds": 0.253814643,
+      "harness_seconds": 0.010842383000001843,
+      "phase_seconds": {
+        "checks": 0.090990053,
+        "history_notes": 0.001666045,
+        "project_map": 0.00017744,
+        "seed_pack": 0.00057064,
+        "working_set": 0.000077024
+      },
+      "tool_times": {
+        "bash": {
+          "calls": 1,
+          "seconds": 0.160458072,
+          "max_seconds": 0.160458072,
+          "result_bytes": 307
+        },
+        "edit": {
+          "calls": 2,
+          "seconds": 0.092880776,
+          "max_seconds": 0.048241031,
+          "result_bytes": 288
+        },
+        "glob": {
+          "calls": 1,
+          "seconds": 0.000329153,
+          "max_seconds": 0.000329153,
+          "result_bytes": 28
+        },
+        "read": {
+          "calls": 2,
+          "seconds": 0.000146642,
+          "max_seconds": 0.000087007,
+          "result_bytes": 4303
+        }
+      },
+      "call_stats": {
+        "calls": 6,
+        "inference_seconds": 33.617872107,
+        "prefill_seconds": 10.26356,
+        "decode_seconds": 23.245212000000002,
+        "ttft_median_ms": 1837.695985,
+        "ttft_max_ms": 2121.977911,
+        "reasoning_tokens": 103,
+        "reasoning_count": "tokenizer",
+        "cache_invalidations": 0,
+        "cache_invalidations_after_rewrite": 0,
+        "recomputed_prompt_tokens": 0,
+        "peak_call": 5
+      },
+      "call_log": [
+        {
+          "prompt_tokens": 3742,
+          "cached_tokens": 3270,
+          "completion_tokens": 78,
+          "reasoning_tokens": 17,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1708.260453,
+          "prefill_ms": 1695.44,
+          "decode_ms": 2028.082,
+          "total_ms": 3736.638016,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 4793,
+          "cached_tokens": 3738,
+          "completion_tokens": 104,
+          "reasoning_tokens": 73,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2121.977911,
+          "prefill_ms": 2106.727,
+          "decode_ms": 2743.884,
+          "total_ms": 4866.03622,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 5434,
+          "cached_tokens": 4789,
+          "completion_tokens": 372,
+          "reasoning_tokens": 2,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1897.556864,
+          "prefill_ms": 1878.258,
+          "decode_ms": 9873.031,
+          "total_ms": 11770.987772,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 5871,
+          "cached_tokens": 5430,
+          "completion_tokens": 159,
+          "reasoning_tokens": 11,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1837.695985,
+          "prefill_ms": 1818.517,
+          "decode_ms": 4163.352,
+          "total_ms": 6001.292675,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 6056,
+          "cached_tokens": 5867,
+          "completion_tokens": 51,
+          "ttft_ms": 1515.523609,
+          "prefill_ms": 1434.887,
+          "decode_ms": 1321.207,
+          "total_ms": 2777.233371,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 6202,
+          "cached_tokens": 6052,
+          "completion_tokens": 119,
+          "ttft_ms": 1409.865566,
+          "prefill_ms": 1329.731,
+          "decode_ms": 3115.656,
+          "total_ms": 4465.684053,
+          "status": "ok",
+          "streamed": true
+        }
+      ],
+      "context": {
+        "call": 5,
+        "prompt_tokens": 6202,
+        "counting": "tokenizer",
+        "sections": {
+          "assistant": {
+            "bytes": 128,
+            "tokens": 34
+          },
+          "environment": {
+            "bytes": 700,
+            "tokens": 196
+          },
+          "project_map": {
+            "bytes": 409,
+            "tokens": 121
+          },
+          "seed_pack": {
+            "bytes": 292,
+            "tokens": 73
+          },
+          "system": {
+            "bytes": 2586,
+            "tokens": 537
+          },
+          "tool:bash": {
+            "bytes": 307,
+            "tokens": 81
+          },
+          "tool:edit": {
+            "bytes": 288,
+            "tokens": 74
+          },
+          "tool:glob": {
+            "bytes": 28,
+            "tokens": 6
+          },
+          "tool:read": {
+            "bytes": 4303,
+            "tokens": 1565
+          },
+          "tool_calls": {
+            "bytes": 1834,
+            "tokens": 499
+          },
+          "tool_schemas": {
+            "bytes": 9515,
+            "tokens": 1992
+          },
+          "user": {
+            "bytes": 309,
+            "tokens": 68
+          }
+        },
+        "framing_tokens": 956
+      },
+      "resources": {
+        "harness_rss_mib": 30.6171875,
+        "model_server_rss_mib": 23668.29296875,
+        "gpu_mem_used_mib": 7161,
+        "samples": 35
+      }
+    },
+    {
+      "id": "rename-entries",
+      "category": "refactor",
+      "model": "qwen3.6-35b-a3b",
+      "success": true,
+      "mode": "code",
+      "routed": "the change concerns ledger; verification is unavailable (benchmark: direct mode only), so a change needs your go-ahead (direct.verify_fallback) (verify)",
+      "turns": 1,
+      "model_calls": 7,
+      "tool_calls": 10,
+      "tools": {
+        "bash": 2,
+        "edit": 1,
+        "glob": 1,
+        "grep": 2,
+        "read": 4
+      },
+      "prompt_tokens": 35278,
+      "cached_prompt_tokens": 32679,
+      "generated_tokens": 992,
+      "peak_prompt_tokens": 5845,
+      "tool_result_bytes": 4789,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 0,
+      "wall_seconds": 35.946833076,
+      "files_changed": [
+        "internal/ledger/ledger.go"
+      ],
+      "answer": "Done. The `Entries` method has been renamed to `Postings` in `internal/ledger/ledger.go`. There were no callers of the method anywhere in the codebase (no callers in production code or tests), so no other files needed updating.\n\n- `go build ./...` — passes\n- `go test ./...` — passes",
+      "agent_patch": "diff --git a/internal/ledger/ledger.go b/internal/ledger/ledger.go\nindex 690c3c5..a7ab121 100644\n--- a/internal/ledger/ledger.go\n+++ b/internal/ledger/ledger.go\n@@ -53,8 +53,8 @@ func (l *Ledger) Balance(accountID string) int64 {\n \treturn b\n }\n \n-// Entries returns a copy of all entries.\n-func (l *Ledger) Entries() []Entry {\n+// Postings returns a copy of all entries.\n+func (l *Ledger) Postings() []Entry {\n \tl.mu.Lock()\n \tdefer l.mu.Unlock()\n \treturn append([]Entry(nil), l.entries...)\n",
+      "session_id": "20261027-212644-decd",
+      "language": "go",
+      "agent_seconds": 35.741915954,
+      "tool_seconds": 0.172485214,
+      "harness_seconds": 0.0112974200000035,
+      "phase_seconds": {
+        "checks": 0.025786873,
+        "history_notes": 0.001591813,
+        "project_map": 0.000109281,
+        "seed_pack": 0.000033051,
+        "working_set": 0.000081982
+      },
+      "tool_times": {
+        "bash": {
+          "calls": 2,
+          "seconds": 0.14401751000000002,
+          "max_seconds": 0.111306182,
+          "result_bytes": 132
+        },
+        "edit": {
+          "calls": 1,
+          "seconds": 0.027469777,
+          "max_seconds": 0.027469777,
+          "result_bytes": 90
+        },
+        "glob": {
+          "calls": 1,
+          "seconds": 0.000265909,
+          "max_seconds": 0.000265909,
+          "result_bytes": 90
+        },
+        "grep": {
+          "calls": 2,
+          "seconds": 0.000525468,
+          "max_seconds": 0.000272089,
+          "result_bytes": 24
+        },
+        "read": {
+          "calls": 4,
+          "seconds": 0.00020654999999999998,
+          "max_seconds": 0.000077094,
+          "result_bytes": 4453
+        }
+      },
+      "call_stats": {
+        "calls": 7,
+        "inference_seconds": 35.558133319999996,
+        "prefill_seconds": 9.552303,
+        "decode_seconds": 25.876552,
+        "ttft_median_ms": 1399.485688,
+        "ttft_max_ms": 2450.013592,
+        "reasoning_tokens": 464,
+        "reasoning_count": "tokenizer",
+        "cache_invalidations": 0,
+        "cache_invalidations_after_rewrite": 0,
+        "recomputed_prompt_tokens": 0,
+        "peak_call": 6
+      },
+      "call_log": [
+        {
+          "prompt_tokens": 3581,
+          "cached_tokens": 3270,
+          "completion_tokens": 77,
+          "reasoning_tokens": 22,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1570.986799,
+          "prefill_ms": 1557.918,
+          "decode_ms": 1994.406,
+          "total_ms": 3565.660854,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 3698,
+          "cached_tokens": 3577,
+          "completion_tokens": 90,
+          "ttft_ms": 1349.302341,
+          "prefill_ms": 1115.715,
+          "decode_ms": 2341.124,
+          "total_ms": 3473.941353,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 5403,
+          "cached_tokens": 3694,
+          "completion_tokens": 166,
+          "reasoning_tokens": 134,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2450.013592,
+          "prefill_ms": 2431.65,
+          "decode_ms": 4293.669,
+          "total_ms": 6743.91157,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 5453,
+          "cached_tokens": 5399,
+          "completion_tokens": 230,
+          "reasoning_tokens": 98,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 802.394757,
+          "prefill_ms": 784.773,
+          "decode_ms": 6009.615,
+          "total_ms": 6812.338789,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 5624,
+          "cached_tokens": 5449,
+          "completion_tokens": 125,
+          "reasoning_tokens": 93,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1469.727543,
+          "prefill_ms": 1450.398,
+          "decode_ms": 3267.756,
+          "total_ms": 4737.77589,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 5674,
+          "cached_tokens": 5620,
+          "completion_tokens": 112,
+          "ttft_ms": 915.800829,
+          "prefill_ms": 834.148,
+          "decode_ms": 2912.835,
+          "total_ms": 3767.683032,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 5845,
+          "cached_tokens": 5670,
+          "completion_tokens": 192,
+          "reasoning_tokens": 117,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1399.485688,
+          "prefill_ms": 1377.701,
+          "decode_ms": 5057.147,
+          "total_ms": 6456.821832,
+          "status": "ok",
+          "streamed": true
+        }
+      ],
+      "context": {
+        "call": 6,
+        "prompt_tokens": 5845,
+        "counting": "tokenizer",
+        "sections": {
+          "assistant": {
+            "bytes": 172,
+            "tokens": 47
+          },
+          "environment": {
+            "bytes": 692,
+            "tokens": 200
+          },
+          "project_map": {
+            "bytes": 242,
+            "tokens": 68
+          },
+          "system": {
+            "bytes": 2586,
+            "tokens": 537
+          },
+          "tool:bash": {
+            "bytes": 132,
+            "tokens": 40
+          },
+          "tool:edit": {
+            "bytes": 90,
+            "tokens": 24
+          },
+          "tool:glob": {
+            "bytes": 90,
+            "tokens": 21
+          },
+          "tool:grep": {
+            "bytes": 24,
+            "tokens": 6
+          },
+          "tool:read": {
+            "bytes": 4453,
+            "tokens": 1623
+          },
+          "tool_calls": {
+            "bytes": 617,
+            "tokens": 174
+          },
+          "tool_schemas": {
+            "bytes": 9515,
+            "tokens": 1992
+          },
+          "user": {
+            "bytes": 152,
+            "tokens": 30
+          }
+        },
+        "framing_tokens": 1083
+      },
+      "resources": {
+        "harness_rss_mib": 30.8046875,
+        "model_server_rss_mib": 23731.109375,
+        "gpu_mem_used_mib": 7161,
+        "samples": 37
+      }
+    },
+    {
+      "id": "rust-explain-ledger",
+      "category": "explain",
+      "model": "qwen3.6-35b-a3b",
+      "success": true,
+      "mode": "chat",
+      "routed": "a question",
+      "turns": 1,
+      "model_calls": 6,
+      "tool_calls": 10,
+      "tools": {
+        "ls": 3,
+        "read": 7
+      },
+      "prompt_tokens": 24592,
+      "cached_prompt_tokens": 22660,
+      "generated_tokens": 567,
+      "peak_prompt_tokens": 5182,
+      "tool_result_bytes": 3077,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 0,
+      "wall_seconds": 23.151199627,
+      "answer": "Here are the answers:\n\n1. **`Ledger::transfer` with zero or negative amount:** Returns `Err(LedgerError::NonPositiveAmount)`. The check `if cents \u003c= 0` is at line 52–54 of `src/lib.rs`.\n\n2. **Balance of an account that was never used:** Returns `0`. The `balance` method uses `unwrap_or(0)` (line 47), and the test confirms this with `assert_eq!(l.balance(\"nobody\"), 0)`.",
+      "session_id": "20261027-212720-9520",
+      "language": "rust",
+      "agent_seconds": 23.100728143,
+      "tool_seconds": 0.000581094,
+      "harness_seconds": 0.010821526999998447,
+      "phase_seconds": {
+        "project_map": 0.000103955,
+        "seed_pack": 0.000046092,
+        "working_set": 0.000118161
+      },
+      "tool_times": {
+        "ls": {
+          "calls": 3,
+          "seconds": 0.000132738,
+          "max_seconds": 0.000057815,
+          "result_bytes": 65
+        },
+        "read": {
+          "calls": 7,
+          "seconds": 0.000448356,
+          "max_seconds": 0.000087332,
+          "result_bytes": 3012
+        }
+      },
+      "call_stats": {
+        "calls": 6,
+        "inference_seconds": 23.089325522000003,
+        "prefill_seconds": 8.319161,
+        "decode_seconds": 14.663516,
+        "ttft_median_ms": 1611.393373,
+        "ttft_max_ms": 2120.486566,
+        "reasoning_tokens": 179,
+        "reasoning_count": "tokenizer",
+        "cache_invalidations": 0,
+        "cache_invalidations_after_rewrite": 0,
+        "recomputed_prompt_tokens": 0,
+        "peak_call": 5
+      },
+      "call_log": [
+        {
+          "prompt_tokens": 3604,
+          "cached_tokens": 3270,
+          "completion_tokens": 91,
+          "reasoning_tokens": 31,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1620.161525,
+          "prefill_ms": 1606.973,
+          "decode_ms": 2305.813,
+          "total_ms": 3926.125533,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 3801,
+          "cached_tokens": 3600,
+          "completion_tokens": 83,
+          "reasoning_tokens": 56,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1430.317674,
+          "prefill_ms": 1415.358,
+          "decode_ms": 2169.379,
+          "total_ms": 3599.954449,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 3861,
+          "cached_tokens": 3797,
+          "completion_tokens": 80,
+          "reasoning_tokens": 2,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 897.825378,
+          "prefill_ms": 879.872,
+          "decode_ms": 2071.16,
+          "total_ms": 2969.324488,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 4034,
+          "cached_tokens": 3857,
+          "completion_tokens": 52,
+          "ttft_ms": 1611.393373,
+          "prefill_ms": 1351.59,
+          "decode_ms": 1331.312,
+          "total_ms": 2702.094168,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 4110,
+          "cached_tokens": 4030,
+          "completion_tokens": 55,
+          "ttft_ms": 1204.824645,
+          "prefill_ms": 964.949,
+          "decode_ms": 1469.481,
+          "total_ms": 2454.704412,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 5182,
+          "cached_tokens": 4106,
+          "completion_tokens": 206,
+          "reasoning_tokens": 90,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2120.486566,
+          "prefill_ms": 2100.419,
+          "decode_ms": 5316.371,
+          "total_ms": 7437.122472,
+          "status": "ok",
+          "streamed": true
+        }
+      ],
+      "context": {
+        "call": 5,
+        "prompt_tokens": 5182,
+        "counting": "tokenizer",
+        "sections": {
+          "environment": {
+            "bytes": 663,
+            "tokens": 205
+          },
+          "project_map": {
+            "bytes": 252,
+            "tokens": 75
+          },
+          "system": {
+            "bytes": 2586,
+            "tokens": 537
+          },
+          "tool:ls": {
+            "bytes": 65,
+            "tokens": 21
+          },
+          "tool:read": {
+            "bytes": 3400,
+            "tokens": 1193
+          },
+          "tool_calls": {
+            "bytes": 241,
+            "tokens": 79
+          },
+          "tool_schemas": {
+            "bytes": 9515,
+            "tokens": 1992
+          },
+          "user": {
+            "bytes": 186,
+            "tokens": 41
+          }
+        },
+        "framing_tokens": 1039
+      },
+      "resources": {
+        "harness_rss_mib": 30.50390625,
+        "model_server_rss_mib": 23731.109375,
+        "gpu_mem_used_mib": 7161,
+        "samples": 25
+      }
+    },
+    {
+      "id": "rust-fix-transfer",
+      "category": "small-fix",
+      "model": "qwen3.6-35b-a3b",
+      "success": false,
+      "mode": "",
+      "routed": "",
+      "turns": 0,
+      "model_calls": 0,
+      "tool_calls": 0,
+      "prompt_tokens": 0,
+      "cached_prompt_tokens": 0,
+      "generated_tokens": 0,
+      "peak_prompt_tokens": 0,
+      "tool_result_bytes": 0,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 0,
+      "wall_seconds": 0,
+      "language": "rust",
+      "skipped": "cargo not on PATH",
+      "failure_class": "environment",
+      "agent_seconds": 0,
+      "tool_seconds": 0,
+      "harness_seconds": 0,
+      "call_stats": {
+        "calls": 0,
+        "inference_seconds": 0,
+        "reasoning_tokens": 0,
+        "cache_invalidations": 0,
+        "cache_invalidations_after_rewrite": 0,
+        "recomputed_prompt_tokens": 0,
+        "peak_call": 0
+      },
+      "resources": {
+        "harness_rss_mib": 0,
+        "samples": 0
+      }
+    },
+    {
+      "id": "session-ledger",
+      "category": "session",
+      "model": "qwen3.6-35b-a3b",
+      "success": true,
+      "mode": "chat",
+      "routed": "a request to run or check something",
+      "switched": "code",
+      "turns": 4,
+      "turn_modes": [
+        "chat",
+        "code",
+        "code",
+        "chat"
+      ],
+      "turn_answers": [
+        "…sis:\n\n---\n\n### Root cause: `Balance()` in `internal/ledger/ledger.go` line 49\n\n```go\nif e.AccountID != accountID || e.AmountCents \u003c 0 {\n    b += e.AmountCents\n}\n```\n\nThe condition is **backwards**. It should only sum entries **for the requested account** (`e.AccountID == accountID`), but instead it:\n\n1. **Includes entries from *other* accounts** (`e.AccountID != accountID`), and\n2. **Includes negative-amount entries regardless of account** (`e.AmountCents \u003c 0`).\n\n### Effect on `TestBalance` (`ledger_test.go`)\n\nAfter posting `{account: \"a\", amount: 100}` and `{account: \"b\", amount: -100}`:\n\n| Entry | `e.AccountID != \"a\"` | `e.AmountCents \u003c 0` | Included? |\n|---|---|---|---|\n| `\"a\", +100` | false | false | **No** |\n| `\"b\", -100` | true | true | **Yes** → b += -100 |\n\nResult: `balance(\"a\") = -100`, but the test expects `100`.\n\n### Effect on `TestHandlePaymentCharged` (`consumer_test.go`)\n\nAfter posting `{account: \"a1\", amount: 500}` and `{account: \"settlement\", amount: -500}`:\n\n| Entry | `e.AccountID != \"a1\"` | `e.AmountCents \u003c 0` | Included? |\n|---|---|---|---|\n| `\"a1\", +500` | false | false | **No** |\n| `\"settlement\", -500` | true | true | **Yes** → b += -500 |\n\nResult: `balance(\"a1\") = -500`, but the test expects `500`. (The settlement assertion on line 19 would also fail for the same reason.)\n\n---\n\n**Fix needed:** Change line 49 in `internal/ledger/ledger.go` from:\n\n```go\nif e.AccountID != accountID || e.AmountCents \u003c 0 {\n```\n\nto:\n\n```go\nif e.AccountID == accountID {\n```",
+        "Both tests pass now. The fix was a single-line change in `internal/ledger/ledger.go` line 49: the `Balance` method's condition was inverted (`!= accountID || AmountCents \u003c 0` → `== accountID`), causing it to skip entries belonging to the queried account and instead include entries from other accounts.",
+        "All tests pass (including the new `TestBalanceMultiplePostings`). The new file `internal/ledger/balance_test.go` posts two balanced transactions affecting account \"a\" (credit 300, debit 100) and verifies the resulting balance is 200.",
+        "The original condition on line 49 of `internal/ledger/ledger.go` was:\n\n```go\nif e.AccountID != accountID || e.AmountCents \u003c 0 {\n```\n\nIt contains **two separate mistakes**:\n\n1. **Inverted account comparison** — `!= accountID` instead of `== accountID`. This causes the function to include entries from *other* accounts and exclude entries belonging to the queried account.\n\n2. **Spurious amount filter** — `|| e.AmountCents \u003c 0` adds a second, unrelated condition. Any negative-amount entry from *any* account gets included, regardless of which account is being queried. The balance function should only care about which account the entry belongs to, not its sign.\n\nTogether they produce a completely wrong result: for any query, entries for the target account are excluded (unless they're negative, which would then be re-included by the second clause), and entries from other accounts are included whenever they're negative."
+      ],
+      "model_calls": 10,
+      "tool_calls": 9,
+      "tools": {
+        "bash": 3,
+        "edit": 1,
+        "read": 4,
+        "write": 1
+      },
+      "prompt_tokens": 62340,
+      "cached_prompt_tokens": 57513,
+      "generated_tokens": 2498,
+      "peak_prompt_tokens": 7766,
+      "tool_result_bytes": 5546,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 0,
+      "wall_seconds": 86.770670966,
+      "files_changed": [
+        "internal/ledger/ledger.go",
+        "internal/ledger/balance_test.go"
+      ],
+      "answer": "The original condition on line 49 of `internal/ledger/ledger.go` was:\n\n```go\nif e.AccountID != accountID || e.AmountCents \u003c 0 {\n```\n\nIt contains **two separate mistakes**:\n\n1. **Inverted account comparison** — `!= accountID` instead of `== accountID`. This causes the function to include entries from *other* accounts and exclude entries belonging to the queried account.\n\n2. **Spurious amount filter** — `|| e.AmountCents \u003c 0` adds a second, unrelated condition. Any negative-amount entry from *any* account gets included, regardless of which account is being queried. The balance function should only care about which account the entry belongs to, not its sign.\n\nTogether they produce a completely wrong result: for any query, entries for the target account are excluded (unless they're negative, which would then be re-included by the second clause), and entries from other accounts are included whenever they're negative.",
+      "agent_patch": "diff --git a/internal/ledger/ledger.go b/internal/ledger/ledger.go\nindex bfbbbd2..690c3c5 100644\n--- a/internal/ledger/ledger.go\n+++ b/internal/ledger/ledger.go\n@@ -46,7 +46,7 @@ func (l *Ledger) Balance(accountID string) int64 {\n \tdefer l.mu.Unlock()\n \tvar b int64\n \tfor _, e := range l.entries {\n-\t\tif e.AccountID != accountID || e.AmountCents \u003c 0 {\n+\t\tif e.AccountID == accountID {\n \t\t\tb += e.AmountCents\n \t\t}\n \t}\ndiff --git a/internal/ledger/balance_test.go b/internal/ledger/balance_test.go\nnew file mode 100644\nindex 0000000..107d054\n--- /dev/null\n+++ b/internal/ledger/balance_test.go\n@@ -0,0 +1,27 @@\n+package ledger\n+\n+import \"testing\"\n+\n+func TestBalanceMultiplePostings(t *testing.T) {\n+\tl := \u0026Ledger{}\n+\n+\t// Credit of 300 to account \"a\", debited from \"b\"\n+\tif err := l.Post(\n+\t\tEntry{AccountID: \"a\", AmountCents: 300, Currency: \"EUR\"},\n+\t\tEntry{AccountID: \"b\", AmountCents: -300, Currency: \"EUR\"},\n+\t); err != nil {\n+\t\tt.Fatal(err)\n+\t}\n+\n+\t// Debit of 100 from account \"a\", credited to \"c\"\n+\tif err := l.Post(\n+\t\tEntry{AccountID: \"a\", AmountCents: -100, Currency: \"EUR\"},\n+\t\tEntry{AccountID: \"c\", AmountCents: 100, Currency: \"EUR\"},\n+\t); err != nil {\n+\t\tt.Fatal(err)\n+\t}\n+\n+\tif got := l.Balance(\"a\"); got != 200 {\n+\t\tt.Fatalf(\"balance(a) = %d, want 200\", got)\n+\t}\n+}\n",
+      "session_id": "20261027-212743-1466",
+      "language": "go",
+      "agent_seconds": 86.596171943,
+      "tool_seconds": 0.40947881099999994,
+      "harness_seconds": 0.031167847000005744,
+      "phase_seconds": {
+        "checks": 0.062003043,
+        "history_notes": 0.001583767,
+        "project_map": 0.000207563,
+        "seed_pack": 0.000332123,
+        "working_set": 0.000146225
+      },
+      "tool_times": {
+        "bash": {
+          "calls": 3,
+          "seconds": 0.34550219699999996,
+          "max_seconds": 0.118354516,
+          "result_bytes": 517
+        },
+        "edit": {
+          "calls": 1,
+          "seconds": 0.024909034,
+          "max_seconds": 0.024909034,
+          "result_bytes": 90
+        },
+        "read": {
+          "calls": 4,
+          "seconds": 0.000198982,
+          "max_seconds": 0.0000747,
+          "result_bytes": 4841
+        },
+        "write": {
+          "calls": 1,
+          "seconds": 0.038868598,
+          "max_seconds": 0.038868598,
+          "result_bytes": 98
+        }
+      },
+      "call_stats": {
+        "calls": 10,
+        "inference_seconds": 86.155525285,
+        "prefill_seconds": 19.752822,
+        "decode_seconds": 66.19532600000001,
+        "ttft_median_ms": 1767.843461,
+        "ttft_max_ms": 3222.572033,
+        "reasoning_tokens": 949,
+        "reasoning_count": "tokenizer",
+        "cache_invalidations": 1,
+        "cache_invalidations_after_rewrite": 0,
+        "recomputed_prompt_tokens": 299,
+        "peak_call": 9
+      },
+      "call_log": [
+        {
+          "prompt_tokens": 3569,
+          "cached_tokens": 3270,
+          "completion_tokens": 84,
+          "reasoning_tokens": 30,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1557.858302,
+          "prefill_ms": 1545.119,
+          "decode_ms": 2168.516,
+          "total_ms": 3726.529855,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 3754,
+          "cached_tokens": 3270,
+          "completion_tokens": 158,
+          "reasoning_tokens": 20,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1767.843461,
+          "prefill_ms": 1753.881,
+          "decode_ms": 4133.503,
+          "total_ms": 5901.703282,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 5701,
+          "cached_tokens": 3750,
+          "completion_tokens": 1170,
+          "reasoning_tokens": 647,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2559.975432,
+          "prefill_ms": 2541.758,
+          "decode_ms": 31073.481,
+          "total_ms": 33633.98534,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 6449,
+          "cached_tokens": 5697,
+          "completion_tokens": 107,
+          "reasoning_tokens": 26,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 3222.572033,
+          "prefill_ms": 3204.303,
+          "decode_ms": 2806.438,
+          "total_ms": 6029.299267,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 6569,
+          "cached_tokens": 6445,
+          "completion_tokens": 66,
+          "reasoning_tokens": 14,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1379.31303,
+          "prefill_ms": 1359.416,
+          "decode_ms": 1736.17,
+          "total_ms": 3115.88758,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 6673,
+          "cached_tokens": 6565,
+          "completion_tokens": 92,
+          "reasoning_tokens": 17,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1276.031277,
+          "prefill_ms": 1255.177,
+          "decode_ms": 2407.273,
+          "total_ms": 3683.556148,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 7022,
+          "cached_tokens": 6669,
+          "completion_tokens": 407,
+          "reasoning_tokens": 108,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2639.540951,
+          "prefill_ms": 2614.347,
+          "decode_ms": 10893.733,
+          "total_ms": 13533.508136,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 7367,
+          "cached_tokens": 7018,
+          "completion_tokens": 75,
+          "reasoning_tokens": 21,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1753.517653,
+          "prefill_ms": 1730.62,
+          "decode_ms": 1974.707,
+          "total_ms": 3728.478917,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 7470,
+          "cached_tokens": 7363,
+          "completion_tokens": 98,
+          "reasoning_tokens": 36,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1301.946594,
+          "prefill_ms": 1278.493,
+          "decode_ms": 2599.759,
+          "total_ms": 3901.973808,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 7766,
+          "cached_tokens": 7466,
+          "completion_tokens": 241,
+          "reasoning_tokens": 30,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2498.557798,
+          "prefill_ms": 2469.708,
+          "decode_ms": 6401.746,
+          "total_ms": 8900.602952,
+          "status": "ok",
+          "streamed": true
+        }
+      ],
+      "context": {
+        "call": 9,
+        "prompt_tokens": 7766,
+        "counting": "tokenizer",
+        "sections": {
+          "assistant": {
+            "bytes": 2136,
+            "tokens": 668
+          },
+          "environment": {
+            "bytes": 2759,
+            "tokens": 798
+          },
+          "project_map": {
+            "bytes": 242,
+            "tokens": 68
+          },
+          "system": {
+            "bytes": 2586,
+            "tokens": 537
+          },
+          "tool:bash": {
+            "bytes": 538,
+            "tokens": 188
+          },
+          "tool:edit": {
+            "bytes": 90,
+            "tokens": 24
+          },
+          "tool:read": {
+            "bytes": 4841,
+            "tokens": 1791
+          },
+          "tool:write": {
+            "bytes": 98,
+            "tokens": 31
+          },
+          "tool_calls": {
+            "bytes": 1391,
+            "tokens": 457
+          },
+          "tool_schemas": {
+            "bytes": 9515,
+            "tokens": 1992
+          },
+          "user": {
+            "bytes": 478,
+            "tokens": 110
+          }
+        },
+        "framing_tokens": 1102
+      },
+      "resources": {
+        "harness_rss_mib": 31.01171875,
+        "model_server_rss_mib": 24045.19140625,
+        "gpu_mem_used_mib": 7161,
+        "samples": 88
+      }
+    },
+    {
+      "id": "session-x-tools",
+      "category": "session",
+      "model": "qwen3.6-35b-a3b",
+      "success": true,
+      "mode": "chat",
+      "routed": "a question about how to change something",
+      "turns": 6,
+      "turn_modes": [
+        "chat",
+        "chat",
+        "chat",
+        "chat",
+        "code",
+        "chat"
+      ],
+      "turn_answers": [
+        "Here's the answer:\n\n### How it makes repeated traversals fast\n\nDuring `New`, the inspector does **one** full walk of the AST and records a flat list of **push and pop events** — sometimes called a **\"balanced parenthesis tree\"** (as the package comment says). Each event stores:\n\n- The node itself\n- A **type bit** (`uint64` bitmask from `typeOf`)\n- An **index** linking the push event to its matching pop event\n- A **parent index** (for push) or packed edge kind/index (for pop)\n\nSubsequent traversals (`Preorder`, `Nodes`, `WithStack`, `PreorderSeq`, `All`) **scan this pre-built `[]event` slice** linearly rather than walking the AST. Type filtering is done with a single bitwise `\u0026` against a pre-computed `mask` — no type assertions, no per-node reflection. The push→pop index link also lets it **skip entire subtrees** in one step when a subtree contains no matching types.\n\n### Data structure built during `New`\n\nThe data structure is the **`[]event` slice** (a flat array of `event` structs). It is defined in:\n\n**`go/ast/inspector/inspector.go`** — the `event` struct at line 79:\n\n```go\ntype event struct {\n    node   ast.Node\n    typ    uint64 // typeOf(node) on push, union of descendant types on pop\n    index  int32  // index of the matching push/pop event\n    parent int32  // parent's push index (push) or packed edge kind/index (pop)\n}\n```\n\nThe `Inspector` struct itself (line 55) holds just a single field:\n\n```go\ntype Inspector struct {\n    events []event\n}\n```",
+        "… the AST in **arbitrary directions** (not just top-down depth-first) and **start traversals from any node**, not just from the root. The Inspector's `Preorder`, `Nodes`, `WithStack`, and `PreorderSeq` methods only do a full traversal from the root.\n\nSpecifically, `Cursor` provides:\n\n1. **Bidirectional navigation** — move up and sideways, not just down:\n   - `Parent()` — go to the parent node\n   - `PrevSibling()` / `NextSibling()` — go to neighboring siblings\n   - `FirstChild()` / `LastChild()` — go to children\n   - `Enclosing()` — iterate over all ancestor nodes (like a traversal stack)\n\n2. **Edge information** — know *how* a node is connected to its parent:\n   - `ParentEdge()` — returns which field of the parent holds this node and its index in a slice\n   - `ParentEdgeKind()` / `ParentEdgeIndex()` — convenience accessors\n\n3. **Subtree-local traversals** — start a traversal from any node, not just the root:\n   - `Preorder()` — depth-first from the current cursor's subtree\n   - `Inspect()` — depth-first with pre/post-order callbacks and pruning\n\n4. **Random access to any event** — `Inspector.At(index)` + `Cursor.Index()` lets you jump to any position in the traversal.\n\n5. **`FindByPos(start, end)`** — find the cursor for a node at a specific source position.\n\n6. **`Contains(c2)`** — check whether one cursor's subtree contains another.\n\n7. **`GoString()`** — returns a human-readable path like `File.Decls[1].(*ast.GenDecl).Specs[0].(*ast.TypeSpec)`.",
+        "`Apply` can **mutate the AST** — `ast.Inspect` is read-only. Specifically, `Apply`'s `Cursor` provides:\n\n- **`Replace(n ast.Node)`** — substitute the current node with another\n- **`Delete()`** — remove the current node from its parent's field/slice\n- **`InsertAfter(n ast.Node)`** — add a sibling after the current node\n- **`InsertBefore(n ast.Node)`** — add a sibling before the current node\n\nIt also exposes `Parent()`, `Name()` (the field name), and `Index()` (the slice index), giving the callback full structural context to decide what to change.\n\n`ast.Inspect` only visits nodes in depth-first order with no ability to modify the tree or know the node's position within its parent.\n\n`Apply` is defined in **`go/ast/astutil/rewrite.go`**.",
+        "**How Parse recognizes a new file:**\n\n`Parse` calls `findFileMarker`, which scans for lines beginning with `-- ` and ending with ` --` on the same line (the \"file marker\" format, e.g. `-- foo/bar.txt --`). `findFileMarker` uses `bytes.Index(data[i:], newlineMarker)` to jump to each `\\n-- ` position, then delegates to `isMarker` to validate the full line.\n\n**The function that checks a single line:**\n\n`isMarker` (line 117 of `txtar/archive.go`). It verifies the line has the `-- ... --` pattern and returns the extracted file name and the data after the line. If the line doesn't match, it returns `name == \"\"`.",
+        "Tests pass. Here's a summary of the changes:\n\n**`go/ast/inspector/inspector.go`** — added `Len()` method (lines 229–238):\n\n```go\n// Len returns the number of AST nodes the inspector holds,\n// the same number that ast.Inspect visits over the files given to New.\nfunc (in *Inspector) Len() int {\n\tn := 0\n\tfor i := int32(0); i \u003c int32(len(in.events)); i++ {\n\t\tif in.events[i].index \u003e i {\n\t\t\tn++\n\t\t}\n\t}\n\treturn n\n}\n```\n\nIt counts **push events** — those where `index \u003e i` (push events point forward to their matching pop, while pop events point backward). This matches the count `ast.Inspect` visits.\n\n**`go/ast/inspector/inspector_test.go`** — added `TestLen` which parses a small AST, counts nodes via `ast.Inspect`, and asserts `inspect.Len()` matches.",
+        "- `astutil.Apply` is defined in **`go/ast/astutil/rewrite.go`**.\n- `txtar`'s function that checks a single line for a file marker is **`isMarker`** (in `txtar/archive.go`)."
+      ],
+      "model_calls": 26,
+      "tool_calls": 22,
+      "tools": {
+        "bash": 1,
+        "edit": 4,
+        "glob": 2,
+        "grep": 1,
+        "read": 14
+      },
+      "denied": 1,
+      "prompt_tokens": 549334,
+      "cached_prompt_tokens": 518352,
+      "generated_tokens": 5186,
+      "peak_prompt_tokens": 34152,
+      "tool_result_bytes": 67982,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 1,
+      "guard_refusals": 1,
+      "wall_seconds": 223.271228288,
+      "files_changed": [
+        "go/ast/inspector/inspector.go",
+        "go/ast/inspector/inspector_test.go"
+      ],
+      "answer": "- `astutil.Apply` is defined in **`go/ast/astutil/rewrite.go`**.\n- `txtar`'s function that checks a single line for a file marker is **`isMarker`** (in `txtar/archive.go`).",
+      "agent_patch": "diff --git a/go/ast/inspector/inspector.go b/go/ast/inspector/inspector.go\nindex b414d17..5bfe5d5 100644\n--- a/go/ast/inspector/inspector.go\n+++ b/go/ast/inspector/inspector.go\n@@ -226,6 +226,18 @@ func (in *Inspector) WithStack(types []ast.Node, f func(n ast.Node, push bool, s\n \t}\n }\n \n+// Len returns the number of AST nodes the inspector holds,\n+// the same number that ast.Inspect visits over the files given to New.\n+func (in *Inspector) Len() int {\n+\tn := 0\n+\tfor i := int32(0); i \u003c int32(len(in.events)); i++ {\n+\t\tif in.events[i].index \u003e i {\n+\t\t\tn++\n+\t\t}\n+\t}\n+\treturn n\n+}\n+\n // traverse builds the table of events representing a traversal.\n func traverse(files []*ast.File) []event {\n \t// Preallocate approximate number of events\ndiff --git a/go/ast/inspector/inspector_test.go b/go/ast/inspector/inspector_test.go\nindex 316e7c2..0422b60 100644\n--- a/go/ast/inspector/inspector_test.go\n+++ b/go/ast/inspector/inspector_test.go\n@@ -53,6 +53,32 @@ func parseNetFiles() ([]*ast.File, error) {\n }\n \n // TestInspectAllNodes compares Inspector against ast.Inspect.\n+func TestLen(t *testing.T) {\n+\tconst src = `package a\n+func f() {\n+\tx := 1 + 2\n+\t_ = x\n+}\n+`\n+\tfset := token.NewFileSet()\n+\tf, _ := parser.ParseFile(fset, \"a.go\", src, 0)\n+\tinspect := inspector.New([]*ast.File{f})\n+\n+\tvar want int\n+\tfor _, file := range []*ast.File{f} {\n+\t\tast.Inspect(file, func(n ast.Node) bool {\n+\t\t\tif n != nil {\n+\t\t\t\twant++\n+\t\t\t}\n+\t\t\treturn true\n+\t\t})\n+\t}\n+\n+\tif got := inspect.Len(); got != want {\n+\t\tt.Errorf(\"Len() = %d, want %d\", got, want)\n+\t}\n+}\n+\n func TestInspectAllNodes(t *testing.T) {\n \tinspect := inspector.New(netFiles)\n \n",
+      "session_id": "20261027-212910-4a9c",
+      "language": "go",
+      "agent_seconds": 222.584757326,
+      "tool_seconds": 0.6962392260000001,
+      "harness_seconds": 0.2006304769999645,
+      "phase_seconds": {
+        "checks": 0.267314031,
+        "history_notes": 0.007996004,
+        "project_map": 0.004343902,
+        "seed_pack": 0.000331082,
+        "working_set": 0.000391341
+      },
+      "tool_times": {
+        "bash": {
+          "calls": 1,
+          "seconds": 0.295563541,
+          "max_seconds": 0.295563541,
+          "result_bytes": 48
+        },
+        "edit": {
+          "calls": 4,
+          "seconds": 0.275976247,
+          "max_seconds": 0.0758736,
+          "result_bytes": 553
+        },
+        "glob": {
+          "calls": 2,
+          "seconds": 0.064922182,
+          "max_seconds": 0.034462926,
+          "result_bytes": 264
+        },
+        "grep": {
+          "calls": 1,
+          "seconds": 0.056103564,
+          "max_seconds": 0.056103564,
+          "result_bytes": 3175
+        },
+        "read": {
+          "calls": 14,
+          "seconds": 0.0036736919999999997,
+          "max_seconds": 0.000907149,
+          "result_bytes": 63942
+        }
+      },
+      "call_stats": {
+        "calls": 26,
+        "inference_seconds": 221.68788762300002,
+        "prefill_seconds": 73.460266,
+        "decode_seconds": 146.89606399999997,
+        "ttft_median_ms": 1956.36205,
+        "ttft_max_ms": 12912.951269,
+        "reasoning_tokens": 1922,
+        "reasoning_count": "tokenizer",
+        "cache_invalidations": 0,
+        "cache_invalidations_after_rewrite": 0,
+        "recomputed_prompt_tokens": 0,
+        "peak_call": 25
+      },
+      "call_log": [
+        {
+          "prompt_tokens": 3769,
+          "cached_tokens": 3270,
+          "completion_tokens": 449,
+          "reasoning_tokens": 297,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2076.615479,
+          "prefill_ms": 1746.573,
+          "decode_ms": 11687.832,
+          "total_ms": 13764.623839,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 4918,
+          "cached_tokens": 3765,
+          "completion_tokens": 163,
+          "reasoning_tokens": 87,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2134.438189,
+          "prefill_ms": 2118.944,
+          "decode_ms": 4217.819,
+          "total_ms": 6352.577528,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 10974,
+          "cached_tokens": 4914,
+          "completion_tokens": 413,
+          "reasoning_tokens": 14,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 7634.652154,
+          "prefill_ms": 7611.122,
+          "decode_ms": 11230.765,
+          "total_ms": 18865.946139,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 11611,
+          "cached_tokens": 10970,
+          "completion_tokens": 71,
+          "reasoning_tokens": 37,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 3076.024848,
+          "prefill_ms": 3051.81,
+          "decode_ms": 1918.036,
+          "total_ms": 4994.615574,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 12213,
+          "cached_tokens": 11607,
+          "completion_tokens": 89,
+          "reasoning_tokens": 55,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1810.614451,
+          "prefill_ms": 1786.366,
+          "decode_ms": 2404.917,
+          "total_ms": 4216.112561,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 12815,
+          "cached_tokens": 12209,
+          "completion_tokens": 83,
+          "reasoning_tokens": 48,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1909.337001,
+          "prefill_ms": 1878.413,
+          "decode_ms": 2252.732,
+          "total_ms": 4162.626151,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 13417,
+          "cached_tokens": 12811,
+          "completion_tokens": 57,
+          "reasoning_tokens": 22,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1942.719276,
+          "prefill_ms": 1916.344,
+          "decode_ms": 1545.55,
+          "total_ms": 3488.586918,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 14019,
+          "cached_tokens": 13413,
+          "completion_tokens": 52,
+          "reasoning_tokens": 17,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1956.36205,
+          "prefill_ms": 1925.849,
+          "decode_ms": 1428.654,
+          "total_ms": 3385.51103,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 14621,
+          "cached_tokens": 14015,
+          "completion_tokens": 83,
+          "reasoning_tokens": 22,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1968.920839,
+          "prefill_ms": 1934.221,
+          "decode_ms": 2259.679,
+          "total_ms": 4229.034233,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 18909,
+          "cached_tokens": 14617,
+          "completion_tokens": 417,
+          "reasoning_tokens": 24,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 6736.073482,
+          "prefill_ms": 6704.32,
+          "decode_ms": 11698.542,
+          "total_ms": 18434.99343,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 19534,
+          "cached_tokens": 18905,
+          "completion_tokens": 78,
+          "reasoning_tokens": 43,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 3008.031185,
+          "prefill_ms": 2971.734,
+          "decode_ms": 2156.142,
+          "total_ms": 5164.891295,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 19657,
+          "cached_tokens": 19530,
+          "completion_tokens": 34,
+          "ttft_ms": 1418.135695,
+          "prefill_ms": 1153.95,
+          "decode_ms": 938.216,
+          "total_ms": 2126.332131,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 20038,
+          "cached_tokens": 19653,
+          "completion_tokens": 87,
+          "reasoning_tokens": 53,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1674.512332,
+          "prefill_ms": 1637.931,
+          "decode_ms": 2441.123,
+          "total_ms": 4116.211665,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 20419,
+          "cached_tokens": 20034,
+          "completion_tokens": 446,
+          "reasoning_tokens": 250,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1772.673758,
+          "prefill_ms": 1736.714,
+          "decode_ms": 12604.884,
+          "total_ms": 14378.149717,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 20848,
+          "cached_tokens": 20415,
+          "completion_tokens": 53,
+          "reasoning_tokens": 22,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2775.516936,
+          "prefill_ms": 2735.299,
+          "decode_ms": 1475.019,
+          "total_ms": 4250.882935,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 20915,
+          "cached_tokens": 20844,
+          "completion_tokens": 29,
+          "ttft_ms": 1197.215197,
+          "prefill_ms": 926.414,
+          "decode_ms": 783.065,
+          "total_ms": 1747.713835,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 22910,
+          "cached_tokens": 20911,
+          "completion_tokens": 294,
+          "reasoning_tokens": 131,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2766.911368,
+          "prefill_ms": 2724.002,
+          "decode_ms": 8315.547,
+          "total_ms": 11083.351893,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 23354,
+          "cached_tokens": 22906,
+          "completion_tokens": 388,
+          "reasoning_tokens": 318,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2800.366688,
+          "prefill_ms": 2756.394,
+          "decode_ms": 11021.459,
+          "total_ms": 13822.478557,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 31989,
+          "cached_tokens": 23350,
+          "completion_tokens": 401,
+          "reasoning_tokens": 198,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 12912.951269,
+          "prefill_ms": 12863.164,
+          "decode_ms": 11876.664,
+          "total_ms": 24790.874069,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 32294,
+          "cached_tokens": 31985,
+          "completion_tokens": 256,
+          "reasoning_tokens": 35,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1783.489152,
+          "prefill_ms": 1727.989,
+          "decode_ms": 7625,
+          "total_ms": 9409.437824,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 32561,
+          "cached_tokens": 32290,
+          "completion_tokens": 101,
+          "reasoning_tokens": 17,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1761.020362,
+          "prefill_ms": 1711.684,
+          "decode_ms": 3021.334,
+          "total_ms": 4783.153419,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 32929,
+          "cached_tokens": 32557,
+          "completion_tokens": 355,
+          "reasoning_tokens": 88,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1883.48305,
+          "prefill_ms": 1828.106,
+          "decode_ms": 10598.404,
+          "total_ms": 12482.935089,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 33242,
+          "cached_tokens": 32925,
+          "completion_tokens": 292,
+          "reasoning_tokens": 32,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1855.865292,
+          "prefill_ms": 1795.47,
+          "decode_ms": 8749.29,
+          "total_ms": 10605.88285,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 33549,
+          "cached_tokens": 33238,
+          "completion_tokens": 111,
+          "reasoning_tokens": 18,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1803.01037,
+          "prefill_ms": 1744.995,
+          "decode_ms": 3292.301,
+          "total_ms": 5096.191215,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 33677,
+          "cached_tokens": 33545,
+          "completion_tokens": 253,
+          "reasoning_tokens": 21,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1397.575509,
+          "prefill_ms": 1343.652,
+          "decode_ms": 7505.328,
+          "total_ms": 8903.910517,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 34152,
+          "cached_tokens": 33673,
+          "completion_tokens": 131,
+          "reasoning_tokens": 73,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 3182.308907,
+          "prefill_ms": 3128.806,
+          "decode_ms": 3847.762,
+          "total_ms": 7030.863209,
+          "status": "ok",
+          "streamed": true
+        }
+      ],
+      "context": {
+        "call": 25,
+        "prompt_tokens": 34152,
+        "counting": "tokenizer",
+        "sections": {
+          "assistant": {
+            "bytes": 5651,
+            "tokens": 1502
+          },
+          "environment": {
+            "bytes": 3927,
+            "tokens": 1175
+          },
+          "project_map": {
+            "bytes": 713,
+            "tokens": 261
+          },
+          "system": {
+            "bytes": 2586,
+            "tokens": 537
+          },
+          "tool:bash": {
+            "bytes": 48,
+            "tokens": 21
+          },
+          "tool:edit": {
+            "bytes": 553,
+            "tokens": 181
+          },
+          "tool:glob": {
+            "bytes": 264,
+            "tokens": 95
+          },
+          "tool:grep": {
+            "bytes": 3175,
+            "tokens": 913
+          },
+          "tool:read": {
+            "bytes": 63942,
+            "tokens": 24397
+          },
+          "tool:web_search": {
+            "bytes": 281,
+            "tokens": 64
+          },
+          "tool_calls": {
+            "bytes": 3542,
+            "tokens": 1158
+          },
+          "tool_schemas": {
+            "bytes": 9515,
+            "tokens": 1992
+          },
+          "user": {
+            "bytes": 923,
+            "tokens": 209
+          }
+        },
+        "framing_tokens": 1647
+      },
+      "resources": {
+        "harness_rss_mib": 34.8515625,
+        "model_server_rss_mib": 26138.73828125,
+        "gpu_mem_used_mib": 7161,
+        "samples": 224
+      }
+    },
+    {
+      "id": "ts-fix-cart-discount",
+      "category": "small-fix",
+      "model": "qwen3.6-35b-a3b",
+      "success": true,
+      "mode": "code",
+      "routed": "a request for a change",
+      "turns": 1,
+      "model_calls": 5,
+      "tool_calls": 6,
+      "tools": {
+        "bash": 1,
+        "edit": 1,
+        "glob": 1,
+        "read": 3
+      },
+      "prompt_tokens": 21580,
+      "cached_prompt_tokens": 19925,
+      "generated_tokens": 397,
+      "peak_prompt_tokens": 4909,
+      "tool_result_bytes": 2592,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 0,
+      "wall_seconds": 19.169551147,
+      "files_changed": [
+        "src/cart.ts"
+      ],
+      "answer": "**Fix:** In `src/cart.ts`, line 25 of `applyCode()` — changed `this.discountPercent += pct` to `this.discountPercent = pct`.\n\nThe bug was that each `applyCode` call *accumulated* the percentage (`+=`) instead of *replacing* it (`=`). Now applying SAVE10 then SAVE25 gives 25% off (not 35%). All 3 tests pass.",
+      "agent_patch": "diff --git a/src/cart.ts b/src/cart.ts\nindex b41f422..5d7ed8a 100644\n--- a/src/cart.ts\n+++ b/src/cart.ts\n@@ -22,7 +22,7 @@ export class Cart {\n   applyCode(code: string): void {\n     const pct = DISCOUNTS[code.toUpperCase()];\n     if (pct === undefined) throw new Error(`unknown code ${code}`);\n-    this.discountPercent += pct;\n+    this.discountPercent = pct;\n   }\n \n   subtotal(): number {\n",
+      "session_id": "20261027-213253-9763",
+      "language": "typescript",
+      "agent_seconds": 19.031216794,
+      "tool_seconds": 0.156598886,
+      "harness_seconds": 0.009290168999997406,
+      "phase_seconds": {
+        "checks": 0.000004598,
+        "history_notes": 0.00171197,
+        "project_map": 0.000186306,
+        "seed_pack": 0.00007459,
+        "working_set": 0.000063087
+      },
+      "tool_times": {
+        "bash": {
+          "calls": 1,
+          "seconds": 0.154526367,
+          "max_seconds": 0.154526367,
+          "result_bytes": 258
+        },
+        "edit": {
+          "calls": 1,
+          "seconds": 0.001819449,
+          "max_seconds": 0.001819449,
+          "result_bytes": 37
+        },
+        "glob": {
+          "calls": 1,
+          "seconds": 0.000109387,
+          "max_seconds": 0.000109387,
+          "result_bytes": 43
+        },
+        "read": {
+          "calls": 3,
+          "seconds": 0.000143683,
+          "max_seconds": 0.000062361,
+          "result_bytes": 2254
+        }
+      },
+      "call_stats": {
+        "calls": 5,
+        "inference_seconds": 18.865327739,
+        "prefill_seconds": 7.685537,
+        "decode_seconds": 10.272836,
+        "ttft_median_ms": 1545.348087,
+        "ttft_max_ms": 2445.919555,
+        "reasoning_tokens": 38,
+        "reasoning_count": "tokenizer",
+        "cache_invalidations": 0,
+        "cache_invalidations_after_rewrite": 0,
+        "recomputed_prompt_tokens": 0,
+        "peak_call": 4
+      },
+      "call_log": [
+        {
+          "prompt_tokens": 3595,
+          "cached_tokens": 3270,
+          "completion_tokens": 69,
+          "reasoning_tokens": 14,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2445.919555,
+          "prefill_ms": 1613.003,
+          "decode_ms": 1758.346,
+          "total_ms": 4204.547684,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 3757,
+          "cached_tokens": 3591,
+          "completion_tokens": 55,
+          "ttft_ms": 1545.348087,
+          "prefill_ms": 1320.201,
+          "decode_ms": 1392.872,
+          "total_ms": 2727.22522,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 4595,
+          "cached_tokens": 3753,
+          "completion_tokens": 105,
+          "ttft_ms": 2061.457858,
+          "prefill_ms": 1985.194,
+          "decode_ms": 2754.653,
+          "total_ms": 4757.208563,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 4724,
+          "cached_tokens": 4591,
+          "completion_tokens": 59,
+          "reasoning_tokens": 10,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1357.525839,
+          "prefill_ms": 1333.934,
+          "decode_ms": 1536.685,
+          "total_ms": 2894.567097,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 4909,
+          "cached_tokens": 4720,
+          "completion_tokens": 109,
+          "reasoning_tokens": 14,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1451.639428,
+          "prefill_ms": 1433.205,
+          "decode_ms": 2830.28,
+          "total_ms": 4281.779175,
+          "status": "ok",
+          "streamed": true
+        }
+      ],
+      "context": {
+        "call": 4,
+        "prompt_tokens": 4909,
+        "counting": "tokenizer",
+        "sections": {
+          "assistant": {
+            "bytes": 148,
+            "tokens": 39
+          },
+          "environment": {
+            "bytes": 690,
+            "tokens": 200
+          },
+          "project_map": {
+            "bytes": 237,
+            "tokens": 68
+          },
+          "system": {
+            "bytes": 2586,
+            "tokens": 537
+          },
+          "tool:bash": {
+            "bytes": 258,
+            "tokens": 123
+          },
+          "tool:edit": {
+            "bytes": 37,
+            "tokens": 9
+          },
+          "tool:glob": {
+            "bytes": 43,
+            "tokens": 12
+          },
+          "tool:read": {
+            "bytes": 2254,
+            "tokens": 847
+          },
+          "tool_calls": {
+            "bytes": 300,
+            "tokens": 81
+          },
+          "tool_schemas": {
+            "bytes": 9515,
+            "tokens": 1992
+          },
+          "user": {
+            "bytes": 179,
+            "tokens": 44
+          }
+        },
+        "framing_tokens": 957
+      },
+      "resources": {
+        "harness_rss_mib": 30.796875,
+        "model_server_rss_mib": 26279.640625,
+        "gpu_mem_used_mib": 7161,
+        "samples": 21
+      }
+    },
+    {
+      "id": "ts-locate-discount",
+      "category": "locate",
+      "model": "qwen3.6-35b-a3b",
+      "success": true,
+      "mode": "chat",
+      "routed": "a question",
+      "turns": 1,
+      "model_calls": 5,
+      "tool_calls": 7,
+      "tools": {
+        "glob": 3,
+        "ls": 1,
+        "read": 3
+      },
+      "prompt_tokens": 19733,
+      "cached_prompt_tokens": 18252,
+      "generated_tokens": 541,
+      "peak_prompt_tokens": 4735,
+      "tool_result_bytes": 2180,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 0,
+      "wall_seconds": 21.142459002,
+      "answer": "Here's the answer from `src/cart.ts`:\n\n1. **Percentage lookup:** The discount percentage is stored in the `DISCOUNTS` constant (line 8):\n\n   ```ts\n   const DISCOUNTS: Record\u003cstring, number\u003e = { SAVE10: 10, SAVE25: 25 };\n   ```\n\n   It is looked up in `applyCode()` (line 23) via `DISCOUNTS[code.toUpperCase()]`.\n\n2. **Rounding:** The discount amount is rounded **down** (floored) to whole cents using `Math.floor()` (line 36):\n\n   ```ts\n   return sub - Math.floor((sub * this.discountPercent) / 100);\n   ```",
+      "session_id": "20261027-213312-6255",
+      "language": "typescript",
+      "agent_seconds": 21.092361798,
+      "tool_seconds": 0.0005921120000000001,
+      "harness_seconds": 0.010002638999999291,
+      "phase_seconds": {
+        "project_map": 0.000188066,
+        "seed_pack": 0.000052002,
+        "working_set": 0.000069026
+      },
+      "tool_times": {
+        "glob": {
+          "calls": 3,
+          "seconds": 0.00037310399999999997,
+          "max_seconds": 0.000155307,
+          "result_bytes": 58
+        },
+        "ls": {
+          "calls": 1,
+          "seconds": 0.000065035,
+          "max_seconds": 0.000065035,
+          "result_bytes": 43
+        },
+        "read": {
+          "calls": 3,
+          "seconds": 0.000153973,
+          "max_seconds": 0.000060158,
+          "result_bytes": 2079
+        }
+      },
+      "call_stats": {
+        "calls": 5,
+        "inference_seconds": 21.081767047,
+        "prefill_seconds": 7.061734,
+        "decode_seconds": 13.929233,
+        "ttft_median_ms": 1551.778789,
+        "ttft_max_ms": 1991.251784,
+        "reasoning_tokens": 144,
+        "reasoning_count": "tokenizer",
+        "cache_invalidations": 0,
+        "cache_invalidations_after_rewrite": 0,
+        "recomputed_prompt_tokens": 0,
+        "peak_call": 4
+      },
+      "call_log": [
+        {
+          "prompt_tokens": 3580,
+          "cached_tokens": 3270,
+          "completion_tokens": 81,
+          "reasoning_tokens": 23,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1590.568562,
+          "prefill_ms": 1576.707,
+          "decode_ms": 2089.991,
+          "total_ms": 3680.772709,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 3713,
+          "cached_tokens": 3576,
+          "completion_tokens": 65,
+          "ttft_ms": 1551.778789,
+          "prefill_ms": 1297.019,
+          "decode_ms": 1661.791,
+          "total_ms": 2976.831803,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 3808,
+          "cached_tokens": 3709,
+          "completion_tokens": 58,
+          "ttft_ms": 1428.768698,
+          "prefill_ms": 1175.333,
+          "decode_ms": 1481.984,
+          "total_ms": 2675.246266,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 3897,
+          "cached_tokens": 3804,
+          "completion_tokens": 55,
+          "ttft_ms": 1266.714819,
+          "prefill_ms": 1039.678,
+          "decode_ms": 1391.218,
+          "total_ms": 2452.985,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 4735,
+          "cached_tokens": 3893,
+          "completion_tokens": 282,
+          "reasoning_tokens": 121,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1991.251784,
+          "prefill_ms": 1972.997,
+          "decode_ms": 7304.249,
+          "total_ms": 9295.931269,
+          "status": "ok",
+          "streamed": true
+        }
+      ],
+      "context": {
+        "call": 4,
+        "prompt_tokens": 4735,
+        "counting": "tokenizer",
+        "sections": {
+          "environment": {
+            "bytes": 653,
+            "tokens": 199
+          },
+          "project_map": {
+            "bytes": 237,
+            "tokens": 68
+          },
+          "system": {
+            "bytes": 2586,
+            "tokens": 537
+          },
+          "tool:glob": {
+            "bytes": 58,
+            "tokens": 16
+          },
+          "tool:ls": {
+            "bytes": 43,
+            "tokens": 15
+          },
+          "tool:read": {
+            "bytes": 2224,
+            "tokens": 821
+          },
+          "tool_calls": {
+            "bytes": 283,
+            "tokens": 94
+          },
+          "tool_schemas": {
+            "bytes": 9515,
+            "tokens": 1992
+          },
+          "user": {
+            "bytes": 134,
+            "tokens": 30
+          }
+        },
+        "framing_tokens": 963
+      },
+      "resources": {
+        "harness_rss_mib": 31.4765625,
+        "model_server_rss_mib": 26279.640625,
+        "gpu_mem_used_mib": 7161,
+        "samples": 23
+      }
+    }
+  ],
+  "summary": {
+    "tasks": 23,
+    "passed": 21,
+    "pass_rate": 0.9130434782608695,
+    "model_calls_per_task": 6.043478260869565,
+    "tool_calls_per_task": 6.6521739130434785,
+    "prompt_tokens_per_task": 49779.86956521739,
+    "prompt_cache_hit_rate": 0.9185946475657613,
+    "generated_tokens_per_task": 1033.0869565217392,
+    "tool_result_bytes_per_task": 7392.260869565217,
+    "wall_seconds_per_task": 40.19744390265216,
+    "peak_prompt_tokens": 34152,
+    "elided": 0,
+    "recalls": 0,
+    "compactions": 0,
+    "checks_caught": 3,
+    "check_notes": 0,
+    "guard_refusals": 1,
+    "history_notes": 0,
+    "errors": 0,
+    "skipped": 2,
+    "agent_seconds_per_task": 39.92943496286956,
+    "inference_seconds_per_task": 39.7492910073913,
+    "tool_seconds_per_task": 0.1526587952173913,
+    "harness_seconds_per_task": 0.02748516026086803,
+    "reasoning_tokens_per_task": 278.1304347826087,
+    "ttft_median_ms": 1767.843461,
+    "cache_invalidations": 2,
+    "cache_invalidations_after_rewrite": 0,
+    "recomputed_prompt_tokens": 614,
+    "processed_tokens_per_passed_task": 5057.952380952381,
+    "seconds_per_passed_task": 37.9111447285238,
+    "processed_tokens_per_failed_task": 5374,
+    "seconds_per_failed_task": 64.203585231,
+    "failures": {
+      "environment (skipped)": 2,
+      "model": 2
+    },
+    "peak_harness_rss_mib": 34.8515625,
+    "peak_model_server_rss_mib": 29336.3203125,
+    "peak_gpu_mem_used_mib": 7161
+  },
+  "settings": {
+    "approval": "auto",
+    "checks": true,
+    "context_tokens": 131072,
+    "history_notes": true,
+    "max_tool_output": 0,
+    "provider": "local",
+    "seed_pack": true,
+    "working_set_tokens": 0
+  },
+  "by_category": [
+    {
+      "category": "add-test",
+      "tasks": 1,
+      "passed": 1,
+      "pass_rate": 1,
+      "model_calls_per_task": 6,
+      "tool_calls_per_task": 6,
+      "prompt_tokens_per_task": 26164,
+      "prompt_cache_hit_rate": 0.8019798195994496,
+      "generated_tokens_per_task": 1093,
+      "tool_result_bytes_per_task": 2131,
+      "wall_seconds_per_task": 44.187458981,
+      "peak_prompt_tokens": 5161,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 0,
+      "check_notes": 0,
+      "history_notes": 0,
+      "errors": 0,
+      "agent_seconds_per_task": 44.006983348,
+      "inference_seconds_per_task": 43.839702796000005,
+      "tool_seconds_per_task": 0.150299134,
+      "harness_seconds_per_task": 0.01698141799999403,
+      "reasoning_tokens_per_task": 328,
+      "ttft_median_ms": 1813.543092,
+      "cache_invalidations": 0,
+      "cache_invalidations_after_rewrite": 0,
+      "recomputed_prompt_tokens": 0,
+      "processed_tokens_per_passed_task": 6274,
+      "seconds_per_passed_task": 44.187458981,
+      "processed_tokens_per_failed_task": 0,
+      "seconds_per_failed_task": 0,
+      "peak_harness_rss_mib": 28.28515625,
+      "peak_model_server_rss_mib": 29336.3203125,
+      "peak_gpu_mem_used_mib": 7155
+    },
+    {
+      "category": "diagnose",
+      "tasks": 2,
+      "passed": 2,
+      "pass_rate": 1,
+      "model_calls_per_task": 3,
+      "tool_calls_per_task": 4,
+      "prompt_tokens_per_task": 12562.5,
+      "prompt_cache_hit_rate": 0.8446965174129353,
+      "generated_tokens_per_task": 794,
+      "tool_result_bytes_per_task": 3324.5,
+      "wall_seconds_per_task": 26.1089417825,
+      "peak_prompt_tokens": 5708,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 0,
+      "check_notes": 0,
+      "history_notes": 0,
+      "errors": 0,
+      "agent_seconds_per_task": 26.057958944,
+      "inference_seconds_per_task": 25.98682395,
+      "tool_seconds_per_task": 0.059778954999999995,
+      "harness_seconds_per_task": 0.011356038999998565,
+      "reasoning_tokens_per_task": 308,
+      "ttft_median_ms": 1776.183346,
+      "cache_invalidations": 1,
+      "cache_invalidations_after_rewrite": 0,
+      "recomputed_prompt_tokens": 315,
+      "processed_tokens_per_passed_task": 2745,
+      "seconds_per_passed_task": 26.1089417825,
+      "processed_tokens_per_failed_task": 0,
+      "seconds_per_failed_task": 0,
+      "peak_harness_rss_mib": 29.1640625,
+      "peak_model_server_rss_mib": 19884.765625,
+      "peak_gpu_mem_used_mib": 7157
+    },
+    {
+      "category": "explain",
+      "tasks": 5,
+      "passed": 5,
+      "pass_rate": 1,
+      "model_calls_per_task": 3,
+      "tool_calls_per_task": 3.8,
+      "prompt_tokens_per_task": 12294.8,
+      "prompt_cache_hit_rate": 0.8776881283144093,
+      "generated_tokens_per_task": 372.6,
+      "tool_result_bytes_per_task": 2829.6,
+      "wall_seconds_per_task": 14.574214477800002,
+      "peak_prompt_tokens": 5488,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 0,
+      "check_notes": 0,
+      "history_notes": 0,
+      "errors": 0,
+      "agent_seconds_per_task": 14.524609338599998,
+      "inference_seconds_per_task": 14.514870501400003,
+      "tool_seconds_per_task": 0.0003271593999999999,
+      "harness_seconds_per_task": 0.009411677799999393,
+      "reasoning_tokens_per_task": 100.4,
+      "ttft_median_ms": 1892.779917,
+      "cache_invalidations": 0,
+      "cache_invalidations_after_rewrite": 0,
+      "recomputed_prompt_tokens": 0,
+      "processed_tokens_per_passed_task": 1876.4,
+      "seconds_per_passed_task": 14.574214477800002,
+      "processed_tokens_per_failed_task": 0,
+      "seconds_per_failed_task": 0,
+      "peak_harness_rss_mib": 30.50390625,
+      "peak_model_server_rss_mib": 23731.109375,
+      "peak_gpu_mem_used_mib": 7161
+    },
+    {
+      "category": "feature",
+      "tasks": 2,
+      "passed": 1,
+      "pass_rate": 0.5,
+      "model_calls_per_task": 11,
+      "tool_calls_per_task": 13,
+      "prompt_tokens_per_task": 74378,
+      "prompt_cache_hit_rate": 0.9275726693377074,
+      "generated_tokens_per_task": 2122,
+      "tool_result_bytes_per_task": 8520.5,
+      "wall_seconds_per_task": 76.172661758,
+      "peak_prompt_tokens": 8780,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 1,
+      "check_notes": 0,
+      "history_notes": 0,
+      "errors": 0,
+      "agent_seconds_per_task": 75.910037423,
+      "inference_seconds_per_task": 75.5392907715,
+      "tool_seconds_per_task": 0.35686335950000003,
+      "harness_seconds_per_task": 0.013883291999995745,
+      "reasoning_tokens_per_task": 98.5,
+      "ttft_median_ms": 1684.941178,
+      "cache_invalidations": 0,
+      "cache_invalidations_after_rewrite": 0,
+      "recomputed_prompt_tokens": 0,
+      "processed_tokens_per_passed_task": 6963,
+      "seconds_per_passed_task": 52.942405192,
+      "processed_tokens_per_failed_task": 8055,
+      "seconds_per_failed_task": 99.402918324,
+      "failures": {
+        "model": 1
+      },
+      "peak_harness_rss_mib": 30.75390625,
+      "peak_model_server_rss_mib": 23012.9453125,
+      "peak_gpu_mem_used_mib": 7161
+    },
+    {
+      "category": "small-fix",
+      "tasks": 4,
+      "passed": 3,
+      "pass_rate": 0.75,
+      "model_calls_per_task": 5,
+      "tool_calls_per_task": 5.25,
+      "prompt_tokens_per_task": 22952.25,
+      "prompt_cache_hit_rate": 0.9167184045137187,
+      "generated_tokens_per_task": 582.5,
+      "tool_result_bytes_per_task": 3139.25,
+      "wall_seconds_per_task": 23.81875307525,
+      "peak_prompt_tokens": 5783,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 0,
+      "check_notes": 0,
+      "history_notes": 0,
+      "errors": 0,
+      "skipped": 2,
+      "agent_seconds_per_task": 23.682247564,
+      "inference_seconds_per_task": 23.51257966075,
+      "tool_seconds_per_task": 0.15706903375,
+      "harness_seconds_per_task": 0.012598869500000578,
+      "reasoning_tokens_per_task": 156.5,
+      "ttft_median_ms": 1632.508487,
+      "cache_invalidations": 0,
+      "cache_invalidations_after_rewrite": 0,
+      "recomputed_prompt_tokens": 0,
+      "processed_tokens_per_passed_task": 2427.6666666666665,
+      "seconds_per_passed_task": 22.090253387666667,
+      "processed_tokens_per_failed_task": 2693,
+      "seconds_per_failed_task": 29.004252138,
+      "failures": {
+        "environment (skipped)": 2,
+        "model": 1
+      },
+      "peak_harness_rss_mib": 30.796875,
+      "peak_model_server_rss_mib": 26279.640625,
+      "peak_gpu_mem_used_mib": 7161
+    },
+    {
+      "category": "large-change",
+      "tasks": 1,
+      "passed": 1,
+      "pass_rate": 1,
+      "model_calls_per_task": 6,
+      "tool_calls_per_task": 6,
+      "prompt_tokens_per_task": 43917,
+      "prompt_cache_hit_rate": 0.8820274608921375,
+      "generated_tokens_per_task": 1163,
+      "tool_result_bytes_per_task": 9726,
+      "wall_seconds_per_task": 46.635916998,
+      "peak_prompt_tokens": 8431,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 0,
+      "check_notes": 0,
+      "history_notes": 0,
+      "errors": 0,
+      "agent_seconds_per_task": 43.787062299,
+      "inference_seconds_per_task": 43.424647504,
+      "tool_seconds_per_task": 0.27258253899999996,
+      "harness_seconds_per_task": 0.08983225599999944,
+      "reasoning_tokens_per_task": 225,
+      "ttft_median_ms": 1766.010424,
+      "cache_invalidations": 0,
+      "cache_invalidations_after_rewrite": 0,
+      "recomputed_prompt_tokens": 0,
+      "processed_tokens_per_passed_task": 6344,
+      "seconds_per_passed_task": 46.635916998,
+      "processed_tokens_per_failed_task": 0,
+      "seconds_per_failed_task": 0,
+      "peak_harness_rss_mib": 29.76953125,
+      "peak_model_server_rss_mib": 21115.265625,
+      "peak_gpu_mem_used_mib": 7161
+    },
+    {
+      "category": "large-locate",
+      "tasks": 1,
+      "passed": 1,
+      "pass_rate": 1,
+      "model_calls_per_task": 5,
+      "tool_calls_per_task": 5,
+      "prompt_tokens_per_task": 28562,
+      "prompt_cache_hit_rate": 0.7443456340592396,
+      "generated_tokens_per_task": 741,
+      "tool_result_bytes_per_task": 17167,
+      "wall_seconds_per_task": 34.014419751,
+      "peak_prompt_tokens": 10556,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 0,
+      "check_notes": 0,
+      "history_notes": 0,
+      "errors": 0,
+      "agent_seconds_per_task": 33.734091407,
+      "inference_seconds_per_task": 33.549279041999995,
+      "tool_seconds_per_task": 0.090186847,
+      "harness_seconds_per_task": 0.0946255180000062,
+      "reasoning_tokens_per_task": 145,
+      "ttft_median_ms": 1983.106463,
+      "cache_invalidations": 0,
+      "cache_invalidations_after_rewrite": 0,
+      "recomputed_prompt_tokens": 0,
+      "processed_tokens_per_passed_task": 8043,
+      "seconds_per_passed_task": 34.014419751,
+      "processed_tokens_per_failed_task": 0,
+      "seconds_per_failed_task": 0,
+      "peak_harness_rss_mib": 30.45703125,
+      "peak_model_server_rss_mib": 21771.07421875,
+      "peak_gpu_mem_used_mib": 7161
+    },
+    {
+      "category": "locate",
+      "tasks": 3,
+      "passed": 3,
+      "pass_rate": 1,
+      "model_calls_per_task": 3.3333333333333335,
+      "tool_calls_per_task": 5,
+      "prompt_tokens_per_task": 13360,
+      "prompt_cache_hit_rate": 0.8917415169660678,
+      "generated_tokens_per_task": 393.3333333333333,
+      "tool_result_bytes_per_task": 2453.3333333333335,
+      "wall_seconds_per_task": 15.635029973333332,
+      "peak_prompt_tokens": 5004,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 0,
+      "check_notes": 0,
+      "history_notes": 0,
+      "errors": 0,
+      "agent_seconds_per_task": 15.585154351,
+      "inference_seconds_per_task": 15.574581633333333,
+      "tool_seconds_per_task": 0.0009564383333333335,
+      "harness_seconds_per_task": 0.009616279333333899,
+      "reasoning_tokens_per_task": 106.66666666666667,
+      "ttft_median_ms": 1922.652634,
+      "cache_invalidations": 0,
+      "cache_invalidations_after_rewrite": 0,
+      "recomputed_prompt_tokens": 0,
+      "processed_tokens_per_passed_task": 1839.6666666666667,
+      "seconds_per_passed_task": 15.635029973333332,
+      "processed_tokens_per_failed_task": 0,
+      "seconds_per_failed_task": 0,
+      "peak_harness_rss_mib": 31.4765625,
+      "peak_model_server_rss_mib": 26279.640625,
+      "peak_gpu_mem_used_mib": 7161
+    },
+    {
+      "category": "refactor",
+      "tasks": 2,
+      "passed": 2,
+      "pass_rate": 1,
+      "model_calls_per_task": 6.5,
+      "tool_calls_per_task": 8,
+      "prompt_tokens_per_task": 33688,
+      "prompt_cache_hit_rate": 0.9176116124436001,
+      "generated_tokens_per_task": 937.5,
+      "tool_result_bytes_per_task": 4857.5,
+      "wall_seconds_per_task": 35.023566543,
+      "peak_prompt_tokens": 6202,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 1,
+      "check_notes": 0,
+      "history_notes": 0,
+      "errors": 0,
+      "agent_seconds_per_task": 34.8122225435,
+      "inference_seconds_per_task": 34.588002713499996,
+      "tool_seconds_per_task": 0.2131499285,
+      "harness_seconds_per_task": 0.011069901500002671,
+      "reasoning_tokens_per_task": 283.5,
+      "ttft_median_ms": 1837.695985,
+      "cache_invalidations": 0,
+      "cache_invalidations_after_rewrite": 0,
+      "recomputed_prompt_tokens": 0,
+      "processed_tokens_per_passed_task": 3713,
+      "seconds_per_passed_task": 35.023566543,
+      "processed_tokens_per_failed_task": 0,
+      "seconds_per_failed_task": 0,
+      "peak_harness_rss_mib": 30.8046875,
+      "peak_model_server_rss_mib": 23731.109375,
+      "peak_gpu_mem_used_mib": 7161
+    },
+    {
+      "category": "session",
+      "tasks": 2,
+      "passed": 2,
+      "pass_rate": 1,
+      "model_calls_per_task": 18,
+      "tool_calls_per_task": 15.5,
+      "prompt_tokens_per_task": 305837,
+      "prompt_cache_hit_rate": 0.9414573776227206,
+      "generated_tokens_per_task": 3842,
+      "tool_result_bytes_per_task": 36764,
+      "wall_seconds_per_task": 155.020949627,
+      "peak_prompt_tokens": 34152,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 1,
+      "check_notes": 0,
+      "guard_refusals": 1,
+      "history_notes": 0,
+      "errors": 0,
+      "agent_seconds_per_task": 154.5904646345,
+      "inference_seconds_per_task": 153.921706454,
+      "tool_seconds_per_task": 0.5528590185,
+      "harness_seconds_per_task": 0.11589916199998512,
+      "reasoning_tokens_per_task": 1435.5,
+      "ttft_median_ms": 1956.36205,
+      "cache_invalidations": 1,
+      "cache_invalidations_after_rewrite": 0,
+      "recomputed_prompt_tokens": 299,
+      "processed_tokens_per_passed_task": 21746.5,
+      "seconds_per_passed_task": 155.020949627,
+      "processed_tokens_per_failed_task": 0,
+      "seconds_per_failed_task": 0,
+      "peak_harness_rss_mib": 34.8515625,
+      "peak_model_server_rss_mib": 26138.73828125,
+      "peak_gpu_mem_used_mib": 7161
+    }
+  ],
+  "by_language": [
+    {
+      "tasks": 15,
+      "passed": 14,
+      "pass_rate": 0.9333333333333333,
+      "model_calls_per_task": 6.4,
+      "tool_calls_per_task": 6.466666666666667,
+      "prompt_tokens_per_task": 61985.333333333336,
+      "prompt_cache_hit_rate": 0.916511432812063,
+      "generated_tokens_per_task": 1206.1333333333334,
+      "tool_result_bytes_per_task": 9815.733333333334,
+      "wall_seconds_per_task": 47.0906928326,
+      "peak_prompt_tokens": 34152,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 3,
+      "check_notes": 0,
+      "guard_refusals": 1,
+      "history_notes": 0,
+      "errors": 0,
+      "language": "go",
+      "agent_seconds_per_task": 46.73108007346666,
+      "inference_seconds_per_task": 46.501130842533335,
+      "tool_seconds_per_task": 0.1941445402,
+      "harness_seconds_per_task": 0.03580469073333241,
+      "reasoning_tokens_per_task": 367.4,
+      "ttft_median_ms": 1776.183346,
+      "cache_invalidations": 2,
+      "cache_invalidations_after_rewrite": 0,
+      "recomputed_prompt_tokens": 614,
+      "processed_tokens_per_passed_task": 6644.642857142857,
+      "seconds_per_passed_task": 48.38258145364286,
+      "processed_tokens_per_failed_task": 2693,
+      "seconds_per_failed_task": 29.004252138,
+      "failures": {
+        "model": 1
+      },
+      "peak_harness_rss_mib": 34.8515625,
+      "peak_model_server_rss_mib": 29336.3203125,
+      "peak_gpu_mem_used_mib": 7161
+    },
+    {
+      "tasks": 1,
+      "passed": 1,
+      "pass_rate": 1,
+      "model_calls_per_task": 2,
+      "tool_calls_per_task": 1,
+      "prompt_tokens_per_task": 7828,
+      "prompt_cache_hit_rate": 0.8797904956566173,
+      "generated_tokens_per_task": 125,
+      "tool_result_bytes_per_task": 1786,
+      "wall_seconds_per_task": 6.721866888,
+      "peak_prompt_tokens": 4207,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 0,
+      "check_notes": 0,
+      "history_notes": 0,
+      "errors": 0,
+      "language": "java",
+      "skipped": 1,
+      "agent_seconds_per_task": 6.673368452,
+      "inference_seconds_per_task": 6.664389368,
+      "tool_seconds_per_task": 0.00005494,
+      "harness_seconds_per_task": 0.008924143999999915,
+      "reasoning_tokens_per_task": 35,
+      "ttft_median_ms": 1892.779917,
+      "cache_invalidations": 0,
+      "cache_invalidations_after_rewrite": 0,
+      "recomputed_prompt_tokens": 0,
+      "processed_tokens_per_passed_task": 1066,
+      "seconds_per_passed_task": 6.721866888,
+      "processed_tokens_per_failed_task": 0,
+      "seconds_per_failed_task": 0,
+      "failures": {
+        "environment (skipped)": 1
+      },
+      "peak_harness_rss_mib": 29.48828125,
+      "peak_model_server_rss_mib": 20989.6328125,
+      "peak_gpu_mem_used_mib": 7161
+    },
+    {
+      "tasks": 2,
+      "passed": 1,
+      "pass_rate": 0.5,
+      "model_calls_per_task": 9,
+      "tool_calls_per_task": 12.5,
+      "prompt_tokens_per_task": 55875,
+      "prompt_cache_hit_rate": 0.9375212527964206,
+      "generated_tokens_per_task": 1593,
+      "tool_result_bytes_per_task": 4364,
+      "wall_seconds_per_task": 57.17976805,
+      "peak_prompt_tokens": 8454,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 0,
+      "check_notes": 0,
+      "history_notes": 0,
+      "errors": 0,
+      "language": "multi",
+      "agent_seconds_per_task": 57.0041950775,
+      "inference_seconds_per_task": 56.79631249650001,
+      "tool_seconds_per_task": 0.1947742945,
+      "harness_seconds_per_task": 0.01310828649999269,
+      "reasoning_tokens_per_task": 113.5,
+      "ttft_median_ms": 2019.940695,
+      "cache_invalidations": 0,
+      "cache_invalidations_after_rewrite": 0,
+      "recomputed_prompt_tokens": 0,
+      "processed_tokens_per_passed_task": 2113,
+      "seconds_per_passed_task": 14.956617776,
+      "processed_tokens_per_failed_task": 8055,
+      "seconds_per_failed_task": 99.402918324,
+      "failures": {
+        "model": 1
+      },
+      "peak_harness_rss_mib": 30.75390625,
+      "peak_model_server_rss_mib": 23479.84375,
+      "peak_gpu_mem_used_mib": 7161
+    },
+    {
+      "tasks": 2,
+      "passed": 2,
+      "pass_rate": 1,
+      "model_calls_per_task": 3.5,
+      "tool_calls_per_task": 3.5,
+      "prompt_tokens_per_task": 14837,
+      "prompt_cache_hit_rate": 0.9128193030936174,
+      "generated_tokens_per_task": 426.5,
+      "tool_result_bytes_per_task": 2211.5,
+      "wall_seconds_per_task": 16.818102254,
+      "peak_prompt_tokens": 4796,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 0,
+      "check_notes": 0,
+      "history_notes": 0,
+      "errors": 0,
+      "language": "python",
+      "agent_seconds_per_task": 16.752368851,
+      "inference_seconds_per_task": 16.7116479315,
+      "tool_seconds_per_task": 0.025804283,
+      "harness_seconds_per_task": 0.014916636499999119,
+      "reasoning_tokens_per_task": 131.5,
+      "ttft_median_ms": 1949.655391,
+      "cache_invalidations": 0,
+      "cache_invalidations_after_rewrite": 0,
+      "recomputed_prompt_tokens": 0,
+      "processed_tokens_per_passed_task": 1720,
+      "seconds_per_passed_task": 16.818102254,
+      "processed_tokens_per_failed_task": 0,
+      "seconds_per_failed_task": 0,
+      "peak_harness_rss_mib": 30.1875,
+      "peak_model_server_rss_mib": 23605.4765625,
+      "peak_gpu_mem_used_mib": 7161
+    },
+    {
+      "tasks": 1,
+      "passed": 1,
+      "pass_rate": 1,
+      "model_calls_per_task": 6,
+      "tool_calls_per_task": 10,
+      "prompt_tokens_per_task": 24592,
+      "prompt_cache_hit_rate": 0.9214378659726741,
+      "generated_tokens_per_task": 567,
+      "tool_result_bytes_per_task": 3077,
+      "wall_seconds_per_task": 23.151199627,
+      "peak_prompt_tokens": 5182,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 0,
+      "check_notes": 0,
+      "history_notes": 0,
+      "errors": 0,
+      "language": "rust",
+      "skipped": 1,
+      "agent_seconds_per_task": 23.100728143,
+      "inference_seconds_per_task": 23.089325522000003,
+      "tool_seconds_per_task": 0.000581094,
+      "harness_seconds_per_task": 0.010821526999998447,
+      "reasoning_tokens_per_task": 179,
+      "ttft_median_ms": 1611.393373,
+      "cache_invalidations": 0,
+      "cache_invalidations_after_rewrite": 0,
+      "recomputed_prompt_tokens": 0,
+      "processed_tokens_per_passed_task": 2499,
+      "seconds_per_passed_task": 23.151199627,
+      "processed_tokens_per_failed_task": 0,
+      "seconds_per_failed_task": 0,
+      "failures": {
+        "environment (skipped)": 1
+      },
+      "peak_harness_rss_mib": 30.50390625,
+      "peak_model_server_rss_mib": 23731.109375,
+      "peak_gpu_mem_used_mib": 7161
+    },
+    {
+      "tasks": 2,
+      "passed": 2,
+      "pass_rate": 1,
+      "model_calls_per_task": 5,
+      "tool_calls_per_task": 6.5,
+      "prompt_tokens_per_task": 20656.5,
+      "prompt_cache_hit_rate": 0.9240916902669862,
+      "generated_tokens_per_task": 469,
+      "tool_result_bytes_per_task": 2386,
+      "wall_seconds_per_task": 20.1560050745,
+      "peak_prompt_tokens": 4909,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 0,
+      "check_notes": 0,
+      "history_notes": 0,
+      "errors": 0,
+      "language": "typescript",
+      "agent_seconds_per_task": 20.061789296,
+      "inference_seconds_per_task": 19.973547393,
+      "tool_seconds_per_task": 0.078595499,
+      "harness_seconds_per_task": 0.00964640399999835,
+      "reasoning_tokens_per_task": 91,
+      "ttft_median_ms": 1551.778789,
+      "cache_invalidations": 0,
+      "cache_invalidations_after_rewrite": 0,
+      "recomputed_prompt_tokens": 0,
+      "processed_tokens_per_passed_task": 2037,
+      "seconds_per_passed_task": 20.1560050745,
+      "processed_tokens_per_failed_task": 0,
+      "seconds_per_failed_task": 0,
+      "peak_harness_rss_mib": 31.4765625,
+      "peak_model_server_rss_mib": 26279.640625,
+      "peak_gpu_mem_used_mib": 7161
+    }
+  ],
+  "environment": {
+    "build": "dev a4311aeaf04e-dirty",
+    "os": "linux/amd64",
+    "cpu": "13th Gen Intel(R) Core(TM) i7-13620H",
+    "cpus": 16,
+    "mem_mib": 62741,
+    "gpu": "NVIDIA GeForce RTX 4060 Laptop GPU, 8188 MiB, 595.99.02",
+    "model": {
+      "file": "Qwen3.6-35B-A3B-UD-Q4_K_M.gguf",
+      "profile": "qwen3.6-35b-a3b",
+      "provider": "local",
+      "repo": "unsloth/Qwen3.6-35B-A3B-GGUF",
+      "revision": "a483e9e6cbd595906af30beda3187c2663a1118c",
+      "sampling": {
+        "min_p": 0,
+        "presence_penalty": 0,
+        "repeat_penalty": 0,
+        "temperature": 0.6,
+        "top_k": 20,
+        "top_p": 0.95
+      },
+      "server": {
+        "batch_size": 2048,
+        "cache_reuse": 0,
+        "cache_type_k": "q8_0",
+        "cache_type_v": "q8_0",
+        "ctx_size": 131072,
+        "extra_args": [],
+        "flash_attn": "on",
+        "gpu_layers": 999,
+        "jinja": true,
+        "mlock": false,
+        "n_cpu_moe": 35,
+        "no_mmap": false,
+        "parallel": 1,
+        "reasoning": "",
+        "reasoning_budget": 0,
+        "reasoning_budget_message": "",
+        "threads": 8,
+        "ubatch_size": 2048
+      },
+      "sha256": "ac0e2c1189e055faa36eff361580e79c5bd6f8e76bffb4ce547f167d53e31a61",
+      "size_bytes": 22134528992
+    },
+    "server": "llama.cpp 0.5.0-dev (build 11146, commit 7fe450e19)",
+    "toolchains": {
+      "docker": "Docker version 29.9.1, build dfc520d",
+      "git": "git version 2.53.0",
+      "go": "go version go1.27.3 linux/amd64",
+      "node": "v24.22.0",
+      "python3": "Python 3.14.4"
+    },
+    "tasks_sha256": "547dd200a937ade8",
+    "fixtures_sha256": {
+      "payment-platform": "c151d9d9d3c4dcd4",
+      "polyglot": "1379bbda7393ab7e"
+    }
+  }
+}
