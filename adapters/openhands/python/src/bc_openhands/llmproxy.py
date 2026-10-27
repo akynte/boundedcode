@@ -17,6 +17,18 @@ from .rpc import Peer, RPCError
 
 log = logging.getLogger("bc_openhands.llmproxy")
 
+# CONDENSER_PREFIX marks the history condenser's requests (its LLM's
+# base_url carries it), so the control plane records them apart from the
+# agent's.
+CONDENSER_PREFIX = "/condenser"
+
+
+def split_purpose(path: str) -> tuple[str, str]:
+    """Return (purpose, path without the purpose prefix)."""
+    if path == CONDENSER_PREFIX or path.startswith(CONDENSER_PREFIX + "/"):
+        return "condenser", path[len(CONDENSER_PREFIX):] or "/"
+    return "", path
+
 
 def start_proxy(peer: Peer, model_alias: str, timeout: float) -> ThreadingHTTPServer:
     class Handler(BaseHTTPRequestHandler):
@@ -53,7 +65,11 @@ def start_proxy(peer: Peer, model_alias: str, timeout: float) -> ThreadingHTTPSe
                 self._reply(400, {"error": {"message": "streaming not supported by boundedcode tunnel"}})
                 return
             try:
-                result = peer.call("llm.complete", {"path": self.path, "body": body}, timeout=timeout)
+                purpose, path = split_purpose(self.path)
+                params: dict[str, Any] = {"path": path, "body": body}
+                if purpose:
+                    params["purpose"] = purpose
+                result = peer.call("llm.complete", params, timeout=timeout)
             except RPCError as e:
                 self._reply(502, {"error": {"message": f"control plane: {e.message}", "type": "bc_tunnel"}})
                 return

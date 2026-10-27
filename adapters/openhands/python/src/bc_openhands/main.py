@@ -40,7 +40,7 @@ import uuid  # noqa: E402
 from pathlib import Path  # noqa: E402
 from typing import Any  # noqa: E402
 
-from .llmproxy import start_proxy  # noqa: E402
+from .llmproxy import CONDENSER_PREFIX, start_proxy  # noqa: E402
 from .rpc import INVALID_PARAMS, Peer, RPCError  # noqa: E402
 
 log = logging.getLogger("bc_openhands")
@@ -145,8 +145,10 @@ class Session:
                 caching_prompt=False,
                 litellm_extra_body=p.get("extra_body") or {},
             )
+            # The condenser's calls go through their own path prefix, so the
+            # control plane can tell them from the agent's in its ledger.
             condenser = LLMSummarizingCondenser(
-                llm=llm.model_copy(update={"usage_id": "condenser"}),
+                llm=llm.model_copy(update={"usage_id": "condenser", "base_url": f"http://127.0.0.1:{port}{CONDENSER_PREFIX}/v1"}),
                 max_size=int(p.get("condenser_max_events") or 80),
                 max_tokens=p.get("condenser_max_tokens"),
                 keep_first=int(p.get("condenser_keep_first") or 2),

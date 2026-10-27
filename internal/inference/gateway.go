@@ -64,6 +64,10 @@ type CallStat struct {
 	TotalMS   float64 `json:"total_ms"` // request to complete answer
 	Status    string  `json:"status"`
 	Streamed  bool    `json:"streamed,omitempty"`
+	// Purpose names a call made for something other than the caller's own
+	// turn ("condenser": summarising the history); the ledger records the
+	// call's source as "source:purpose".
+	Purpose string `json:"purpose,omitempty"`
 }
 
 // CallLog returns the calls so far (KeepLog only).
@@ -110,6 +114,15 @@ func (g *Gateway) Used() int {
 // Forward sends an OpenAI-compatible request body to path and returns the
 // HTTP status and decoded response body.
 func (g *Gateway) Forward(ctx context.Context, path string, body map[string]any) (int, any, error) {
+	return g.ForwardFor(ctx, "", path, body)
+}
+
+// ForwardFor is Forward for a call with a purpose other than the caller's
+// own turn (see CallStat.Purpose); purpose may be "".
+func (g *Gateway) ForwardFor(ctx context.Context, purpose, path string, body map[string]any) (int, any, error) {
+	if purpose != "" && !validPurpose(purpose) {
+		purpose = "other"
+	}
 	if path != "/v1/chat/completions" && path != "/chat/completions" {
 		return http.StatusNotFound, map[string]any{"error": map[string]any{"message": "unsupported path " + path}}, nil
 	}
@@ -127,10 +140,24 @@ func (g *Gateway) Forward(ctx context.Context, path string, body map[string]any)
 	total := time.Since(start)
 	if err != nil {
 		// Transport errors become a 502 for the agent, not a Go error.
-		g.record(ctx, CallStat{TotalMS: ms(total), Status: "transport_error"})
+		g.record(ctx, CallStat{TotalMS: ms(total), Status: "transport_error", Purpose: purpose})
 		return http.StatusBadGateway, map[string]any{"error": map[string]any{"message": err.Error()}}, nil //nolint:nilerr // see above
 	}
-	return g.account(ctx, status, resp, CallStat{TotalMS: ms(total)}), g.decode(resp), nil
+	return g.account(ctx, status, resp, CallStat{TotalMS: ms(total), Purpose: purpose}), g.decode(resp), nil
+}
+
+// validPurpose accepts a short lowercase word: the purpose comes from the
+// sandboxed adapter and ends up in the ledger.
+func validPurpose(p string) bool {
+	if len(p) > 32 {
+		return false
+	}
+	for _, c := range p {
+		if (c < 'a' || c > 'z') && c != '-' && c != '_' {
+			return false
+		}
+	}
+	return true
 }
 
 func ms(d time.Duration) float64 { return float64(d) / float64(time.Millisecond) }
@@ -222,7 +249,11 @@ func (g *Gateway) record(ctx context.Context, cs CallStat) {
 	if g.DB == nil {
 		return
 	}
+	source := g.Source
+	if cs.Purpose != "" {
+		source += ":" + cs.Purpose
+	}
 	_, _ = g.DB.ExecContext(context.WithoutCancel(ctx), `INSERT INTO model_calls(task_id, source, model, provider, prompt_tokens, completion_tokens, cached_tokens, reasoning_tokens, prompt_ms, decode_ms, total_ms, ttft_ms, status, created_at)
-		VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, g.TaskID, g.Source, g.Model, g.Provider(), cs.Prompt, cs.Completion, cs.Cached, cs.Reasoning,
+		VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, g.TaskID, source, g.Model, g.Provider(), cs.Prompt, cs.Completion, cs.Cached, cs.Reasoning,
 		cs.PrefillMS, cs.DecodeMS, cs.TotalMS, cs.TTFTMS, cs.Status, store.Now())
 }

@@ -46,7 +46,9 @@ RUN uv sync --frozen --no-dev --no-editable && rm -rf /root/.cache
 # between tasks unless explicitly mounted.
 # Package caches likewise (CARGO_HOME, the Maven local repository and
 # GRADLE_USER_HOME are set per task by verification and the agent runtime).
-ENV PATH=/opt/adapter/.venv/bin:/usr/local/go/bin:/usr/local/cargo/bin:$PATH \
+# The default JDK (JAVA_HOME's) is on PATH so the agent can run java and
+# javac; verification puts the version a project asks for first (pickJDK).
+ENV PATH=/opt/adapter/.venv/bin:/usr/local/go/bin:/usr/local/cargo/bin:/opt/jdk/21/bin:$PATH \
     GOTOOLCHAIN=local GOPROXY=off \
     RUSTUP_HOME=/usr/local/rustup CARGO_NET_OFFLINE=true \
     JAVA_HOME=/opt/jdk/21 JDK11_HOME=/opt/jdk/11 JDK17_HOME=/opt/jdk/17 JDK21_HOME=/opt/jdk/21 \

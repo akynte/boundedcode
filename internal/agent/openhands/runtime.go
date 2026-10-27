@@ -211,11 +211,14 @@ func (r *Runtime) Open(ctx context.Context, req agent.OpenRequest) (agent.Sessio
 		var p struct {
 			Path string         `json:"path"`
 			Body map[string]any `json:"body"`
+			// Purpose names a call that is not the agent's own turn
+			// ("condenser"); the ledger records it with the call.
+			Purpose string `json:"purpose"`
 		}
 		if err := json.Unmarshal(params, &p); err != nil {
 			return nil, err
 		}
-		status, body, err := gw.Forward(ctx, p.Path, p.Body)
+		status, body, err := gw.ForwardFor(ctx, p.Purpose, p.Path, p.Body)
 		if err != nil && !errors.Is(err, inference.ErrBudgetExhausted) {
 			return nil, err
 		}

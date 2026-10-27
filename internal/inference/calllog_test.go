@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/akynte/boundedcode/internal/store"
@@ -77,5 +78,42 @@ func TestGatewayCallLog(t *testing.T) {
 	_, _, _ = g2.Forward(ctx, "/v1/chat/completions", map[string]any{"messages": []any{}})
 	if len(g2.CallLog()) != 0 {
 		t.Fatal("call log kept without KeepLog")
+	}
+}
+
+// A call with a purpose is recorded under it; a purpose from the sandbox
+// that is not a plain word is not written to the ledger as given.
+func TestGatewayPurpose(t *testing.T) {
+	ctx := context.Background()
+	st, err := store.Open(ctx, ":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, `{"choices":[{"index":0,"message":{"role":"assistant","content":"ok"}}],"usage":{"prompt_tokens":5,"completion_tokens":1}}`)
+	}))
+	t.Cleanup(srv.Close)
+	g := &Gateway{Client: NewClient(srv.URL, 0), Model: "m", DB: st.DB, TaskID: "t", Source: "agent", KeepLog: true}
+	for _, p := range []string{"", "condenser", "'; DROP TABLE x; --"} {
+		if _, _, err := g.ForwardFor(ctx, p, "/v1/chat/completions", map[string]any{"messages": []any{}}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	rows, err := st.DB.QueryContext(ctx, `SELECT source FROM model_calls ORDER BY id`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for rows.Next() {
+		var s string
+		_ = rows.Scan(&s)
+		got = append(got, s)
+	}
+	rows.Close()
+	if strings.Join(got, ",") != "agent,agent:condenser,agent:other" {
+		t.Fatalf("sources = %v", got)
+	}
+	if log := g.CallLog(); log[1].Purpose != "condenser" {
+		t.Fatalf("call log: %+v", log)
 	}
 }
