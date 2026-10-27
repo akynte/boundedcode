@@ -2,6 +2,7 @@ package verify
 
 import (
 	"path"
+	"sort"
 	"strings"
 	"time"
 
@@ -27,8 +28,20 @@ import (
 // `make test` or `make check` when the Makefile has one.
 
 // presetFor returns built-in stages for the languages found in files
-// (repository-relative paths at the base commit).
+// (repository-relative paths at the base commit). A repository whose root
+// is no project of its own and has no Makefile, a monorepo of projects in
+// subdirectories, gets each outermost project's stages, run in its
+// directory.
 func presetFor(files map[string]bool) Config {
+	c := presetRoot(files)
+	if !c.runsTests() && !files["Makefile"] {
+		c.Stages = append(c.Stages, subprojectStages(files)...)
+	}
+	return c
+}
+
+// presetRoot returns the built-in stages for a project at the root of files.
+func presetRoot(files map[string]bool) Config {
 	c := Config{Version: 1, preset: true}
 	add := func(st ...Stage) {
 		for i := range st {
@@ -58,14 +71,17 @@ func presetFor(files map[string]bool) Config {
 	if files["package.json"] {
 		// Dependencies are never installed by verification (no network): they
 		// come read-only from the repository's own checkout (see
-		// sandbox.DependencyMounts). A script the project declares, with no
-		// dependencies installed, fails: skipping it would pass the change
-		// with no tests run. A script the project lacks is skipped.
+		// sandbox.DependencyMounts). A script of a project that declares
+		// dependencies, with none installed, fails: skipping it would pass the
+		// change with no tests run. A project that declares no dependencies
+		// needs no node_modules. A script the project lacks is skipped.
 		const missingDeps = `{ echo "node_modules missing: install the project's dependencies in the repository checkout (e.g. npm ci) so verification can run them"; exit 1; }`
 		npmScript := func(name string) string {
-			return `node -e 'process.exit(require("./package.json").scripts?.["` + name + `"] ? 0 : 3)'; rc=$?; ` +
-				`[ $rc = 3 ] && { echo "no ` + name + ` script"; exit 127; }; [ $rc = 0 ] || exit $rc; ` +
-				`[ -d node_modules ] || ` + missingDeps + `; npm run --silent ` + name
+			// Exit 3: no such script; 4: dependencies are declared.
+			return `node -e 'const p=require("./package.json"); if(!p.scripts?.["` + name + `"]) process.exit(3); ` +
+				`process.exit(["dependencies","devDependencies","optionalDependencies"].some(k=>Object.keys(p[k]||{}).length) ? 4 : 0)'; rc=$?; ` +
+				`[ $rc = 3 ] && { echo "no ` + name + ` script"; exit 127; }; [ $rc = 0 ] || [ $rc = 4 ] || exit $rc; ` +
+				`[ $rc = 4 ] && [ ! -d node_modules ] && ` + missingDeps + `; npm run --silent ` + name
 		}
 		tsc := `if [ -x node_modules/.bin/tsc ]; then node_modules/.bin/tsc --noEmit; ` +
 			`elif [ ! -d node_modules ] && grep -q '"typescript"' package.json; then ` + missingDeps + `; ` +
@@ -144,6 +160,80 @@ func presetFor(files map[string]bool) Config {
 		add(Stage{Name: "make-test", Run: []string{"sh", "-c", makeTest}, Optional: true, Requires: []string{"Makefile"}, Timeout: config.Duration(30 * time.Minute), Tests: true})
 	}
 	return c
+}
+
+// projectManifests make a directory a project of its own.
+var projectManifests = map[string]bool{
+	"go.mod": true, "package.json": true, "Cargo.toml": true, "pom.xml": true, "build.gradle": true, "build.gradle.kts": true,
+	"settings.gradle": true, "settings.gradle.kts": true, "pyproject.toml": true, "setup.py": true, "setup.cfg": true,
+	"Gemfile": true, "composer.json": true, "CMakeLists.txt": true, "meson.build": true, "Makefile": true, "configure.ac": true,
+}
+
+const (
+	maxSubprojects     = 16 // projects given stages, in path order
+	maxSubprojectDepth = 3  // directory levels below the root
+)
+
+// notProjectDirs hold other people's code or test material, not projects
+// of the repository.
+var notProjectDirs = map[string]bool{"vendor": true, "node_modules": true, "third_party": true, "testdata": true, "fixtures": true}
+
+// subprojectStages finds the outermost projects below the root and returns
+// their built-in stages, named and run in their directory. Checks that
+// already cover the whole tree from the root (Terraform, Helm) are left out.
+func subprojectStages(files map[string]bool) []Stage {
+	dirs := map[string]bool{}
+	for f := range files {
+		dir, base := path.Split(f)
+		dir = strings.TrimSuffix(dir, "/")
+		if dir == "" || !projectManifests[base] || strings.Count(dir, "/")+1 > maxSubprojectDepth {
+			continue
+		}
+		skip := false
+		for _, part := range strings.Split(dir, "/") {
+			if notProjectDirs[part] || strings.HasPrefix(part, ".") {
+				skip = true
+				break
+			}
+		}
+		if !skip {
+			dirs[dir] = true
+		}
+	}
+	var outer []string
+	for d := range dirs {
+		nested := false
+		for a := path.Dir(d); a != "."; a = path.Dir(a) {
+			if dirs[a] {
+				nested = true
+				break
+			}
+		}
+		if !nested {
+			outer = append(outer, d)
+		}
+	}
+	sort.Strings(outer)
+	if len(outer) > maxSubprojects {
+		outer = outer[:maxSubprojects]
+	}
+	var out []Stage
+	for _, d := range outer {
+		sub := map[string]bool{}
+		for f := range files {
+			if rest, ok := strings.CutPrefix(f, d+"/"); ok {
+				sub[rest] = true
+			}
+		}
+		for _, st := range presetRoot(sub).Stages {
+			if len(st.Requires) == 0 {
+				continue
+			}
+			st.Dir, st.Name = d, d+"/"+st.Name
+			out = append(out, st)
+		}
+	}
+	return out
 }
 
 // runsTests reports whether a config has a stage that runs tests.

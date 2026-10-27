@@ -918,28 +918,69 @@ func secretMasks(workDir string, wts []task.Worktree) ([]string, error) {
 	return out, nil
 }
 
-// behaviourEvidence reports whether a test the change added or modified
-// fails on the base and passes on the candidate, in any changed repository.
+// behaviourEvidence reports whether the change is demonstrated: in every
+// changed repository whose change goes beyond tests and documentation, a
+// test the change added or modified fails on the base and passes on the
+// candidate. One repository's test proves nothing about another's code (in
+// the 2026-10-27 baseline a two-service change was verified by one
+// service's test while the other service's code was wrong). When no
+// repository changed more than tests or documentation, a demonstrating test
+// in any of them suffices, as before.
 func (r *Runner) behaviourEvidence(ctx context.Context, t *task.Task, wts []task.Worktree, changedRepos []string) (bool, string) {
-	why := "no test demonstrates the change"
+	type repo struct {
+		w      task.Worktree
+		needed bool
+	}
+	var repos []repo
+	anyNeeded := false
 	for _, w := range wts {
 		if !slices.Contains(changedRepos, w.RepoName) {
 			continue
 		}
+		files, err := gitops.ChangedFiles(ctx, w.Path, w.BaseCommit)
+		needed := err != nil || verify.NeedsEvidence(files) // unknown: demand evidence
+		anyNeeded = anyNeeded || needed
+		repos = append(repos, repo{w, needed})
+	}
+	var missing, shown []string
+	for _, rp := range repos {
+		if anyNeeded && !rp.needed {
+			continue
+		}
+		w := rp.w
+		why := ""
 		ev, err := r.Verify.BehaviourEvidence(ctx, verify.RepoTarget{Name: w.RepoName, Worktree: w.Path, Base: w.BaseCommit, TaskID: t.ID, Source: w.RepoPath})
 		if err != nil {
 			r.Log.Warn("behavioural evidence", "repo", w.RepoName, "err", err)
 			why = "the behavioural check failed to run: " + trunc(err.Error(), 200)
-			continue
+		} else {
+			r.Rec.Emit(ctx, t.ID, "verify.evidence", map[string]any{"repo": w.RepoName, "verified": ev.Verified, "tests": ev.Tests,
+				"test_files": len(ev.TestFiles), "reason": ev.Reason, "required": rp.needed})
+			if ev.Verified {
+				shown = append(shown, w.RepoName+": "+ev.Reason)
+				if !anyNeeded {
+					return true, ev.Reason
+				}
+				continue
+			}
+			why = ev.Reason
 		}
-		r.Rec.Emit(ctx, t.ID, "verify.evidence", map[string]any{"repo": w.RepoName, "verified": ev.Verified, "tests": ev.Tests,
-			"test_files": len(ev.TestFiles), "reason": ev.Reason})
-		if ev.Verified {
-			return true, ev.Reason
+		if len(repos) > 1 {
+			why = w.RepoName + ": " + why
 		}
-		why = ev.Reason
+		missing = append(missing, why)
 	}
-	return false, why
+	switch {
+	case len(missing) == 0 && len(shown) > 0:
+		if len(shown) == 1 {
+			_, reason, _ := strings.Cut(shown[0], ": ")
+			return true, reason
+		}
+		return true, strings.Join(shown, "; ")
+	case len(missing) == 0:
+		return false, "no test demonstrates the change"
+	}
+	return false, strings.Join(missing, "; ")
 }
 
 // evidenceRequest is the retry instruction when checks pass without

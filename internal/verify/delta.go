@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/akynte/boundedcode/internal/ecosystem"
 	"github.com/akynte/boundedcode/internal/gitops"
 	"github.com/akynte/boundedcode/internal/sandbox"
 )
@@ -32,57 +33,16 @@ type Evidence struct {
 	Reason    string   `json:"reason"`
 }
 
-// testFileRE matches the test file naming conventions of the languages
-// verification has presets for (and a few more).
-var testFileRE = regexp.MustCompile(`(^|/)(` +
-	`[^/]*(_test\.go|\.(test|spec)\.[cm]?[jt]sx?)` + // Go, JavaScript/TypeScript
-	`|test_[^/]*\.py|[^/]*_test\.py|tests\.py|conftest\.py` + // Python
-	`|[^/]*(Test|Tests|IT|TestCase|Spec|Suite)\.(java|kt|kts|scala|groovy)` + // JVM
-	`|[^/]*_(test|spec)\.rb|test_[^/]*\.rb` + // Ruby
-	`|[^/]*Test\.php` + // PHP
-	`|[^/]*Tests?\.(cs|fs|vb|swift)` + // .NET, Swift
-	`|[^/]*_(test|unittest)\.(c|cc|cpp|cxx)|test_[^/]*\.(c|cc|cpp|cxx)` + // C, C++
-	`|[^/]*_test\.(exs|dart)|[^/]*Spec\.hs` + // Elixir, Dart, Haskell
-	`)$`)
-
 // IsTestFile reports whether a workspace-relative path is test code or test
-// data: a conventional test file, or anything under a directory that marks
-// tests (test, tests, testdata, spec, __tests__, or a name such as caddytest,
-// test_utils or e2e-tests). A directory name is split on "-", "_" and ".";
-// a part marks tests when it starts or ends with "test" and is not an
-// ordinary word that happens to (latest, contest, ...).
-func IsTestFile(p string) bool {
-	if testFileRE.MatchString(p) {
-		return true
-	}
-	parts := strings.Split(filepath.ToSlash(p), "/")
-	for _, d := range parts[:len(parts)-1] {
-		if testDirName(d) {
-			return true
-		}
-	}
-	return false
-}
+// data (ecosystem.IsTestOrData): evidence and the strategy governor count a
+// change to either as a change to tests.
+func IsTestFile(p string) bool { return ecosystem.IsTestOrData(p) }
 
-// notTestWords end (or start) with "test" but name no tests.
-var notTestWords = map[string]bool{
-	"latest": true, "greatest": true, "contest": true, "contests": true, "protest": true,
-	"attest": true, "attests": true, "detest": true, "testament": true, "testimony": true,
-	"fastest": true, "shortest": true, "smartest": true, "strictest": true, "lightest": true,
-	"tightest": true, "brightest": true, "softest": true, "hottest": true, "slightest": true,
-}
-
-func testDirName(d string) bool {
-	l := strings.ToLower(d)
-	switch l {
-	case "spec", "specs", "__tests__", "__mocks__", "e2e", "fixtures":
-		return true
-	}
-	for _, part := range strings.FieldsFunc(l, func(r rune) bool { return r == '-' || r == '_' || r == '.' }) {
-		if notTestWords[part] {
-			continue
-		}
-		if strings.HasPrefix(part, "test") || strings.HasSuffix(part, "test") || strings.HasSuffix(part, "tests") {
+// NeedsEvidence reports whether a repository's change goes beyond tests and
+// documentation, so that a test must show its behaviour.
+func NeedsEvidence(changed []string) bool {
+	for _, f := range changed {
+		if !IsTestFile(f) && !ecosystem.IsDocumentation(f) {
 			return true
 		}
 	}
@@ -216,7 +176,8 @@ func (e *Engine) BehaviourEvidence(ctx context.Context, t RepoTarget) (Evidence,
 
 	attr := newAttribution(t.Worktree, ev.TestFiles)
 	ran, notBuilt, timedOut, notPassing := false, false, false, false
-	envErr := "" // a stage that could not run (sandbox or engine problem)
+	envErr := ""     // a stage that could not run (sandbox or engine problem)
+	baseBroken := "" // a stage that fails on the base without the changed tests too
 	seen := map[string]bool{}
 	controlTarget := RepoTarget{Name: t.Name, Worktree: control, TaskID: t.TaskID, Source: t.Source}
 	baseTarget := RepoTarget{Name: t.Name, Worktree: base, TaskID: t.TaskID, Source: t.Source}
@@ -330,10 +291,16 @@ func (e *Engine) BehaviourEvidence(ctx context.Context, t RepoTarget) (Evidence,
 				}
 			}
 			if found || c.Status != "pass" {
+				if !found && baseBroken == "" {
+					baseBroken = st.Name + ": " + firstLine(failureLine(cout, c.Output))
+				}
 				continue
 			}
 		}
 		if c.Status != "pass" {
+			if baseBroken == "" {
+				baseBroken = st.Name + ": " + firstLine(failureLine(cout, c.Output))
+			}
 			continue
 		}
 		// The stage passes without the changed tests; a load failure that
@@ -358,12 +325,30 @@ func (e *Engine) BehaviourEvidence(ctx context.Context, t RepoTarget) (Evidence,
 		ev.Reason = "a test stage could not run on the base commit (" + trunc(envErr, 300) + "), so the changed tests could not be compared"
 	case timedOut:
 		ev.Reason = "a test stage timed out on the base commit, so the changed tests could not be compared"
+	case baseBroken != "":
+		ev.Reason = "a test stage fails on the base commit even without the changed tests (" + trunc(baseBroken, 300) +
+			"), so the changed tests could not be compared"
 	case !ran:
 		ev.Reason = "no test stage runs the changed test files"
 	default:
 		ev.Reason = "the changed tests also pass on the base commit, so they do not demonstrate the change"
 	}
 	return ev, nil
+}
+
+// failureLine is the most telling line of a failed run: the last non-empty
+// line of its output (where runners print the error), else the recorded
+// output's.
+func failureLine(full, recorded string) string {
+	for _, out := range []string{full, recorded} {
+		lines := strings.Split(strings.TrimSpace(out), "\n")
+		for i := len(lines) - 1; i >= 0; i-- {
+			if l := strings.TrimSpace(lines[i]); l != "" {
+				return l
+			}
+		}
+	}
+	return "no output"
 }
 
 // goTestRE matches a top-level Go test result in `go test -v` output.
@@ -520,7 +505,7 @@ type attribution struct {
 func newAttribution(worktree string, testFiles []string) attribution {
 	var a attribution
 	for _, f := range testFiles {
-		if !testFileRE.MatchString(f) && !sourceFileRE.MatchString(f) {
+		if !ecosystem.HasTestName(f) && !sourceFileRE.MatchString(f) {
 			a.data = true
 		}
 		a.paths = append(a.paths, filepath.ToSlash(f))

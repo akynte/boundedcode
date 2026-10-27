@@ -2,6 +2,8 @@ package ecosystem
 
 import (
 	"path"
+	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -77,6 +79,85 @@ func hasAnySuffix(s string, suffixes ...string) bool {
 func inSequence(dirs []string, a, b string) bool {
 	for i := 0; i+1 < len(dirs); i++ {
 		if dirs[i] == a && dirs[i+1] == b {
+			return true
+		}
+	}
+	return false
+}
+
+// testFileRE matches the test file naming conventions of the languages
+// verification has presets for (and a few more).
+var testFileRE = regexp.MustCompile(`(^|/)(` +
+	`[^/]*(_test\.go|\.(test|spec)\.[cm]?[jt]sx?)` + // Go, JavaScript/TypeScript
+	`|test_[^/]*\.py|[^/]*_test\.py|tests\.py|conftest\.py` + // Python
+	`|[^/]*(Test|Tests|IT|TestCase|Spec|Suite)\.(java|kt|kts|scala|groovy)` + // JVM
+	`|[^/]*_(test|spec)\.rb|test_[^/]*\.rb` + // Ruby
+	`|[^/]*Test\.php` + // PHP
+	`|[^/]*Tests?\.(cs|fs|vb|swift)` + // .NET, Swift
+	`|[^/]*_(test|unittest)\.(c|cc|cpp|cxx)|test_[^/]*\.(c|cc|cpp|cxx)` + // C, C++
+	`|[^/]*_test\.(exs|dart)|[^/]*Spec\.hs` + // Elixir, Dart, Haskell
+	`)$`)
+
+// HasTestName reports a conventional test file name in any language (the
+// name alone, whatever its directory).
+func HasTestName(p string) bool { return testFileRE.MatchString(p) }
+
+// IsTestOrData reports whether a path is test code or test data: test code
+// by IsTest, a conventional test file name in any language, or anything
+// under a directory that marks tests (test, tests, testdata, spec,
+// __tests__, fixtures, or a name such as caddytest, test_utils or
+// e2e-tests: test data and helpers). A directory name is split on "-", "_"
+// and "."; a part marks tests when it starts or ends with "test" and is not
+// an ordinary word that happens to (latest, contest, ...). Verification uses
+// it: a change to any of these is a change to the tests.
+func IsTestOrData(p string) bool {
+	if IsTest(filepath.ToSlash(p)) || testFileRE.MatchString(p) {
+		return true
+	}
+	parts := strings.Split(filepath.ToSlash(p), "/")
+	for _, d := range parts[:len(parts)-1] {
+		if testDirName(d) {
+			return true
+		}
+	}
+	return false
+}
+
+// IsDocumentation reports prose: Markdown, reStructuredText, AsciiDoc and
+// plain text files, and the conventional licence and changelog files.
+func IsDocumentation(p string) bool {
+	base := strings.ToLower(path.Base(filepath.ToSlash(p)))
+	switch path.Ext(base) {
+	case ".md", ".markdown", ".rst", ".adoc", ".txt":
+		return true
+	}
+	for _, n := range []string{"license", "licence", "notice", "changelog", "authors", "contributors"} {
+		if base == n || strings.HasPrefix(base, n+".") {
+			return true
+		}
+	}
+	return false
+}
+
+// notTestWords end (or start) with "test" but name no tests.
+var notTestWords = map[string]bool{
+	"latest": true, "greatest": true, "contest": true, "contests": true, "protest": true,
+	"attest": true, "attests": true, "detest": true, "testament": true, "testimony": true,
+	"fastest": true, "shortest": true, "smartest": true, "strictest": true, "lightest": true,
+	"tightest": true, "brightest": true, "softest": true, "hottest": true, "slightest": true,
+}
+
+func testDirName(d string) bool {
+	l := strings.ToLower(d)
+	switch l {
+	case "spec", "specs", "__tests__", "__mocks__", "e2e", "fixtures":
+		return true
+	}
+	for _, part := range strings.FieldsFunc(l, func(r rune) bool { return r == '-' || r == '_' || r == '.' }) {
+		if notTestWords[part] {
+			continue
+		}
+		if strings.HasPrefix(part, "test") || strings.HasSuffix(part, "test") || strings.HasSuffix(part, "tests") {
 			return true
 		}
 	}

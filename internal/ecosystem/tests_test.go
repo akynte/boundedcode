@@ -65,3 +65,34 @@ func TestIsTest(t *testing.T) {
 		}
 	}
 }
+
+// Test code is always test code or data; data and helpers are only the
+// latter, and prose is neither.
+func TestIsTestOrData(t *testing.T) {
+	for _, rel := range []string{"internal/cart/cart_test.go", "tests/test_api.py", "web/src/cart.test.ts", "src/cart/tests.rs", "cli.bats", "spec/models/cart_spec.rb"} {
+		if !IsTest(rel) || !IsTestOrData(rel) {
+			t.Errorf("%s: test code is test code or data", rel)
+		}
+	}
+	for rel, want := range map[string]bool{
+		"testdata/cases.json":        true,
+		"internal/testutil/fake.go":  true,
+		"e2e-tests/run.sh":           true,
+		"fixtures/order.json":        true,
+		"internal/latest/version.go": false,
+		"contest/entry.go":           false,
+		"README.md":                  false,
+	} {
+		if got := IsTestOrData(rel); got != want {
+			t.Errorf("IsTestOrData(%q) = %v", rel, got)
+		}
+		if IsTest(rel) && !want {
+			t.Errorf("%s is test code but not test code or data", rel)
+		}
+	}
+	for rel, want := range map[string]bool{"docs/guide.md": true, "CHANGELOG": true, "LICENSE.txt": true, "notes.rst": true, "main.go": false, "config.yaml": false} {
+		if IsDocumentation(rel) != want {
+			t.Errorf("IsDocumentation(%q) != %v", rel, want)
+		}
+	}
+}

@@ -97,6 +97,54 @@ func TestBehaviourEvidenceNonGo(t *testing.T) {
 	}
 }
 
+// TestBehaviourEvidenceNodeDependencies is the regression test for the
+// 2026-10-27 baseline, where a TypeScript project with no dependencies was
+// never verified: its test stage demanded node_modules, failed the same way
+// on the base with and without the changed tests, and the evidence said the
+// tests "also pass on the base".
+func TestBehaviourEvidenceNodeDependencies(t *testing.T) {
+	if _, err := exec.LookPath("node"); err != nil || testing.Short() {
+		t.Skip("node required")
+	}
+	if _, err := exec.LookPath("npm"); err != nil {
+		t.Skip("npm required")
+	}
+	ctx := context.Background()
+	e := &Engine{Sandbox: sandbox.None{}, CacheDir: t.TempDir()}
+	base := map[string]string{
+		"lib.js":      "exports.clamp = (v, max) => v > max ? max : v;\n",
+		"test/run.js": "const {clamp} = require('../lib');\nif (clamp(9, 5) !== 5) process.exit(1);\n",
+	}
+	change := map[string]string{
+		"lib.js":      "exports.clamp = (v, max) => v > max ? max : v < 0 ? 0 : v;\n",
+		"test/run.js": "const {clamp} = require('../lib');\nif (clamp(9, 5) !== 5 || clamp(-1, 5) !== 0) process.exit(1);\n",
+	}
+	run := func(pkg string) Evidence {
+		t.Helper()
+		files := map[string]string{"package.json": pkg}
+		for k, v := range base {
+			files[k] = v
+		}
+		repo, b := commitRepo(t, files)
+		writeFiles(t, repo, change)
+		ev, err := e.BehaviourEvidence(ctx, RepoTarget{Name: "js", Worktree: repo, Base: b, TaskID: "t", Source: repo})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return ev
+	}
+	// No dependencies declared: no node_modules is needed.
+	if ev := run(`{"scripts":{"test":"node test/run.js"}}`); !ev.Verified {
+		t.Fatalf("project without dependencies: %+v", ev)
+	}
+	// Dependencies declared and not installed: the stage fails on the base
+	// either way, and the reason says so instead of "also pass on the base".
+	ev := run(`{"scripts":{"test":"node test/run.js"},"devDependencies":{"left-pad":"1.3.0"}}`)
+	if ev.Verified || !strings.Contains(ev.Reason, "fails on the base commit even without the changed tests") || !strings.Contains(ev.Reason, "node_modules missing") {
+		t.Fatalf("missing dependencies: %+v", ev)
+	}
+}
+
 // casesTest reads table cases from testdata, as Prometheus's TestEvaluations
 // reads promql/testdata/*.test.
 const casesTest = "package calc\n\nimport (\n\t\"bufio\"\n\t\"fmt\"\n\t\"os\"\n\t\"testing\"\n)\n\n" +

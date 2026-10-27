@@ -107,9 +107,17 @@ var polyglotCases = []polyglotCase{
 			"test/calc_test.rb": "require \"minitest/autorun\"\nrequire \"calc\"\n\nclass CalcTest < Minitest::Test\n  def test_clamp_high = assert_equal(5, Calc.clamp(9, 5))\nend\n",
 			".gitignore":        "vendor/\n.bundle/\n",
 		},
-		fix:       map[string]string{"lib/calc.rb": "module Calc\n  def self.clamp(v, max) = v > max ? max : (v < 0 ? 0 : v)\nend\n"},
-		test:      map[string]string{"test/calc_test.rb": "require \"minitest/autorun\"\nrequire \"calc\"\n\nclass CalcTest < Minitest::Test\n  def test_clamp_high = assert_equal(5, Calc.clamp(9, 5))\n  def test_clamp_negative = assert_equal(0, Calc.clamp(-1, 5))\nend\n"},
-		prep:      `bundle config set --local path vendor/bundle && bundle install --quiet`,
+		fix:  map[string]string{"lib/calc.rb": "module Calc\n  def self.clamp(v, max) = v > max ? max : (v < 0 ? 0 : v)\nend\n"},
+		test: map[string]string{"test/calc_test.rb": "require \"minitest/autorun\"\nrequire \"calc\"\n\nclass CalcTest < Minitest::Test\n  def test_clamp_high = assert_equal(5, Calc.clamp(9, 5))\n  def test_clamp_negative = assert_equal(0, Calc.clamp(-1, 5))\nend\n"},
+		// Gems are built in the container's own filesystem and copied into
+		// the checkout: on Docker Desktop's file sharing, `install -m` of a
+		// freshly written native extension fails with EPERM in a large share
+		// of attempts (a chmod racing the write), so building in place makes
+		// the step flaky. Copying is not affected.
+		// (The local path is set afterwards: Bundler's local config would
+		// override BUNDLE_PATH.)
+		prep: `BUNDLE_PATH=/tmp/bundle bundle install --quiet && mkdir -p vendor && rm -rf vendor/bundle && ` +
+			`cp -a /tmp/bundle vendor/bundle && bundle config set --local path vendor/bundle`,
 		lockfiles: []string{"Gemfile.lock"},
 		stage:     "ruby-test",
 		evidence:  "CalcTest#test_clamp_negative",

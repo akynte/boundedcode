@@ -58,6 +58,10 @@ type Stage struct {
 	// stages on the base commit with the change's tests (see delta.go).
 	// Without it, a stage whose name or command mentions "test" counts.
 	Tests bool `yaml:"tests"`
+	// Dir is the directory the stage runs in, relative to the repository
+	// root (a project inside a monorepo); Requires are relative to it, and
+	// {packages} lists the packages under it. "" is the root.
+	Dir string `yaml:"dir,omitempty"`
 
 	preset bool // built in (presetFor): Tests is authoritative
 }
@@ -273,8 +277,83 @@ func (c Config) validate() error {
 		if err := policy.CheckCommand(s.Run); err != nil {
 			return fmt.Errorf("stage %s: %w", s.Name, err)
 		}
+		if err := validStageDir(s.Dir); err != nil {
+			return fmt.Errorf("stage %s: %w", s.Name, err)
+		}
 	}
 	return nil
+}
+
+// validStageDir accepts "" (the root) or a clean, relative, slash-separated
+// path that stays inside the repository.
+func validStageDir(dir string) error {
+	if dir == "" {
+		return nil
+	}
+	if path.IsAbs(dir) || strings.Contains(dir, `\`) || path.Clean(dir) != dir || dir == "." || dir == ".." || strings.HasPrefix(dir, "../") {
+		return fmt.Errorf("dir %q must be a clean relative path inside the repository", dir)
+	}
+	return nil
+}
+
+// stageDir is the directory a stage runs in, refusing one that leaves the
+// worktree through a symbolic link.
+func stageDir(worktree, dir string) (string, error) {
+	if dir == "" {
+		return worktree, nil
+	}
+	if err := validStageDir(dir); err != nil {
+		return "", err
+	}
+	abs := filepath.Join(worktree, filepath.FromSlash(dir))
+	real, err := filepath.EvalSymlinks(abs)
+	if err != nil {
+		return "", err
+	}
+	root, err := filepath.EvalSymlinks(worktree)
+	if err != nil {
+		return "", err
+	}
+	if rel, err := filepath.Rel(root, real); err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf("dir %q leaves the repository", dir)
+	}
+	return abs, nil
+}
+
+// stagePackages maps repository-relative {packages} arguments to a stage
+// running in dir: packages under dir become relative to it, packages
+// elsewhere are dropped (all of the project's run when none is left), and
+// flags pass through (-run takes a value).
+func stagePackages(dir string, args []string) []string {
+	if dir == "" {
+		return args
+	}
+	prefix := "./" + dir
+	var out []string
+	pkgs := 0
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		switch {
+		case a == "-run" && i+1 < len(args):
+			out = append(out, a, args[i+1])
+			i++
+		case strings.HasPrefix(a, "-"):
+			out = append(out, a)
+		case a == "./..." || a == prefix+"/...":
+			out = append(out, "./...")
+			pkgs++
+		case a == prefix:
+			out = append(out, ".")
+			pkgs++
+		case strings.HasPrefix(a, prefix+"/"):
+			out = append(out, "./"+strings.TrimPrefix(a, prefix+"/"))
+			pkgs++
+		}
+	}
+	if pkgs == 0 {
+		out = append(out, "./...")
+	}
+	return out
 }
 
 // Run verifies one repository at the given scope. Built-in stages
@@ -440,22 +519,39 @@ func (e *Engine) runStage(ctx context.Context, t RepoTarget, st Stage, packages 
 func (e *Engine) runStageFull(ctx context.Context, t RepoTarget, st Stage, packages []string) (StageResult, string) {
 	sr := StageResult{Name: st.Name}
 	full := ""
-	for _, req := range st.Requires {
-		if _, err := os.Stat(filepath.Join(t.Worktree, req)); err != nil {
-			// A stage that applied at base cannot be switched off by deleting
-			// its required file.
-			if t.Base != "" && !blobMissing(ctx, t.Worktree, t.Base, req) {
-				sr.Status, sr.ExitCode, sr.Output = "fail", 1, req+" exists at the base commit but was removed by the change"
+	dir := t.Worktree
+	if st.Dir != "" {
+		if _, err := os.Stat(filepath.Join(t.Worktree, filepath.FromSlash(st.Dir))); err != nil {
+			if t.Base != "" && !blobMissing(ctx, t.Worktree, t.Base, st.Dir) {
+				sr.Status, sr.ExitCode, sr.Output = "fail", 1, st.Dir+" exists at the base commit but was removed by the change"
 				return sr, full
 			}
-			sr.Status, sr.Output = "skipped", "missing "+req
+			sr.Status, sr.Output = "skipped", "missing "+st.Dir
+			return sr, full
+		}
+		d, err := stageDir(t.Worktree, st.Dir)
+		if err != nil {
+			sr.Status, sr.Output = "error", err.Error()
+			return sr, full
+		}
+		dir = d
+	}
+	for _, req := range st.Requires {
+		if _, err := os.Stat(filepath.Join(dir, req)); err != nil {
+			// A stage that applied at base cannot be switched off by deleting
+			// its required file.
+			if t.Base != "" && !blobMissing(ctx, t.Worktree, t.Base, path.Join(st.Dir, req)) {
+				sr.Status, sr.ExitCode, sr.Output = "fail", 1, path.Join(st.Dir, req)+" exists at the base commit but was removed by the change"
+				return sr, full
+			}
+			sr.Status, sr.Output = "skipped", "missing "+path.Join(st.Dir, req)
 			return sr, full
 		}
 	}
 	var argv []string
 	for _, a := range st.Run {
 		if a == "{packages}" {
-			argv = append(argv, packages...)
+			argv = append(argv, stagePackages(st.Dir, packages)...)
 			continue
 		}
 		argv = append(argv, a)
@@ -465,7 +561,7 @@ func (e *Engine) runStageFull(ctx context.Context, t RepoTarget, st Stage, packa
 		sr.Status, sr.Output = "error", err.Error()
 		return sr, full
 	}
-	spec, err := e.spec(t, argv)
+	spec, err := e.specIn(t, dir, argv)
 	if err != nil {
 		sr.Status, sr.Output = "error", err.Error()
 		return sr, full
@@ -571,6 +667,12 @@ func (e *Engine) engineMissing(ctx context.Context, runErr error) string {
 }
 
 func (e *Engine) spec(t RepoTarget, argv []string) (sandbox.Spec, error) {
+	return e.specIn(t, t.Worktree, argv)
+}
+
+// specIn is spec for a command run in workdir, a directory inside the
+// worktree.
+func (e *Engine) specIn(t RepoTarget, workdir string, argv []string) (sandbox.Spec, error) {
 	mounts := []sandbox.Mount{{Host: t.Worktree, Target: t.Worktree}}
 	env := map[string]string{"GOFLAGS": "-buildvcs=false", "GOTOOLCHAIN": "local", "CI": "1"}
 	if common, err := gitops.CommonDir(context.Background(), t.Worktree); err == nil {
@@ -599,7 +701,7 @@ func (e *Engine) spec(t RepoTarget, argv []string) (sandbox.Spec, error) {
 			// -mod=mod lets a module resolve from the cache offline, but it
 			// ignores vendor/: a vendored module builds from its vendor
 			// directory (Go's default when vendor/modules.txt exists).
-			if !goVendored(t.Worktree) {
+			if !goVendored(workdir) {
 				env["GOFLAGS"] = "-buildvcs=false -mod=mod"
 			}
 		}
@@ -643,7 +745,7 @@ func (e *Engine) spec(t RepoTarget, argv []string) (sandbox.Spec, error) {
 	for _, s := range secrets {
 		masks = append(masks, filepath.Join(t.Worktree, s))
 	}
-	return sandbox.Spec{Argv: argv, Workdir: t.Worktree, Mounts: mounts, Scratch: scratch, Env: env, Masks: masks}, nil
+	return sandbox.Spec{Argv: argv, Workdir: workdir, Mounts: mounts, Scratch: scratch, Env: env, Masks: masks}, nil
 }
 
 // goVendored reports whether a tree's root module is vendored
