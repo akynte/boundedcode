@@ -184,3 +184,46 @@ func TestSubprojectVerificationAndEvidence(t *testing.T) {
 		t.Fatal("the subproject's failing test did not fail verification")
 	}
 }
+
+// Formatting is judged on the files the change touched: a file already
+// unformatted at the base (Temporal's SDK ships one) does not fail every
+// change, and an unformatted file the change touches does.
+func TestGofmtJudgesChangedFiles(t *testing.T) {
+	if _, err := exec.LookPath("gofmt"); err != nil || testing.Short() {
+		t.Skip("gofmt required")
+	}
+	ctx := context.Background()
+	repo, base := commitRepo(t, map[string]string{
+		"go.mod":       "module example.com/calc\n\ngo 1.22\n",
+		"calc.go":      buggyGo,
+		"calc_test.go": oldTest,
+		"upstream.go":  "package calc\n\nfunc upstream() {}", // no final newline: gofmt would change it
+	})
+	e := &Engine{Sandbox: sandbox.None{}, CacheDir: t.TempDir()}
+	target := RepoTarget{Name: "calc", Worktree: repo, Base: base, TaskID: "t", Source: repo}
+	gofmtStatus := func() (string, string) {
+		t.Helper()
+		res, err := e.Run(ctx, target, Full)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, s := range res.Stages {
+			if s.Name == "gofmt" {
+				return s.Status, s.Output
+			}
+		}
+		t.Fatal("no gofmt stage")
+		return "", ""
+	}
+	writeFiles(t, repo, map[string]string{"calc.go": fixedGo})
+	if st, out := gofmtStatus(); st != "pass" {
+		t.Fatalf("a formatted change fails gofmt because of an untouched file: %s %s", st, out)
+	}
+	writeFiles(t, repo, map[string]string{"calc.go": strings.Replace(fixedGo, "\tif v > max {", "\tif v>max {", 1)})
+	if st, out := gofmtStatus(); st != "fail" || !strings.Contains(out, "calc.go") || strings.Contains(out, "upstream.go") {
+		t.Fatalf("an unformatted change: %s %s", st, out)
+	}
+	if got := strings.Join(stageFiles("api", []string{"api/a.go", "web/b.ts", "api/x/c.go"}), " "); got != "a.go x/c.go" {
+		t.Fatalf("stageFiles = %q", got)
+	}
+}

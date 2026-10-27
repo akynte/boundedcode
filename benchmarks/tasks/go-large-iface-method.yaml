@@ -18,7 +18,9 @@ setup:
       version: 1
       max_changed_files: 30
       stages:
-        - {name: gofmt, run: [sh, -c, "out=$(gofmt -l $(git ls-files '*.go')); [ -z \"$out\" ] || { echo \"$out\"; exit 1; }"]}
+        # Only the files the change touched: upstream ships an unformatted
+        # file (internal/cmd/prepare-release/main.go lacks a final newline).
+        - {name: gofmt, run: [sh, -c, "set -- $(for f in \"$@\"; do case \"$f\" in *.go) [ -f \"$f\" ] && echo \"$f\";; esac; done); [ $# -eq 0 ] && exit 0; out=$(gofmt -l \"$@\"); [ -z \"$out\" ] || { echo \"$out\"; exit 1; }", gofmt, "{changed}"]}
         - {name: go-build, run: [go, build, ./...]}
         - {name: go-vet, run: [go, vet, ./...], timeout: 20m}
         - {name: go-test, run: [go, test, -count=1, ./converter/...], timeout: 10m}

@@ -61,7 +61,9 @@ func presetRoot(files map[string]bool) Config {
 	}
 	if files["go.mod"] {
 		add(
-			Stage{Name: "gofmt", Run: []string{"sh", "-c", `out=$(gofmt -l $(git ls-files '*.go' | grep -v '^vendor/') 2>&1); [ -z "$out" ] || { echo "files need gofmt:"; echo "$out"; exit 1; }`}, Requires: []string{"go.mod"}},
+			// Only the Go files the change touched: a file already
+			// unformatted at the base is not the change's doing.
+			Stage{Name: "gofmt", Run: []string{"sh", "-c", gofmtChanged, "gofmt", "{changed}"}, Requires: []string{"go.mod"}},
 			Stage{Name: "go-build", Run: []string{"go", "build", "./..."}, Requires: []string{"go.mod"}},
 			Stage{Name: "go-vet", Run: []string{"go", "vet", "{packages}"}, Requires: []string{"go.mod"}},
 			Stage{Name: "go-test", Run: []string{"go", "test", "-count=1", "{packages}"}, Requires: []string{"go.mod"}, Timeout: config.Duration(20 * time.Minute), Tests: true},
@@ -161,6 +163,11 @@ func presetRoot(files map[string]bool) Config {
 	}
 	return c
 }
+
+// gofmtChanged lists the change's Go files (its arguments) that gofmt
+// would rewrite; deleted and vendored files are skipped.
+const gofmtChanged = `set -- $(for f in "$@"; do case "$f" in vendor/*) ;; *.go) [ -f "$f" ] && printf '%s\n' "$f";; esac; done); ` +
+	`[ $# -eq 0 ] && exit 0; out=$(gofmt -l "$@" 2>&1); [ -z "$out" ] || { echo "files need gofmt:"; echo "$out"; exit 1; }`
 
 // projectManifests make a directory a project of its own.
 var projectManifests = map[string]bool{

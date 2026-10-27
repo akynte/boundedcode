@@ -45,7 +45,9 @@ const (
 type Stage struct {
 	Name string `yaml:"name"`
 	// Run is argv. Placeholders: {packages} (impact-selected Go packages or
-	// ./... in full scope).
+	// ./... in full scope); {changed} (the change's files, relative to the
+	// stage's directory; per-file checks such as formatting judge only what
+	// the change touched).
 	Run []string `yaml:"run"`
 	// Scope: targeted, full, or always (default).
 	Scope   string          `yaml:"scope"`
@@ -181,6 +183,9 @@ type RepoTarget struct {
 	// derived from the agent-writable worktree). Dependencies installed there
 	// (node_modules) are mounted read-only into the worktree's sandbox.
 	Source string
+	// Changed are the change's files (repository-relative), for stages
+	// that use {changed}; Run sets them.
+	Changed []string
 }
 
 // ConfigPath is the repository-relative verification config.
@@ -320,6 +325,21 @@ func stageDir(worktree, dir string) (string, error) {
 	return abs, nil
 }
 
+// stageFiles maps the change's repository-relative files to a stage
+// running in dir: the files under it, relative to it.
+func stageFiles(dir string, files []string) []string {
+	var out []string
+	for _, f := range files {
+		f = filepath.ToSlash(f)
+		if dir == "" {
+			out = append(out, f)
+		} else if rest, ok := strings.CutPrefix(f, dir+"/"); ok {
+			out = append(out, rest)
+		}
+	}
+	return out
+}
+
 // stagePackages maps repository-relative {packages} arguments to a stage
 // running in dir: packages under dir become relative to it, packages
 // elsewhere are dropped (all of the project's run when none is left), and
@@ -368,6 +388,7 @@ func (e *Engine) Run(ctx context.Context, t RepoTarget, scope Scope) (Result, er
 	if err != nil {
 		return res, err
 	}
+	t.Changed = changed
 	res.Stages = append(res.Stages, diffScope(changed, cfg))
 	res.Stages = append(res.Stages, e.secretScan(ctx, t, scope))
 	if st, ok := e.buildTagsStage(ctx, t, changed); ok {
@@ -552,6 +573,10 @@ func (e *Engine) runStageFull(ctx context.Context, t RepoTarget, st Stage, packa
 	for _, a := range st.Run {
 		if a == "{packages}" {
 			argv = append(argv, stagePackages(st.Dir, packages)...)
+			continue
+		}
+		if a == "{changed}" {
+			argv = append(argv, stageFiles(st.Dir, t.Changed)...)
 			continue
 		}
 		argv = append(argv, a)
