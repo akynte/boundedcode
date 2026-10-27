@@ -227,3 +227,30 @@ func TestGofmtJudgesChangedFiles(t *testing.T) {
 		t.Fatalf("stageFiles = %q", got)
 	}
 }
+
+// A repository's own go test stage, with fixed packages and no requires
+// (as go-large-iface-method's), still gives per-test evidence.
+func TestEvidenceCustomGoTestStage(t *testing.T) {
+	if _, err := exec.LookPath("go"); err != nil || testing.Short() {
+		t.Skip("go toolchain required")
+	}
+	ctx := context.Background()
+	repo, base := commitRepo(t, map[string]string{
+		"go.mod":       "module example.com/calc\n\ngo 1.22\n",
+		"calc.go":      buggyGo,
+		"calc_test.go": oldTest,
+		ConfigPath:     "version: 1\nstages:\n  - {name: go-test, run: [go, test, -count=1, ./...]}\n",
+	})
+	writeFiles(t, repo, map[string]string{
+		"calc.go":      fixedGo,
+		"calc_test.go": oldTest + "\nfunc TestClampNegative(t *testing.T) {\n\tif Clamp(-1, 5) != 0 {\n\t\tt.Fatal(\"negative\")\n\t}\n}\n",
+	})
+	e := &Engine{Sandbox: sandbox.None{}, CacheDir: t.TempDir()}
+	ev, err := e.BehaviourEvidence(ctx, RepoTarget{Name: "calc", Worktree: repo, Base: base, TaskID: "t", Source: repo})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ev.Verified || len(ev.Tests) != 1 || ev.Tests[0] != "TestClampNegative" {
+		t.Fatalf("evidence = %+v", ev)
+	}
+}

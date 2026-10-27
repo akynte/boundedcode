@@ -182,7 +182,7 @@ func (e *Engine) BehaviourEvidence(ctx context.Context, t RepoTarget) (Evidence,
 	controlTarget := RepoTarget{Name: t.Name, Worktree: control, TaskID: t.TaskID, Source: t.Source}
 	baseTarget := RepoTarget{Name: t.Name, Worktree: base, TaskID: t.TaskID, Source: t.Source}
 	for _, st := range stages {
-		goStage := len(st.Requires) > 0 && st.Requires[0] == "go.mod"
+		goStage := isGoStage(st)
 		if goStage && len(packages) == 0 {
 			continue // no Go test code or data changed
 		}
@@ -351,6 +351,12 @@ func failureLine(full, recorded string) string {
 	return "no output"
 }
 
+// isGoStage reports a stage whose test results are Go's, named per test
+// function: its first requirement is go.mod, or it runs go test itself.
+func isGoStage(st Stage) bool {
+	return len(st.Requires) > 0 && st.Requires[0] == "go.mod" || len(st.Run) > 1 && st.Run[0] == "go" && st.Run[1] == "test"
+}
+
 // goTestRE matches a top-level Go test result in `go test -v` output.
 var goTestRE = regexp.MustCompile(`(?m)^--- (PASS|FAIL|SKIP): (Test[A-Za-z0-9_]*)`)
 
@@ -358,7 +364,12 @@ var goTestRE = regexp.MustCompile(`(?m)^--- (PASS|FAIL|SKIP): (Test[A-Za-z0-9_]*
 // reports which of them passed: a PASS result and no FAIL or SKIP for that
 // name in any package.
 func (e *Engine) goTestsPass(ctx context.Context, t RepoTarget, st Stage, pkgs, names []string) (map[string]bool, StageResult) {
-	args := append([]string{"-run", "^(" + strings.Join(names, "|") + ")$", "-v"}, pkgs...)
+	filter := []string{"-run", "^(" + strings.Join(names, "|") + ")$", "-v"}
+	args := append(append([]string(nil), filter...), pkgs...)
+	if !slices.Contains(st.Run, "{packages}") {
+		// A stage with fixed packages: go test takes test flags after them.
+		st.Run = append(append([]string(nil), st.Run...), filter...)
+	}
 	r, out := e.runStageFull(ctx, t, st, args)
 	if r.Status == "error" || r.Status == "skipped" || stageTimedOut(r) {
 		return nil, r
