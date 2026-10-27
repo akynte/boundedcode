@@ -135,6 +135,19 @@ without BoundedCode's control plane.
 denied the baseline's agent its build environment. That baseline arm was
 re-run, and both arms are published.
 
+## Baseline (2026-10-27)
+
+The [baseline](baseline-2026-10.md) is the reference for later changes. It
+covers both modes, three runs each, with a pinned model, build, fixtures
+and environment.
+- Direct mode passed 21–23 of 23 runnable tasks.
+- Bounded mode passed 16–17 of 18, with 1–2 false verifications per run.
+- Model calls take 83–99% of the time, and generating tokens 71–78% of
+  that.
+- `bcode bench compare` judges a change against the baseline's own noise.
+  It detects changes of 10% or more in direct mode and about 20–25% in
+  bounded mode.
+
 ## Direct mode (2026-10)
 
 Direct mode, the everyday agent, is measured apart from bounded tasks.

@@ -172,3 +172,14 @@ func TestBoundedSuiteDefinitions(t *testing.T) {
 		}
 	}
 }
+
+func TestRedactHome(t *testing.T) {
+	home, err := os.UserHomeDir()
+	if err != nil || home == "/" {
+		t.Skip("no home directory")
+	}
+	got := string(RedactHome([]byte(`{"state_dir": "` + home + `/.cache/x"}`)))
+	if got != `{"state_dir": "~/.cache/x"}` {
+		t.Fatal(got)
+	}
+}

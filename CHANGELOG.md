@@ -118,8 +118,32 @@ used on real work.
   working set and whose change depends on the first answer. Reports add
   the largest single prompt and the recalls; `--working-set N` overrides
   the history budget for a run.
-- `bcode bench direct` refuses to start when a task's check command
-  (such as `go`) is not on the PATH, instead of failing every task.
+- `bcode bench direct` skips a task whose check command (such as `cargo`)
+  or `requires` is not on the PATH and reports it as an environment gap;
+  it refuses to start only when no task can run.
+- Where time, tokens and memory go, in both suites
+  (docs/benchmarks/baseline-2026-10.md):
+  - **per model call:** time to first token, the server's prefill and
+    decode times, cached and reasoning tokens (counted with the model's own
+    tokenizer when the provider does not report them). Also stored in the
+    ledger as `model_calls.reasoning_tokens` and `ttft_ms`.
+  - **per direct-mode task:** tool time per tool; the harness's own time by
+    phase; prompt-cache invalidations; the largest request by section; peak
+    memory of the harness, model server and GPU; stalls; a failure class
+    (model, timeout, interrupted, routing, environment, harness).
+  - **per bounded task:** verification runs and their time; stalls; sandbox
+    memory; false and missed verifications.
+  - **both reports** pin the build, machine, model file and checksum, server
+    settings, toolchains, and hashes of the tasks and fixtures.
+- `bcode bench compare` compares candidate runs with baseline runs. Its
+  verdicts rest on paired per-task ratios. The noise band comes from the
+  baseline's own runs (at least three) and is never narrower than ±10%.
+  Pass and fail are compared per task.
+- Fixtures and tasks in Python, TypeScript, Rust, Java and a Go +
+  TypeScript monorepo, in both suites. Each change task was validated: the
+  planted defect fails its hidden checks and a reference fix passes them.
+  Tasks name their language, and reports group by it.
+- A tool's elapsed time now includes its check after the edit.
 - `bcode bench lease` scores request-derived leases (the declarations,
   files and directories a request is about, `internal/lease`) against
   real commits. On 663 commits of golang.org/x/tools, cobra and this

@@ -1,6 +1,7 @@
 package benchmark
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -274,7 +275,7 @@ func (s *SuiteRunner) run(ctx context.Context, model string, tasks []TaskSpec, o
 		rep.Summary = summarize(rep.Results)
 		if out != "" {
 			b, _ := json.MarshalIndent(rep, "", "  ")
-			_ = config.WriteFileAtomic(out, b, 0o644)
+			_ = config.WriteFileAtomic(out, RedactHome(b), 0o644)
 		}
 	}
 	for _, t := range tasks {
@@ -468,6 +469,17 @@ func (s *SuiteRunner) runOne(ctx context.Context, model string, spec TaskSpec) (
 	res.LocalOnly = res.Success && res.Escalations == 0
 	res.Intel = collectIntel(ctx, r.DB, tk.ID)
 	return res
+}
+
+// RedactHome replaces the home directory in a report with "~": reports are
+// kept in the repository, and must not carry machine-specific paths. The
+// state directory and errors name paths under it.
+func RedactHome(b []byte) []byte {
+	home, _ := os.UserHomeDir()
+	if home == "" || home == "/" {
+		return b
+	}
+	return bytes.ReplaceAll(b, []byte(home), []byte("~"))
 }
 
 // collectRun reads a task's model calls, verification runs and stalls

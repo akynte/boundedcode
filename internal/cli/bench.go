@@ -240,7 +240,7 @@ func newBenchTasksCmd(app *App) *cobra.Command {
 				md := strings.TrimSuffix(out, ".json") + ".md"
 				var b bytes.Buffer
 				_ = benchmark.WriteSuiteMarkdown(&b, rep)
-				_ = os.WriteFile(md, b.Bytes(), 0o644)
+				_ = os.WriteFile(md, benchmark.RedactHome(b.Bytes()), 0o644)
 				_ = recordBenchmark(cmd, app, rep.ID, "engineering", p.Name, map[string]any{"tasks": len(tasks)}, rep)
 				s := rep.Summary
 				app.printf("verified %d/%d (%.0f%%), local-only %.0f%%, escalation rate %.0f%%, %.1f verified/hour, %.0fs/task\nreport: %s\n",

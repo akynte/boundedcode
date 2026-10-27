@@ -22,9 +22,30 @@ and the agent must recall or re-read them. Checks run after the last turn.
 `--working-set N` runs with a smaller (or larger) history budget than the
 configuration's, to exercise setting results aside on purpose.
 
+Each task names its `language` (`go`, `python`, `typescript`, `rust`,
+`java`, `multi`); the `polyglot` fixture holds one small project per
+language and a Go + TypeScript monorepo. A task whose checks need a
+toolchain that is not installed (their first word, plus `requires`) is
+skipped and reported as an environment gap, not run.
+
 The report (`benchmarks/reports/<stamp>-direct-<model>.json` and `.md`)
-records per task: pass or fail, model calls, tool calls by name, prompt
-tokens and how many the server served from its cache, generated tokens,
-tool-result bytes, the largest single prompt, results set aside and
-recalled, summaries, broken edits caught by the post-change check, mode
-switches, and wall time; for a session, each turn's mode and answer.
+records per task:
+- the result: pass or fail, why it failed (model, timeout, interrupted,
+  routing, environment, harness) and any stalls;
+- calls and tokens: model calls with each call's figures (time to first
+  token, prefill and decode time, cached and reasoning tokens), tool calls
+  by name with their time, prompt tokens and the cache's share, generated
+  tokens, tool-result bytes, the largest single prompt and what it was made
+  of by section;
+- time: model, tools and the harness's own work, split by phase;
+- memory: peak memory of the harness, the model server and the GPU;
+- the working set: results set aside and recalled, summaries, broken edits
+  caught by the post-change check, mode switches, wall time;
+- for a session: each turn's mode and answer.
+
+The report also records the environment: build, machine, model and server,
+toolchains, and hashes of the tasks and fixtures.
+
+`bcode bench compare --base A.json --base B.json --base C.json --candidate
+D.json …` compares runs. See docs/benchmarks/baseline-2026-10.md for the
+baseline and how verdicts are made.

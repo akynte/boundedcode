@@ -264,6 +264,7 @@ need no model. The suite ran with Qwen3.6-35B-A3B on the reference laptop.
 | Direct-mode suite: 13 everyday tasks (explain, locate, diagnose, fix, test, refactor, feature, two on golang.org/x/tools), five runs, each adding one change | **11 → 12–13 of 13** passed; tool calls per task 6.7 → 5.3–5.6; 85–89% of prompt tokens served from the server's cache; about 30 s per task. Two runs of one build differ by one task, so smaller differences are noise | [suite series](docs/benchmarks/direct-mode-suite-2026-10.md) |
 | Session tasks: several messages in one conversation, one of them six messages on golang.org/x/tools | pass, also with a 16K working set that set 5 results aside (prompt tokens 295K → 220K) | [suite series](docs/benchmarks/direct-mode-suite-2026-10.md#sessions-second-series-same-day) |
 | Lease study: can a request's text say which code it will change? 663 commits of x/tools, cobra and BoundedCode | symbol precision 33–55%; the whole change inside the lease in 0–65% of commits. The planned edit check on leases was **not built** | [lease study](docs/benchmarks/lease-study-2026-10.md) |
+| Baseline (2026-10-27): three runs per mode, pinned environment, time and tokens attributed per component | direct mode 21–23 of 23 runnable tasks, 40 s per task; bounded mode 16–17 of 18, 5–6.5 min per task, 1–2 false verifications per run. Model calls are 83–99% of the time; the harness's own work in direct mode is 0.025 s per task | [baseline](docs/benchmarks/baseline-2026-10.md) |
 | Trail study: does a repository's history predict the files a change needs? Pass bars fixed before each run | after an edit, on commits not used to pick the rule: 70–81% of the files named were changed by the same commit, and a note fired on 2–7% of single-file commits, so the **history note was built**. Co-changed files added at request time did **not** pass and were not built. The note's effect on the agent is not measured yet | [trail study](docs/benchmarks/trail-study-2026-10.md) |
 
 Direct mode has not been used on real work, and no cloud model has run
@@ -507,8 +508,11 @@ See [ADR-0009](docs/architecture/adr/0009-frontier-escalation.md).
 9. **Terminal only.** There is the CLI and the full-screen `bcode`
    interface, but no daemon or GUI.
 10. **Direct mode is new and measured only on its own suite.**
-    - It passes 12–13 of 13 suite tasks with the local model
+    - It passes 21–23 of the suite's 23 runnable tasks with the local model
       ([results](#direct-mode)), but it has not been used on real work.
+    - Its tasks in languages other than Go are one change and one question
+      each, on small fixtures. Rust and Java changes were not run in direct
+      mode, because this machine has no cargo or JDK.
     - The routing between chat, code and verify is not measured on real
       requests.
     - Streaming from Anthropic and Gemini is tested against recorded event
