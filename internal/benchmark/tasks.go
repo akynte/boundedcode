@@ -486,20 +486,23 @@ func RedactHome(b []byte) []byte {
 // from its ledger.
 func collectRun(ctx context.Context, db *sql.DB, taskID string, res *TaskResult) {
 	var log []inference.CallStat
-	if rows, err := db.QueryContext(ctx, `SELECT prompt_tokens, cached_tokens, completion_tokens, reasoning_tokens, prompt_ms, decode_ms, total_ms, ttft_ms, status
+	var sources []string
+	if rows, err := db.QueryContext(ctx, `SELECT source, prompt_tokens, cached_tokens, completion_tokens, reasoning_tokens, prompt_ms, decode_ms, total_ms, ttft_ms, status
 		FROM model_calls WHERE task_id = ? ORDER BY id`, taskID); err == nil {
 		for rows.Next() {
 			var c inference.CallStat
-			if rows.Scan(&c.Prompt, &c.Cached, &c.Completion, &c.Reasoning, &c.PrefillMS, &c.DecodeMS, &c.TotalMS, &c.TTFTMS, &c.Status) == nil {
+			var src string
+			if rows.Scan(&src, &c.Prompt, &c.Cached, &c.Completion, &c.Reasoning, &c.PrefillMS, &c.DecodeMS, &c.TotalMS, &c.TTFTMS, &c.Status) == nil {
 				if c.Reasoning > 0 {
 					c.ReasoningSource = "provider"
 				}
 				log = append(log, c)
+				sources = append(sources, src)
 			}
 		}
 		rows.Close()
 	}
-	res.Calls = summarizeCalls(log, nil)
+	res.Calls = summarizeCalls(log, expectedMisses(sources))
 	for _, c := range log {
 		res.Calls.PromptTokens += c.Prompt
 	}
@@ -537,6 +540,21 @@ func collectRun(ctx context.Context, db *sql.DB, taskID string, res *TaskResult)
 		}
 		rows.Close()
 	}
+}
+
+// expectedMisses marks the calls whose prompt cannot share the previous
+// call's cache: a different caller (the planner, then the agent), the
+// history condenser's own call, and the agent's first call after the
+// condenser rewrote the history. Invalidations there are expected.
+func expectedMisses(sources []string) map[int]bool {
+	m := map[int]bool{}
+	for i := 1; i < len(sources); i++ {
+		prev, cur := sources[i-1], sources[i]
+		if cur != prev || strings.HasSuffix(cur, ":condenser") || strings.HasSuffix(prev, ":condenser") {
+			m[i] = true
+		}
+	}
+	return m
 }
 
 // boundedFailure classifies a bounded task's outcome.
@@ -745,9 +763,66 @@ func sourceDir(ctx context.Context, src string) (string, error) {
 	}
 	dir := filepath.Join(mc, escapeModulePath(mod)+"@"+ver)
 	if _, err := os.Stat(filepath.Join(dir, "go.mod")); err != nil {
-		return "", fmt.Errorf("%s not in the module cache (run `go mod download %s@%s`)", dir, mod, ver)
+		if err := goCommand(ctx, "", "mod", "download", mod+"@"+ver); err != nil {
+			return "", fmt.Errorf("%s@%s is not in the module cache and could not be downloaded: %w", mod, ver, err)
+		}
+		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err != nil {
+			return "", fmt.Errorf("%s@%s was downloaded but %s is missing", mod, ver, dir)
+		}
+	}
+	// The task builds and tests the module as the main module, offline:
+	// every module in its build list must be in the cache.
+	if err := downloadBuildList(ctx, dir); err != nil {
+		return "", fmt.Errorf("the modules %s@%s needs could not be downloaded: %w", mod, ver, err)
 	}
 	return dir, nil
+}
+
+// downloadBuildList fetches every module in the build list of the module
+// in dir (go mod download all, as that module): through the configured
+// proxy, with checksums verified against the checksum database (Go's
+// defaults). It needs no network when they are all cached. The module
+// cache is read-only, so its go.mod and go.sum are copied to a scratch
+// directory first.
+func downloadBuildList(ctx context.Context, dir string) error {
+	tmp, err := os.MkdirTemp("", "bc-gomod-")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(tmp)
+	for _, f := range []string{"go.mod", "go.sum"} {
+		b, err := os.ReadFile(filepath.Join(dir, f))
+		if err != nil {
+			if f == "go.sum" && errors.Is(err, os.ErrNotExist) {
+				continue
+			}
+			return err
+		}
+		if err := os.WriteFile(filepath.Join(tmp, f), b, 0o644); err != nil {
+			return err
+		}
+	}
+	return goCommand(ctx, tmp, "mod", "download", "all")
+}
+
+// goCommand runs the go command in dir (a fresh scratch directory when
+// "") and returns its output's tail on failure.
+func goCommand(ctx context.Context, dir string, args ...string) error {
+	if dir == "" {
+		tmp, err := os.MkdirTemp("", "bc-go-")
+		if err != nil {
+			return err
+		}
+		defer os.RemoveAll(tmp)
+		dir = tmp
+	}
+	c := exec.CommandContext(ctx, "go", args...)
+	c.Dir = dir
+	c.Env = append(os.Environ(), "GOFLAGS=-mod=mod", "GOTOOLCHAIN=local")
+	if out, err := c.CombinedOutput(); err != nil {
+		return fmt.Errorf("go %s: %w: %s", strings.Join(args, " "), err, tailStr(strings.TrimSpace(string(out)), 600))
+	}
+	return nil
 }
 
 // escapeModulePath applies the module cache's case encoding ("A" -> "!a").

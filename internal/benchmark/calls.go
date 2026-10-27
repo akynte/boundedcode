@@ -28,8 +28,9 @@ type CallSummary struct {
 	// Invalidations are calls whose prompt reused less of the previous
 	// call's prompt from the server's cache than it shared with it (more
 	// than invalidationSlack tokens recomputed); AfterRewrite is how many
-	// of them followed a rewrite of the history (results set aside or a
-	// summary), which is expected. RecomputedTokens is what they cost.
+	// of them are expected: after a rewrite of the history (results set
+	// aside, a summary, the condenser) or a change of caller (planner and
+	// agent). RecomputedTokens is what they cost.
 	Invalidations    int `json:"cache_invalidations"`
 	AfterRewrite     int `json:"cache_invalidations_after_rewrite"`
 	RecomputedTokens int `json:"recomputed_prompt_tokens"`

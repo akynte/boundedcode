@@ -77,3 +77,14 @@ func TestParseMiB(t *testing.T) {
 }
 
 func runtimeOS() string { return goruntime.GOOS }
+
+// In bounded mode, a change of caller and the condenser's calls are where
+// the cache is expected to miss.
+func TestExpectedMisses(t *testing.T) {
+	got := expectedMisses([]string{"planner", "agent", "agent", "agent:condenser", "agent", "agent"})
+	for i, want := range []bool{false, true, false, true, true, false} {
+		if got[i] != want {
+			t.Errorf("call %d: %v", i, got[i])
+		}
+	}
+}

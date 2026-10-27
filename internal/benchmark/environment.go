@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/akynte/boundedcode/internal/buildinfo"
+	"github.com/akynte/boundedcode/internal/inference/llamacpp"
 )
 
 // Environment pins what a run depends on, so a later run can be compared
@@ -58,8 +59,10 @@ func captureEnvironment(ctx context.Context, model map[string]any, serverBinary 
 		e.GPU = strings.TrimSpace(out)
 	}
 	if serverBinary != "" {
-		if out, err := cmdOutput(ctx, serverBinary, "--version"); err == nil {
-			e.Server = firstLines(out, 2)
+		if v, err := llamacpp.Version(ctx, serverBinary); err == nil {
+			e.Server = "llama.cpp " + v
+		} else {
+			e.Server = "unknown (" + err.Error() + ")"
 		}
 	}
 	e.Toolchains = map[string]string{}
