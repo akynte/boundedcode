@@ -355,7 +355,7 @@ func (r *Runner) Send(ctx context.Context, text string) (string, error) {
 		u := r.usageSince(start)
 		r.emit(Event{Kind: EventDone, Usage: &u, Changed: changedSince(before, r.gitState())})
 	}()
-	nudged := false
+	nudged, emptyNudged := false, false
 	lastFail, failures := "", 0
 	for turn := 0; turn < r.maxTurns(); turn++ {
 		if err := ctx.Err(); err != nil {
@@ -389,6 +389,17 @@ func (r *Runner) Send(ctx context.Context, text string) (string, error) {
 				nudged = true
 				r.emit(Event{Kind: EventNote, Text: "A stop hook asked to continue: " + res.Reason})
 				if err := r.Session.Append(Message{Role: "user", Content: res.Reason}); err != nil {
+					return final, err
+				}
+				continue
+			}
+			// A reasoning model can end a turn having only thought: the
+			// user gets no answer (seen in the 2026-10-27 baseline). Ask
+			// once.
+			if strings.TrimSpace(final) == "" && !emptyNudged {
+				emptyNudged = true
+				r.emit(Event{Kind: EventNote, Text: "The model ended without an answer; asking it for one."})
+				if err := r.Session.Append(Message{Role: "user", Content: "You ended without answering. Answer my message now, from what you have found."}); err != nil {
 					return final, err
 				}
 				continue

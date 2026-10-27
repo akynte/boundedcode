@@ -757,3 +757,32 @@ func TestDoneEventListsChangedFiles(t *testing.T) {
 		t.Fatalf("second turn changed = %#v", done.Changed)
 	}
 }
+
+// A turn that ends with no answer text (a reasoning model that only
+// thought) is asked once for an answer.
+func TestEmptyAnswerIsAskedForOnce(t *testing.T) {
+	up := &scripted{replies: []reply{{text: ""}, {text: "The balance is 0."}}}
+	r, _, events := newRunner(t, up, ApprovalAuto)
+	got, err := r.Send(context.Background(), "what is the balance of an unused account?")
+	if err != nil || got != "The balance is 0." {
+		t.Fatalf("answer %q, err %v", got, err)
+	}
+	notes := 0
+	for _, e := range *events {
+		if e.Kind == EventNote && strings.Contains(e.Text, "without an answer") {
+			notes++
+		}
+	}
+	if notes != 1 {
+		t.Fatalf("notes = %d", notes)
+	}
+	// Still nothing after the nudge: the turn ends, with no second nudge.
+	up2 := &scripted{replies: []reply{{text: ""}, {text: ""}, {text: "unused"}}}
+	r2, _, _ := newRunner(t, up2, ApprovalAuto)
+	if got, err := r2.Send(context.Background(), "hello?"); err != nil || got != "" {
+		t.Fatalf("answer %q, err %v", got, err)
+	}
+	if n := len(up2.requests); n != 2 {
+		t.Fatalf("model calls = %d, want 2", n)
+	}
+}

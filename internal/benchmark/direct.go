@@ -125,7 +125,8 @@ type DirectResult struct {
 	// "harness" (BoundedCode itself).
 	FailureClass string `json:"failure_class,omitempty"`
 	// Stalls: "max_turns" (stopped at direct.max_turns), "repeated_failure"
-	// (the same call failed three times), "nudged", "timeout".
+	// (the same call failed three times), "nudged", "empty_answer" (asked
+	// for an answer after a turn ended without one), "timeout".
 	Stalls []string `json:"stalls,omitempty"`
 	// Where the agent's time went: AgentSeconds is the turns themselves
 	// (no fixture set-up or hidden checks); Model is the calls' sum
@@ -455,6 +456,9 @@ func (d *DirectRunner) runOne(ctx context.Context, model string, spec TaskSpec) 
 			}
 			if strings.HasPrefix(e.Text, "Stopped after") {
 				res.Stalls = append(res.Stalls, "max_turns")
+			}
+			if strings.Contains(e.Text, "ended without an answer") {
+				res.Stalls = append(res.Stalls, "empty_answer")
 			}
 		}
 	}
