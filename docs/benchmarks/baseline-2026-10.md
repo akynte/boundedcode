@@ -47,9 +47,9 @@ and the A/A run `20261027-direct-aa-r4`).
     build, and whole-run means by up to 60%.
   - `bench compare` detects a change of 10% or more in direct mode, and
     about 20–25% in bounded mode.
-- **Findings** that need decisions are listed as F1–F7 in section 1. The
-  first is a security gap: direct mode's `grep` does not mask secret paths
-  when ripgrep is installed.
+- **Findings** F1–F7 (section 1), among them a security gap in direct
+  mode's `grep`, and the other problems these runs surfaced were fixed
+  afterwards; section 10 lists each cause, fix and check.
 
 ## How to compare a later change with this baseline
 
@@ -185,7 +185,7 @@ Key:
   baseline or earlier validations.
 - **T**: covered by automated tests with fixtures but no model. For the
   verification presets, that is `TestPolyglotVerification` in the sandbox
-  image, which is opt-in (`BC_TEST_DOCKER_IMAGE`). It was run for this baseline against the new image: Python, Rust, Maven, Gradle, PHP, CMake and Make passed. Ruby was skipped because installing its test dependencies failed: `bundle install` could not build the `prism` gem's native extension. So Ruby's preset is **not** re-validated here.
+  image, which is opt-in (`BC_TEST_DOCKER_IMAGE`). It was run for this baseline against the new image: Python, Rust, Maven, Gradle, PHP, CMake and Make passed. Ruby was first skipped: installing its test dependencies failed on a Docker Desktop file-sharing race (section 10). After that fix, all eight cases passed, Ruby with per-test evidence.
 - **–**: absent.
 
 | | Go | Python | JS / TS | Rust | Java | C / C++ | Ruby | PHP | Other |
@@ -196,7 +196,7 @@ Key:
 | Outline of long files (direct) | parsed | pattern | pattern | pattern | pattern | pattern | pattern | pattern | pattern |
 | Test files left out of history notes | T | T | T | T | T | T | T | T | T: .NET, Swift, Elixir, Dart, Bats |
 | Symbol navigation (optional Serena, both modes' context) | T | T | T | T | – | – | – | – | – |
-| Verification preset (bounded) | T, M | T, M | T, M | T, M | T (Maven, Gradle); M through `make test` (plain javac) | T | T (not re-validated: dependency install failed) | T | Terraform fmt, Helm lint, `make test` fallback |
+| Verification preset (bounded) | T, M | T, M | T, M | T, M | T (Maven, Gradle); M through `make test` (plain javac) | T | T | T | Terraform fmt, Helm lint, `make test` fallback |
 | Behavioural evidence granularity (bounded) | per test function | per test (pytest, unittest) | per stage | per test (Cargo) | per test (Surefire, Gradle) | per test (CTest, Meson) | per test (minitest, RSpec) | per test (PHPUnit) | per stage |
 | Cross-repository compatibility gate | gRPC, protobuf | – | OpenAPI (spec-reading tests) | – | – | – | – | – | – |
 | Direct suite tasks (this baseline) | 15 | 2 | 2 | 2 | 2 | – | – | – | 2 mixed Go + TS |
@@ -492,7 +492,61 @@ evidence loop's purpose, not proof of it.
 - **Memory is sampled**, and GPU memory is the device's, other processes
   included.
 
-## 10. Not measured yet
+## 10. Findings fixed after the baseline (2026-10-28)
+
+Each problem the runs surfaced was traced to its cause and fixed. The
+baseline figures above are unchanged; they describe the build that was
+measured (`8e4caea`).
+
+| Finding | Cause | Fix | Checked by |
+|---|---|---|---|
+| F1: direct mode's `grep` through ripgrep showed secret files | ripgrep's ignore rules do not know the secret-path policy | ripgrep reports JSON; every file passes the same check as the other tools | a fake-ripgrep test with `credentials.json`, `*.pem` and `.env.example` |
+| False verification of `cross-service-idempotency` | one repository's test verified a change to two | each changed repository whose change goes beyond tests and documentation needs its own evidence | orchestrator tests (the old rule reproduces the false pass). In the rerun both services had evidence; the hidden test still fails on concurrent requests, which no agent test covered. That is the gate's documented limit: a test shows only the reading the agent chose |
+| TypeScript tasks never verified, 4–5 attempts, a stray `package-lock.json` | npm stages demanded `node_modules` for a project with no dependencies, so they failed on every clean checkout, and the evidence then said "also pass on the base" | `node_modules` is required only when dependencies are declared; a stage that fails on the base either way is reported as such | evidence tests (the old preset reproduces it). In the rerun `ts-bugfix-cart-discount` was verified in 2 attempts and 111 s, with no stray file |
+| F7: the Go + TypeScript monorepo had no test stage | presets looked only at the repository root | the stages of each outermost subproject, run in its directory (stages take a `dir`) | preset, package-mapping, directory and end-to-end tests. In the rerun the `api/*` and `web/*` stages ran and the task was verified in one attempt |
+| F5: an empty answer was accepted | the loop ended when the model's last call had no text | the model is asked once for an answer | unit test. It fired once in the rerun of the direct suite (`empty_answer` stall) |
+| No `java` or `javac` for the bounded agent | the image set `JAVA_HOME` but did not add a JDK to `PATH` | the default JDK is on `PATH`; verification still puts the version a project asks for first | the image and the Maven and Gradle presets, 3 times each |
+| `go-large-iface-method` could not start | its module, and the modules it needs, were not in the cache | the harness downloads the module and its whole build list (`go mod download all`, as that module), with checksums verified | a local-proxy test that also builds offline. The first rerun exposed that downloading only the module was not enough |
+| `go-large-iface-method` still could not pass | the Go preset's `gofmt` checked every file, and Temporal's SDK ships one without a final newline | `gofmt` checks only the files the change touched (`{changed}`) | a verification test with an unformatted file at the base |
+| `go-large-iface-method` passed unverified | the task's own `go test ./converter/...` stage was not recognised as a Go stage (no `requires: [go.mod]`), and re-running named tests needed `{packages}` | a stage that runs `go test` is a Go stage; with fixed packages the test filter is appended after them | an evidence test with such a stage (the old code gives the run's exact reason) |
+| Ruby's preset could not be re-validated | on Docker Desktop's file sharing, `install -m` of a freshly built native extension fails with EPERM in many attempts | the test builds gems in the container and copies them | Ruby passed 3 of 3, with per-test evidence |
+| F2: bounded cache misses unattributed | the condenser's calls were recorded as the agent's | condenser calls are recorded as `agent:condenser`; misses at a change of caller or around the condenser count as expected | gateway and adapter tests |
+| F3: two test-file classifiers | two definitions in two packages | one place, `ecosystem.IsTestOrData` (verification) extending `ecosystem.IsTest` (history notes) | the existing verification tests, unchanged, and a relationship test |
+| F6: README's OS | the machine was reinstalled | corrected | — |
+| Server version in reports | the first output lines are log lines | `llamacpp.Version`, as `doctor` uses | a test with a fake server |
+
+Not changed:
+- **The three project detectors.** Verification reads the base commit's
+  file list on purpose, so an agent cannot change which stages run. Direct
+  mode's map walks the working tree. Serena needs languages, not projects.
+  They answer different questions from different inputs.
+- **`go-debug-ledger-balance-query`'s false verification.** The agent's
+  code fix was right. It added its test to `ledger_test.go`, which the
+  task's criteria forbade and its hidden check enforces. The gate does not
+  read criteria written in natural language.
+
+A rerun of the direct suite with these fixes (`20261028-direct-fixcheck`)
+is within the baseline's noise on every paired metric, and passed 21 of
+23. Its two failures are model mistakes the baseline also showed.
+
+Bounded reruns of the affected tasks, one run each
+(`20261028-tasks-fixcheck`, `20261028-tasks-fixcheck-large`):
+
+| Task | Baseline (3 runs) | After the fixes |
+|---|---|---|
+| `ts-bugfix-cart-discount` | passed, never verified, 4–5 attempts, 282–447 s | passed, verified, 2 attempts, 111 s |
+| `multi-feature-discount` | passed, never verified (no test stage) | passed, verified, 1 attempt, 301 s; the `api/*` and `web/*` stages ran |
+| `go-large-iface-method` | could not start | passed in 2 attempts, 380 s. Not verified: the agent's tests call the method the change adds, so they cannot build on the base (new API, a documented limit) |
+| `cross-service-idempotency` | failed, falsely verified | failed, with evidence in both services; the hidden test is about concurrent requests |
+| `java-bugfix-paid-total`, `py-bugfix-inventory` | passed, verified | passed, verified |
+
+The first rerun of `go-large-iface-method` exposed two more causes, each
+fixed and in the table above: the module's dependencies were missing, and
+`gofmt` failed on a file the change did not touch. The `fixcheck` report
+holds that run (blocked after 6 attempts); `fixcheck-large` holds the run
+with all fixes.
+
+## 11. Not measured yet
 
 - Cloud providers (time to first token and caching behave differently).
 - Direct mode on Rust, Java, C#, C/C++, Ruby or PHP changes (no host

@@ -135,3 +135,22 @@ part of this boundary.
 15. **Secret-name matching is case-sensitive and skips dependency
    directories.** `.ENV` or `ID_RSA` are neither masked nor denied, and a
    `.env` under `vendor/`, `node_modules/` or `.venv/` is not masked.
+## Docker Desktop notes
+
+Docker Desktop shares host directories with its VM through its own file
+system, which behaves differently from a plain bind mount:
+
+- **Only shared directories mount.** By default that is the home
+  directory: scratch space for tasks and benchmarks lives under
+  `~/.cache`, not `/tmp`.
+- **`install -m` can fail.** Writing a file into a shared directory and
+  setting its mode on the open file (as `install -m 0755` does for a
+  freshly built native library) intermittently fails with "Operation not
+  permitted": 129 of 300 attempts for a 3 MB file on the reference machine.
+  `chmod` after a copy, and writes inside the container's own file system,
+  are not affected. Verification stages do not install anything; a setup
+  step that builds native extensions (for example `bundle install` of a gem
+  with a C extension) should build inside the container and copy the
+  result, as `TestPolyglotVerification` does.
+- **A directory recreated at the same path** can fail to mount for a while
+  ("bind source path does not exist"); use a fresh name per run.

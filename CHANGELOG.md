@@ -159,6 +159,44 @@ used on real work.
   scene-setting clause ("In package txtar, how does …"), and no longer
   ends a sentence at the dot in `ast.Inspect`.
 
+### Fixes from the 2026-10-27 baseline
+
+- **Security:** with ripgrep installed, direct mode's `grep` did not apply
+  the secret-path mask (it searched `credentials.json`, `*.pem` and the
+  like). It now reads ripgrep's JSON output and drops every file the other
+  tools refuse.
+- **Verification:** a task changing several repositories is
+  `TASK_VERIFIED` only when each repository whose change goes beyond tests
+  and documentation has its own demonstrating test. Before, one service's
+  test verified a two-service change whose other half was wrong.
+- **Verification:** a repository whose root is no project (a monorepo of
+  `api/` and `web/`) now gets each subproject's stages, run in its
+  directory; it used to get no test stage. Stages take a `dir`.
+- **Verification:** npm stages no longer demand `node_modules` for a
+  project that declares no dependencies; its tests failed in every clean
+  checkout, so its changes could never be verified. When the base fails a
+  test stage with and without the changed tests, the evidence now says so
+  instead of "the changed tests also pass on the base".
+- **Verification:** `gofmt` checks only the Go files the change touched;
+  a file already unformatted at the base (Temporal's Go SDK ships one)
+  failed every change. Stages get a `{changed}` placeholder.
+- **Verification:** a repository's own `go test` stage gives per-test
+  evidence even without `requires: [go.mod]` or `{packages}`; before, it
+  gave none.
+- **Direct mode:** a turn that ends without an answer (a reasoning model
+  that only thought) is asked once for one.
+- **Sandbox image:** the default JDK is on the agent's `PATH` (it had
+  `JAVA_HOME` but no `java` or `javac`).
+- **Ledger:** the history condenser's model calls are recorded as
+  `agent:condenser`, so a bounded task's cache misses can be attributed.
+- **Benchmarks:** a `gomod:` task source missing from the module cache is
+  downloaded (checksums verified); the model server's version is read past
+  its log lines; `TestPolyglotVerification`'s Ruby case builds gems in the
+  container, avoiding a Docker Desktop file-sharing race.
+- Test-file conventions live in one place: `ecosystem.IsTestOrData` (what
+  verification counts) extends `ecosystem.IsTest` (what history notes
+  count).
+
 ### Automatic modes: chat, code, verify (ADR-0012)
 
 - Every message is routed automatically: **chat** answers without changing

@@ -373,7 +373,7 @@ evidence, and `/task` does so on demand.
 |---|---|
 | **builds** | It compiles and lints. |
 | **`tests_green`** | The repository's checks pass. Not enough on its own. |
-| **`TASK_VERIFIED`** | The checks pass **and** a test the change adds or modifies (test code or test data) **fails on the base commit with the changed tests, does not fail there without them, and passes with the change**. In a multi-repository task, every gRPC, protobuf or OpenAPI link the change affects must also be shown `compatible` (experimental). |
+| **`TASK_VERIFIED`** | The checks pass **and** a test the change adds or modifies (test code or test data) **fails on the base commit with the changed tests, does not fail there without them, and passes with the change**. In a multi-repository task, each repository whose code the change modifies needs such a test, and every gRPC, protobuf or OpenAPI link the change affects must also be shown `compatible` (experimental). |
 
 Main limits:
 - **Comparison granularity.** Go is compared per test function. Other
@@ -529,7 +529,7 @@ The tested configuration below is not a minimum requirement:
 | CPU | Intel Core i7-13620H |
 | GPU | NVIDIA RTX 4060 Laptop, 8 GB VRAM |
 | RAM | 64 GB DDR5 |
-| OS | Debian 13 |
+| OS | Debian 13 for the validations up to 2026-10-10; Ubuntu 26.04.1 for the 2026-10-27 baseline |
 | Model | Qwen3.6-35B-A3B, UD-Q4_K_M, 131 K context, MoE experts partly on CPU |
 
 During validation the model server used up to 28.6 GiB (29,310 MiB) of RAM,

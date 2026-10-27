@@ -15,7 +15,7 @@ test captures a change in behaviour, not proof that the change is correct.
 |---|---|
 | **builds** | It compiles and lints. |
 | **`tests_green`** | The repository's checks pass. On its own this is weak evidence: in the initial validation, patches that changed nothing passed the existing tests. A task that ends here is reported as UNVERIFIED and is never presented as a verified merge candidate. |
-| **`TASK_VERIFIED`** | The checks pass **and** there is behavioural evidence (below). In a multi-repository task, every gRPC, protobuf or OpenAPI link that the change affects must also be `compatible`. |
+| **`TASK_VERIFIED`** | The checks pass **and** there is behavioural evidence (below) in every repository whose code the change modifies. In a multi-repository task, every gRPC, protobuf or OpenAPI link that the change affects must also be `compatible`. |
 
 ## Behavioural evidence
 
@@ -135,13 +135,18 @@ Measured or reproduced. The
   equivalent case is rejected.
 - **New API in general.** A change that only adds new API needs a test that
   also runs on the original code (Go), or it ends `tests_green`.
-- **Custom Go stages.** A custom Go stage in `.boundedcode/verification.yaml`
-  is treated as a non-Go stage unless its first `requires` entry is
-  `go.mod`.
+- **Custom Go stages.** A custom stage in `.boundedcode/verification.yaml`
+  gives per-test Go evidence when its first `requires` entry is `go.mod` or
+  its command is `go test`; a Go stage behind `sh -c` counts per stage.
 - **Test data.** Changed test data is attributed to every test in the Go
   package that reads it, or to the whole stage for other languages.
-- **Multi-repository evidence.** In a multi-repository task, evidence from
-  one changed repository verifies the task.
+- **Multi-repository evidence.** In a multi-repository task, every changed
+  repository whose change goes beyond tests and documentation needs its
+  own demonstrating test. A test in one service proves nothing about
+  another service's code: in the 2026-10-27 baseline, a two-service change
+  was verified by one service's test while the other service's code was
+  wrong. When only one repository changed code, a repository whose change
+  is documentation alone needs no test.
 - **Readings of the request.** A test can only demonstrate the reading of a
   request that the agent chose. In development runs, tasks were
   `TASK_VERIFIED` yet failed hidden acceptance tests:

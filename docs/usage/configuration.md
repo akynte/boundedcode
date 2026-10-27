@@ -299,16 +299,18 @@ stages:
     requires: [go.mod]      # the stage applies only if these files exist
     tests: true             # runs tests (see behavioural evidence)
     optional: false         # skip instead of fail when the tool is missing
+    dir: ""                 # run in this subdirectory (a project in a monorepo)
 ```
 
 | Key | Meaning |
 |---|---|
-| `name`, `run` | Required. `run` is an argument vector, not a shell line; use `[sh, -c, "..."]` for a script. Every command goes through the same command policy as the agent's commands. `{packages}` expands to the impact-selected Go packages (or `./...` in the full gate). |
+| `name`, `run` | Required. `run` is an argument vector, not a shell line; use `[sh, -c, "..."]` for a script. Every command goes through the same command policy as the agent's commands. `{packages}` expands to the impact-selected Go packages (or `./...` in the full gate); `{changed}` to the change's files (deleted ones included), for per-file checks such as formatting. |
 | `scope` | `targeted` stages run only while iterating, `full` stages only in the full gate before a task becomes a merge candidate, `always` in both. |
-| `requires` | Files that must exist for the stage to apply. A required file that exists at the base and is deleted by the change fails the stage, so a change cannot switch a stage off. A stage whose first required file is `go.mod` is treated as a Go stage by behavioural evidence. |
+| `requires` | Files that must exist for the stage to apply. A required file that exists at the base and is deleted by the change fails the stage, so a change cannot switch a stage off. A stage whose first required file is `go.mod`, or whose command is `go test`, is treated as a Go stage by behavioural evidence (per test function). |
 | `tests` | Marks a stage that runs tests. Behavioural evidence reruns such stages on the base commit with and without the change's tests. Without the key, a stage whose name or command mentions "test" counts. |
 | `deny_paths` | Repository-relative patterns in Go `filepath.Match` syntax: `*` does not cross `/`, and there is no `**`. A changed file that matches fails the diff scope. |
 | `optional` | The stage is skipped, not failed, when its tool is not installed (exit code 127). |
+| `dir` | The directory the stage runs in, relative to the repository root (for a project in a monorepo). `requires` are relative to it, and `{packages}` lists the impact-selected packages under it. It must stay inside the repository; a path or symbolic link that leaves it fails the stage. |
 
 The `diff-scope` and `secret-scan` (gitleaks) stages always run in addition.
 Stages run in the sandbox without network access; dependencies come
@@ -318,14 +320,22 @@ read-only from the repository checkout (for example its `node_modules`).
 
 Without a `verification.yaml`, stages are chosen from the files at the base
 commit, for every language found; a repository with several gets the stages
-of each. The toolchains are in the sandbox image (`boundedcode sandbox
+of each.
+
+A repository whose root is no project and has no `Makefile` (a monorepo
+with, say, `api/go.mod` and `web/package.json`) gets the stages of each
+outermost project up to three levels down, named after its directory
+(`api/go-test`, `web/npm-test`) and run in it. Projects under `vendor`,
+`node_modules`, `third_party`, `testdata`, `fixtures` and hidden
+directories are left out, and at most 16 projects get stages. A repository
+with a project or a `Makefile` at its root keeps the root's stages only. The toolchains are in the sandbox image (`boundedcode sandbox
 build`; `boundedcode setup` rebuilds an image built from an older
 definition).
 
 | Language | Detected by (repository root) | Stages | Dependencies (offline) |
 |---|---|---|---|
-| Go | `go.mod` | `gofmt`, `go-build`, `go-vet`, `go-test`, `golangci-lint` (full gate, optional) | the host's module cache, or the module's own `vendor/` when it has `vendor/modules.txt` |
-| JavaScript/TypeScript | `package.json`, `tsconfig.json` | `tsc`, `npm-lint`, `npm-test`, `npm-build` (full gate), each when the project declares it | the checkout's `node_modules` |
+| Go | `go.mod` | `gofmt` (the Go files the change touched), `go-build`, `go-vet`, `go-test`, `golangci-lint` (full gate, optional) | the host's module cache, or the module's own `vendor/` when it has `vendor/modules.txt` |
+| JavaScript/TypeScript | `package.json`, `tsconfig.json` | `tsc`, `npm-lint`, `npm-test`, `npm-build` (full gate), each when the project declares it | the checkout's `node_modules` (needed only when `package.json` declares dependencies) |
 | Python | Python test files (`test_*.py`, `*_test.py`, `conftest.py`) | `python-test`: pytest, or `unittest` when the project does not use pytest | the checkout's `.venv` or `venv` |
 | Rust | `Cargo.toml` | `cargo-build`, `cargo-test` | the host's Cargo registry (`~/.cargo/registry`, `~/.cargo/git`) |
 | Java (Maven) | `pom.xml` | `maven-compile`, `maven-test` | the host's `~/.m2/repository` |
