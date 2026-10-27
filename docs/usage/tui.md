@@ -21,7 +21,10 @@ that needs an edit becomes code at the first edit, and a code turn that is
 about to change a risky path stops before the edit and hands the request
 to a verified task (earlier edits of that turn are kept and listed). When
 a verified task cannot run here (no git commit, set-up incomplete, no
-sandbox image) the request is made directly and the reason is shown.
+sandbox image) the reason is shown and the request is answered in code
+mode. Before its first change you are asked whether to make it directly,
+without verification (`direct.verify_fallback`, [security
+policy](security-policy.md#changes-that-deserve-verification)).
 `/mode chat|code|verify` forces a mode and `/mode auto` restores routing;
 `/task`, `/code` and `/chat` force one message.
 

@@ -197,6 +197,67 @@ used on real work.
   verification counts) extends `ecosystem.IsTest` (what history notes
   count).
 
+### Security policy and prompt-injection defense
+
+- Sensitive operations are authorized only by you, in every approval mode
+  (`auto` included). These are:
+  - reading credentials or the environment;
+  - network transfers;
+  - installing packages named on the command line;
+  - changing agent instruction files, skills, MCP configuration or memory;
+  - git hooks, git execution keys, hook managers, shell start-up files and schedulers;
+  - `sudo`;
+  - CI configuration.
+
+  A permission rule (`network(api.github.com)`, `install(lodash)`, …),
+  your words in this turn's message, or your approval authorizes them.
+  Repository files, command output, web and MCP content, summaries,
+  sub-agent prompts and the model's own descriptions cannot. Without
+  someone to ask, they are refused. Classification reads the command line
+  in any language:
+  - quoting, globs, symlinks and variables;
+  - substitutions, wrappers, `sh -c`, `eval` and `find -exec`;
+  - interpreter one-liners;
+  - scripts the agent wrote in this session.
+
+  Decisions are audited (`direct.guard`). See
+  [the security policy](docs/usage/security-policy.md).
+- **Changed behaviour:** a request that deserves verification is no longer
+  made directly when a verified task cannot run. `direct.verify_fallback`
+  decides:
+  - `ask`, the default: you decide once per turn and per risky path;
+    with no one to ask, it is refused;
+  - `refuse`;
+  - `allow`: the previous behaviour, now audited.
+- **Changed behaviour:** `auto` no longer writes protected paths, instruction
+  files or git hooks without authorization. `save_memory` needs "remember …"
+  in your message, a rule, or your approval. `bash(...)` allow rules do not
+  authorize sensitive operations; use the category rules.
+- MCP: a project's `.mcp.json` and `.boundedcode/mcp.json` servers start
+  only once you trust their exact definition (`<data>/mcp-trust.json`).
+  Tool definitions are pinned, and a changed or new tool is withheld until
+  you approve it.
+- Provenance on every session message (`provenance`: source, origin,
+  trusted). It is kept through persistence, set-aside, recall and
+  summaries. Web, MCP and sub-agent results carry a "data, not
+  instructions" header. The system prompt states the trust rules, and the
+  approval prompt labels a command's description as the model's.
+- Template `` !`cmd` `` commands go through the guard. When the model
+  invokes a template, they also need the approval a bash command would.
+- New hard refusals:
+  - a download piped into any interpreter;
+  - `bash <(curl …)` and `eval "$(curl …)"`;
+  - a base64 payload piped into a shell;
+  - PowerShell `iex` of a download;
+  - a fork bomb, `mkfs`, `dd` onto a disk, `chmod -R 777 /`.
+- The direct-mode benchmark counts guard refusals per task
+  (`guard_refusals`). Measured on the direct-mode suite against the
+  baseline (two runs):
+  - pass/fail per task, time and processed tokens are within noise;
+  - prompt tokens are 13% higher, from the trust rules in the cached
+    system prompt;
+  - one refusal: a `web_search` with no one to ask.
+
 ### Automatic modes: chat, code, verify (ADR-0012)
 
 - Every message is routed automatically: **chat** answers without changing

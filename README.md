@@ -404,6 +404,7 @@ example by prompt injection in repository content.
 | Command policy | A deterministic policy blocks push, destructive and deploy commands in verification. |
 | Host reads | Context building never follows symlinks out of a worktree. |
 | Frontier | Packets are sanitized, and the gate fails closed. |
+| Direct mode | Sensitive operations need a permission rule, your own words or your approval, in every approval mode. These are reading credentials, network transfers, installing named packages, changing agent instructions or memory, git hooks and execution config, privilege and CI configuration. Repository files, tool output, web and MCP content, summaries and the model's own claims cannot authorize them. A request that deserves verification is not silently made directly when verification is unavailable (`direct.verify_fallback`). Project MCP servers start only once trusted, and tool definitions are pinned. See the [security policy](docs/usage/security-policy.md). |
 
 > [!WARNING]
 > A container is not a perfect boundary. Running an autonomous coding agent

@@ -50,9 +50,21 @@ context, with no manual step.
 - The risk vocabulary is shared with frontier escalation
   (`escalation.architectural_risk`, `escalation.high_risk_review`).
 
+## Amendment (2026-10-28): the fallback fails closed
+
+Originally, when a verified task could not run, a verify-routed request was
+made directly with a note. A request that deserved verification therefore
+lost it silently. Now the request is still answered in code mode, but its
+first change, and each risky path, is decided by `direct.verify_fallback`:
+`ask` (the default; refused when no one can be asked), `refuse`, or `allow`
+(audited). See [the security policy](../../usage/security-policy.md).
+
 ## Evidence
 `internal/direct/router_test.go` (rule table, risky paths, model fallback,
 chat→code switch, code→verify hand-off before writing, AllowRisky);
+`internal/direct/security_test.go` (a verification downgrade fails closed:
+`direct.verify_fallback` ask, refuse, allow; risky paths without
+verification);
 `internal/cli` (`TestChatRoutesToVerification`: verify route, forced mode,
 fallback without a sandbox); `internal/tui` (auto routing to code and
 verify, mid-turn hand-off creating the task, forced modes).
