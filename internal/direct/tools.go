@@ -3,6 +3,7 @@ package direct
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -854,61 +855,159 @@ func grepTool() Tool {
 			}
 			ctxLines := num(a, "context")
 			if rg, err := exec.LookPath("rg"); err == nil {
-				args := []string{"--no-heading", "--color", "never", "--no-messages", "--max-columns", "300", "--max-columns-preview"}
-				switch mode {
-				case "files":
-					args = append(args, "-l")
-				case "count":
-					args = append(args, "-c")
-				default:
-					args = append(args, "--line-number", "--max-count", "50")
-					if ctxLines > 0 {
-						args = append(args, "-C", fmt.Sprint(min(ctxLines, 10)))
-					}
-				}
-				if boolean(a, "ignore_case") {
-					args = append(args, "-i")
-				}
-				if g := str(a, "glob"); g != "" {
-					args = append(args, "--glob", g)
-				}
-				args = append(args, "-e", pattern, abs)
-				c := exec.CommandContext(ctx, rg, args...)
-				c.Dir = r.cwd()
-				out, err := c.Output()
-				var ee *exec.ExitError
-				if err != nil && (!errors.As(err, &ee) || ee.ExitCode() != 1) {
-					if ee != nil && ee.ExitCode() == 2 {
-						return "", fmt.Errorf("invalid pattern: %s", strings.TrimSpace(string(ee.Stderr)))
-					}
-					return "", err
-				}
-				return r.relativizeMatches(string(out)), nil
+				return r.rgGrep(ctx, rg, abs, pattern, str(a, "glob"), boolean(a, "ignore_case"), mode, ctxLines)
 			}
 			return r.goGrep(ctx, abs, pattern, str(a, "glob"), boolean(a, "ignore_case"), mode, ctxLines)
 		},
 	}
 }
 
-func (r *Runner) relativizeMatches(out string) string {
+// rgGrep searches with ripgrep, reading its JSON output so that every file
+// it reports passes the same readability rule as the other file tools
+// (secret paths, .git): ripgrep's own ignore rules do not know the
+// secret-path policy. The output has the Go fallback's form.
+func (r *Runner) rgGrep(ctx context.Context, rg, abs, pattern, glob string, ignoreCase bool, mode string, ctxLines int) (string, error) {
+	ctxLines = min(max(ctxLines, 0), 10)
+	args := []string{"--json", "--no-messages"}
+	switch mode {
+	case "files":
+		args = append(args, "--max-count", "1")
+	case "content":
+		args = append(args, "--max-count", "50")
+		if ctxLines > 0 {
+			args = append(args, "-C", fmt.Sprint(ctxLines))
+		}
+	}
+	if ignoreCase {
+		args = append(args, "-i")
+	}
+	if glob != "" {
+		args = append(args, "--glob", glob)
+	}
+	args = append(args, "-e", pattern, abs)
+	c := exec.CommandContext(ctx, rg, args...)
+	c.Dir = r.cwd()
+	out, err := c.Output()
+	var ee *exec.ExitError
+	if err != nil && (!errors.As(err, &ee) || ee.ExitCode() != 1) {
+		if ee != nil && ee.ExitCode() == 2 {
+			return "", fmt.Errorf("invalid pattern: %s", strings.TrimSpace(string(ee.Stderr)))
+		}
+		return "", err
+	}
 	root, _ := filepath.EvalSymlinks(r.cwd())
 	if root == "" {
 		root = r.cwd()
 	}
-	lines := strings.Split(strings.TrimRight(out, "\n"), "\n")
-	if len(lines) == 1 && lines[0] == "" {
-		return "(no matches)"
-	}
-	for i, l := range lines {
-		if strings.HasPrefix(l, root+string(filepath.Separator)) {
-			lines[i] = filepath.ToSlash(l[len(root)+1:])
+	var (
+		lines    []string
+		counts   = map[string]int{}
+		order    []string
+		allowed  = map[string]bool{}
+		lastFile string
+		lastLine int
+	)
+	for _, raw := range bytes.Split(out, []byte("\n")) {
+		var m rgMessage
+		if len(raw) == 0 || json.Unmarshal(raw, &m) != nil {
+			continue
+		}
+		file := m.Data.Path.String()
+		if file == "" {
+			continue
+		}
+		ok, seen := allowed[file]
+		if !seen {
+			ok = r.checkReadable(file) == nil
+			allowed[file] = ok
+		}
+		if !ok {
+			continue
+		}
+		rel := file
+		if rr, err := filepath.Rel(root, file); err == nil && !strings.HasPrefix(rr, "..") {
+			rel = filepath.ToSlash(rr)
+		}
+		switch m.Type {
+		case "match":
+			if counts[rel] == 0 {
+				order = append(order, rel)
+			}
+			counts[rel]++
+			if mode != "content" {
+				continue
+			}
+			if ctxLines > 0 && len(lines) > 0 && (rel != lastFile || m.Data.LineNumber > lastLine+1) {
+				lines = append(lines, "--")
+			}
+			lines = append(lines, fmt.Sprintf("%s:%d:%s", rel, m.Data.LineNumber, clipLine(m.Data.Lines.line())))
+			lastFile, lastLine = rel, m.Data.LineNumber
+		case "context":
+			if mode != "content" {
+				continue
+			}
+			if len(lines) > 0 && (rel != lastFile || m.Data.LineNumber > lastLine+1) {
+				lines = append(lines, "--")
+			}
+			lines = append(lines, fmt.Sprintf("%s-%d-%s", rel, m.Data.LineNumber, clipLine(m.Data.Lines.line())))
+			lastFile, lastLine = rel, m.Data.LineNumber
 		}
 	}
-	if len(lines) > maxGrepMatches {
-		return collapseMatches(lines, maxGrepMatches)
+	switch mode {
+	case "files":
+		lines = order
+	case "count":
+		lines = nil
+		for _, f := range order {
+			lines = append(lines, fmt.Sprintf("%s:%d", f, counts[f]))
+		}
 	}
-	return strings.Join(lines, "\n")
+	if len(lines) == 0 {
+		return "(no matches)", nil
+	}
+	if len(lines) > maxGrepMatches {
+		if mode == "content" {
+			var hits []string
+			for _, f := range order {
+				for i := 0; i < counts[f]; i++ {
+					hits = append(hits, f+":0:")
+				}
+			}
+			return collapseMatches(hits, maxGrepMatches), nil
+		}
+		return strings.Join(lines[:maxGrepMatches], "\n") + fmt.Sprintf("\n… (more than %d files; narrow the pattern or path)", maxGrepMatches), nil
+	}
+	return strings.Join(lines, "\n"), nil
 }
+
+// rgMessage is one line of ripgrep's --json output.
+type rgMessage struct {
+	Type string `json:"type"`
+	Data struct {
+		Path       rgText `json:"path"`
+		Lines      rgText `json:"lines"`
+		LineNumber int    `json:"line_number"`
+	} `json:"data"`
+}
+
+// rgText is ripgrep's text: UTF-8 in text, anything else base64 in bytes.
+type rgText struct {
+	Text  string `json:"text"`
+	Bytes string `json:"bytes"`
+}
+
+func (t rgText) String() string {
+	if t.Text != "" || t.Bytes == "" {
+		return t.Text
+	}
+	b, err := base64.StdEncoding.DecodeString(t.Bytes)
+	if err != nil {
+		return ""
+	}
+	return string(b)
+}
+
+func (t rgText) line() string { return strings.TrimRight(t.String(), "\r\n") }
 
 // goGrep is the fallback without ripgrep. mode is content, files or count;
 // ctxLines adds context around matches in content mode.
