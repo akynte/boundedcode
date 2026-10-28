@@ -1,0 +1,14 @@
+# Held-out locate task (benchmarks/retrieval/agent_tasks.py) from google__gson-2479.
+# The fix changed: gson/src/main/java/com/google/gson/GsonBuilder.java.
+id: locate-google__gson-2479
+category: locate-heldout
+language: java
+read_only: true
+source: "swe-bench google__gson-2479"
+sources:
+  gson: git:https://github.com/google/gson@4dfae77af3d543bea2782f85a154cc070290f086
+repos: [gson]
+request: "`GsonBuilder` should throw exception when trying to register adapter for `Object` or `JsonElement`\n# Problem solved by the feature\n`GsonBuilder` does not support overwriting the built-in adapters for `Object` and for `JsonElement` (and subclasses). This might not be obvious to users (see #1177).\nhttps://github.com/google/gson/blob/6d9c3566b71900c54644a9f71ce028696ee5d4bd/gson/src/main/java/com/google/gson/Gson.java#L283-L285\n\n(Side note: This only affects `GsonBuilder`; it is possible to overwrite these adapters when using `@JsonAdapter` on a field.)\n\n# Feature description\n- `GsonBuilder.registerTypeAdapter` should throw an exception when the type is `Object` or `JsonElement` or a subclass of it\n- `GsonBuilder.registerTypeHierarchyAdapter` should throw an exception when the type is `JsonElement` or a subclass of it\n\nAdditionally for both methods the documentation should be extended to specify that overwriting these adapters is not possible (but maybe mention that `@JsonAdapter` can be used instead).\n\n# Alternatives / workarounds\nOnly adjust the documentation (and Troubleshooting Guide) to mention that these adapters cannot be overwritten.\n\nOr as proposed by #1177 let users overwrite the built-in adapters for these types.\n\n\n\n---\nInvestigate the code of this repository and answer: which file or files would need to change to fix the issue above? Give their paths relative to the repository root. Do not change any files."
+expect:
+  - "(?:gson/src/main/java/com/google/gson/GsonBuilder\\.java)"
+timeout: 15m

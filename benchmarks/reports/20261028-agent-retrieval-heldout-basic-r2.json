@@ -1,0 +1,4273 @@
+{
+  "id": "direct-20261028T070916Z",
+  "model": "qwen3.6-35b-a3b",
+  "started": "2026-10-28T07:09:16.168567343Z",
+  "finished": "2026-10-28T08:19:27.872444133Z",
+  "results": [
+    {
+      "id": "locate-astropy__astropy-14365",
+      "category": "locate-heldout",
+      "model": "qwen3.6-35b-a3b",
+      "success": true,
+      "mode": "code",
+      "routed": "a request for a change",
+      "turns": 1,
+      "model_calls": 12,
+      "tool_calls": 11,
+      "tools": {
+        "grep": 2,
+        "read": 9
+      },
+      "prompt_tokens": 63290,
+      "cached_prompt_tokens": 57523,
+      "generated_tokens": 1189,
+      "peak_prompt_tokens": 7880,
+      "tool_result_bytes": 11548,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 0,
+      "files_read": 1,
+      "redundant_reads": 7,
+      "wall_seconds": 54.475543746,
+      "answer": "The only place that needs changing is line 63 in `astropy/io/ascii/qdp.py`. The regex `_command_re = r\"READ [TS]ERR(\\s+[0-9]+)+\"` only matches uppercase `READ`, `SERR`, and `TERR`. Making it case-insensitive will fix the issue.\n\n**File that needs to change:**\n\n`astropy/io/ascii/qdp.py`\n\nSpecifically, line 63: the `_command_re` regex pattern `\"READ [TS]ERR(\\s+[0-9]+)+\"` needs to be made case-insensitive (e.g., by using `(?i)` inline flag or `[Rr][Ee][Aa][Dd] [TtSs][Ee][Rr][Rr]`).",
+      "session_id": "20261028-070916-0289",
+      "language": "python",
+      "agent_seconds": 53.894697318,
+      "tool_seconds": 0.094326862,
+      "harness_seconds": 1.3256011990000003,
+      "phase_seconds": {
+        "project_map": 0.00306135,
+        "seed_pack": 1.170256267,
+        "working_set": 0.000175232
+      },
+      "tool_times": {
+        "grep": {
+          "calls": 2,
+          "seconds": 0.091384775,
+          "max_seconds": 0.090777762,
+          "result_bytes": 514
+        },
+        "read": {
+          "calls": 9,
+          "seconds": 0.0029420870000000003,
+          "max_seconds": 0.000484398,
+          "result_bytes": 11034
+        }
+      },
+      "call_stats": {
+        "calls": 12,
+        "inference_seconds": 52.474769257,
+        "prefill_seconds": 20.946617999999997,
+        "decode_seconds": 31.019773,
+        "ttft_median_ms": 1798.727304,
+        "ttft_max_ms": 2482.48349,
+        "reasoning_tokens": 503,
+        "reasoning_count": "tokenizer",
+        "cache_invalidations": 0,
+        "cache_invalidations_after_rewrite": 0,
+        "recomputed_prompt_tokens": 0,
+        "peak_call": 11
+      },
+      "call_log": [
+        {
+          "prompt_tokens": 3302,
+          "cached_tokens": 2157,
+          "completion_tokens": 105,
+          "reasoning_tokens": 73,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2482.48349,
+          "prefill_ms": 2160.12,
+          "decode_ms": 2704.804,
+          "total_ms": 5187.410908,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 3419,
+          "cached_tokens": 3298,
+          "completion_tokens": 58,
+          "reasoning_tokens": 25,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1187.318017,
+          "prefill_ms": 1176.674,
+          "decode_ms": 1490.501,
+          "total_ms": 2677.93961,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 3768,
+          "cached_tokens": 3415,
+          "completion_tokens": 65,
+          "reasoning_tokens": 31,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1541.533854,
+          "prefill_ms": 1529.245,
+          "decode_ms": 1687.14,
+          "total_ms": 3228.753674,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 4117,
+          "cached_tokens": 3764,
+          "completion_tokens": 36,
+          "reasoning_tokens": 2,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1702.078771,
+          "prefill_ms": 1688.921,
+          "decode_ms": 947.627,
+          "total_ms": 2649.605252,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 4466,
+          "cached_tokens": 4113,
+          "completion_tokens": 59,
+          "reasoning_tokens": 25,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1772.82633,
+          "prefill_ms": 1759.022,
+          "decode_ms": 1541.483,
+          "total_ms": 3314.475864,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 4815,
+          "cached_tokens": 4462,
+          "completion_tokens": 55,
+          "reasoning_tokens": 21,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1793.017977,
+          "prefill_ms": 1774.175,
+          "decode_ms": 1424.639,
+          "total_ms": 3218.027345,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 5164,
+          "cached_tokens": 4811,
+          "completion_tokens": 52,
+          "reasoning_tokens": 18,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1799.628506,
+          "prefill_ms": 1783.092,
+          "decode_ms": 1352.833,
+          "total_ms": 3152.653412,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 5513,
+          "cached_tokens": 5160,
+          "completion_tokens": 51,
+          "reasoning_tokens": 2,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1798.727304,
+          "prefill_ms": 1782.032,
+          "decode_ms": 1341.964,
+          "total_ms": 3141.038518,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 5877,
+          "cached_tokens": 5509,
+          "completion_tokens": 154,
+          "reasoning_tokens": 80,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1830.603837,
+          "prefill_ms": 1812.706,
+          "decode_ms": 4020.651,
+          "total_ms": 5851.473063,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 7280,
+          "cached_tokens": 5873,
+          "completion_tokens": 244,
+          "reasoning_tokens": 149,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2310.253577,
+          "prefill_ms": 2290.168,
+          "decode_ms": 6402.564,
+          "total_ms": 8713.087447,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 7689,
+          "cached_tokens": 7276,
+          "completion_tokens": 137,
+          "reasoning_tokens": 75,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1813.862854,
+          "prefill_ms": 1792.381,
+          "decode_ms": 3554.652,
+          "total_ms": 5368.88942,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 7880,
+          "cached_tokens": 7685,
+          "completion_tokens": 173,
+          "reasoning_tokens": 2,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1420.264613,
+          "prefill_ms": 1398.082,
+          "decode_ms": 4550.915,
+          "total_ms": 5971.414744,
+          "status": "ok",
+          "streamed": true
+        }
+      ],
+      "context": {
+        "call": 11,
+        "prompt_tokens": 7880,
+        "counting": "tokenizer",
+        "sections": {
+          "assistant": {
+            "bytes": 387,
+            "tokens": 101
+          },
+          "environment": {
+            "bytes": 708,
+            "tokens": 220
+          },
+          "project_map": {
+            "bytes": 1294,
+            "tokens": 394
+          },
+          "system": {
+            "bytes": 2586,
+            "tokens": 537
+          },
+          "tool:grep": {
+            "bytes": 514,
+            "tokens": 184
+          },
+          "tool:read": {
+            "bytes": 11034,
+            "tokens": 3734
+          },
+          "tool_calls": {
+            "bytes": 482,
+            "tokens": 159
+          },
+          "tool_schemas": {
+            "bytes": 5400,
+            "tokens": 1132
+          },
+          "user": {
+            "bytes": 1504,
+            "tokens": 518
+          }
+        },
+        "framing_tokens": 901
+      },
+      "resources": {
+        "harness_rss_mib": 39.2734375,
+        "model_server_rss_mib": 28199.453125,
+        "gpu_mem_used_mib": 7161,
+        "samples": 55
+      }
+    },
+    {
+      "id": "locate-axios__axios-5085",
+      "category": "locate-heldout",
+      "model": "qwen3.6-35b-a3b",
+      "success": false,
+      "mode": "code",
+      "routed": "a request for a change",
+      "turns": 1,
+      "model_calls": 6,
+      "tool_calls": 11,
+      "tools": {
+        "grep": 3,
+        "read": 8
+      },
+      "prompt_tokens": 56830,
+      "cached_prompt_tokens": 41064,
+      "generated_tokens": 12009,
+      "peak_prompt_tokens": 17903,
+      "tool_result_bytes": 42262,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 0,
+      "files_read": 8,
+      "redundant_reads": 0,
+      "wall_seconds": 362.062143863,
+      "answer": "\n\n[output cut at the completion limit]",
+      "failed_checks": [
+        "answer does not match /(?:index\\.d\\.ts|lib/core/AxiosHeaders\\.js)/"
+      ],
+      "session_id": "20261028-071010-a296",
+      "language": "javascript",
+      "failure_class": "model",
+      "agent_seconds": 361.948243959,
+      "tool_seconds": 0.11903768500000002,
+      "harness_seconds": 0.07235981200002538,
+      "phase_seconds": {
+        "project_map": 0.001031083,
+        "seed_pack": 0.034654442,
+        "working_set": 0.000085719
+      },
+      "tool_times": {
+        "grep": {
+          "calls": 3,
+          "seconds": 0.11781940199999999,
+          "max_seconds": 0.044025324,
+          "result_bytes": 6373
+        },
+        "read": {
+          "calls": 8,
+          "seconds": 0.0012182830000000001,
+          "max_seconds": 0.000447664,
+          "result_bytes": 35889
+        }
+      },
+      "call_stats": {
+        "calls": 6,
+        "inference_seconds": 361.756846462,
+        "prefill_seconds": 23.675192,
+        "decode_seconds": 337.625581,
+        "ttft_median_ms": 4519.921418,
+        "ttft_max_ms": 7351.209215,
+        "reasoning_tokens": 11405,
+        "reasoning_count": "tokenizer",
+        "cache_invalidations": 0,
+        "cache_invalidations_after_rewrite": 0,
+        "recomputed_prompt_tokens": 0,
+        "peak_call": 5
+      },
+      "call_log": [
+        {
+          "prompt_tokens": 3292,
+          "cached_tokens": 2157,
+          "completion_tokens": 209,
+          "reasoning_tokens": 177,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2507.460978,
+          "prefill_ms": 2151.261,
+          "decode_ms": 5371.077,
+          "total_ms": 7878.828696,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 6350,
+          "cached_tokens": 3288,
+          "completion_tokens": 251,
+          "reasoning_tokens": 161,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 4519.921418,
+          "prefill_ms": 4506.859,
+          "decode_ms": 6628.203,
+          "total_ms": 11148.559573,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 7127,
+          "cached_tokens": 6346,
+          "completion_tokens": 288,
+          "reasoning_tokens": 2,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2007.262736,
+          "prefill_ms": 1991.984,
+          "decode_ms": 7672.311,
+          "total_ms": 9679.811285,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 9156,
+          "cached_tokens": 7123,
+          "completion_tokens": 475,
+          "reasoning_tokens": 421,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2629.673238,
+          "prefill_ms": 2610.8,
+          "decode_ms": 12595.908,
+          "total_ms": 15225.87262,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 13002,
+          "cached_tokens": 9152,
+          "completion_tokens": 2594,
+          "reasoning_tokens": 2452,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 5113.230045,
+          "prefill_ms": 5091.44,
+          "decode_ms": 70958.868,
+          "total_ms": 76072.564974,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 17903,
+          "cached_tokens": 12998,
+          "completion_tokens": 8192,
+          "reasoning_tokens": 8192,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 7351.209215,
+          "prefill_ms": 7322.848,
+          "decode_ms": 234399.214,
+          "total_ms": 241751.209314,
+          "status": "ok",
+          "streamed": true
+        }
+      ],
+      "context": {
+        "call": 5,
+        "prompt_tokens": 17903,
+        "counting": "tokenizer",
+        "sections": {
+          "assistant": {
+            "bytes": 867,
+            "tokens": 216
+          },
+          "environment": {
+            "bytes": 694,
+            "tokens": 212
+          },
+          "project_map": {
+            "bytes": 1010,
+            "tokens": 284
+          },
+          "seed_pack": {
+            "bytes": 688,
+            "tokens": 173
+          },
+          "system": {
+            "bytes": 2586,
+            "tokens": 537
+          },
+          "tool:grep": {
+            "bytes": 6373,
+            "tokens": 1743
+          },
+          "tool:read": {
+            "bytes": 35889,
+            "tokens": 12179
+          },
+          "tool_calls": {
+            "bytes": 560,
+            "tokens": 155
+          },
+          "tool_schemas": {
+            "bytes": 5400,
+            "tokens": 1132
+          },
+          "user": {
+            "bytes": 1368,
+            "tokens": 452
+          }
+        },
+        "framing_tokens": 820
+      },
+      "resources": {
+        "harness_rss_mib": 34.9765625,
+        "model_server_rss_mib": 28185.12109375,
+        "gpu_mem_used_mib": 7161,
+        "samples": 363
+      }
+    },
+    {
+      "id": "locate-burntsushi__ripgrep-2209",
+      "category": "locate-heldout",
+      "model": "qwen3.6-35b-a3b",
+      "success": false,
+      "mode": "code",
+      "routed": "a request for a change",
+      "turns": 1,
+      "model_calls": 19,
+      "tool_calls": 24,
+      "tools": {
+        "grep": 5,
+        "read": 19
+      },
+      "prompt_tokens": 421232,
+      "cached_prompt_tokens": 364082,
+      "generated_tokens": 23668,
+      "peak_prompt_tokens": 36627,
+      "tool_result_bytes": 123037,
+      "elided": 6,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 0,
+      "files_read": 8,
+      "redundant_reads": 0,
+      "wall_seconds": 786.463495602,
+      "answer": "\n\n[output cut at the completion limit]",
+      "failed_checks": [
+        "answer does not match /(?:crates/printer/src/util\\.rs)/"
+      ],
+      "session_id": "20261028-071612-4152",
+      "language": "rust",
+      "failure_class": "model",
+      "agent_seconds": 786.328067293,
+      "tool_seconds": 0.091228487,
+      "harness_seconds": 0.16942532100002913,
+      "phase_seconds": {
+        "project_map": 0.002044755,
+        "seed_pack": 0.114582328,
+        "working_set": 0.000296176
+      },
+      "tool_times": {
+        "grep": {
+          "calls": 5,
+          "seconds": 0.07681781400000001,
+          "max_seconds": 0.036660546,
+          "result_bytes": 1068
+        },
+        "read": {
+          "calls": 19,
+          "seconds": 0.014410672999999997,
+          "max_seconds": 0.006586738,
+          "result_bytes": 121969
+        }
+      },
+      "call_stats": {
+        "calls": 19,
+        "inference_seconds": 786.067413485,
+        "prefill_seconds": 91.98526,
+        "decode_seconds": 692.288545,
+        "ttft_median_ms": 2536.932717,
+        "ttft_max_ms": 31026.492231,
+        "reasoning_tokens": 22374,
+        "reasoning_count": "tokenizer",
+        "cache_invalidations": 1,
+        "cache_invalidations_after_rewrite": 1,
+        "recomputed_prompt_tokens": 22612,
+        "peak_call": 17
+      },
+      "call_log": [
+        {
+          "prompt_tokens": 4341,
+          "cached_tokens": 2157,
+          "completion_tokens": 353,
+          "reasoning_tokens": 206,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 4125.52244,
+          "prefill_ms": 3759.955,
+          "decode_ms": 9173.068,
+          "total_ms": 13298.877762,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 4574,
+          "cached_tokens": 4337,
+          "completion_tokens": 127,
+          "reasoning_tokens": 97,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1418.359298,
+          "prefill_ms": 1406.131,
+          "decode_ms": 3313.639,
+          "total_ms": 4732.321492,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 11375,
+          "cached_tokens": 4570,
+          "completion_tokens": 79,
+          "reasoning_tokens": 22,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 9620.189482,
+          "prefill_ms": 9601.912,
+          "decode_ms": 2160.245,
+          "total_ms": 11780.815751,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 11827,
+          "cached_tokens": 11371,
+          "completion_tokens": 161,
+          "reasoning_tokens": 91,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1832.026613,
+          "prefill_ms": 1809.861,
+          "decode_ms": 4340.531,
+          "total_ms": 6172.893598,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 12083,
+          "cached_tokens": 11823,
+          "completion_tokens": 113,
+          "reasoning_tokens": 79,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1387.472921,
+          "prefill_ms": 1368.197,
+          "decode_ms": 3047.758,
+          "total_ms": 4435.684476,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 16343,
+          "cached_tokens": 12079,
+          "completion_tokens": 7461,
+          "reasoning_tokens": 7397,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 6642.192466,
+          "prefill_ms": 6618.594,
+          "decode_ms": 211288.35,
+          "total_ms": 217931.396855,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 18397,
+          "cached_tokens": 16339,
+          "completion_tokens": 90,
+          "reasoning_tokens": 27,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2826.446473,
+          "prefill_ms": 2798.709,
+          "decode_ms": 2495.427,
+          "total_ms": 5322.382676,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 19331,
+          "cached_tokens": 18393,
+          "completion_tokens": 140,
+          "reasoning_tokens": 76,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2165.930278,
+          "prefill_ms": 2134.582,
+          "decode_ms": 3941.381,
+          "total_ms": 6107.966222,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 21528,
+          "cached_tokens": 19327,
+          "completion_tokens": 182,
+          "reasoning_tokens": 103,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 3994.554782,
+          "prefill_ms": 3965.189,
+          "decode_ms": 5211.77,
+          "total_ms": 9206.909972,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 22114,
+          "cached_tokens": 21524,
+          "completion_tokens": 247,
+          "reasoning_tokens": 140,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2000.302655,
+          "prefill_ms": 1962.63,
+          "decode_ms": 6949.692,
+          "total_ms": 8950.649762,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 23617,
+          "cached_tokens": 22110,
+          "completion_tokens": 45,
+          "reasoning_tokens": 14,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2536.932717,
+          "prefill_ms": 2500.525,
+          "decode_ms": 1241.241,
+          "total_ms": 3778.839667,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 26291,
+          "cached_tokens": 23613,
+          "completion_tokens": 517,
+          "reasoning_tokens": 334,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 4625.791475,
+          "prefill_ms": 4587.071,
+          "decode_ms": 14968.581,
+          "total_ms": 19595.244052,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 31153,
+          "cached_tokens": 26287,
+          "completion_tokens": 280,
+          "reasoning_tokens": 247,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 7697.287983,
+          "prefill_ms": 7642.624,
+          "decode_ms": 8263.157,
+          "total_ms": 15961.157213,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 31917,
+          "cached_tokens": 31149,
+          "completion_tokens": 73,
+          "reasoning_tokens": 17,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2117.254526,
+          "prefill_ms": 2064.116,
+          "decode_ms": 2162.075,
+          "total_ms": 4280.438379,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 33030,
+          "cached_tokens": 31913,
+          "completion_tokens": 1086,
+          "reasoning_tokens": 1025,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2362.906226,
+          "prefill_ms": 2316.297,
+          "decode_ms": 32522.547,
+          "total_ms": 34886.443526,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 34248,
+          "cached_tokens": 33026,
+          "completion_tokens": 3108,
+          "reasoning_tokens": 3046,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2473.402436,
+          "prefill_ms": 2414.992,
+          "decode_ms": 93917.801,
+          "total_ms": 96392.137985,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 35254,
+          "cached_tokens": 34244,
+          "completion_tokens": 576,
+          "reasoning_tokens": 514,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2318.802295,
+          "prefill_ms": 2264.209,
+          "decode_ms": 17359.718,
+          "total_ms": 19679.621882,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 36627,
+          "cached_tokens": 35250,
+          "completion_tokens": 838,
+          "reasoning_tokens": 747,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2593.718186,
+          "prefill_ms": 2540.688,
+          "decode_ms": 25496.629,
+          "total_ms": 28091.255533,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 27182,
+          "cached_tokens": 4570,
+          "completion_tokens": 8192,
+          "reasoning_tokens": 8192,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 31026.492231,
+          "prefill_ms": 30228.978,
+          "decode_ms": 244434.935,
+          "total_ms": 275462.376682,
+          "status": "ok",
+          "streamed": true
+        }
+      ],
+      "context": {
+        "call": 17,
+        "prompt_tokens": 36627,
+        "counting": "tokenizer",
+        "sections": {
+          "assistant": {
+            "bytes": 448,
+            "tokens": 101
+          },
+          "environment": {
+            "bytes": 712,
+            "tokens": 224
+          },
+          "project_map": {
+            "bytes": 810,
+            "tokens": 238
+          },
+          "seed_pack": {
+            "bytes": 660,
+            "tokens": 289
+          },
+          "system": {
+            "bytes": 2586,
+            "tokens": 537
+          },
+          "tool:grep": {
+            "bytes": 884,
+            "tokens": 269
+          },
+          "tool:read": {
+            "bytes": 84571,
+            "tokens": 30586
+          },
+          "tool_calls": {
+            "bytes": 1356,
+            "tokens": 437
+          },
+          "tool_schemas": {
+            "bytes": 5400,
+            "tokens": 1132
+          },
+          "user": {
+            "bytes": 4200,
+            "tokens": 1419
+          }
+        },
+        "framing_tokens": 1395
+      },
+      "resources": {
+        "harness_rss_mib": 36.953125,
+        "model_server_rss_mib": 28842.69921875,
+        "gpu_mem_used_mib": 7161,
+        "samples": 788
+      }
+    },
+    {
+      "id": "locate-caddyserver__caddy-5404",
+      "category": "locate-heldout",
+      "model": "qwen3.6-35b-a3b",
+      "success": true,
+      "mode": "code",
+      "routed": "the change concerns token; verification is unavailable (benchmark: direct mode only), so a change needs your go-ahead (direct.verify_fallback) (verify)",
+      "turns": 1,
+      "model_calls": 4,
+      "tool_calls": 1,
+      "tools": {
+        "read": 1
+      },
+      "denied": 2,
+      "prompt_tokens": 31891,
+      "cached_prompt_tokens": 24683,
+      "generated_tokens": 2776,
+      "peak_prompt_tokens": 9353,
+      "tool_result_bytes": 11991,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 0,
+      "guard_refusals": 2,
+      "files_read": 1,
+      "redundant_reads": 0,
+      "wall_seconds": 89.009599345,
+      "answer": "The crash occurs at line 295 in `finalizeHeredoc`:\n\n```go\npaddingToStrip := string(val[lastNewline+1 : len(val)-len(marker)])\n```\n\nThe panic `slice bounds out of range [4:2]` means `lastNewline+1 \u003e len(val)-len(marker)`. This happens when the heredoc content is very short or structured such that there's insufficient content between the last newline and the end of `val` (where the marker starts). For example, if `val` = `\"abc\\n\u003c\u003c\"` (lastNewline=3) and marker = `\"abcd\"`, then `lastNewline+1=4` but `len(val)-len(marker)=0`.\n\nThe fix needs to guard this slice operation with a bounds check. The file to change is:\n\n**`caddyconfig/caddyfile/lexer.go`**",
+      "session_id": "20261028-072919-6d21",
+      "language": "go",
+      "agent_seconds": 88.898147102,
+      "tool_seconds": 0.000090641,
+      "harness_seconds": 0.1787217830000002,
+      "phase_seconds": {
+        "project_map": 0.001438762,
+        "seed_pack": 0.13366333,
+        "working_set": 0.000114505
+      },
+      "tool_times": {
+        "read": {
+          "calls": 1,
+          "seconds": 0.000090641,
+          "max_seconds": 0.000090641,
+          "result_bytes": 11991
+        }
+      },
+      "call_stats": {
+        "calls": 4,
+        "inference_seconds": 88.719334678,
+        "prefill_seconds": 13.158449000000001,
+        "decode_seconds": 75.15235,
+        "ttft_median_ms": 3839.160936,
+        "ttft_max_ms": 6888.994588,
+        "reasoning_tokens": 2403,
+        "reasoning_count": "tokenizer",
+        "cache_invalidations": 0,
+        "cache_invalidations_after_rewrite": 0,
+        "recomputed_prompt_tokens": 0,
+        "peak_call": 3
+      },
+      "call_log": [
+        {
+          "prompt_tokens": 4319,
+          "cached_tokens": 2157,
+          "completion_tokens": 164,
+          "reasoning_tokens": 130,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 3839.160936,
+          "prefill_ms": 3483.662,
+          "decode_ms": 4247.572,
+          "total_ms": 8086.945726,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 9027,
+          "cached_tokens": 4315,
+          "completion_tokens": 1422,
+          "reasoning_tokens": 1348,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 6888.994588,
+          "prefill_ms": 6870.937,
+          "decode_ms": 38231.89,
+          "total_ms": 45121.212329,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 9192,
+          "cached_tokens": 9023,
+          "completion_tokens": 86,
+          "reasoning_tokens": 10,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1365.835568,
+          "prefill_ms": 1350.149,
+          "decode_ms": 2281.27,
+          "total_ms": 3647.479137,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 9353,
+          "cached_tokens": 9188,
+          "completion_tokens": 1104,
+          "reasoning_tokens": 915,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1471.680293,
+          "prefill_ms": 1453.701,
+          "decode_ms": 30391.618,
+          "total_ms": 31863.697486,
+          "status": "ok",
+          "streamed": true
+        }
+      ],
+      "context": {
+        "call": 3,
+        "prompt_tokens": 9353,
+        "counting": "tokenizer",
+        "sections": {
+          "assistant": {
+            "bytes": 90,
+            "tokens": 19
+          },
+          "environment": {
+            "bytes": 706,
+            "tokens": 216
+          },
+          "project_map": {
+            "bytes": 913,
+            "tokens": 283
+          },
+          "seed_pack": {
+            "bytes": 416,
+            "tokens": 131
+          },
+          "system": {
+            "bytes": 2586,
+            "tokens": 537
+          },
+          "tool:read": {
+            "bytes": 11991,
+            "tokens": 4662
+          },
+          "tool:web_fetch": {
+            "bytes": 596,
+            "tokens": 146
+          },
+          "tool_calls": {
+            "bytes": 258,
+            "tokens": 103
+          },
+          "tool_schemas": {
+            "bytes": 5400,
+            "tokens": 1132
+          },
+          "user": {
+            "bytes": 3566,
+            "tokens": 1518
+          }
+        },
+        "framing_tokens": 606
+      },
+      "resources": {
+        "harness_rss_mib": 37.96484375,
+        "model_server_rss_mib": 27323.48828125,
+        "gpu_mem_used_mib": 7161,
+        "samples": 90
+      }
+    },
+    {
+      "id": "locate-caddyserver__caddy-6370",
+      "category": "locate-heldout",
+      "model": "qwen3.6-35b-a3b",
+      "success": true,
+      "mode": "code",
+      "routed": "a request for a change",
+      "turns": 1,
+      "model_calls": 3,
+      "tool_calls": 2,
+      "tools": {
+        "read": 2
+      },
+      "prompt_tokens": 10906,
+      "cached_prompt_tokens": 8665,
+      "generated_tokens": 796,
+      "peak_prompt_tokens": 4390,
+      "tool_result_bytes": 3504,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 0,
+      "files_read": 1,
+      "redundant_reads": 0,
+      "wall_seconds": 27.527858203,
+      "answer": "Now I can see the issue clearly. Let me trace through the logic with the config file `.serve/Caddyfile.preview`:\n\n1. `filepath.Base(\".serve/Caddyfile.preview\")` returns `\"Caddyfile.preview\"` (the base name, stripping the directory)\n2. `baseConfigExt = filepath.Ext(\"Caddyfile.preview\")` returns `\".preview\"`\n3. `startsOrEndsInCaddyfile = strings.HasPrefix(\"caddyfile.preview\", \"caddyfile\") || ...` → `true` (it starts with \"caddyfile\")\n4. `extNotCaddyfileOrJSON = (\".preview\" != \"\" \u0026\u0026 \".preview\" != \".caddyfile\" \u0026\u0026 \".preview\" != \".json\")` → `true`\n5. Since `adapterName == \"\" \u0026\u0026 startsOrEndsInCaddyfile \u0026\u0026 extNotCaddyfileOrJSON`, it returns the ambiguous error.\n\nThe problem is that `filepath.Base` correctly extracts `\"Caddyfile.preview\"`, but the logic at line 121 considers `strings.HasPrefix(baseConfig, \"caddyfile\")` which matches because the filename *starts* with \"Caddyfile\". The intention of this check is to handle filenames like `Caddyfile` or `Caddyfile.json`, but it incorrectly triggers on `Caddyfile.preview` — a file with a non-standard extension that happens to start with \"Caddyfile\".\n\nThe fix should change the `strings.HasPrefix(baseConfig, \"caddyfile\")` check to only match when the filename *is* \"Caddyfile\" (with any extension) rather than just *starting with* \"caddyfile\". It should use `baseConfig == \"caddyfile\"` instead of `strings.HasPrefix(baseConfig, \"caddyfile\")`.\n\nThe file that needs to change:\n\n**`cmd/main.go`**\n\nSpecifically, line 121 should change from:\n```go\nstartsOrEndsInCaddyfile := strings.HasPrefix(baseConfig, \"caddyfile\") || strings.HasSuffix(baseConfig, \".caddyfile\")\n```\nto:\n```go\nstartsOrEndsInCaddyfile := baseConfig == \"caddyfile\" || strings.HasSuffix(baseConfig, \".caddyfile\")\n```\n\nThis ensures that only a file whose base name is exactly `Caddyfile` (e.g., `Caddyfile`, `Caddyfile.json`, `Caddyfile.yaml`) is treated as a Caddyfile, rather than any file whose name happens to *start* with \"Caddyfile\" (e.g., `Caddyfile.preview`, `Caddyfile.backup`).",
+      "session_id": "20261028-073048-9ba0",
+      "language": "go",
+      "agent_seconds": 27.411683718,
+      "tool_seconds": 0.00037852999999999997,
+      "harness_seconds": 0.06993069399999895,
+      "phase_seconds": {
+        "project_map": 0.001676961,
+        "seed_pack": 0.030111117,
+        "working_set": 0.000058508
+      },
+      "tool_times": {
+        "read": {
+          "calls": 2,
+          "seconds": 0.00037852999999999997,
+          "max_seconds": 0.000291393,
+          "result_bytes": 3504
+        }
+      },
+      "call_stats": {
+        "calls": 3,
+        "inference_seconds": 27.341374494,
+        "prefill_seconds": 5.812989,
+        "decode_seconds": 21.2936,
+        "ttft_median_ms": 2065.588797,
+        "ttft_max_ms": 2209.594628,
+        "reasoning_tokens": 125,
+        "reasoning_count": "tokenizer",
+        "cache_invalidations": 0,
+        "cache_invalidations_after_rewrite": 0,
+        "recomputed_prompt_tokens": 0,
+        "peak_call": 2
+      },
+      "call_log": [
+        {
+          "prompt_tokens": 3030,
+          "cached_tokens": 2157,
+          "completion_tokens": 141,
+          "reasoning_tokens": 86,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2209.594628,
+          "prefill_ms": 2001.804,
+          "decode_ms": 3803.561,
+          "total_ms": 6013.285755,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 3486,
+          "cached_tokens": 3026,
+          "completion_tokens": 93,
+          "reasoning_tokens": 37,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1772.101559,
+          "prefill_ms": 1760.933,
+          "decode_ms": 2490.768,
+          "total_ms": 4263.111597,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 4390,
+          "cached_tokens": 3482,
+          "completion_tokens": 562,
+          "reasoning_tokens": 2,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2065.588797,
+          "prefill_ms": 2050.252,
+          "decode_ms": 14999.271,
+          "total_ms": 17064.977142,
+          "status": "ok",
+          "streamed": true
+        }
+      ],
+      "context": {
+        "call": 2,
+        "prompt_tokens": 4390,
+        "counting": "tokenizer",
+        "sections": {
+          "assistant": {
+            "bytes": 106,
+            "tokens": 26
+          },
+          "environment": {
+            "bytes": 706,
+            "tokens": 216
+          },
+          "project_map": {
+            "bytes": 919,
+            "tokens": 284
+          },
+          "seed_pack": {
+            "bytes": 282,
+            "tokens": 79
+          },
+          "system": {
+            "bytes": 2586,
+            "tokens": 537
+          },
+          "tool:read": {
+            "bytes": 3504,
+            "tokens": 1225
+          },
+          "tool_calls": {
+            "bytes": 76,
+            "tokens": 27
+          },
+          "tool_schemas": {
+            "bytes": 5400,
+            "tokens": 1132
+          },
+          "user": {
+            "bytes": 849,
+            "tokens": 280
+          }
+        },
+        "framing_tokens": 584
+      },
+      "resources": {
+        "harness_rss_mib": 33.50390625,
+        "model_server_rss_mib": 27337.7265625,
+        "gpu_mem_used_mib": 7161,
+        "samples": 29
+      }
+    },
+    {
+      "id": "locate-faker-ruby__faker-2705",
+      "category": "locate-heldout",
+      "model": "qwen3.6-35b-a3b",
+      "success": true,
+      "mode": "code",
+      "routed": "the change concerns password; verification is unavailable (benchmark: direct mode only), so a change needs your go-ahead (direct.verify_fallback) (verify)",
+      "turns": 1,
+      "model_calls": 4,
+      "tool_calls": 4,
+      "tools": {
+        "glob": 1,
+        "grep": 1,
+        "read": 2
+      },
+      "prompt_tokens": 14182,
+      "cached_prompt_tokens": 11802,
+      "generated_tokens": 540,
+      "peak_prompt_tokens": 4525,
+      "tool_result_bytes": 4252,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 0,
+      "files_read": 1,
+      "redundant_reads": 0,
+      "wall_seconds": 22.022607425,
+      "answer": "The file that needs to change is:\n\n**`lib/faker/default/internet.rb`**\n\nSpecifically, the `password` method (lines 149–192). The current implementation builds the password from only lowercase letters, optional uppercase letters (`mix_case`), and optional special characters (`special_characters`). It never includes digits (0-9).\n\nTo fix the issue, the method would need to:\n1. Add a new parameter (e.g., `numerics: true` or similar) to control whether digits are included.\n2. When enabled, add a digit character to the password (similar to how it adds a lowercase char, uppercase char, or special char).\n3. Include digits in the `character_bag` used for filling the remaining length.",
+      "session_id": "20261028-073116-de98",
+      "language": "ruby",
+      "agent_seconds": 21.814464158,
+      "tool_seconds": 0.037274851,
+      "harness_seconds": 0.153742981,
+      "phase_seconds": {
+        "project_map": 0.00153944,
+        "seed_pack": 0.136687306,
+        "working_set": 0.000048228
+      },
+      "tool_times": {
+        "glob": {
+          "calls": 1,
+          "seconds": 0.013058432,
+          "max_seconds": 0.013058432,
+          "result_bytes": 120
+        },
+        "grep": {
+          "calls": 1,
+          "seconds": 0.023825624,
+          "max_seconds": 0.023825624,
+          "result_bytes": 126
+        },
+        "read": {
+          "calls": 2,
+          "seconds": 0.000390795,
+          "max_seconds": 0.000319489,
+          "result_bytes": 4006
+        }
+      },
+      "call_stats": {
+        "calls": 4,
+        "inference_seconds": 21.623446326,
+        "prefill_seconds": 7.075373,
+        "decode_seconds": 14.377052,
+        "ttft_median_ms": 2066.812581,
+        "ttft_max_ms": 2119.561328,
+        "reasoning_tokens": 211,
+        "reasoning_count": "tokenizer",
+        "cache_invalidations": 0,
+        "cache_invalidations_after_rewrite": 0,
+        "recomputed_prompt_tokens": 0,
+        "peak_call": 3
+      },
+      "call_log": [
+        {
+          "prompt_tokens": 2941,
+          "cached_tokens": 2157,
+          "completion_tokens": 124,
+          "reasoning_tokens": 54,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2066.812581,
+          "prefill_ms": 1937.448,
+          "decode_ms": 3265.694,
+          "total_ms": 5332.713922,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 3101,
+          "cached_tokens": 2937,
+          "completion_tokens": 56,
+          "reasoning_tokens": 23,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1248.795582,
+          "prefill_ms": 1237.252,
+          "decode_ms": 1505.166,
+          "total_ms": 2754.148208,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 3615,
+          "cached_tokens": 3097,
+          "completion_tokens": 71,
+          "reasoning_tokens": 11,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1810.44591,
+          "prefill_ms": 1797.64,
+          "decode_ms": 1881.67,
+          "total_ms": 3692.325428,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 4525,
+          "cached_tokens": 3611,
+          "completion_tokens": 289,
+          "reasoning_tokens": 123,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2119.561328,
+          "prefill_ms": 2103.033,
+          "decode_ms": 7724.522,
+          "total_ms": 9844.258768,
+          "status": "ok",
+          "streamed": true
+        }
+      ],
+      "context": {
+        "call": 3,
+        "prompt_tokens": 4525,
+        "counting": "tokenizer",
+        "sections": {
+          "environment": {
+            "bytes": 704,
+            "tokens": 216
+          },
+          "project_map": {
+            "bytes": 609,
+            "tokens": 187
+          },
+          "seed_pack": {
+            "bytes": 200,
+            "tokens": 52
+          },
+          "system": {
+            "bytes": 2586,
+            "tokens": 537
+          },
+          "tool:glob": {
+            "bytes": 120,
+            "tokens": 32
+          },
+          "tool:grep": {
+            "bytes": 126,
+            "tokens": 38
+          },
+          "tool:read": {
+            "bytes": 4006,
+            "tokens": 1307
+          },
+          "tool_calls": {
+            "bytes": 189,
+            "tokens": 56
+          },
+          "tool_schemas": {
+            "bytes": 5400,
+            "tokens": 1132
+          },
+          "user": {
+            "bytes": 1252,
+            "tokens": 315
+          }
+        },
+        "framing_tokens": 653
+      },
+      "resources": {
+        "harness_rss_mib": 33.96484375,
+        "model_server_rss_mib": 27766.171875,
+        "gpu_mem_used_mib": 7161,
+        "samples": 23
+      }
+    },
+    {
+      "id": "locate-fastlane__fastlane-20958",
+      "category": "locate-heldout",
+      "model": "qwen3.6-35b-a3b",
+      "success": true,
+      "mode": "code",
+      "routed": "a request for a change",
+      "turns": 1,
+      "model_calls": 4,
+      "tool_calls": 4,
+      "tools": {
+        "read": 4
+      },
+      "prompt_tokens": 25559,
+      "cached_prompt_tokens": 19532,
+      "generated_tokens": 3534,
+      "peak_prompt_tokens": 8172,
+      "tool_result_bytes": 12926,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 0,
+      "files_read": 2,
+      "redundant_reads": 0,
+      "wall_seconds": 110.226248485,
+      "answer": "The bug is at **`fastlane/lib/fastlane/fast_file.rb`**, line **355**.\n\n**Root cause:** When `cache_path` is `nil` (no caching), the clone at line 315 uses `--no-checkout`, so the working tree is empty. The subsequent `git checkout` at line 356 only runs when `!version.nil? \u0026\u0026 current_tag != version`. Since `version` defaults to `nil`, the condition is `false` and the checkout is skipped entirely — leaving the repo with no files, so `Fastfile` can't be found.\n\n**Fix:** Change line 355 from:\n```ruby\nif !version.nil? \u0026\u0026 current_tag != version\n```\nto:\n```ruby\nif version.nil? || current_tag != version\n```\n\nThis ensures the checkout happens when `version` is `nil` (the default case), and only skips when `version` is specified and already matched.",
+      "session_id": "20261028-073138-ef4f",
+      "language": "ruby",
+      "agent_seconds": 109.07285499,
+      "tool_seconds": 0.000480226,
+      "harness_seconds": 1.9204703209999896,
+      "phase_seconds": {
+        "project_map": 0.007038782,
+        "seed_pack": 1.848065569,
+        "working_set": 0.000067924
+      },
+      "tool_times": {
+        "read": {
+          "calls": 4,
+          "seconds": 0.000480226,
+          "max_seconds": 0.000207919,
+          "result_bytes": 12926
+        }
+      },
+      "call_stats": {
+        "calls": 4,
+        "inference_seconds": 107.151904443,
+        "prefill_seconds": 9.371996000000001,
+        "decode_seconds": 97.523169,
+        "ttft_median_ms": 2575.069385,
+        "ttft_max_ms": 2712.744838,
+        "reasoning_tokens": 2880,
+        "reasoning_count": "tokenizer",
+        "cache_invalidations": 0,
+        "cache_invalidations_after_rewrite": 0,
+        "recomputed_prompt_tokens": 0,
+        "peak_call": 3
+      },
+      "call_log": [
+        {
+          "prompt_tokens": 4004,
+          "cached_tokens": 2157,
+          "completion_tokens": 186,
+          "reasoning_tokens": 119,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2712.744838,
+          "prefill_ms": 2510.369,
+          "decode_ms": 4971.423,
+          "total_ms": 7684.34561,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 5735,
+          "cached_tokens": 4000,
+          "completion_tokens": 95,
+          "reasoning_tokens": 33,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2495.411879,
+          "prefill_ms": 2481.177,
+          "decode_ms": 2529.604,
+          "total_ms": 5025.345157,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 7648,
+          "cached_tokens": 5731,
+          "completion_tokens": 2857,
+          "reasoning_tokens": 2540,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2575.069385,
+          "prefill_ms": 2556.93,
+          "decode_ms": 79205.063,
+          "total_ms": 81780.605534,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 8172,
+          "cached_tokens": 7644,
+          "completion_tokens": 396,
+          "reasoning_tokens": 188,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1844.206936,
+          "prefill_ms": 1823.52,
+          "decode_ms": 10817.079,
+          "total_ms": 12661.608142,
+          "status": "ok",
+          "streamed": true
+        }
+      ],
+      "context": {
+        "call": 3,
+        "prompt_tokens": 8172,
+        "counting": "tokenizer",
+        "sections": {
+          "assistant": {
+            "bytes": 917,
+            "tokens": 256
+          },
+          "environment": {
+            "bytes": 714,
+            "tokens": 216
+          },
+          "project_map": {
+            "bytes": 2209,
+            "tokens": 740
+          },
+          "seed_pack": {
+            "bytes": 539,
+            "tokens": 152
+          },
+          "system": {
+            "bytes": 2586,
+            "tokens": 537
+          },
+          "tool:read": {
+            "bytes": 12926,
+            "tokens": 3685
+          },
+          "tool_calls": {
+            "bytes": 259,
+            "tokens": 77
+          },
+          "tool_schemas": {
+            "bytes": 5400,
+            "tokens": 1132
+          },
+          "user": {
+            "bytes": 2006,
+            "tokens": 725
+          }
+        },
+        "framing_tokens": 652
+      },
+      "resources": {
+        "harness_rss_mib": 68.36328125,
+        "model_server_rss_mib": 27766.171875,
+        "gpu_mem_used_mib": 7161,
+        "samples": 111
+      }
+    },
+    {
+      "id": "locate-google__gson-2479",
+      "category": "locate-heldout",
+      "model": "qwen3.6-35b-a3b",
+      "success": true,
+      "mode": "code",
+      "routed": "a request for a change",
+      "turns": 1,
+      "model_calls": 5,
+      "tool_calls": 5,
+      "tools": {
+        "find_symbol": 1,
+        "grep": 1,
+        "read": 3
+      },
+      "prompt_tokens": 23113,
+      "cached_prompt_tokens": 18631,
+      "generated_tokens": 835,
+      "peak_prompt_tokens": 6623,
+      "tool_result_bytes": 11317,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 0,
+      "files_read": 2,
+      "redundant_reads": 0,
+      "wall_seconds": 33.435171928,
+      "answer": "The file that needs to change is:\n\n**`gson/src/main/java/com/google/gson/GsonBuilder.java`**\n\nThis file contains both methods that need modification:\n\n1. **`registerTypeAdapter`** (line 669) — needs a check that throws an exception when `type` is `Object.class`, `JsonElement.class`, or a subclass of `JsonElement`.\n2. **`registerTypeHierarchyAdapter`** (line 724) — needs a check that throws an exception when `baseType` is `JsonElement.class` or a subclass of `JsonElement`.\n\nBoth methods also need their Javadoc updated to document that overwriting these built-in adapters is not possible (with a note that `@JsonAdapter` can be used instead).",
+      "session_id": "20261028-073328-0dd4",
+      "language": "java",
+      "agent_seconds": 33.325784432,
+      "tool_seconds": 0.029214004000000002,
+      "harness_seconds": 0.1812406609999932,
+      "phase_seconds": {
+        "project_map": 0.001351076,
+        "seed_pack": 0.15137777,
+        "working_set": 0.000074983
+      },
+      "tool_times": {
+        "find_symbol": {
+          "calls": 1,
+          "seconds": 0.025466155,
+          "max_seconds": 0.025466155,
+          "result_bytes": 87
+        },
+        "grep": {
+          "calls": 1,
+          "seconds": 0.002255285,
+          "max_seconds": 0.002255285,
+          "result_bytes": 451
+        },
+        "read": {
+          "calls": 3,
+          "seconds": 0.001492564,
+          "max_seconds": 0.001205865,
+          "result_bytes": 10779
+        }
+      },
+      "call_stats": {
+        "calls": 5,
+        "inference_seconds": 33.115329767000006,
+        "prefill_seconds": 10.579139000000001,
+        "decode_seconds": 22.317668,
+        "ttft_median_ms": 1884.802221,
+        "ttft_max_ms": 3447.870614,
+        "reasoning_tokens": 405,
+        "reasoning_count": "tokenizer",
+        "cache_invalidations": 0,
+        "cache_invalidations_after_rewrite": 0,
+        "recomputed_prompt_tokens": 0,
+        "peak_call": 4
+      },
+      "call_log": [
+        {
+          "prompt_tokens": 3078,
+          "cached_tokens": 2157,
+          "completion_tokens": 159,
+          "reasoning_tokens": 66,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2165.790436,
+          "prefill_ms": 2010.943,
+          "decode_ms": 4206.85,
+          "total_ms": 6372.92114,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 3328,
+          "cached_tokens": 3074,
+          "completion_tokens": 63,
+          "reasoning_tokens": 25,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1424.132668,
+          "prefill_ms": 1412.028,
+          "decode_ms": 1635.115,
+          "total_ms": 3059.468519,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 3992,
+          "cached_tokens": 3324,
+          "completion_tokens": 87,
+          "reasoning_tokens": 20,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1884.802221,
+          "prefill_ms": 1871.371,
+          "decode_ms": 2342.96,
+          "total_ms": 4228.076579,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 6092,
+          "cached_tokens": 3988,
+          "completion_tokens": 232,
+          "reasoning_tokens": 167,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 3447.870614,
+          "prefill_ms": 3429.393,
+          "decode_ms": 6249.175,
+          "total_ms": 9697.318495,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 6623,
+          "cached_tokens": 6088,
+          "completion_tokens": 294,
+          "reasoning_tokens": 127,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1873.766543,
+          "prefill_ms": 1855.404,
+          "decode_ms": 7883.568,
+          "total_ms": 9757.545034,
+          "status": "ok",
+          "streamed": true
+        }
+      ],
+      "context": {
+        "call": 4,
+        "prompt_tokens": 6623,
+        "counting": "tokenizer",
+        "sections": {
+          "environment": {
+            "bytes": 692,
+            "tokens": 212
+          },
+          "project_map": {
+            "bytes": 876,
+            "tokens": 259
+          },
+          "seed_pack": {
+            "bytes": 301,
+            "tokens": 74
+          },
+          "system": {
+            "bytes": 2586,
+            "tokens": 537
+          },
+          "tool:find_symbol": {
+            "bytes": 87,
+            "tokens": 24
+          },
+          "tool:grep": {
+            "bytes": 451,
+            "tokens": 113
+          },
+          "tool:read": {
+            "bytes": 10779,
+            "tokens": 3089
+          },
+          "tool_calls": {
+            "bytes": 405,
+            "tokens": 115
+          },
+          "tool_schemas": {
+            "bytes": 5400,
+            "tokens": 1132
+          },
+          "user": {
+            "bytes": 1439,
+            "tokens": 362
+          }
+        },
+        "framing_tokens": 706
+      },
+      "resources": {
+        "harness_rss_mib": 36.30859375,
+        "model_server_rss_mib": 27362.74609375,
+        "gpu_mem_used_mib": 7161,
+        "samples": 35
+      }
+    },
+    {
+      "id": "locate-immutable-js__immutable-js-2006",
+      "category": "locate-heldout",
+      "model": "qwen3.6-35b-a3b",
+      "success": false,
+      "mode": "code",
+      "routed": "a request for a change",
+      "turns": 1,
+      "model_calls": 8,
+      "tool_calls": 8,
+      "tools": {
+        "grep": 4,
+        "read": 4
+      },
+      "prompt_tokens": 38674,
+      "cached_prompt_tokens": 33097,
+      "generated_tokens": 2938,
+      "peak_prompt_tokens": 7706,
+      "tool_result_bytes": 12705,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 0,
+      "files_read": 2,
+      "redundant_reads": 0,
+      "wall_seconds": 95.363486391,
+      "answer": "Now I understand the issue. Let me trace through the code:\n\n1. `Immutable.Range(0, 10).filter($ =\u003e true)` creates a filtered sequence. `filterFactory` (line 326) does NOT set a `.size` property on the result — the size is unknown.\n\n2. `.slice(-2)` calls `sliceFactory` (line 404). Since `collection.size` is `undefined` (unknown), `wholeSlice(-2, undefined, undefined)` returns `false` (correct — it's not the whole slice).\n\n3. Then `resolveBegin(-2, undefined)` is called in `TrieUtils.js` line 66-68:\n```javascript\nfunction resolveIndex(index, size, defaultIndex) {\n  return index === undefined\n    ? defaultIndex\n    : isNeg(index)\n    ? size === Infinity\n      ? size\n      : Math.max(0, size + index) | 0   // \u003c-- BUG HERE\n    : ...\n}\n```\n\nWhen `size` is `undefined` and `index` is `-2`: `size + index` = `NaN`, `Math.max(0, NaN)` = `NaN`, `NaN | 0` = `0`. So `resolvedBegin` becomes `0` instead of `NaN`.\n\n4. The NaN check `resolvedBegin !== resolvedBegin` is `false` (0 is not NaN), so the `cacheResult()` fallback is skipped.\n\n5. The iteration skips `0` elements, returning all 10 elements instead of the last 2.\n\nThe fix is in `TrieUtils.js`: when `size` is `undefined` and the index is negative, the result should be `NaN` (to trigger the caching path), not `0`.\n\n**File that needs to change:**\n\n- **`src/TrieUtils.js`** — the `resolveIndex` function (line 74-86). Specifically, the negative-index branch needs to check for `size === undefined` and return `NaN` instead of falling through to `Math.max(0, size + index) | 0`, which produces `0` when `size` is `undefined`.",
+      "failed_checks": [
+        "answer does not match /(?:src/Operations\\.js)/"
+      ],
+      "session_id": "20261028-073401-cc9e",
+      "language": "typescript",
+      "failure_class": "model",
+      "agent_seconds": 95.266121988,
+      "tool_seconds": 0.020455284,
+      "harness_seconds": 0.03319259700000339,
+      "phase_seconds": {
+        "project_map": 0.00121988,
+        "seed_pack": 0.00018191,
+        "working_set": 0.00013003
+      },
+      "tool_times": {
+        "grep": {
+          "calls": 4,
+          "seconds": 0.019352221,
+          "max_seconds": 0.007616372,
+          "result_bytes": 917
+        },
+        "read": {
+          "calls": 4,
+          "seconds": 0.001103063,
+          "max_seconds": 0.00072397,
+          "result_bytes": 11788
+        }
+      },
+      "call_stats": {
+        "calls": 8,
+        "inference_seconds": 95.21247410699999,
+        "prefill_seconds": 14.365216,
+        "decode_seconds": 80.533279,
+        "ttft_median_ms": 2101.729561,
+        "ttft_max_ms": 2381.037937,
+        "reasoning_tokens": 2046,
+        "reasoning_count": "tokenizer",
+        "cache_invalidations": 0,
+        "cache_invalidations_after_rewrite": 0,
+        "recomputed_prompt_tokens": 0,
+        "peak_call": 7
+      },
+      "call_log": [
+        {
+          "prompt_tokens": 2886,
+          "cached_tokens": 2157,
+          "completion_tokens": 182,
+          "reasoning_tokens": 70,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2120.170123,
+          "prefill_ms": 1933.229,
+          "decode_ms": 4750.38,
+          "total_ms": 6870.815236,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 3041,
+          "cached_tokens": 2882,
+          "completion_tokens": 69,
+          "reasoning_tokens": 15,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1175.141333,
+          "prefill_ms": 1160.253,
+          "decode_ms": 1828.003,
+          "total_ms": 3003.451419,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 3151,
+          "cached_tokens": 3037,
+          "completion_tokens": 48,
+          "reasoning_tokens": 19,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1143.617377,
+          "prefill_ms": 1130.552,
+          "decode_ms": 1245.995,
+          "total_ms": 2389.824516,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 3916,
+          "cached_tokens": 3147,
+          "completion_tokens": 79,
+          "reasoning_tokens": 21,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1922.300926,
+          "prefill_ms": 1906.726,
+          "decode_ms": 2125.171,
+          "total_ms": 4047.601906,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 5387,
+          "cached_tokens": 3912,
+          "completion_tokens": 118,
+          "reasoning_tokens": 63,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2381.037937,
+          "prefill_ms": 2364.764,
+          "decode_ms": 3219.4,
+          "total_ms": 5600.703171,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 5690,
+          "cached_tokens": 5383,
+          "completion_tokens": 179,
+          "reasoning_tokens": 148,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1569.587619,
+          "prefill_ms": 1551.235,
+          "decode_ms": 4825.286,
+          "total_ms": 6395.07673,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 6897,
+          "cached_tokens": 5686,
+          "completion_tokens": 601,
+          "reasoning_tokens": 520,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2263.519758,
+          "prefill_ms": 2240.068,
+          "decode_ms": 16393.654,
+          "total_ms": 18657.605321,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 7706,
+          "cached_tokens": 6893,
+          "completion_tokens": 1662,
+          "reasoning_tokens": 1190,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2101.729561,
+          "prefill_ms": 2078.389,
+          "decode_ms": 46145.39,
+          "total_ms": 48247.395808,
+          "status": "ok",
+          "streamed": true
+        }
+      ],
+      "context": {
+        "call": 7,
+        "prompt_tokens": 7706,
+        "counting": "tokenizer",
+        "sections": {
+          "assistant": {
+            "bytes": 102,
+            "tokens": 24
+          },
+          "environment": {
+            "bytes": 736,
+            "tokens": 218
+          },
+          "project_map": {
+            "bytes": 938,
+            "tokens": 258
+          },
+          "system": {
+            "bytes": 2586,
+            "tokens": 537
+          },
+          "tool:grep": {
+            "bytes": 917,
+            "tokens": 298
+          },
+          "tool:read": {
+            "bytes": 11788,
+            "tokens": 4006
+          },
+          "tool_calls": {
+            "bytes": 463,
+            "tokens": 136
+          },
+          "tool_schemas": {
+            "bytes": 5400,
+            "tokens": 1132
+          },
+          "user": {
+            "bytes": 926,
+            "tokens": 240
+          }
+        },
+        "framing_tokens": 857
+      },
+      "resources": {
+        "harness_rss_mib": 36.65234375,
+        "model_server_rss_mib": 28063.265625,
+        "gpu_mem_used_mib": 7161,
+        "samples": 97
+      }
+    },
+    {
+      "id": "locate-jqlang__jq-2839",
+      "category": "locate-heldout",
+      "model": "qwen3.6-35b-a3b",
+      "success": true,
+      "mode": "code",
+      "routed": "a request for a change",
+      "turns": 1,
+      "model_calls": 9,
+      "tool_calls": 9,
+      "tools": {
+        "read": 9
+      },
+      "prompt_tokens": 109693,
+      "cached_prompt_tokens": 95413,
+      "generated_tokens": 19006,
+      "peak_prompt_tokens": 16405,
+      "tool_result_bytes": 31077,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 0,
+      "files_read": 4,
+      "redundant_reads": 0,
+      "wall_seconds": 572.343757935,
+      "answer": "The issue is clear. In `jvp_number_cmp` (src/jv.c:744), when two numbers are both decNumber literals, it directly calls `decNumberCompare` without checking whether the exponent difference would overflow a 32-bit int.\n\nThe numbers `3E506760210` (exponent 506760210) and `63E-6855002263` (exponent -6855002262) have an exponent difference of about -7.3 billion, which overflows a 32-bit `int32_t`.\n\nThe fix is to check the exponent difference before calling `decNumberCompare`. If the difference is large enough that one number is clearly bigger than the other (the exponent difference exceeds the number of digits in the smaller number), we can return the result directly without calling into decNumber.\n\nThe file that needs to change:\n\n**`src/jv.c`**\n\nSpecifically, the `jvp_number_cmp` function (around line 744) needs a guard before the `decNumberCompare` call. It should check whether the exponent difference is so large that one number is unambiguously greater than the other, and if so, return the comparison result directly without calling `decNumberCompare`.",
+      "session_id": "20261028-073537-b8e4",
+      "language": "c",
+      "agent_seconds": 572.17553843,
+      "tool_seconds": 0.0033447010000000003,
+      "harness_seconds": 0.21205909499991865,
+      "phase_seconds": {
+        "project_map": 0.000661959,
+        "seed_pack": 0.191867526,
+        "working_set": 0.000124252
+      },
+      "tool_times": {
+        "read": {
+          "calls": 9,
+          "seconds": 0.0033447010000000003,
+          "max_seconds": 0.000863008,
+          "result_bytes": 31077
+        }
+      },
+      "call_stats": {
+        "calls": 9,
+        "inference_seconds": 571.960134634,
+        "prefill_seconds": 26.111355,
+        "decode_seconds": 545.373116,
+        "ttft_median_ms": 1946.449855,
+        "ttft_max_ms": 5085.052501,
+        "reasoning_tokens": 18068,
+        "reasoning_count": "tokenizer",
+        "cache_invalidations": 0,
+        "cache_invalidations_after_rewrite": 0,
+        "recomputed_prompt_tokens": 0,
+        "peak_call": 8
+      },
+      "call_log": [
+        {
+          "prompt_tokens": 4922,
+          "cached_tokens": 2157,
+          "completion_tokens": 508,
+          "reasoning_tokens": 352,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 4723.670874,
+          "prefill_ms": 4447.45,
+          "decode_ms": 13849.603,
+          "total_ms": 18573.545133,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 8688,
+          "cached_tokens": 4918,
+          "completion_tokens": 241,
+          "reasoning_tokens": 167,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 4956.114574,
+          "prefill_ms": 4941.15,
+          "decode_ms": 6633.628,
+          "total_ms": 11590.1017,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 9305,
+          "cached_tokens": 8684,
+          "completion_tokens": 81,
+          "reasoning_tokens": 2,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1938.542914,
+          "prefill_ms": 1922.604,
+          "decode_ms": 2253.119,
+          "total_ms": 4192.001274,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 9840,
+          "cached_tokens": 9301,
+          "completion_tokens": 225,
+          "reasoning_tokens": 174,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1840.332108,
+          "prefill_ms": 1821.738,
+          "decode_ms": 6175.662,
+          "total_ms": 8016.244266,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 13617,
+          "cached_tokens": 9836,
+          "completion_tokens": 2837,
+          "reasoning_tokens": 2754,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 5085.052501,
+          "prefill_ms": 5059.39,
+          "decode_ms": 81018.352,
+          "total_ms": 86104.237011,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 15192,
+          "cached_tokens": 13613,
+          "completion_tokens": 4251,
+          "reasoning_tokens": 4180,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2508.010411,
+          "prefill_ms": 2480.529,
+          "decode_ms": 122721.025,
+          "total_ms": 125229.539826,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 15750,
+          "cached_tokens": 15188,
+          "completion_tokens": 5839,
+          "reasoning_tokens": 5785,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1946.449855,
+          "prefill_ms": 1913.643,
+          "decode_ms": 167328.431,
+          "total_ms": 169275.609929,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 15974,
+          "cached_tokens": 15746,
+          "completion_tokens": 4445,
+          "reasoning_tokens": 4365,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1672.604924,
+          "prefill_ms": 1644.637,
+          "decode_ms": 128719.873,
+          "total_ms": 130393.228429,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 16405,
+          "cached_tokens": 15970,
+          "completion_tokens": 579,
+          "reasoning_tokens": 289,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1911.759193,
+          "prefill_ms": 1880.214,
+          "decode_ms": 16673.423,
+          "total_ms": 18585.627066,
+          "status": "ok",
+          "streamed": true
+        }
+      ],
+      "context": {
+        "call": 8,
+        "prompt_tokens": 16405,
+        "counting": "tokenizer",
+        "sections": {
+          "assistant": {
+            "bytes": 887,
+            "tokens": 207
+          },
+          "environment": {
+            "bytes": 684,
+            "tokens": 214
+          },
+          "project_map": {
+            "bytes": 925,
+            "tokens": 280
+          },
+          "seed_pack": {
+            "bytes": 244,
+            "tokens": 91
+          },
+          "system": {
+            "bytes": 2586,
+            "tokens": 537
+          },
+          "tool:read": {
+            "bytes": 31077,
+            "tokens": 10738
+          },
+          "tool_calls": {
+            "bytes": 408,
+            "tokens": 162
+          },
+          "tool_schemas": {
+            "bytes": 5400,
+            "tokens": 1132
+          },
+          "user": {
+            "bytes": 4547,
+            "tokens": 2166
+          }
+        },
+        "framing_tokens": 878
+      },
+      "resources": {
+        "harness_rss_mib": 38.40625,
+        "model_server_rss_mib": 28198.18359375,
+        "gpu_mem_used_mib": 7162,
+        "samples": 574
+      }
+    },
+    {
+      "id": "locate-laravel__framework-48636",
+      "category": "locate-heldout",
+      "model": "qwen3.6-35b-a3b",
+      "success": true,
+      "mode": "code",
+      "routed": "a request for a change",
+      "turns": 1,
+      "model_calls": 4,
+      "tool_calls": 5,
+      "tools": {
+        "find_symbol": 1,
+        "read": 4
+      },
+      "prompt_tokens": 22921,
+      "cached_prompt_tokens": 18103,
+      "generated_tokens": 691,
+      "peak_prompt_tokens": 6963,
+      "tool_result_bytes": 8864,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 0,
+      "files_read": 4,
+      "redundant_reads": 0,
+      "wall_seconds": 30.888506273,
+      "answer": "Now I have a clear picture. The `replicate()` method in `Model.php` only excludes the primary key (`getKeyName()`), created_at, and updated_at columns. It doesn't account for other unique ID columns defined via `HasUuids`, `HasUlids`, or the `HasUniqueIds` trait.\n\nThe fix needs to include all unique ID columns in the defaults that are excluded during replication. The `replicate()` method in `Model.php` should check if the model uses unique IDs and include them in the exclusion list.\n\n**Files that would need to change:**\n\n1. **`src/Illuminate/Database/Eloquent/Model.php`** — The `replicate()` method (lines ~1720-1739) needs to be updated to also exclude columns returned by `uniqueIds()` when the model uses unique IDs (i.e., when `usesUniqueIds()` returns true). This is the only file that needs to change, since the `uniqueIds()` method and `usesUniqueIds()` flag are already properly defined in the `HasUniqueIds`, `HasUuids`, and `HasUlids` traits.",
+      "session_id": "20261028-074509-23a8",
+      "language": "php",
+      "agent_seconds": 30.305004705,
+      "tool_seconds": 0.004439319,
+      "harness_seconds": 1.1712569809999984,
+      "phase_seconds": {
+        "project_map": 0.004882441,
+        "seed_pack": 0.92992093,
+        "working_set": 0.000067681
+      },
+      "tool_times": {
+        "find_symbol": {
+          "calls": 1,
+          "seconds": 0.003790966,
+          "max_seconds": 0.003790966,
+          "result_bytes": 78
+        },
+        "read": {
+          "calls": 4,
+          "seconds": 0.000648353,
+          "max_seconds": 0.000231877,
+          "result_bytes": 8786
+        }
+      },
+      "call_stats": {
+        "calls": 4,
+        "inference_seconds": 29.129308405000003,
+        "prefill_seconds": 9.696772999999999,
+        "decode_seconds": 18.903809,
+        "ttft_median_ms": 2799.244342,
+        "ttft_max_ms": 4352.860325,
+        "reasoning_tokens": 208,
+        "reasoning_count": "tokenizer",
+        "cache_invalidations": 0,
+        "cache_invalidations_after_rewrite": 0,
+        "recomputed_prompt_tokens": 0,
+        "peak_call": 3
+      },
+      "call_log": [
+        {
+          "prompt_tokens": 3595,
+          "cached_tokens": 2157,
+          "completion_tokens": 284,
+          "reasoning_tokens": 153,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2799.244342,
+          "prefill_ms": 2327.595,
+          "decode_ms": 7654.41,
+          "total_ms": 10453.967278,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 6139,
+          "cached_tokens": 3591,
+          "completion_tokens": 72,
+          "reasoning_tokens": 26,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 4352.860325,
+          "prefill_ms": 4337.701,
+          "decode_ms": 1915.797,
+          "total_ms": 6269.075247,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 6224,
+          "cached_tokens": 6135,
+          "completion_tokens": 91,
+          "reasoning_tokens": 27,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1061.176645,
+          "prefill_ms": 1039.908,
+          "decode_ms": 2395.661,
+          "total_ms": 3457.225216,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 6963,
+          "cached_tokens": 6220,
+          "completion_tokens": 244,
+          "reasoning_tokens": 2,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2010.828233,
+          "prefill_ms": 1991.569,
+          "decode_ms": 6937.941,
+          "total_ms": 8949.040664,
+          "status": "ok",
+          "streamed": true
+        }
+      ],
+      "context": {
+        "call": 3,
+        "prompt_tokens": 6963,
+        "counting": "tokenizer",
+        "sections": {
+          "assistant": {
+            "bytes": 78,
+            "tokens": 15
+          },
+          "environment": {
+            "bytes": 716,
+            "tokens": 212
+          },
+          "project_map": {
+            "bytes": 1679,
+            "tokens": 441
+          },
+          "seed_pack": {
+            "bytes": 1488,
+            "tokens": 394
+          },
+          "system": {
+            "bytes": 2586,
+            "tokens": 537
+          },
+          "tool:find_symbol": {
+            "bytes": 78,
+            "tokens": 24
+          },
+          "tool:read": {
+            "bytes": 8786,
+            "tokens": 3061
+          },
+          "tool_calls": {
+            "bytes": 368,
+            "tokens": 105
+          },
+          "tool_schemas": {
+            "bytes": 5400,
+            "tokens": 1132
+          },
+          "user": {
+            "bytes": 1499,
+            "tokens": 377
+          }
+        },
+        "framing_tokens": 665
+      },
+      "resources": {
+        "harness_rss_mib": 38.0546875,
+        "model_server_rss_mib": 28198.18359375,
+        "gpu_mem_used_mib": 7161,
+        "samples": 32
+      }
+    },
+    {
+      "id": "locate-laravel__framework-52451",
+      "category": "locate-heldout",
+      "model": "qwen3.6-35b-a3b",
+      "success": false,
+      "mode": "code",
+      "routed": "a request for a change",
+      "turns": 1,
+      "model_calls": 8,
+      "tool_calls": 8,
+      "tools": {
+        "grep": 4,
+        "read": 4
+      },
+      "prompt_tokens": 50422,
+      "cached_prompt_tokens": 44076,
+      "generated_tokens": 18117,
+      "peak_prompt_tokens": 8475,
+      "tool_result_bytes": 13371,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 0,
+      "files_read": 2,
+      "redundant_reads": 0,
+      "wall_seconds": 533.462034213,
+      "answer": "\n\n[output cut at the completion limit]",
+      "failed_checks": [
+        "answer does not match /(?:src/Illuminate/Validation/Concerns/FormatsMessages\\.php)/"
+      ],
+      "session_id": "20261028-074540-dd06",
+      "language": "php",
+      "failure_class": "model",
+      "agent_seconds": 532.81198929,
+      "tool_seconds": 0.011779382,
+      "harness_seconds": 0.8007391980000736,
+      "phase_seconds": {
+        "project_map": 0.004775184,
+        "seed_pack": 0.528453898,
+        "working_set": 0.000130983
+      },
+      "tool_times": {
+        "grep": {
+          "calls": 4,
+          "seconds": 0.009813259,
+          "max_seconds": 0.006593983,
+          "result_bytes": 942
+        },
+        "read": {
+          "calls": 4,
+          "seconds": 0.001966123,
+          "max_seconds": 0.001196015,
+          "result_bytes": 12429
+        }
+      },
+      "call_stats": {
+        "calls": 8,
+        "inference_seconds": 531.99947071,
+        "prefill_seconds": 15.174025,
+        "decode_seconds": 516.500912,
+        "ttft_median_ms": 2071.135231,
+        "ttft_max_ms": 2721.594094,
+        "reasoning_tokens": 17586,
+        "reasoning_count": "tokenizer",
+        "cache_invalidations": 0,
+        "cache_invalidations_after_rewrite": 0,
+        "recomputed_prompt_tokens": 0,
+        "peak_call": 7
+      },
+      "call_log": [
+        {
+          "prompt_tokens": 3864,
+          "cached_tokens": 2157,
+          "completion_tokens": 357,
+          "reasoning_tokens": 226,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2721.594094,
+          "prefill_ms": 2539.023,
+          "decode_ms": 9667.155,
+          "total_ms": 12388.812446,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 4106,
+          "cached_tokens": 3860,
+          "completion_tokens": 34,
+          "ttft_ms": 1710.288091,
+          "prefill_ms": 1476.556,
+          "decode_ms": 903.278,
+          "total_ms": 2395.385296,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 5388,
+          "cached_tokens": 4102,
+          "completion_tokens": 92,
+          "reasoning_tokens": 30,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2202.889663,
+          "prefill_ms": 2188.306,
+          "decode_ms": 2460.906,
+          "total_ms": 4665.130311,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 6819,
+          "cached_tokens": 5384,
+          "completion_tokens": 839,
+          "reasoning_tokens": 752,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2394.295901,
+          "prefill_ms": 2374.851,
+          "decode_ms": 23190.492,
+          "total_ms": 25585.355635,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 6941,
+          "cached_tokens": 6815,
+          "completion_tokens": 72,
+          "reasoning_tokens": 14,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1303.739802,
+          "prefill_ms": 1284.338,
+          "decode_ms": 1971.002,
+          "total_ms": 3274.993482,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 7152,
+          "cached_tokens": 6937,
+          "completion_tokens": 6200,
+          "reasoning_tokens": 6136,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1465.229761,
+          "prefill_ms": 1445.285,
+          "decode_ms": 176168.909,
+          "total_ms": 177634.851942,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 7677,
+          "cached_tokens": 7148,
+          "completion_tokens": 2331,
+          "reasoning_tokens": 2236,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1843.207226,
+          "prefill_ms": 1821.38,
+          "decode_ms": 66254.792,
+          "total_ms": 68098.655907,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 8475,
+          "cached_tokens": 7673,
+          "completion_tokens": 8192,
+          "reasoning_tokens": 8192,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2071.135231,
+          "prefill_ms": 2044.286,
+          "decode_ms": 235884.378,
+          "total_ms": 237956.285691,
+          "status": "ok",
+          "streamed": true
+        }
+      ],
+      "context": {
+        "call": 7,
+        "prompt_tokens": 8475,
+        "counting": "tokenizer",
+        "sections": {
+          "assistant": {
+            "bytes": 453,
+            "tokens": 102
+          },
+          "environment": {
+            "bytes": 716,
+            "tokens": 212
+          },
+          "project_map": {
+            "bytes": 1771,
+            "tokens": 474
+          },
+          "seed_pack": {
+            "bytes": 634,
+            "tokens": 154
+          },
+          "system": {
+            "bytes": 2586,
+            "tokens": 537
+          },
+          "tool:grep": {
+            "bytes": 942,
+            "tokens": 248
+          },
+          "tool:read": {
+            "bytes": 12429,
+            "tokens": 3732
+          },
+          "tool_calls": {
+            "bytes": 716,
+            "tokens": 179
+          },
+          "tool_schemas": {
+            "bytes": 5400,
+            "tokens": 1132
+          },
+          "user": {
+            "bytes": 2895,
+            "tokens": 853
+          }
+        },
+        "framing_tokens": 852
+      },
+      "resources": {
+        "harness_rss_mib": 38.20703125,
+        "model_server_rss_mib": 28088.453125,
+        "gpu_mem_used_mib": 7162,
+        "samples": 534
+      }
+    },
+    {
+      "id": "locate-nushell__nushell-12950",
+      "category": "locate-heldout",
+      "model": "qwen3.6-35b-a3b",
+      "success": true,
+      "mode": "code",
+      "routed": "the request asks for a verified or test-backed change; verification is unavailable (benchmark: direct mode only), so a change needs your go-ahead (direct.verify_fallback) (verify)",
+      "turns": 1,
+      "model_calls": 22,
+      "tool_calls": 27,
+      "tools": {
+        "grep": 15,
+        "read": 12
+      },
+      "denied": 2,
+      "prompt_tokens": 220408,
+      "cached_prompt_tokens": 201317,
+      "generated_tokens": 7424,
+      "peak_prompt_tokens": 21164,
+      "tool_result_bytes": 46910,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 0,
+      "files_read": 3,
+      "redundant_reads": 2,
+      "wall_seconds": 256.464281248,
+      "answer": "This is a Nushell bug where `git add .` fails because Nushell's glob expansion turns `.` into empty strings. Here's my analysis:\n\n## Bug Analysis\n\nWhen `git add .` is run in Nushell:\n\n1. **`expand_glob(\".\", cwd, span)`** is called at line 303 of `crates/nu-command/src/system/run_external.rs`\n2. **`nu_glob::glob_with_parent(\".\", ...)`** expands `.` to the cwd and all files within it\n3. Each result path is stripped of the cwd prefix via **`path.strip_prefix(cwd)`** at line 315\n4. When the cwd itself is in the glob results, `cwd.strip_prefix(cwd)` returns an empty `PathBuf` (`\"\"`)\n5. These empty strings are passed as arguments to git, causing `git add \"\"` → error: *\"empty string is not a valid pathspec\"*\n\nThe same issue affects `..` (parent directory).\n\n## File That Needs to Change\n\n**`crates/nu-command/src/system/run_external.rs`**\n\nSpecifically, the `expand_glob` function (lines 303–325). The fix is on line 315–316: after calling `path.strip_prefix(cwd)`, the code must check whether the result is an empty path and substitute `.` in that case:\n\n```rust\n// Strip PWD from the resulting paths if possible.\nlet path_stripped = path.strip_prefix(cwd).unwrap_or(\u0026path);\n// Fix: empty string after strip_prefix means the path equals cwd\nlet path_stripped = if path_stripped.as_os_str().is_empty() {\n    Path::new(\".\")\n} else {\n    path_stripped\n};\n```\n\nThe existing test `test_expand_glob` (line 632) tests `*.txt`, `'*.txt'`, and `[*.txt` patterns but does not test the `.` or `..` cases, so the regression went unnoticed.",
+      "session_id": "20261028-075433-c510",
+      "language": "rust",
+      "agent_seconds": 256.067992694,
+      "tool_seconds": 0.731468541,
+      "harness_seconds": 0.05812457900006318,
+      "phase_seconds": {
+        "project_map": 0.003530501,
+        "seed_pack": 0.000507052,
+        "working_set": 0.000309027
+      },
+      "tool_times": {
+        "grep": {
+          "calls": 15,
+          "seconds": 0.7256683270000001,
+          "max_seconds": 0.057352723,
+          "result_bytes": 9083
+        },
+        "read": {
+          "calls": 12,
+          "seconds": 0.005800214000000001,
+          "max_seconds": 0.00361633,
+          "result_bytes": 37827
+        }
+      },
+      "call_stats": {
+        "calls": 22,
+        "inference_seconds": 255.27839957399993,
+        "prefill_seconds": 43.129201,
+        "decode_seconds": 211.17529699999997,
+        "ttft_median_ms": 2092.73565,
+        "ttft_max_ms": 2792.189602,
+        "reasoning_tokens": 4816,
+        "reasoning_count": "tokenizer",
+        "cache_invalidations": 0,
+        "cache_invalidations_after_rewrite": 0,
+        "recomputed_prompt_tokens": 0,
+        "peak_call": 21
+      },
+      "call_log": [
+        {
+          "prompt_tokens": 3197,
+          "cached_tokens": 2157,
+          "completion_tokens": 36,
+          "ttft_ms": 2744.871631,
+          "prefill_ms": 2160.296,
+          "decode_ms": 940.942,
+          "total_ms": 3405.992836,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 3250,
+          "cached_tokens": 3193,
+          "completion_tokens": 144,
+          "reasoning_tokens": 88,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 833.083538,
+          "prefill_ms": 822.062,
+          "decode_ms": 3792.016,
+          "total_ms": 4625.233372,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 3332,
+          "cached_tokens": 3246,
+          "completion_tokens": 337,
+          "reasoning_tokens": 192,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 984.718474,
+          "prefill_ms": 972.035,
+          "decode_ms": 9192.58,
+          "total_ms": 10177.529206,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 4985,
+          "cached_tokens": 3328,
+          "completion_tokens": 311,
+          "reasoning_tokens": 213,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2524.976304,
+          "prefill_ms": 2509.078,
+          "decode_ms": 8288.426,
+          "total_ms": 10813.633414,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 5109,
+          "cached_tokens": 4981,
+          "completion_tokens": 257,
+          "reasoning_tokens": 192,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1232.880067,
+          "prefill_ms": 1216.156,
+          "decode_ms": 7067.191,
+          "total_ms": 8300.421065,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 5200,
+          "cached_tokens": 5105,
+          "completion_tokens": 343,
+          "reasoning_tokens": 160,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1044.096212,
+          "prefill_ms": 1025.435,
+          "decode_ms": 9500.648,
+          "total_ms": 10544.960651,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 5414,
+          "cached_tokens": 5196,
+          "completion_tokens": 275,
+          "reasoning_tokens": 189,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1589.748637,
+          "prefill_ms": 1566.566,
+          "decode_ms": 7581.049,
+          "total_ms": 9171.041675,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 6146,
+          "cached_tokens": 5410,
+          "completion_tokens": 146,
+          "reasoning_tokens": 71,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1968.714737,
+          "prefill_ms": 1944.542,
+          "decode_ms": 4043.406,
+          "total_ms": 6012.309449,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 6384,
+          "cached_tokens": 6142,
+          "completion_tokens": 221,
+          "reasoning_tokens": 163,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1564.452898,
+          "prefill_ms": 1541.769,
+          "decode_ms": 6070.698,
+          "total_ms": 7635.53478,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 7005,
+          "cached_tokens": 6380,
+          "completion_tokens": 115,
+          "reasoning_tokens": 79,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1890.750719,
+          "prefill_ms": 1864.388,
+          "decode_ms": 3190.164,
+          "total_ms": 5081.236481,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 7543,
+          "cached_tokens": 7001,
+          "completion_tokens": 97,
+          "reasoning_tokens": 33,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1800.688429,
+          "prefill_ms": 1774.2,
+          "decode_ms": 2681.755,
+          "total_ms": 4482.826827,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 9437,
+          "cached_tokens": 7539,
+          "completion_tokens": 373,
+          "reasoning_tokens": 310,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2638.927196,
+          "prefill_ms": 2607.867,
+          "decode_ms": 10448.18,
+          "total_ms": 13087.593591,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 10144,
+          "cached_tokens": 9433,
+          "completion_tokens": 533,
+          "reasoning_tokens": 424,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2092.73565,
+          "prefill_ms": 2050.331,
+          "decode_ms": 15114.229,
+          "total_ms": 17207.318132,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 11511,
+          "cached_tokens": 10140,
+          "completion_tokens": 77,
+          "reasoning_tokens": 15,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2380.174621,
+          "prefill_ms": 2346.083,
+          "decode_ms": 2167.996,
+          "total_ms": 4548.820037,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 12215,
+          "cached_tokens": 11507,
+          "completion_tokens": 551,
+          "reasoning_tokens": 468,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2069.253621,
+          "prefill_ms": 2034.473,
+          "decode_ms": 15816.283,
+          "total_ms": 17886.194344,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 12796,
+          "cached_tokens": 12211,
+          "completion_tokens": 419,
+          "reasoning_tokens": 355,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2026.111614,
+          "prefill_ms": 1989.022,
+          "decode_ms": 11797.681,
+          "total_ms": 13824.341541,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 14823,
+          "cached_tokens": 12792,
+          "completion_tokens": 551,
+          "reasoning_tokens": 336,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2742.306466,
+          "prefill_ms": 2697.807,
+          "decode_ms": 15720.509,
+          "total_ms": 18463.512821,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 16113,
+          "cached_tokens": 14819,
+          "completion_tokens": 1163,
+          "reasoning_tokens": 927,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2435.196509,
+          "prefill_ms": 2386.474,
+          "decode_ms": 34180.206,
+          "total_ms": 36616.101192,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 16848,
+          "cached_tokens": 16109,
+          "completion_tokens": 104,
+          "ttft_ms": 2210.881581,
+          "prefill_ms": 2100.378,
+          "decode_ms": 3039.134,
+          "total_ms": 5182.819068,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 18526,
+          "cached_tokens": 16844,
+          "completion_tokens": 407,
+          "reasoning_tokens": 166,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2679.896684,
+          "prefill_ms": 2635.275,
+          "decode_ms": 12066.348,
+          "total_ms": 14746.936762,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 19266,
+          "cached_tokens": 18522,
+          "completion_tokens": 296,
+          "reasoning_tokens": 207,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2194.860204,
+          "prefill_ms": 2142.448,
+          "decode_ms": 8884.291,
+          "total_ms": 11079.745848,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 21164,
+          "cached_tokens": 19262,
+          "completion_tokens": 668,
+          "reasoning_tokens": 228,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2792.189602,
+          "prefill_ms": 2742.516,
+          "decode_ms": 19591.565,
+          "total_ms": 22384.296482,
+          "status": "ok",
+          "streamed": true
+        }
+      ],
+      "context": {
+        "call": 21,
+        "prompt_tokens": 21164,
+        "counting": "tokenizer",
+        "sections": {
+          "assistant": {
+            "bytes": 2973,
+            "tokens": 780
+          },
+          "environment": {
+            "bytes": 708,
+            "tokens": 222
+          },
+          "project_map": {
+            "bytes": 893,
+            "tokens": 279
+          },
+          "system": {
+            "bytes": 2586,
+            "tokens": 537
+          },
+          "tool:bash": {
+            "bytes": 152,
+            "tokens": 32
+          },
+          "tool:grep": {
+            "bytes": 9083,
+            "tokens": 2800
+          },
+          "tool:read": {
+            "bytes": 37827,
+            "tokens": 12653
+          },
+          "tool_calls": {
+            "bytes": 1830,
+            "tokens": 605
+          },
+          "tool_schemas": {
+            "bytes": 5400,
+            "tokens": 1132
+          },
+          "user": {
+            "bytes": 2028,
+            "tokens": 526
+          }
+        },
+        "framing_tokens": 1598
+      },
+      "resources": {
+        "harness_rss_mib": 39.2109375,
+        "model_server_rss_mib": 28807.1484375,
+        "gpu_mem_used_mib": 7161,
+        "samples": 258
+      }
+    },
+    {
+      "id": "locate-projectlombok__lombok-3371",
+      "category": "locate-heldout",
+      "model": "qwen3.6-35b-a3b",
+      "success": true,
+      "mode": "code",
+      "routed": "a request for a change",
+      "turns": 1,
+      "model_calls": 20,
+      "tool_calls": 26,
+      "tools": {
+        "glob": 1,
+        "grep": 7,
+        "read": 18
+      },
+      "prompt_tokens": 266607,
+      "cached_prompt_tokens": 245809,
+      "generated_tokens": 24013,
+      "peak_prompt_tokens": 22879,
+      "tool_result_bytes": 52235,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 0,
+      "files_read": 11,
+      "redundant_reads": 4,
+      "wall_seconds": 736.123781753,
+      "answer": "The file that needs to change to fix this bug is:\n\n**`src/core/lombok/javac/handlers/HandleNonNull.java`**\n\n### Why this file\n\nThe bug is in the `handle()` method of `HandleNonNull`. When `@NonNull` is applied to a primitive array field on a record (e.g., `byte @NonNull[] bytes`), the annotation is a **TYPE_USE** annotation on the array type expression, not directly on the field declaration.\n\nThe code flow:\n\n1. **Line 221** checks `annotationNode.up().getKind() == Kind.FIELD`. For a TYPE_USE annotation, the parent is the type expression node (TYPE_USE), not the field declaration, so this branch is **skipped**.\n\n2. The code falls through to the **switch at line 248**. In the `TYPE_USE` case (lines 252–255), `paramNode = typeNode.directUp()` resolves to the field declaration (`JCVariableDecl`).\n\n3. **Line 260** checks `paramNode.getKind() != Kind.ARGUMENT` and returns early because the parent is `Kind.FIELD`, not `Kind.ARGUMENT`. The method exits without generating any null check.\n\n4. Additionally, the `isPrimitive` check at line 228 (which would warn about `@NonNull` on a primitive) is also skipped because it's inside the `Kind.FIELD` branch.\n\nThe fix: the `TYPE_USE` case needs to also check if `paramNode` is a record field (i.e., `paramNode.getKind() == Kind.FIELD` and the field has the `RECORD` flag) and, if so, handle it the same way as lines 227–241 (checking for primitives and generating null checks for compact constructors).",
+      "session_id": "20261028-075850-3029",
+      "language": "java",
+      "agent_seconds": 735.73240152,
+      "tool_seconds": 0.533385501,
+      "harness_seconds": 0.8850859470001048,
+      "phase_seconds": {
+        "project_map": 0.006621853,
+        "seed_pack": 0.801661024,
+        "working_set": 0.00027585
+      },
+      "tool_times": {
+        "glob": {
+          "calls": 1,
+          "seconds": 0.033924247,
+          "max_seconds": 0.033924247,
+          "result_bytes": 2761
+        },
+        "grep": {
+          "calls": 7,
+          "seconds": 0.49647309900000003,
+          "max_seconds": 0.162267928,
+          "result_bytes": 5635
+        },
+        "read": {
+          "calls": 18,
+          "seconds": 0.0029881550000000006,
+          "max_seconds": 0.000812444,
+          "result_bytes": 43839
+        }
+      },
+      "call_stats": {
+        "calls": 20,
+        "inference_seconds": 734.313930072,
+        "prefill_seconds": 45.307066,
+        "decode_seconds": 687.607934,
+        "ttft_median_ms": 2154.335551,
+        "ttft_max_ms": 7567.128758,
+        "reasoning_tokens": 21014,
+        "reasoning_count": "tokenizer",
+        "cache_invalidations": 0,
+        "cache_invalidations_after_rewrite": 0,
+        "recomputed_prompt_tokens": 0,
+        "peak_call": 19
+      },
+      "call_log": [
+        {
+          "prompt_tokens": 3012,
+          "cached_tokens": 2157,
+          "completion_tokens": 154,
+          "reasoning_tokens": 69,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2790.007694,
+          "prefill_ms": 2059.515,
+          "decode_ms": 4198.194,
+          "total_ms": 6988.46577,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 3123,
+          "cached_tokens": 3008,
+          "completion_tokens": 109,
+          "reasoning_tokens": 34,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1048.523182,
+          "prefill_ms": 1037.053,
+          "decode_ms": 2916.61,
+          "total_ms": 3965.360995,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 3884,
+          "cached_tokens": 3119,
+          "completion_tokens": 149,
+          "reasoning_tokens": 43,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1876.372277,
+          "prefill_ms": 1861.443,
+          "decode_ms": 4117.931,
+          "total_ms": 5994.402416,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 4262,
+          "cached_tokens": 3880,
+          "completion_tokens": 124,
+          "reasoning_tokens": 2,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1728.708168,
+          "prefill_ms": 1711.999,
+          "decode_ms": 3398.762,
+          "total_ms": 5127.751005,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 4925,
+          "cached_tokens": 4258,
+          "completion_tokens": 66,
+          "reasoning_tokens": 28,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1910.672104,
+          "prefill_ms": 1892.311,
+          "decode_ms": 1768.803,
+          "total_ms": 3679.930459,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 10521,
+          "cached_tokens": 4921,
+          "completion_tokens": 986,
+          "reasoning_tokens": 874,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 7567.128758,
+          "prefill_ms": 7535.252,
+          "decode_ms": 27692.534,
+          "total_ms": 35260.14808,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 11074,
+          "cached_tokens": 10517,
+          "completion_tokens": 448,
+          "reasoning_tokens": 404,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1935.837988,
+          "prefill_ms": 1910.289,
+          "decode_ms": 12921.017,
+          "total_ms": 14857.235425,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 12030,
+          "cached_tokens": 11070,
+          "completion_tokens": 152,
+          "reasoning_tokens": 83,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2154.335551,
+          "prefill_ms": 2125.478,
+          "decode_ms": 4513.445,
+          "total_ms": 6668.208865,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 13604,
+          "cached_tokens": 12026,
+          "completion_tokens": 552,
+          "reasoning_tokens": 506,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2576.863398,
+          "prefill_ms": 2540.023,
+          "decode_ms": 16152.021,
+          "total_ms": 18729.441758,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 13740,
+          "cached_tokens": 13600,
+          "completion_tokens": 502,
+          "reasoning_tokens": 439,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1267.503207,
+          "prefill_ms": 1234.619,
+          "decode_ms": 14641.993,
+          "total_ms": 15909.984809,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 14272,
+          "cached_tokens": 13736,
+          "completion_tokens": 3989,
+          "reasoning_tokens": 3953,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1945.98444,
+          "prefill_ms": 1908.912,
+          "decode_ms": 115419.507,
+          "total_ms": 117366.245675,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 15325,
+          "cached_tokens": 14268,
+          "completion_tokens": 3824,
+          "reasoning_tokens": 3737,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2324.996046,
+          "prefill_ms": 2290.091,
+          "decode_ms": 110638.046,
+          "total_ms": 112963.667678,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 16451,
+          "cached_tokens": 15321,
+          "completion_tokens": 4680,
+          "reasoning_tokens": 4623,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2328.348341,
+          "prefill_ms": 2289.941,
+          "decode_ms": 134733.065,
+          "total_ms": 137062.045815,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 16761,
+          "cached_tokens": 16447,
+          "completion_tokens": 2690,
+          "reasoning_tokens": 2604,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1660.380881,
+          "prefill_ms": 1618.832,
+          "decode_ms": 75752.848,
+          "total_ms": 77413.928993,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 17895,
+          "cached_tokens": 16757,
+          "completion_tokens": 2809,
+          "reasoning_tokens": 2470,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2308.999916,
+          "prefill_ms": 2264.736,
+          "decode_ms": 79634.12,
+          "total_ms": 81943.834399,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 18759,
+          "cached_tokens": 17891,
+          "completion_tokens": 390,
+          "reasoning_tokens": 2,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2143.966769,
+          "prefill_ms": 2098.134,
+          "decode_ms": 11002.482,
+          "total_ms": 13146.970542,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 20195,
+          "cached_tokens": 18755,
+          "completion_tokens": 582,
+          "reasoning_tokens": 288,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2503.38403,
+          "prefill_ms": 2453.464,
+          "decode_ms": 16517.835,
+          "total_ms": 19021.877353,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 21537,
+          "cached_tokens": 20191,
+          "completion_tokens": 610,
+          "reasoning_tokens": 315,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2449.589384,
+          "prefill_ms": 2400.793,
+          "decode_ms": 17403.245,
+          "total_ms": 19853.304264,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 22358,
+          "cached_tokens": 21533,
+          "completion_tokens": 508,
+          "reasoning_tokens": 240,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2198.221351,
+          "prefill_ms": 2149.703,
+          "decode_ms": 14541.44,
+          "total_ms": 16740.181045,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 22879,
+          "cached_tokens": 22354,
+          "completion_tokens": 689,
+          "reasoning_tokens": 300,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1976.102038,
+          "prefill_ms": 1924.478,
+          "decode_ms": 19644.036,
+          "total_ms": 21620.944726,
+          "status": "ok",
+          "streamed": true
+        }
+      ],
+      "context": {
+        "call": 19,
+        "prompt_tokens": 22879,
+        "counting": "tokenizer",
+        "sections": {
+          "assistant": {
+            "bytes": 5066,
+            "tokens": 1338
+          },
+          "environment": {
+            "bytes": 714,
+            "tokens": 216
+          },
+          "project_map": {
+            "bytes": 880,
+            "tokens": 267
+          },
+          "system": {
+            "bytes": 2586,
+            "tokens": 537
+          },
+          "tool:glob": {
+            "bytes": 2761,
+            "tokens": 663
+          },
+          "tool:grep": {
+            "bytes": 5635,
+            "tokens": 1503
+          },
+          "tool:read": {
+            "bytes": 43839,
+            "tokens": 14832
+          },
+          "tool_calls": {
+            "bytes": 1882,
+            "tokens": 540
+          },
+          "tool_schemas": {
+            "bytes": 5400,
+            "tokens": 1132
+          },
+          "user": {
+            "bytes": 1479,
+            "tokens": 359
+          }
+        },
+        "framing_tokens": 1492
+      },
+      "resources": {
+        "harness_rss_mib": 39.4921875,
+        "model_server_rss_mib": 28807.1484375,
+        "gpu_mem_used_mib": 7161,
+        "samples": 737
+      }
+    },
+    {
+      "id": "locate-redis__redis-12472",
+      "category": "locate-heldout",
+      "model": "qwen3.6-35b-a3b",
+      "success": false,
+      "mode": "code",
+      "routed": "the change concerns auth; verification is unavailable (benchmark: direct mode only), so a change needs your go-ahead (direct.verify_fallback) (verify)",
+      "turns": 1,
+      "model_calls": 6,
+      "tool_calls": 7,
+      "tools": {
+        "grep": 4,
+        "read": 3
+      },
+      "prompt_tokens": 35727,
+      "cached_prompt_tokens": 28479,
+      "generated_tokens": 15904,
+      "peak_prompt_tokens": 9385,
+      "tool_result_bytes": 16891,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 0,
+      "files_read": 1,
+      "redundant_reads": 0,
+      "wall_seconds": 451.375706673,
+      "answer": "\n\n[output cut at the completion limit]",
+      "failed_checks": [
+        "answer does not match /(?:src/acl\\.c)/"
+      ],
+      "session_id": "20261028-081106-bdab",
+      "language": "c",
+      "failure_class": "model",
+      "agent_seconds": 450.952173687,
+      "tool_seconds": 0.13104568299999997,
+      "harness_seconds": 0.41297803900001995,
+      "phase_seconds": {
+        "project_map": 0.001803984,
+        "seed_pack": 0.288039672,
+        "working_set": 0.000078782
+      },
+      "tool_times": {
+        "grep": {
+          "calls": 4,
+          "seconds": 0.130415791,
+          "max_seconds": 0.037018757,
+          "result_bytes": 4390
+        },
+        "read": {
+          "calls": 3,
+          "seconds": 0.000629892,
+          "max_seconds": 0.000240887,
+          "result_bytes": 12501
+        }
+      },
+      "call_stats": {
+        "calls": 6,
+        "inference_seconds": 450.408149965,
+        "prefill_seconds": 12.948526,
+        "decode_seconds": 436.797435,
+        "ttft_median_ms": 2312.56564,
+        "ttft_max_ms": 2687.432504,
+        "reasoning_tokens": 15438,
+        "reasoning_count": "tokenizer",
+        "cache_invalidations": 0,
+        "cache_invalidations_after_rewrite": 0,
+        "recomputed_prompt_tokens": 0,
+        "peak_call": 5
+      },
+      "call_log": [
+        {
+          "prompt_tokens": 3185,
+          "cached_tokens": 2157,
+          "completion_tokens": 364,
+          "reasoning_tokens": 258,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2687.432504,
+          "prefill_ms": 2114.131,
+          "decode_ms": 9708.379,
+          "total_ms": 12396.12278,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 3518,
+          "cached_tokens": 3181,
+          "completion_tokens": 145,
+          "reasoning_tokens": 70,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1530.964902,
+          "prefill_ms": 1519.35,
+          "decode_ms": 3770.949,
+          "total_ms": 5302.03967,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 4939,
+          "cached_tokens": 3514,
+          "completion_tokens": 82,
+          "reasoning_tokens": 25,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2281.105974,
+          "prefill_ms": 2267.237,
+          "decode_ms": 2171.755,
+          "total_ms": 4453.120227,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 6355,
+          "cached_tokens": 4935,
+          "completion_tokens": 616,
+          "reasoning_tokens": 526,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2312.56564,
+          "prefill_ms": 2291.87,
+          "decode_ms": 16511.993,
+          "total_ms": 18824.823027,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 8345,
+          "cached_tokens": 6351,
+          "completion_tokens": 6505,
+          "reasoning_tokens": 6367,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2614.213968,
+          "prefill_ms": 2594.597,
+          "decode_ms": 177968.723,
+          "total_ms": 180583.671098,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 9385,
+          "cached_tokens": 8341,
+          "completion_tokens": 8192,
+          "reasoning_tokens": 8192,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2182.025602,
+          "prefill_ms": 2161.341,
+          "decode_ms": 226665.636,
+          "total_ms": 228848.373163,
+          "status": "ok",
+          "streamed": true
+        }
+      ],
+      "context": {
+        "call": 5,
+        "prompt_tokens": 9385,
+        "counting": "tokenizer",
+        "sections": {
+          "assistant": {
+            "bytes": 453,
+            "tokens": 104
+          },
+          "environment": {
+            "bytes": 696,
+            "tokens": 214
+          },
+          "project_map": {
+            "bytes": 946,
+            "tokens": 298
+          },
+          "seed_pack": {
+            "bytes": 280,
+            "tokens": 98
+          },
+          "system": {
+            "bytes": 2586,
+            "tokens": 537
+          },
+          "tool:grep": {
+            "bytes": 4390,
+            "tokens": 1542
+          },
+          "tool:read": {
+            "bytes": 12501,
+            "tokens": 4120
+          },
+          "tool_calls": {
+            "bytes": 382,
+            "tokens": 128
+          },
+          "tool_schemas": {
+            "bytes": 5400,
+            "tokens": 1132
+          },
+          "user": {
+            "bytes": 1170,
+            "tokens": 404
+          }
+        },
+        "framing_tokens": 808
+      },
+      "resources": {
+        "harness_rss_mib": 38.8125,
+        "model_server_rss_mib": 28242.82421875,
+        "gpu_mem_used_mib": 7161,
+        "samples": 452
+      }
+    },
+    {
+      "id": "locate-sphinx-doc__sphinx-10325",
+      "category": "locate-heldout",
+      "model": "qwen3.6-35b-a3b",
+      "success": true,
+      "mode": "code",
+      "routed": "a request for a change",
+      "turns": 1,
+      "model_calls": 5,
+      "tool_calls": 8,
+      "tools": {
+        "grep": 2,
+        "read": 6
+      },
+      "prompt_tokens": 28503,
+      "cached_prompt_tokens": 23003,
+      "generated_tokens": 1430,
+      "peak_prompt_tokens": 7641,
+      "tool_result_bytes": 12882,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 0,
+      "files_read": 2,
+      "redundant_reads": 0,
+      "wall_seconds": 50.238433676,
+      "answer": "Now I have a complete picture. Here are the files that would need to change:\n\n1. **`sphinx/ext/autodoc/__init__.py`** — This is the single file that needs changes:\n   - **`inherited_members_option` (line 112)**: Currently returns `arg` as-is (a string). It needs to parse a comma-separated list of class names and return a `Set[str]` (like `exclude_members_option` does), so it can accept multiple classes.\n   - **`is_filtered_inherited_member` (line 682–695)**: The comparison `cls.__name__ == self.options.inherited_members` compares a single string against a class name. It needs to check `cls.__name__ in self.options.inherited_members` (i.e., membership in a set of class names).\n   - **`Documenter.generate` (line 832)**: The check `self.options.inherited_members or` is a truthiness check that still works with a set (non-empty set is truthy), so no change needed there.\n   - **`ClassDocumenter.get_object_members` (line 1712)**: Similarly, `self.options.inherited_members` is used as a truthiness check, which still works with a set.\n\n2. **`doc/usage/extensions/autodoc.rst`** — The documentation for `inherited-members` would need to be updated to describe the new comma-separated list syntax.\n\n3. **`tests/test_ext_autodoc.py`** (around lines 760–795) — Existing tests would need to be updated (the `inherited-members` option is passed as a string like `\"Base\"` but with the new parsing it would become a set), and new tests should be added for the multi-class case.",
+      "session_id": "20261028-081838-84a1",
+      "language": "python",
+      "agent_seconds": 49.802176736,
+      "tool_seconds": 0.103393782,
+      "harness_seconds": 0.029485510000005474,
+      "phase_seconds": {
+        "project_map": 0.004790149,
+        "seed_pack": 0.000547656,
+        "working_set": 0.000080213
+      },
+      "tool_times": {
+        "grep": {
+          "calls": 2,
+          "seconds": 0.101827182,
+          "max_seconds": 0.067084713,
+          "result_bytes": 3537
+        },
+        "read": {
+          "calls": 6,
+          "seconds": 0.0015666000000000002,
+          "max_seconds": 0.000443814,
+          "result_bytes": 9345
+        }
+      },
+      "call_stats": {
+        "calls": 5,
+        "inference_seconds": 49.669297443999994,
+        "prefill_seconds": 11.586372,
+        "decode_seconds": 37.743598999999996,
+        "ttft_median_ms": 2170.865296,
+        "ttft_max_ms": 3808.890879,
+        "reasoning_tokens": 445,
+        "reasoning_count": "tokenizer",
+        "cache_invalidations": 0,
+        "cache_invalidations_after_rewrite": 0,
+        "recomputed_prompt_tokens": 0,
+        "peak_call": 4
+      },
+      "call_log": [
+        {
+          "prompt_tokens": 3053,
+          "cached_tokens": 2157,
+          "completion_tokens": 282,
+          "reasoning_tokens": 106,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2224.685204,
+          "prefill_ms": 1961.961,
+          "decode_ms": 7305.422,
+          "total_ms": 9530.321648,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 4316,
+          "cached_tokens": 3049,
+          "completion_tokens": 291,
+          "reasoning_tokens": 40,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2170.865296,
+          "prefill_ms": 2158.482,
+          "decode_ms": 7683.493,
+          "total_ms": 9854.538362,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 6585,
+          "cached_tokens": 4312,
+          "completion_tokens": 88,
+          "reasoning_tokens": 2,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 3808.890879,
+          "prefill_ms": 3791.165,
+          "decode_ms": 2302.569,
+          "total_ms": 6111.694646,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 6908,
+          "cached_tokens": 6581,
+          "completion_tokens": 370,
+          "reasoning_tokens": 295,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 1714.100647,
+          "prefill_ms": 1691.985,
+          "decode_ms": 9814.341,
+          "total_ms": 11528.79792,
+          "status": "ok",
+          "streamed": true
+        },
+        {
+          "prompt_tokens": 7641,
+          "cached_tokens": 6904,
+          "completion_tokens": 399,
+          "reasoning_tokens": 2,
+          "reasoning_source": "tokenizer",
+          "ttft_ms": 2005.790833,
+          "prefill_ms": 1982.779,
+          "decode_ms": 10637.774,
+          "total_ms": 12643.944868,
+          "status": "ok",
+          "streamed": true
+        }
+      ],
+      "context": {
+        "call": 4,
+        "prompt_tokens": 7641,
+        "counting": "tokenizer",
+        "sections": {
+          "assistant": {
+            "bytes": 172,
+            "tokens": 37
+          },
+          "environment": {
+            "bytes": 710,
+            "tokens": 218
+          },
+          "project_map": {
+            "bytes": 1397,
+            "tokens": 405
+          },
+          "system": {
+            "bytes": 2586,
+            "tokens": 537
+          },
+          "tool:grep": {
+            "bytes": 3537,
+            "tokens": 1066
+          },
+          "tool:read": {
+            "bytes": 9345,
+            "tokens": 2877
+          },
+          "tool_calls": {
+            "bytes": 719,
+            "tokens": 279
+          },
+          "tool_schemas": {
+            "bytes": 5400,
+            "tokens": 1132
+          },
+          "user": {
+            "bytes": 1318,
+            "tokens": 260
+          }
+        },
+        "framing_tokens": 830
+      },
+      "resources": {
+        "harness_rss_mib": 37.87109375,
+        "model_server_rss_mib": 27892.86328125,
+        "gpu_mem_used_mib": 7161,
+        "samples": 51
+      }
+    }
+  ],
+  "summary": {
+    "tasks": 16,
+    "passed": 11,
+    "pass_rate": 0.6875,
+    "model_calls_per_task": 8.6875,
+    "tool_calls_per_task": 10,
+    "prompt_tokens_per_task": 88747.375,
+    "prompt_cache_hit_rate": 0.8699405193674743,
+    "generated_tokens_per_task": 8429.375,
+    "tool_result_bytes_per_task": 25985.75,
+    "wall_seconds_per_task": 263.2176660474375,
+    "peak_prompt_tokens": 36627,
+    "elided": 6,
+    "recalls": 0,
+    "compactions": 0,
+    "checks_caught": 0,
+    "check_notes": 0,
+    "guard_refusals": 2,
+    "history_notes": 0,
+    "errors": 0,
+    "files_read_per_task": 3.3125,
+    "redundant_reads_per_task": 0.8125,
+    "agent_seconds_per_task": 262.86295887625,
+    "inference_seconds_per_task": 262.26384898893747,
+    "tool_seconds_per_task": 0.11945896743750001,
+    "harness_seconds_per_task": 0.479650919875014,
+    "reasoning_tokens_per_task": 7495.4375,
+    "ttft_median_ms": 2154.335551,
+    "cache_invalidations": 1,
+    "cache_invalidations_after_rewrite": 1,
+    "recomputed_prompt_tokens": 22612,
+    "processed_tokens_per_passed_task": 14075.09090909091,
+    "seconds_per_passed_task": 180.25052636518183,
+    "processed_tokens_per_failed_task": 32944.6,
+    "seconds_per_failed_task": 445.7453733484,
+    "failures": {
+      "model": 5
+    },
+    "peak_harness_rss_mib": 68.36328125,
+    "peak_model_server_rss_mib": 28842.69921875,
+    "peak_gpu_mem_used_mib": 7162
+  },
+  "settings": {
+    "approval": "auto",
+    "checks": true,
+    "context_tokens": 131072,
+    "history_notes": true,
+    "max_tool_output": 0,
+    "provider": "local",
+    "retrieval": "basic",
+    "seed_pack": true,
+    "working_set_tokens": 0
+  },
+  "by_category": [
+    {
+      "category": "locate-heldout",
+      "tasks": 16,
+      "passed": 11,
+      "pass_rate": 0.6875,
+      "model_calls_per_task": 8.6875,
+      "tool_calls_per_task": 10,
+      "prompt_tokens_per_task": 88747.375,
+      "prompt_cache_hit_rate": 0.8699405193674743,
+      "generated_tokens_per_task": 8429.375,
+      "tool_result_bytes_per_task": 25985.75,
+      "wall_seconds_per_task": 263.2176660474375,
+      "peak_prompt_tokens": 36627,
+      "elided": 6,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 0,
+      "check_notes": 0,
+      "guard_refusals": 2,
+      "history_notes": 0,
+      "errors": 0,
+      "files_read_per_task": 3.3125,
+      "redundant_reads_per_task": 0.8125,
+      "agent_seconds_per_task": 262.86295887625,
+      "inference_seconds_per_task": 262.26384898893747,
+      "tool_seconds_per_task": 0.11945896743750001,
+      "harness_seconds_per_task": 0.479650919875014,
+      "reasoning_tokens_per_task": 7495.4375,
+      "ttft_median_ms": 2154.335551,
+      "cache_invalidations": 1,
+      "cache_invalidations_after_rewrite": 1,
+      "recomputed_prompt_tokens": 22612,
+      "processed_tokens_per_passed_task": 14075.09090909091,
+      "seconds_per_passed_task": 180.25052636518183,
+      "processed_tokens_per_failed_task": 32944.6,
+      "seconds_per_failed_task": 445.7453733484,
+      "failures": {
+        "model": 5
+      },
+      "peak_harness_rss_mib": 68.36328125,
+      "peak_model_server_rss_mib": 28842.69921875,
+      "peak_gpu_mem_used_mib": 7162
+    }
+  ],
+  "by_language": [
+    {
+      "tasks": 2,
+      "passed": 2,
+      "pass_rate": 1,
+      "model_calls_per_task": 8.5,
+      "tool_calls_per_task": 9.5,
+      "prompt_tokens_per_task": 45896.5,
+      "prompt_cache_hit_rate": 0.877256435675923,
+      "generated_tokens_per_task": 1309.5,
+      "tool_result_bytes_per_task": 12215,
+      "wall_seconds_per_task": 52.356988711,
+      "peak_prompt_tokens": 7880,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 0,
+      "check_notes": 0,
+      "history_notes": 0,
+      "errors": 0,
+      "files_read_per_task": 1.5,
+      "redundant_reads_per_task": 3.5,
+      "language": "python",
+      "agent_seconds_per_task": 51.848437027,
+      "inference_seconds_per_task": 51.07203335049999,
+      "tool_seconds_per_task": 0.098860322,
+      "harness_seconds_per_task": 0.6775433545000029,
+      "reasoning_tokens_per_task": 474,
+      "ttft_median_ms": 2170.865296,
+      "cache_invalidations": 0,
+      "cache_invalidations_after_rewrite": 0,
+      "recomputed_prompt_tokens": 0,
+      "processed_tokens_per_passed_task": 6943,
+      "seconds_per_passed_task": 52.356988711,
+      "processed_tokens_per_failed_task": 0,
+      "seconds_per_failed_task": 0,
+      "peak_harness_rss_mib": 39.2734375,
+      "peak_model_server_rss_mib": 28199.453125,
+      "peak_gpu_mem_used_mib": 7161
+    },
+    {
+      "tasks": 1,
+      "passed": 0,
+      "pass_rate": 0,
+      "model_calls_per_task": 6,
+      "tool_calls_per_task": 11,
+      "prompt_tokens_per_task": 56830,
+      "prompt_cache_hit_rate": 0.7225761041703326,
+      "generated_tokens_per_task": 12009,
+      "tool_result_bytes_per_task": 42262,
+      "wall_seconds_per_task": 362.062143863,
+      "peak_prompt_tokens": 17903,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 0,
+      "check_notes": 0,
+      "history_notes": 0,
+      "errors": 0,
+      "files_read_per_task": 8,
+      "redundant_reads_per_task": 0,
+      "language": "javascript",
+      "agent_seconds_per_task": 361.948243959,
+      "inference_seconds_per_task": 361.756846462,
+      "tool_seconds_per_task": 0.11903768500000002,
+      "harness_seconds_per_task": 0.07235981200002538,
+      "reasoning_tokens_per_task": 11405,
+      "ttft_median_ms": 4519.921418,
+      "cache_invalidations": 0,
+      "cache_invalidations_after_rewrite": 0,
+      "recomputed_prompt_tokens": 0,
+      "processed_tokens_per_passed_task": 0,
+      "seconds_per_passed_task": 0,
+      "processed_tokens_per_failed_task": 27775,
+      "seconds_per_failed_task": 362.062143863,
+      "failures": {
+        "model": 1
+      },
+      "peak_harness_rss_mib": 34.9765625,
+      "peak_model_server_rss_mib": 28185.12109375,
+      "peak_gpu_mem_used_mib": 7161
+    },
+    {
+      "tasks": 2,
+      "passed": 1,
+      "pass_rate": 0.5,
+      "model_calls_per_task": 20.5,
+      "tool_calls_per_task": 25.5,
+      "prompt_tokens_per_task": 320820,
+      "prompt_cache_hit_rate": 0.8811779190823514,
+      "generated_tokens_per_task": 15546,
+      "tool_result_bytes_per_task": 84973.5,
+      "wall_seconds_per_task": 521.463888425,
+      "peak_prompt_tokens": 36627,
+      "elided": 6,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 0,
+      "check_notes": 0,
+      "history_notes": 0,
+      "errors": 0,
+      "files_read_per_task": 5.5,
+      "redundant_reads_per_task": 1,
+      "language": "rust",
+      "agent_seconds_per_task": 521.1980299935,
+      "inference_seconds_per_task": 520.6729065295,
+      "tool_seconds_per_task": 0.411348514,
+      "harness_seconds_per_task": 0.11377495000004616,
+      "reasoning_tokens_per_task": 13595,
+      "ttft_median_ms": 2536.932717,
+      "cache_invalidations": 1,
+      "cache_invalidations_after_rewrite": 1,
+      "recomputed_prompt_tokens": 22612,
+      "processed_tokens_per_passed_task": 26515,
+      "seconds_per_passed_task": 256.464281248,
+      "processed_tokens_per_failed_task": 80818,
+      "seconds_per_failed_task": 786.463495602,
+      "failures": {
+        "model": 1
+      },
+      "peak_harness_rss_mib": 39.2109375,
+      "peak_model_server_rss_mib": 28842.69921875,
+      "peak_gpu_mem_used_mib": 7161
+    },
+    {
+      "tasks": 2,
+      "passed": 2,
+      "pass_rate": 1,
+      "model_calls_per_task": 3.5,
+      "tool_calls_per_task": 1.5,
+      "prompt_tokens_per_task": 21398.5,
+      "prompt_cache_hit_rate": 0.7792134962731032,
+      "generated_tokens_per_task": 1786,
+      "tool_result_bytes_per_task": 7747.5,
+      "wall_seconds_per_task": 58.268728773999996,
+      "peak_prompt_tokens": 9353,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 0,
+      "check_notes": 0,
+      "guard_refusals": 2,
+      "history_notes": 0,
+      "errors": 0,
+      "files_read_per_task": 1,
+      "redundant_reads_per_task": 0,
+      "language": "go",
+      "agent_seconds_per_task": 58.15491541,
+      "inference_seconds_per_task": 58.030354586,
+      "tool_seconds_per_task": 0.0002345855,
+      "harness_seconds_per_task": 0.12432623849999958,
+      "reasoning_tokens_per_task": 1264,
+      "ttft_median_ms": 3839.160936,
+      "cache_invalidations": 0,
+      "cache_invalidations_after_rewrite": 0,
+      "recomputed_prompt_tokens": 0,
+      "processed_tokens_per_passed_task": 6510.5,
+      "seconds_per_passed_task": 58.268728773999996,
+      "processed_tokens_per_failed_task": 0,
+      "seconds_per_failed_task": 0,
+      "peak_harness_rss_mib": 37.96484375,
+      "peak_model_server_rss_mib": 27337.7265625,
+      "peak_gpu_mem_used_mib": 7161
+    },
+    {
+      "tasks": 2,
+      "passed": 2,
+      "pass_rate": 1,
+      "model_calls_per_task": 4,
+      "tool_calls_per_task": 4,
+      "prompt_tokens_per_task": 19870.5,
+      "prompt_cache_hit_rate": 0.7884552477290455,
+      "generated_tokens_per_task": 2037,
+      "tool_result_bytes_per_task": 8589,
+      "wall_seconds_per_task": 66.124427955,
+      "peak_prompt_tokens": 8172,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 0,
+      "check_notes": 0,
+      "history_notes": 0,
+      "errors": 0,
+      "files_read_per_task": 1.5,
+      "redundant_reads_per_task": 0,
+      "language": "ruby",
+      "agent_seconds_per_task": 65.443659574,
+      "inference_seconds_per_task": 64.3876753845,
+      "tool_seconds_per_task": 0.0188775385,
+      "harness_seconds_per_task": 1.0371066509999949,
+      "reasoning_tokens_per_task": 1545.5,
+      "ttft_median_ms": 2575.069385,
+      "cache_invalidations": 0,
+      "cache_invalidations_after_rewrite": 0,
+      "recomputed_prompt_tokens": 0,
+      "processed_tokens_per_passed_task": 6240.5,
+      "seconds_per_passed_task": 66.124427955,
+      "processed_tokens_per_failed_task": 0,
+      "seconds_per_failed_task": 0,
+      "peak_harness_rss_mib": 68.36328125,
+      "peak_model_server_rss_mib": 27766.171875,
+      "peak_gpu_mem_used_mib": 7161
+    },
+    {
+      "tasks": 2,
+      "passed": 2,
+      "pass_rate": 1,
+      "model_calls_per_task": 12.5,
+      "tool_calls_per_task": 15.5,
+      "prompt_tokens_per_task": 144860,
+      "prompt_cache_hit_rate": 0.9127433383956924,
+      "generated_tokens_per_task": 12424,
+      "tool_result_bytes_per_task": 31776,
+      "wall_seconds_per_task": 384.7794768405,
+      "peak_prompt_tokens": 22879,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 0,
+      "check_notes": 0,
+      "history_notes": 0,
+      "errors": 0,
+      "files_read_per_task": 6.5,
+      "redundant_reads_per_task": 2,
+      "language": "java",
+      "agent_seconds_per_task": 384.529092976,
+      "inference_seconds_per_task": 383.7146299195,
+      "tool_seconds_per_task": 0.2812997525,
+      "harness_seconds_per_task": 0.533163304000049,
+      "reasoning_tokens_per_task": 10709.5,
+      "ttft_median_ms": 2154.335551,
+      "cache_invalidations": 0,
+      "cache_invalidations_after_rewrite": 0,
+      "recomputed_prompt_tokens": 0,
+      "processed_tokens_per_passed_task": 25064,
+      "seconds_per_passed_task": 384.7794768405,
+      "processed_tokens_per_failed_task": 0,
+      "seconds_per_failed_task": 0,
+      "peak_harness_rss_mib": 39.4921875,
+      "peak_model_server_rss_mib": 28807.1484375,
+      "peak_gpu_mem_used_mib": 7161
+    },
+    {
+      "tasks": 1,
+      "passed": 0,
+      "pass_rate": 0,
+      "model_calls_per_task": 8,
+      "tool_calls_per_task": 8,
+      "prompt_tokens_per_task": 38674,
+      "prompt_cache_hit_rate": 0.8557945906810778,
+      "generated_tokens_per_task": 2938,
+      "tool_result_bytes_per_task": 12705,
+      "wall_seconds_per_task": 95.363486391,
+      "peak_prompt_tokens": 7706,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 0,
+      "check_notes": 0,
+      "history_notes": 0,
+      "errors": 0,
+      "files_read_per_task": 2,
+      "redundant_reads_per_task": 0,
+      "language": "typescript",
+      "agent_seconds_per_task": 95.266121988,
+      "inference_seconds_per_task": 95.21247410699999,
+      "tool_seconds_per_task": 0.020455284,
+      "harness_seconds_per_task": 0.03319259700000339,
+      "reasoning_tokens_per_task": 2046,
+      "ttft_median_ms": 2101.729561,
+      "cache_invalidations": 0,
+      "cache_invalidations_after_rewrite": 0,
+      "recomputed_prompt_tokens": 0,
+      "processed_tokens_per_passed_task": 0,
+      "seconds_per_passed_task": 0,
+      "processed_tokens_per_failed_task": 8515,
+      "seconds_per_failed_task": 95.363486391,
+      "failures": {
+        "model": 1
+      },
+      "peak_harness_rss_mib": 36.65234375,
+      "peak_model_server_rss_mib": 28063.265625,
+      "peak_gpu_mem_used_mib": 7161
+    },
+    {
+      "tasks": 2,
+      "passed": 1,
+      "pass_rate": 0.5,
+      "model_calls_per_task": 7.5,
+      "tool_calls_per_task": 8,
+      "prompt_tokens_per_task": 72710,
+      "prompt_cache_hit_rate": 0.8519598404621097,
+      "generated_tokens_per_task": 17455,
+      "tool_result_bytes_per_task": 23984,
+      "wall_seconds_per_task": 511.859732304,
+      "peak_prompt_tokens": 16405,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 0,
+      "check_notes": 0,
+      "history_notes": 0,
+      "errors": 0,
+      "files_read_per_task": 2.5,
+      "redundant_reads_per_task": 0,
+      "language": "c",
+      "agent_seconds_per_task": 511.5638560585,
+      "inference_seconds_per_task": 511.1841422995,
+      "tool_seconds_per_task": 0.06719519199999999,
+      "harness_seconds_per_task": 0.31251856699996927,
+      "reasoning_tokens_per_task": 16753,
+      "ttft_median_ms": 2312.56564,
+      "cache_invalidations": 0,
+      "cache_invalidations_after_rewrite": 0,
+      "recomputed_prompt_tokens": 0,
+      "processed_tokens_per_passed_task": 33286,
+      "seconds_per_passed_task": 572.343757935,
+      "processed_tokens_per_failed_task": 23152,
+      "seconds_per_failed_task": 451.375706673,
+      "failures": {
+        "model": 1
+      },
+      "peak_harness_rss_mib": 38.8125,
+      "peak_model_server_rss_mib": 28242.82421875,
+      "peak_gpu_mem_used_mib": 7162
+    },
+    {
+      "tasks": 2,
+      "passed": 1,
+      "pass_rate": 0.5,
+      "model_calls_per_task": 6,
+      "tool_calls_per_task": 6.5,
+      "prompt_tokens_per_task": 36671.5,
+      "prompt_cache_hit_rate": 0.8477837012393821,
+      "generated_tokens_per_task": 9404,
+      "tool_result_bytes_per_task": 11117.5,
+      "wall_seconds_per_task": 282.175270243,
+      "peak_prompt_tokens": 8475,
+      "elided": 0,
+      "recalls": 0,
+      "compactions": 0,
+      "checks_caught": 0,
+      "check_notes": 0,
+      "history_notes": 0,
+      "errors": 0,
+      "files_read_per_task": 3,
+      "redundant_reads_per_task": 0,
+      "language": "php",
+      "agent_seconds_per_task": 281.5584969975,
+      "inference_seconds_per_task": 280.56438955749996,
+      "tool_seconds_per_task": 0.0081093505,
+      "harness_seconds_per_task": 0.985998089500036,
+      "reasoning_tokens_per_task": 8897,
+      "ttft_median_ms": 2799.244342,
+      "cache_invalidations": 0,
+      "cache_invalidations_after_rewrite": 0,
+      "recomputed_prompt_tokens": 0,
+      "processed_tokens_per_passed_task": 5509,
+      "seconds_per_passed_task": 30.888506273,
+      "processed_tokens_per_failed_task": 24463,
+      "seconds_per_failed_task": 533.462034213,
+      "failures": {
+        "model": 1
+      },
+      "peak_harness_rss_mib": 38.20703125,
+      "peak_model_server_rss_mib": 28198.18359375,
+      "peak_gpu_mem_used_mib": 7162
+    }
+  ],
+  "environment": {
+    "build": "dev b158a2ffa4b5-dirty",
+    "os": "linux/amd64",
+    "cpu": "13th Gen Intel(R) Core(TM) i7-13620H",
+    "cpus": 16,
+    "mem_mib": 62741,
+    "gpu": "NVIDIA GeForce RTX 4060 Laptop GPU, 8188 MiB, 595.99.02",
+    "model": {
+      "file": "Qwen3.6-35B-A3B-UD-Q4_K_M.gguf",
+      "profile": "qwen3.6-35b-a3b",
+      "provider": "local",
+      "repo": "unsloth/Qwen3.6-35B-A3B-GGUF",
+      "revision": "a483e9e6cbd595906af30beda3187c2663a1118c",
+      "sampling": {
+        "min_p": 0,
+        "presence_penalty": 0,
+        "repeat_penalty": 0,
+        "temperature": 0.6,
+        "top_k": 20,
+        "top_p": 0.95
+      },
+      "server": {
+        "batch_size": 2048,
+        "cache_reuse": 0,
+        "cache_type_k": "q8_0",
+        "cache_type_v": "q8_0",
+        "ctx_size": 131072,
+        "extra_args": [],
+        "flash_attn": "on",
+        "gpu_layers": 999,
+        "jinja": true,
+        "mlock": false,
+        "n_cpu_moe": 35,
+        "no_mmap": false,
+        "parallel": 1,
+        "reasoning": "",
+        "reasoning_budget": 0,
+        "reasoning_budget_message": "",
+        "threads": 8,
+        "ubatch_size": 2048
+      },
+      "sha256": "ac0e2c1189e055faa36eff361580e79c5bd6f8e76bffb4ce547f167d53e31a61",
+      "size_bytes": 22134528992
+    },
+    "server": "llama.cpp 0.5.0-dev (build 11146, commit 7fe450e19)",
+    "toolchains": {
+      "docker": "Docker version 29.9.1, build dfc520d",
+      "git": "git version 2.53.0",
+      "node": "v24.22.0",
+      "python3": "Python 3.14.4"
+    },
+    "tasks_sha256": "24af01913d7f4237"
+  }
+}

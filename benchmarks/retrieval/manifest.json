@@ -1,0 +1,36 @@
+{
+  "name": "retrieval-2026-10",
+  "purpose": "Retrieval evaluated separately from patch correctness: for real issues, which of the files their fix changed does each retrieval approach put in front of the model, at what precision, context size and latency. See docs/benchmarks/retrieval-2026-10.md.",
+  "seed": "boundedcode-retrieval-2026-10-28:",
+  "datasets": {
+    "swe-bench-multilingual": {
+      "hf": "SWE-bench/SWE-bench_Multilingual",
+      "revision": "846e647b9f33c0b51b739d005d13d85493c9af09",
+      "file": "data/test-00000-of-00001.parquet",
+      "file_sha256": "92abca7cb527b41a9f66d03a26ce441ff7319e3a49f985998fd56be4bb9b08b2",
+      "license": "MIT"
+    },
+    "swe-bench-lite": {
+      "hf": "princeton-nlp/SWE-bench_Lite",
+      "revision": "6ec7bb89b9342f664a54a6e0a6ea6501d3437cc2",
+      "file": "data/test-00000-of-00001.parquet",
+      "file_sha256": "7a21f37b8bc179c7db5beeb14e88ac538ba283455c776e6b2535bbfb6e3551b4",
+      "license": "MIT"
+    }
+  },
+  "per_repo": 6,
+  "dev_share": 0.34,
+  "split_rule": "Per language, repositories are ordered by sha256(seed + repo); the first round(dev_share * n) (at least one when a language has three or more) are the development split, the rest held out. Instances: per repository, the first per_repo by sha256(seed + instance_id). Fixed before any retrieval was run on them.",
+  "languages": {
+    "apache/druid": "java", "apache/lucene": "java", "google/gson": "java", "javaparser/javaparser": "java", "projectlombok/lombok": "java", "reactivex/rxjava": "java",
+    "astral-sh/ruff": "rust", "burntsushi/ripgrep": "rust", "nushell/nushell": "rust", "sharkdp/bat": "rust", "tokio-rs/axum": "rust", "tokio-rs/tokio": "rust", "uutils/coreutils": "rust",
+    "axios/axios": "javascript", "babel/babel": "typescript", "facebook/docusaurus": "typescript", "immutable-js/immutable-js": "typescript", "mrdoob/three.js": "javascript", "preactjs/preact": "javascript", "vuejs/core": "typescript",
+    "briannesbitt/carbon": "php", "laravel/framework": "php", "php-cs-fixer/php-cs-fixer": "php", "phpoffice/phpspreadsheet": "php",
+    "caddyserver/caddy": "go", "gin-gonic/gin": "go", "gohugoio/hugo": "go", "hashicorp/terraform": "go", "prometheus/prometheus": "go",
+    "faker-ruby/faker": "ruby", "fastlane/fastlane": "ruby", "fluent/fluentd": "ruby", "jekyll/jekyll": "ruby", "jordansissel/fpm": "ruby", "rubocop/rubocop": "ruby",
+    "fmtlib/fmt": "cpp", "nlohmann/json": "cpp", "jqlang/jq": "c", "micropython/micropython": "c", "redis/redis": "c", "valkey-io/valkey": "c",
+    "django/django": "python", "sympy/sympy": "python", "matplotlib/matplotlib": "python", "scikit-learn/scikit-learn": "python", "pytest-dev/pytest": "python",
+    "sphinx-doc/sphinx": "python", "astropy/astropy": "python", "psf/requests": "python", "pylint-dev/pylint": "python", "pydata/xarray": "python",
+    "mwaskom/seaborn": "python", "pallets/flask": "python"
+  }
+}

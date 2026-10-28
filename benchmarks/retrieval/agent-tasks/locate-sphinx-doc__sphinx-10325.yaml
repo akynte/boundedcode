@@ -1,0 +1,14 @@
+# Held-out locate task (benchmarks/retrieval/agent_tasks.py) from sphinx-doc__sphinx-10325.
+# The fix changed: sphinx/ext/autodoc/__init__.py.
+id: locate-sphinx-doc__sphinx-10325
+category: locate-heldout
+language: python
+read_only: true
+source: "swe-bench sphinx-doc__sphinx-10325"
+sources:
+  sphinx: git:https://github.com/sphinx-doc/sphinx@7bdc11e87c7d86dcc2a087eccb7a7c129a473415
+repos: [sphinx]
+request: "inherited-members should support more than one class\n**Is your feature request related to a problem? Please describe.**\nI have two situations:\n- A class inherits from multiple other classes. I want to document members from some of the base classes but ignore some of the base classes\n- A module contains several class definitions that inherit from different classes that should all be ignored (e.g., classes that inherit from list or set or tuple). I want to ignore members from list, set, and tuple while documenting all other inherited members in classes in the module.\n\n**Describe the solution you'd like**\nThe :inherited-members: option to automodule should accept a list of classes. If any of these classes are encountered as base classes when instantiating autoclass documentation, they should be ignored.\n\n**Describe alternatives you've considered**\nThe alternative is to not use automodule, but instead manually enumerate several autoclass blocks for a module. This only addresses the second bullet in the problem description and not the first. It is also tedious for modules containing many class definitions.\n\n\n\n\n---\nInvestigate the code of this repository and answer: which file or files would need to change to fix the issue above? Give their paths relative to the repository root. Do not change any files."
+expect:
+  - "(?:sphinx/ext/autodoc/__init__\\.py)"
+timeout: 15m
