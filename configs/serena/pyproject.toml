@@ -31,4 +31,17 @@ package = false
 # environment contains no LGPL code (as done for the adapter's
 # lmnr-claude-code-proxy). Pillow, which pystray pulled in, is listed
 # directly. See docs/licensing/upstream-license-matrix.md.
-override-dependencies = ["pystray; sys_platform == 'never'"]
+#
+# Serena v1.7.0 pins its dependencies exactly. Two are raised past its pins
+# for security fixes, both within their major version: urllib3 (Serena
+# downloads language servers with requests) and Werkzeug (a patch release).
+# The other pinned packages with advisories are left as Serena locks them,
+# since no code path here reaches the vulnerable code: mcp's advisories
+# concern HTTP transports and clients (Serena runs as a stdio server), and
+# nothing in this environment imports filelock. See
+# docs/licensing/upstream-license-matrix.md.
+override-dependencies = [
+    "pystray; sys_platform == 'never'",
+    "urllib3>=2.8.0,<3",
+    "werkzeug>=3.1.9,<4",
+]

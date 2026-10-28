@@ -197,6 +197,19 @@ used on real work.
   verification counts) extends `ecosystem.IsTest` (what history notes
   count).
 
+### Dependency security updates (2026-10-28)
+
+- **OpenHands adapter environment:** aiohttp 3.14.5, Authlib 1.9.1,
+  certifi 2026.10.23, dnspython 2.9.0, fastmcp 3.4.11, filelock 4.2.4,
+  OpenTelemetry 1.45.1, Pillow 13.0.0 and pypdf 6.21.3. The OpenHands SDK
+  pin (1.51.0) is unchanged. The sandbox image must be rebuilt
+  (`bcode sandbox build`).
+- **Serena environment:** certifi 2026.10.23 and Pillow 13.0.0; urllib3
+  2.8.0 and Werkzeug 3.1.9 through overrides of Serena's exact pins. Serena
+  stays at v1.7.0. mcp and filelock stay at Serena's pins: none of their
+  advisories apply to how Serena runs here
+  ([license matrix](docs/licensing/upstream-license-matrix.md)).
+
 ### Adaptive retrieval: strategies chosen from the task, ranked by reliability
 
 - Direct mode looks up the places a message points at before the model's

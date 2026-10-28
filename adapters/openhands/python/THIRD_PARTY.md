@@ -7,7 +7,7 @@ Review notes are in docs/licensing/upstream-license-matrix.md (Python adapter de
 | verdict | package | version | license (metadata) |
 |---|---|---|---|
 | UNKNOWN | agent-client-protocol | 0.12.1 | (none) |
-| REVIEW | certifi | 2026.7.22 | Mozilla Public License 2.0 (MPL 2.0) |
+| REVIEW | certifi | 2026.10.23 | Mozilla Public License 2.0 (MPL 2.0) |
 | REVIEW | func_timeout | 4.3.5 | GNU Lesser General Public License v2 (LGPLv2) |
 | UNKNOWN | openhands-sdk | 1.51.0 | (none) |
 | UNKNOWN | openhands-tools | 1.51.0 | (none) |
@@ -17,13 +17,13 @@ Review notes are in docs/licensing/upstream-license-matrix.md (Python adapter de
 | ok | aiofile | 3.12.3 | Apache-2.0 |
 | ok | aiofiles | 25.1.0 | Apache Software License |
 | ok | aiohappyeyeballs | 2.7.1 | Python Software Foundation License |
-| ok | aiohttp | 3.14.3 | Apache-2.0 AND MIT |
+| ok | aiohttp | 3.14.5 | Apache-2.0 AND MIT |
 | ok | aiosignal | 1.4.0 | Apache Software License |
 | ok | annotated-types | 0.8.0 | MIT |
 | ok | anthropic | 0.125.0 | MIT License |
 | ok | anyio | 4.15.1 | MIT |
 | ok | attrs | 26.1.0 | MIT |
-| ok | Authlib | 1.8.0 | BSD License |
+| ok | Authlib | 1.9.1 | BSD License |
 | ok | backoff | 2.2.1 | MIT License |
 | ok | bc-openhands-adapter | 0.1.0 | Apache-2.0 |
 | ok | beartype | 0.22.9 | MIT License |
@@ -46,15 +46,15 @@ Review notes are in docs/licensing/upstream-license-matrix.md (Python adapter de
 | ok | cyclopts | 5.1.1 | Apache-2.0 |
 | ok | deprecation | 2.1.0 | Apache Software License |
 | ok | distro | 1.9.0 | Apache Software License |
-| ok | dnspython | 2.8.0 | ISC License (ISCL) |
+| ok | dnspython | 2.9.0 | ISC |
 | ok | docstring_parser | 0.18.0 | MIT License |
 | ok | email-validator | 2.3.0 | The Unlicense (Unlicense) |
 | ok | exceptiongroup | 1.3.1 | MIT License |
 | ok | fakeredis | 2.39.0 | BSD-3-Clause |
-| ok | fastmcp | 3.4.7 | Apache-2.0 |
-| ok | fastmcp-slim | 3.4.7 | Apache-2.0 |
+| ok | fastmcp | 3.4.11 | Apache-2.0 |
+| ok | fastmcp-slim | 3.4.11 | Apache-2.0 |
 | ok | fastuuid | 0.14.0 | BSD License |
-| ok | filelock | 4.0.9 | MIT |
+| ok | filelock | 4.2.4 | MIT |
 | ok | frozenlist | 1.8.0 | Apache-2.0 |
 | ok | fsspec | 2026.9.0 | BSD-3-Clause |
 | ok | google-api-core | 2.40.0 | Apache Software License |
@@ -111,22 +111,22 @@ Review notes are in docs/licensing/upstream-license-matrix.md (Python adapter de
 | ok | ollama | 0.6.3 | MIT |
 | ok | openai | 2.54.0 | Apache Software License |
 | ok | openapi-pydantic | 0.6.0 | MIT License |
-| ok | opentelemetry-api | 1.45.0 | Apache-2.0 |
+| ok | opentelemetry-api | 1.45.1 | Apache-2.0 |
 | ok | opentelemetry-exporter-http-transport | 0.66b0 | Apache-2.0 |
 | ok | opentelemetry-exporter-otlp-common | 0.66b0 | Apache-2.0 |
 | ok | opentelemetry-exporter-otlp-proto-common | 1.45.0 | Apache-2.0 |
 | ok | opentelemetry-exporter-otlp-proto-grpc | 1.45.0 | Apache-2.0 |
 | ok | opentelemetry-exporter-otlp-proto-http | 1.45.0 | Apache-2.0 |
-| ok | opentelemetry-instrumentation | 0.66b0 | Apache-2.0 |
-| ok | opentelemetry-instrumentation-threading | 0.66b0 | Apache-2.0 |
+| ok | opentelemetry-instrumentation | 0.66b1 | Apache-2.0 |
+| ok | opentelemetry-instrumentation-threading | 0.66b1 | Apache-2.0 |
 | ok | opentelemetry-proto | 1.45.0 | Apache-2.0 |
-| ok | opentelemetry-sdk | 1.45.0 | Apache-2.0 |
-| ok | opentelemetry-semantic-conventions | 0.66b0 | Apache-2.0 |
+| ok | opentelemetry-sdk | 1.45.1 | Apache-2.0 |
+| ok | opentelemetry-semantic-conventions | 0.66b1 | Apache-2.0 |
 | ok | opentelemetry-semantic-conventions-ai | 0.4.13 | Apache Software License |
 | ok | packaging | 26.3 | Apache-2.0 OR BSD-2-Clause |
 | ok | pathable | 0.6.0 | Apache Software License |
 | ok | pfzy | 0.3.4 | MIT License |
-| ok | pillow | 12.3.0 | MIT-CMU |
+| ok | pillow | 13.0.0 | MIT-CMU |
 | ok | platformdirs | 4.12.2 | MIT |
 | ok | pluggy | 1.6.0 | MIT License |
 | ok | portalocker | 2.10.1 | BSD License |
@@ -147,7 +147,7 @@ Review notes are in docs/licensing/upstream-license-matrix.md (Python adapter de
 | ok | PyJWT | 2.15.1 | MIT |
 | ok | PyOTP | 2.10.0 | MIT |
 | ok | pyparsing | 3.3.3 | MIT |
-| ok | pypdf | 6.19.0 | BSD-3-Clause |
+| ok | pypdf | 6.21.3 | BSD-3-Clause |
 | ok | pyperclip | 1.11.0 | BSD License |
 | ok | pytest | 9.1.1 | MIT |
 | ok | python-dateutil | 2.9.0.post0 | BSD License; Apache Software License |

@@ -144,6 +144,21 @@ Findings (2026-10-03):
 No GPL, AGPL or SSPL packages are present. The Serena application itself is
 MIT at the pinned release.
 
+Security overrides (2026-10-28). Serena v1.7.0 pins its dependencies
+exactly. Two are raised past those pins, within their major version, with
+`override-dependencies` entries:
+- `urllib3` 2.7.0 → 2.8.0, which Serena reaches through `requests` when it
+  downloads language servers;
+- `Werkzeug` 3.1.7 → 3.1.9, a patch release.
+
+Both keep their licenses (MIT, BSD-3-Clause). The integration tests pass
+in this environment. Two packages with advisories stay at Serena's pins
+because no code path here reaches the vulnerable code:
+- `mcp` 1.28.1: the advisories concern HTTP transports, server bearer-token
+  authentication and client-side fetches, and Serena runs as a stdio
+  server;
+- `filelock` 3.25.2: nothing in the environment imports it.
+
 ## Python adapter dependencies
 
 The adapter is not part of the Go binary. It is installed from PyPI into a
