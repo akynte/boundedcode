@@ -34,6 +34,7 @@
 | [Evaluation overview](benchmarks/README.md) | What was measured, how to read it, and its limits |
 | [Comparative evaluation (2026-10)](../benchmarks/comparative-2026-10/report.md) | BoundedCode vs. the same agent and model without it: protocol, results, deviations |
 | [Baseline (2026-10-27)](benchmarks/baseline-2026-10.md) | Architecture inventory, language-support matrix, three runs per mode with pinned environment, where time, tokens and memory go, run-to-run noise, and how to compare a change with it |
+| [Verification benchmark (2026-10)](benchmarks/verification-benchmark-2026-10.md) | False acceptance and false rejection of the verification pipeline, before and after test integrity and mutation, in Go, Python, JavaScript, TypeScript, Rust, Java and a mixed repository |
 | [Direct-mode suite (2026-10)](benchmarks/direct-mode-suite-2026-10.md) | The everyday agent on 13 tasks and 2 sessions with the local model: pass rate, tool calls, cache hits, time, per change |
 | [Project detection](benchmarks/ecosystem-detection-2026-10.md) | Projects found in any language on 12 public repositories, with what was missed and fixed |
 | [Lease study](benchmarks/lease-study-2026-10.md) · [trail study](benchmarks/trail-study-2026-10.md) | Whether a request's text, or a repository's history, predicts what a change touches; measured on real commits before building on it |

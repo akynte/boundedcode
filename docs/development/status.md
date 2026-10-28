@@ -74,6 +74,14 @@ Direct-mode suite, two runs against the baseline (`benchmarks/reports/20261028-d
 - the one failure (`session-ledger`, an answer-wording check) also occurred in the baseline's repeat run.
 
 Not used on real work in languages other than Go. |
+| Verification 2.0: eight layers with per-repository evidence, test integrity, bounded mutation assessment (Go AST, Python tokenizer, C-family lexer), optional counterexamples, `bcode bench verify` | experimental | [Verification](../usage/verification.md#verification-layers), [benchmark](../benchmarks/verification-benchmark-2026-10.md).
+
+On a 36-case corpus in 7 language groups, with hidden tests as ground truth, in the Docker sandbox:
+- false acceptance fell from 14/21 to 7/21, with false rejection 0/15;
+- `mutation: strict` reaches 0/21 at 6/15 rejection (correct changes whose tests check one input);
+- mutation adds about 10 s a case.
+
+The corpus is synthetic and small: it shows what each layer catches, not a rate on real work. Counterexamples are tested with scripted proposals only; they were not measured with a model. The lexical mutation provider is unit-tested for C++ and PHP, and not run for Kotlin, C, C#, Swift, Dart, Scala or Groovy projects. |
 | Daemon, GUI | planned | |
 | Release packaging, SBOM | implemented | `make dist` (binaries and SBOMs for linux, darwin and windows on amd64 and arm64, reproducible licenses archive, checksums), `scripts/sbom`; published as v0.1.0-alpha.1 (source), v0.1.0-alpha.2 (linux/amd64 binary) v0.1.0-alpha.3 (six binaries with SBOMs), v0.1.0-alpha.4 (the same, adding the cross-repository gate), v0.1.0-alpha.5 (built and attested by the `release` workflow from the tag; SBOMs reproducible) and v0.1.0-alpha.6 (licenses archive reproducible regardless of umask). The workflow only drafts a release; publishing needs maintainer approval. |
 | Local escalation tier (switch to a stronger local model before frontier) | planned | motivated by the 4/4 vs 1/4 result in ADR-0007 |

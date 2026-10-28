@@ -15,7 +15,41 @@ test captures a change in behaviour, not proof that the change is correct.
 |---|---|
 | **builds** | It compiles and lints. |
 | **`tests_green`** | The repository's checks pass. On its own this is weak evidence: in the initial validation, patches that changed nothing passed the existing tests. A task that ends here is reported as UNVERIFIED and is never presented as a verified merge candidate. |
-| **`TASK_VERIFIED`** | The checks pass **and** there is behavioural evidence (below) in every repository whose code the change modifies. In a multi-repository task, every gRPC, protobuf or OpenAPI link that the change affects must also be `compatible`. |
+| **`TASK_VERIFIED`** | The checks pass **and** there is behavioural evidence (below) in every repository whose code the change modifies. In a multi-repository task, every gRPC, protobuf or OpenAPI link that the change affects must also be `compatible`. The change must not touch how its own tests run (test integrity, below), and every layer configured as `required` must hold. |
+| **`incomplete`** | Verification could not judge the change: a required tool is missing from the sandbox, or the engine failed. The task is blocked, not handed back to the agent. |
+
+A label can carry **strength qualifiers** from the optional layers:
+- `mutation established`: the tests fail on most mutants of the changed lines;
+- `mutation weak`: many mutants survive;
+- `N boundary untested`: mutants that move a bound (`<` to `<=`) survive;
+- `counterexamples checked`;
+- `counterexample found`.
+
+These qualifiers do not lower the label unless the layer is configured as
+`required`. A label never claims more than the layers show. A required
+layer that was skipped, unavailable or inconclusive withholds
+`TASK_VERIFIED`.
+
+## Verification layers
+
+Each layer is chosen by capability: what a stage does, which languages
+have a mutation provider, which tools are installed. It is not written for
+one language. `bcode task show` and the task view list every layer's
+outcome; the task stores them as `evidence`.
+
+| Layer | What it checks | How |
+|---|---|---|
+| 1 Syntax and structure | the change parses and is formatted | stages of kind `syntax` (gofmt on changed files); during the task, the per-file checks of [Languages](languages.md) |
+| 2 Build and types | it compiles and type-checks | stages of kind `build` (`go build`, `go vet`, `tsc`, `cargo build`, `mvn test-compile`, CMake) |
+| 3 Repository tests | the existing tests pass, and the change does not weaken them | stages of kind `test`, and the test-integrity layer |
+| 4 Targeted tests | the change brings tests for what it changes | the test files it adds or modifies (Go: impact-selected packages during iteration) |
+| 5 Behavioural difference | those tests fail on the base and pass on the change | [below](#behavioural-evidence) |
+| 6 Mutation | the tests fail when the changed lines are broken | [below](#mutation-assessment); on by default, advisory |
+| 7 Counterexamples | independent tests find no wrong behaviour | [below](#counterexamples); off by default |
+| 8 Contracts | cross-repository links still hold | [below](#cross-repository-compatibility-experimental) |
+
+A stage's kind is set with `kind:` in `.boundedcode/verification.yaml`, or
+inferred from its name and command.
 
 ## Behavioural evidence
 
@@ -115,11 +149,108 @@ change which stages run. The diff-scope check fails a change that touches
 secret paths or protected paths (`.boundedcode/`, `.github/workflows/`,
 `.gitlab-ci.yml`, `.gitmodules`, CODEOWNERS).
 
-The agent can still edit tests and build scripts in its worktree, for
-example a `package.json` `test` script. The stages catch mistakes, not an
-adversarial agent: only human review, or hidden acceptance tests in a
-benchmark, catches that. See the sandbox's
-[residual risks](../design/sandbox.md#residual-risks-known-accepted-for-now).
+The commands those stages run still read the candidate's files. The
+**test-integrity layer** checks the change for ways it can make its own
+verification pass without testing anything. The rules come from the build
+systems' and languages' descriptors, not from one language.
+
+**Block** (verification fails; the agent is told to revert):
+- a test script that verification runs: `package.json` `test`, `pretest`
+  and `posttest`, or the recipe of a Makefile's `test` or `check` target;
+- a wrapper or tool configuration: `gradlew`, `mvnw`, `.mvn/`,
+  `gradle/wrapper/`, `.cargo/config.toml` (whose `runner = "true"` makes
+  tests "pass"), `rust-toolchain`, `.npmrc` (`script-shell`), `.yarnrc*`,
+  `bunfig.toml`, `.bazelrc`, `global.json`;
+- a runner switch that stops tests running or failing: `skipTests`,
+  `maven.test.skip`, `testFailureIgnore`, Gradle `ignoreFailures`,
+  `enabled = false`, Cargo `test = false` or `harness = false`.
+
+**Review** (verification may pass; `TASK_VERIFIED` is withheld, and the
+agent is asked once to revert or justify):
+- test-runner configuration: `pytest.ini`, `conftest.py`, `tox.ini`, the
+  pytest sections of `pyproject.toml` and `setup.cfg`, `jest.config.*`,
+  `vitest.config.*`, `.mocharc*`, `karma.conf.*`, `playwright.config.*`,
+  `phpunit.xml`, `.rspec`, `Rakefile`, Maven surefire and Gradle test
+  blocks, Cargo `[[test]]`, CTest registration, `*.runsettings`;
+- a deleted test file that was not moved;
+- assertions removed from a test without as many added;
+- a line added to a test that skips, disables or focuses tests, in that
+  language. Examples: `t.Skip`, `//go:build ignore`, `@pytest.mark.skip`,
+  `@unittest.skip`, `it.skip`, `test.only`, `xit`, `@Ignore`, `@Disabled`,
+  `#[ignore]`, `markTestSkipped`, `[Ignore]`, `XCTSkip`, `GTEST_SKIP`.
+
+Changes to the same files that do not affect how tests run are not
+flagged: a dependency in `package.json`, `pyproject.toml` or `Cargo.toml`,
+or another Makefile target.
+
+A deliberately adversarial test, for example one that detects where it
+runs, is still caught only by review or hidden acceptance tests. See the
+sandbox's [residual risks](../design/sandbox.md#residual-risks-known-accepted-for-now).
+
+## Mutation assessment
+
+Tests that pass show little if they would also pass with the change
+broken. After the full gate and behavioural evidence pass, the lines the
+change added or modified are mutated, a few at a time. The repository's
+own test stages run on each mutant, in a scratch copy, in the sandbox:
+
+| Language | Provider | Mutations |
+|---|---|---|
+| Go | its syntax tree | negated relational and logical operators, `+`/`-`, negated `if` conditions, `++`/`--`, booleans, bool and numeric return values; bounds |
+| Python | its own tokenizer (strings and comments are tokens), each mutant parsed by Python's parser | negated comparisons, `and`/`or`, binary `+`/`-`, `True`/`False`, returned integers; bounds |
+| JavaScript, TypeScript, Java, Kotlin, Rust, C, C++, C#, Swift, Dart, Scala, Groovy, PHP | a lexer that never touches strings, characters, template literals or comments, and changes only operators written between spaces (so not generics), booleans, returned integers and comparison bounds: same types in and out | |
+| other languages | none: reported as unavailable | |
+
+How mutants are counted:
+- A mutant that does not parse, build or load is **invalid** and set
+  aside; it is never counted against the tests. So is a test run that fails
+  with a compile or load error.
+- A mutant whose tests time out is counted apart.
+- **Boundary** mutants (`<` to `<=`, a bound + 1) are run and reported, not
+  scored. They find untested edges, but are often equivalent to the
+  original: `clamp(v)` at `v == max` returns `max` either way. Surviving
+  ones appear as "N boundary untested".
+- **Established**: the tests kill at least 60% of the scored mutants, with
+  at least 3 valid mutants in all. **Weak**: fewer are killed.
+  **Inconclusive**: too few valid mutants.
+
+The assessment is bounded: by default 8 mutants and 5 minutes per
+repository (`task.verification.mutation_mutants`, `mutation_budget`).
+
+A surviving mutant is not proof of weak tests, since it may be equivalent.
+So the assessment never rejects a change. Weak tests are asked about once
+("add assertions that would fail on these mutants"), then reported.
+
+Two stricter settings change the label:
+- `task.verification.mutation: required`: `TASK_VERIFIED` needs the
+  assessment to be established.
+- `strict`: additionally, every boundary mutant must be killed.
+
+In the benchmark below, `required` made no difference. The wrong changes
+were off-by-one fixes whose tests kill every scored mutant; only `strict`
+told them apart. It also withholds `TASK_VERIFIED` from correct changes
+whose tests check a single input.
+
+## Counterexamples
+
+Optional (`task.verification.counterexamples: on` or `required`). The
+task's model, in a context of its own, writes up to two new test files in
+the project's own framework. It sees the request, the diff and one
+existing test for conventions, never the author's conversation. The
+proposal is a claim, not proof. Each test runs alone, in the sandbox, on
+the change and on the base:
+
+| Outcome | Meaning |
+|---|---|
+| none found | the test passes on the change |
+| regression | fails on the change, passes on the base |
+| fails on the change | fails on the change and on the base, or cannot run on the base: the change does not do what the test expects, or the expectation is wrong |
+| invalid | does not compile or load, is not a new test file, or no test stage runs it; discarded |
+
+A failing counterexample is put to the agent once. The agent fixes the
+code if the test is right, or says why it is wrong. The counterexample
+lowers the label only when the layer is `required`. Generated tests can be
+wrong, so a model's judgement never decides the outcome; only the runs do.
 
 ## Known limits
 
@@ -158,6 +289,15 @@ Measured or reproduced. The
   and [verification honesty](../benchmarks/targeted-engineering-pass-2026-10.md#verification-honesty-in-the-development-checks).
 - **Adversarial tests.** A deliberately adversarial test, for example one
   that detects where it runs, is caught only by review.
+
+## Measured
+
+See [the verification benchmark](../benchmarks/verification-benchmark-2026-10.md):
+one specification implemented in Go, Python, JavaScript, TypeScript, Rust,
+Java and a mixed Go and Node repository, with correct changes, wrong
+changes and weakened tests. Each change's correctness is checked with
+hidden acceptance tests. False acceptance and false rejection are reported
+separately, per pipeline, with the time each takes.
 
 ## Configuration
 

@@ -197,6 +197,49 @@ used on real work.
   verification counts) extends `ecosystem.IsTest` (what history notes
   count).
 
+### Verification 2.0: layers, test integrity, mutation, counterexamples
+
+- Verification is eight capability-driven layers, each recorded per
+  repository on the task (`evidence`; `bcode task show`, the task view):
+  1. syntax;
+  2. build and types;
+  3. repository tests and test integrity;
+  4. targeted tests;
+  5. behavioural difference;
+  6. mutation;
+  7. counterexamples;
+  8. contracts.
+
+  The labels are unchanged (`tests_green`, `task_verified`; `incomplete`
+  when verification could not run) and gain strength qualifiers. A
+  required layer that did not hold withholds `task_verified`.
+- **Test integrity**, from build-system and language descriptors:
+  - **block**, failing verification: a change to the test script, a
+    wrapper or tool configuration (`gradlew`, `.mvn/`,
+    `.cargo/config.toml`, `.npmrc`, …), or a runner switch that stops tests
+    running or failing;
+  - **review**, withholding `task_verified` and asking the agent once:
+    runner configuration, a deleted test, removed assertions, or a skip,
+    disable or focus marker added in the test's language.
+- **Mutation assessment** of the changed lines (default on, advisory;
+  `required`; `strict`). Providers:
+  - Go, from its syntax tree;
+  - Python, from its tokenizer and parser;
+  - a conservative lexical provider for 13 C-like languages.
+
+  Invalid mutants are set aside, never counted against the tests. Boundary
+  mutants are reported, not scored. The assessment is bounded (8 mutants,
+  5 minutes). Surviving mutants are put to the agent once.
+- **Counterexamples** (optional): the task's model, in a separate context
+  (the request and the diff), proposes tests. Each runs alone on the
+  change and the base, in the sandbox. Only what the runs show is
+  recorded.
+- `bcode bench verify`: the corpus in 7 language groups, with hidden
+  acceptance tests. False acceptance fell from 14/21 to 7/21 with no
+  false rejection (0/15); `strict` reaches 0/21 at 6/15 rejection of
+  correct changes with one-input tests. Mutation adds about 10 s a case.
+  See [the benchmark](docs/benchmarks/verification-benchmark-2026-10.md).
+
 ### Languages: a capability architecture for any language
 
 - One registry of language descriptors (`internal/lang`), about 50

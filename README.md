@@ -107,6 +107,18 @@ it runs, and when its work counts as done.
    (a control run), and must pass with the change. If no test does, the
    agent is asked once for one. Without it, the task ends `tests_green`
    (UNVERIFIED), never as a verified merge candidate.
+   The checks also cover:
+   - **test integrity**: a change to how its own tests run is reverted or
+     withheld. That means a test script, a wrapper such as `gradlew` or
+     `.cargo/config.toml`, the runner's configuration, a skip or focus
+     marker, or removed assertions;
+   - **mutation assessment**: the changed lines are mutated, to see whether
+     the tests notice;
+   - optional **independent counterexamples**.
+
+   On a 36-case corpus in seven language groups, wrongly accepted changes
+   fell from 14 of 21 to 7, with no correct change rejected
+   ([benchmark](docs/benchmarks/verification-benchmark-2026-10.md)).
 5. **Durable tasks.** Task state and an audit log are kept in a SQLite
    ledger. A task resumes after Ctrl-C, a crash or a reboot. Running out of attempts,
    tokens or time blocks a task; it does not fail it.

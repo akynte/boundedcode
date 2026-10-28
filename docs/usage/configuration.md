@@ -126,6 +126,17 @@ change approach. Stopping does not by itself escalate to the frontier.
 | `contract` | `true` | Before the first attempt, derive a compact task contract from the request with the task's model (the local model, or the cloud provider when one is selected): what is required, alternatives the request explicitly allows, constraints, what is out of scope, open questions, and acceptance evidence. It is shown to the agent; the request stays authoritative. HTML comments (issue-template instructions) are removed from the request first, and a contract that names nothing required is asked for once more. |
 | `ambiguity` | `ask` | What a *material* ambiguity does (plausible readings that change behaviour, an API, data, security, compatibility, tests or output; implementation choices do not count). Before either policy applies, each material ambiguity is checked against the request text with one more local-model call: it is dropped, and the reason recorded as a task decision, when the request's own words settle it (for example an expected output) or when fewer than two of its readings are supported by a quote from the request. If that check fails, the ambiguity stays material. `ask`: the task blocks before implementation with the questions (SPEC_AMBIGUOUS); answer with `task run TASK --clarify "..."`. `proceed`: the ambiguity is recorded and the agent states and demonstrates the reading it chose (used by benchmarks). Explicitly allowed alternatives never block. |
 
+### `task.verification`
+
+The optional verification layers of a bounded task ([Verification](verification.md#verification-layers)).
+
+| Key | Default | Meaning |
+|---|---|---|
+| `mutation` | `on` | Mutation assessment of the changed lines: `off`, `on` (reported, the label is not lowered), `required` (`TASK_VERIFIED` needs it established), `strict` (and every boundary mutant killed). |
+| `mutation_mutants` | `8` | Mutants per repository. |
+| `mutation_budget` | `5m` | Time per repository. |
+| `counterexamples` | `off` | Independent tests from the task's model in a separate context, run on the change and the base: `off`, `on`, `required`. |
+
 ### `direct`
 
 Direct mode: the native agent loop that works in your checkout (the chat's
