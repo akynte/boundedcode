@@ -197,6 +197,66 @@ used on real work.
   verification counts) extends `ecosystem.IsTest` (what history notes
   count).
 
+### Inference protocol: reasoning in the history, recovered failures, structured output
+
+- **The model sees its own reasoning again** where its chat template
+  renders it ([reference](docs/usage/inference.md)). Neither mode sent it
+  back before: Qwen3.6's template and llama-server keep `reasoning_content`
+  in every turn, so the model read empty reasoning blocks and every call
+  processed the previous answer again. The gateway asks the server
+  (`/props`) once, and sends the reasoning back only where the template
+  reads it. In bounded mode, whose agent drops it, the gateway restores it
+  from what it kept of each answer (kept in the task directory, so a resumed
+  task has it too). Cloud providers are unchanged: Anthropic thinking
+  blocks and Gemini thought signatures were already replayed, and no API
+  is sent reasoning it does not take. `inference.reasoning_history`
+  (`auto`, `keep`, `drop`) overrides the choice.
+- **Measured** ([benchmark](docs/benchmarks/inference-2026-10.md)):
+  - direct-mode suite: 42 of 46 in both arms, the same tasks failing; 9%
+    fewer prompt tokens processed, 16% less prompt time, time to the first
+    token 1,662 ms against 1,757 ms; prompts 11% larger;
+  - bounded suite: 18 and 19 of 19 (the one failure is the baseline's known
+    false verification on the same task); 29% fewer uncached prompt tokens
+    and 22% less prompt time per task.
+- **Failures recovered, not passed on:**
+  - a stream that breaks off is no longer taken as a complete answer; it
+    is discarded and sent once more (the TUI and `chat -p` say so), and an
+    error event keeps its status;
+  - local requests race llama-server closing an idle connection: they are
+    now replayable (`Idempotency-Key`) and retried on connection failures
+    and 500s, up to 3 attempts. This was the cause of the three HTTP 502s
+    in the retrieval benchmark;
+  - a context overflow has one shape for every provider
+    (`context_length_exceeded`), so direct mode summarises on Anthropic's
+    and Gemini's wording too;
+  - an answer without choices is a 502 that names it; tool calls without
+    an id, a type or arguments are completed.
+- **Structured output** (`task.structured_output`, on by default):
+  contract, ambiguity-check and counterexample calls send their schema as
+  each provider takes it: `response_format` (llama.cpp grammar, OpenAI),
+  `output_config.format` (Anthropic) and `responseJsonSchema` (Gemini).
+  A provider that rejects it gets the request without it. On 37 held-out
+  issues, counterexample tests were usable 36 times instead of 34; the
+  other calls were already always parseable. The main loop keeps native
+  tool calling.
+- **Prompt progress:** llama-server reports how far it has read a long
+  prompt; the TUI shows it while the model has not started answering
+  ("reading the conversation: 300 of 1.0k new tokens (8.0k cached)").
+- **Cache attribution:** each call records the first message the request
+  changed and the prompt tokens the server evaluated, so a cache miss can
+  be told from a rewrite of the history; `bench direct` reports the
+  evaluated tokens and prompt time per task.
+- **llama.cpp settings** in model profiles: `ctx_checkpoints`,
+  `checkpoint_min_step`, `cache_ram_mib`, `reasoning_preserve` and
+  `op_offload_min_batch`. The Qwen3.6-35B-A3B profile sets the offload
+  threshold to 256: prompt steps of 57–124 new tokens take 0.43–0.82 s
+  instead of 0.80–1.15 s, and the same as before from about 170 tokens. A
+  user profile that replaces the server section (as `bench infra --apply`
+  writes) does not get it.
+- **Benchmark:** `bcode bench structured` compares prompt-only and
+  schema-constrained calls on the held-out issues; `bench direct` and
+  `bench tasks` take `--reasoning-history`.
+
 ### Dependency security updates (2026-10-28)
 
 - **OpenHands adapter environment:** aiohttp 3.14.5, Authlib 1.9.1,

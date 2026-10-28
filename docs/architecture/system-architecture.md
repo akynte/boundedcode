@@ -135,7 +135,8 @@ Interfaces exist only where replacement is plausible:
 |---|---|---|
 | `inference.Runtime` | `internal/inference` | `llamacpp` (managed or external) |
 | `inference.Upstream` **[exp]** | `internal/inference` | `OpenAIUpstream` (llama-server and OpenAI-compatible APIs), `AnthropicUpstream` (official Go SDK), `GeminiUpstream` (REST) |
-| `inference.ReplayStore` **[exp]** | `internal/inference` | file-backed store of provider reasoning blocks for verbatim replay |
+| `inference.ReplayStore` **[exp]** | `internal/inference` | file-backed store of provider reasoning blocks for verbatim replay (Anthropic thinking, Gemini thought signatures, and a local model's `reasoning_content` that the agent runtime's history dropped) |
+| `inference.CapabilityReporter` | `internal/inference` | what a provider's model supports (streaming, reasoning round trip, structured output, prompt progress), read from llama.cpp's `/props` or assumed from the provider's API; see [Inference protocol](../usage/inference.md) |
 | `agent.Runtime` | `internal/agent` | `openhands` (adapter) and `scripted` (deterministic, for tests) |
 | — (concrete) **[exp]** | `internal/direct` | the direct-mode loop and its tools (ADR-0011); sessions as JSONL files |
 | — (concrete) **[exp]** | `internal/ecosystem` | projects in any language found in a tree (build system, commands, package manager, missing tools, CI) and test files by each language's conventions; used by direct mode's project map and history notes |

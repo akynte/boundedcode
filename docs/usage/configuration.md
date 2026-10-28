@@ -48,6 +48,7 @@ strings (`90s`, `10m`, `4h`).
 | `startup_timeout` | `5m` | Time allowed for the managed server to load the model. |
 | `request_timeout` | `10m` | Bound on one completion; also detects stalls. |
 | `idle_sleep` | `30m` | The managed server unloads the model after this much inactivity and reloads it on the next request. `0s` disables; negative values are rejected. |
+| `reasoning_history` | `auto` | How the model's reasoning travels with the conversation. `auto`: it is sent back where the local model's chat template renders it, so the model reads its earlier turns as it wrote them and the server's prompt cache stays valid; never to cloud APIs that do not take it. `keep`: always (for an OpenAI-compatible service that asks for `reasoning_content` in tool-call turns). `drop`: never. Anthropic and Gemini replay their own thinking regardless. See [Inference protocol](inference.md#reasoning-in-the-history). |
 
 ### Local model choice
 
@@ -60,7 +61,12 @@ Profiles record `status` (`validated`, `experimental`, or `review` for a
 license under review, which is never offered), the pinned `source.revision`,
 `source.size_bytes` and `source.sha256`, and an optional `source.license_notice`
 shown before download. A user profile that overrides a built-in one for the
-same file keeps the built-in revision, checksum and status.
+same file keeps the built-in revision, checksum and status. It replaces the
+built-in `server` section as a whole, so server settings added to the
+built-in profile later (such as `reasoning_budget` or
+`op_offload_min_batch`) do not apply until the override has them too. The
+prompt-cache and offload keys are in
+[Inference protocol](inference.md#llamacpp-server-settings).
 
 ### Model provider
 
@@ -124,6 +130,7 @@ change approach. Stopping does not by itself escalate to the frontier.
 | Key | Default | Meaning |
 |---|---|---|
 | `contract` | `true` | Before the first attempt, derive a compact task contract from the request with the task's model (the local model, or the cloud provider when one is selected): what is required, alternatives the request explicitly allows, constraints, what is out of scope, open questions, and acceptance evidence. It is shown to the agent; the request stays authoritative. HTML comments (issue-template instructions) are removed from the request first, and a contract that names nothing required is asked for once more. |
+| `structured_output` | `true` | The calls whose JSON the control plane parses (the contract, its ambiguity check, verification's counterexample tests) send the reply's JSON schema, as each provider takes it: `response_format` (llama.cpp, OpenAI), `output_config.format` (Anthropic), `responseJsonSchema` (Gemini). A provider that rejects it is asked again without. `false`: the prompt alone asks for the JSON. See [Inference protocol](inference.md#structured-output). |
 | `ambiguity` | `ask` | What a *material* ambiguity does (plausible readings that change behaviour, an API, data, security, compatibility, tests or output; implementation choices do not count). Before either policy applies, each material ambiguity is checked against the request text with one more local-model call: it is dropped, and the reason recorded as a task decision, when the request's own words settle it (for example an expected output) or when fewer than two of its readings are supported by a quote from the request. If that check fails, the ambiguity stays material. `ask`: the task blocks before implementation with the questions (SPEC_AMBIGUOUS); answer with `task run TASK --clarify "..."`. `proceed`: the ambiguity is recorded and the agent states and demonstrates the reading it chose (used by benchmarks). Explicitly allowed alternatives never block. |
 
 ### `task.verification`
