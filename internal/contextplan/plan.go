@@ -15,10 +15,12 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/akynte/boundedcode/internal/gitops"
 	"github.com/akynte/boundedcode/internal/policy"
 	"github.com/akynte/boundedcode/internal/repointel"
+	"github.com/akynte/boundedcode/internal/retrieve"
 	"github.com/akynte/boundedcode/internal/task"
 	"github.com/akynte/boundedcode/internal/telemetry"
 	"github.com/akynte/boundedcode/internal/verify"
@@ -356,32 +358,73 @@ func impactSection(ctx context.Context, in Inputs) string {
 }
 
 var (
-	identRE    = regexp.MustCompile("`([A-Za-z_][A-Za-z0-9_.]*)`|\\b([A-Z][a-z0-9]+(?:[A-Z][a-z0-9]+)+|[a-z]+(?:[A-Z][a-z0-9]+)+)\\b")
-	fileLineRE = regexp.MustCompile(`([A-Za-z0-9_./-]+\.(?:go|ts|tsx|js|py|rs|java)):(\d+)`)
+	identRE = regexp.MustCompile("`([A-Za-z_][A-Za-z0-9_.]*)`|\\b([A-Z][a-z0-9]+(?:[A-Z][a-z0-9]+)+|[a-z]+(?:[A-Z][a-z0-9]+)+)\\b")
 )
 
-// codeSection prefers exact sources: lines referenced by failures, then
+// codeSection prefers exact sources: where the failures point, then
 // symbols named in the request (see requestSymbols for backend routing).
 func codeSection(ctx context.Context, in Inputs, st *IntelStats) string {
 	var b strings.Builder
-	// 1. file:line references from verification output, read from disk.
-	refs := map[string]bool{}
-	for _, r := range in.Verification {
-		for _, f := range r.Failures() {
-			for _, m := range fileLineRE.FindAllStringSubmatch(f.Output, -1) {
-				key := r.Repository + "|" + m[1] + "|" + m[2]
-				if refs[key] || len(refs) >= 6 {
-					continue
-				}
-				refs[key] = true
-				if snip := readAround(in.Worktrees, r.Repository, m[1], atoi(m[2]), 12); snip != "" {
-					fmt.Fprintf(&b, "### %s %s:%s\n```\n%s\n```\n", r.Repository, m[1], m[2], snip)
-				}
+	b.WriteString(failureSources(ctx, in, st))
+	b.WriteString(requestSymbols(ctx, in, st))
+	return b.String()
+}
+
+// failureStrategies are the retrieval strategies driven by verification
+// output; the request's names are requestSymbols' (ADR-0008 routing).
+var failureOnly = map[retrieve.Strategy]bool{retrieve.Lexical: true, retrieve.Symbols: true, retrieve.Graph: true, retrieve.Discovery: true,
+	retrieve.Contracts: true, retrieve.DocsConfig: true, retrieve.History: true, retrieve.Modules: true, retrieve.Paths: true}
+
+const maxFailureSources = 6
+
+// failureSources shows where the latest failures point, in any language
+// (internal/retrieve): stack frames, compiler, linter and test-runner
+// locations, and the code the failing tests exercise, with the lines
+// around each, per repository.
+func failureSources(ctx context.Context, in Inputs, st *IntelStats) string {
+	var b strings.Builder
+	shown := 0
+	for _, w := range in.Worktrees {
+		var evidence []string
+		for _, r := range in.Verification {
+			if r.Repository != w.RepoName {
+				continue
+			}
+			for _, f := range r.Failures() {
+				evidence = append(evidence, f.Digest+"\n"+f.Output)
+			}
+		}
+		if len(evidence) == 0 || shown >= maxFailureSources {
+			continue
+		}
+		res, err := retrieve.Retrieve(ctx, retrieve.Input{Evidence: evidence}, retrieve.Options{Root: w.Path, Budget: 3 * time.Second, Limit: maxFailureSources, Disable: failureOnly})
+		if err != nil {
+			continue
+		}
+		st.RetrievalMillis += res.Millis
+		for _, s := range res.Steps {
+			if s.Ran && s.Found > 0 {
+				st.Retrieval = append(st.Retrieval, w.RepoName+":"+string(s.Strategy))
+			}
+		}
+		for _, it := range res.Items {
+			if shown >= maxFailureSources {
+				break
+			}
+			shown++
+			why := ""
+			if len(it.Why) > 0 {
+				why = " (" + strings.ReplaceAll(string(it.Why[0].Strategy), "_", " ") + ": " + trunc1(it.Why[0].Anchor, 80) + ")"
+			}
+			if it.Line <= 0 {
+				fmt.Fprintf(&b, "### %s %s%s\n", w.RepoName, it.File, why)
+				continue
+			}
+			if snip := readAround([]task.Worktree{w}, w.RepoName, it.File, it.Line, 12); snip != "" {
+				fmt.Fprintf(&b, "### %s %s:%d%s\n```\n%s```\n", w.RepoName, it.File, it.Line, why, snip)
 			}
 		}
 	}
-	// 2. Symbols named in the request.
-	b.WriteString(requestSymbols(ctx, in, st))
 	return b.String()
 }
 

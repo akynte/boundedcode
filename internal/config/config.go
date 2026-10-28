@@ -136,6 +136,10 @@ type DirectConfig struct {
 	// quoted errors) in the project before the first model call and sends
 	// the places found with the message (default true).
 	SeedPack *bool `yaml:"seed_pack,omitempty"`
+	// Retrieval chooses how that lookup works: "adaptive" (the default:
+	// strategies selected from the request and the evidence collected so
+	// far, internal/retrieve) or "basic" (the request's names by grep).
+	Retrieval string `yaml:"retrieval,omitempty"`
 	// HistoryNotes names, after a file change in a git repository, the
 	// files its history usually changes together with that file
 	// (default true).
@@ -634,6 +638,11 @@ func (c Config) Validate() error {
 		if v.val != "" && !strings.Contains(v.ok, "|"+v.val+"|") {
 			errs = append(errs, fmt.Errorf("direct.sandbox.%s: %q is not %s", v.key, v.val, strings.Trim(v.ok, "|")))
 		}
+	}
+	switch c.Direct.Retrieval {
+	case "", "adaptive", "basic":
+	default:
+		errs = append(errs, fmt.Errorf("direct.retrieval: %q is not adaptive|basic", c.Direct.Retrieval))
 	}
 	switch c.Direct.VerifyFallback {
 	case "", "ask", "refuse", "allow":

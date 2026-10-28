@@ -12,6 +12,10 @@ type Diagnostic struct {
 	Line    int
 	Col     int
 	Message string
+	// Symbol is the function a stack frame names ("" when the runtime
+	// prints none); Language the language whose format matched (frames).
+	Symbol   string
+	Language string
 }
 
 func (d Diagnostic) String() string {
@@ -87,4 +91,68 @@ func group(re *regexp.Regexp, m []string, name string) string {
 		return m[i]
 	}
 	return ""
+}
+
+// ParseFrames finds the stack frames in output (panics, exceptions,
+// failed tests' traces), in every registered language's format, innermost
+// (the failing call) first within each trace. Repeated frames are dropped;
+// at most max are returned.
+func ParseFrames(out string, max int) []Diagnostic {
+	type pat struct {
+		re   *regexp.Regexp
+		lang *Language
+	}
+	var pats []pat
+	for _, l := range All() {
+		for _, re := range l.Frames {
+			pats = append(pats, pat{re, l})
+		}
+	}
+	seen := map[string]bool{}
+	var res []Diagnostic
+	// A trace printed innermost last (Python) is reversed as a block.
+	var block []Diagnostic
+	flush := func() {
+		for i := len(block) - 1; i >= 0; i-- {
+			res = append(res, block[i])
+		}
+		block = nil
+	}
+	for _, line := range strings.Split(out, "\n") {
+		line = strings.TrimRight(line, "\r")
+		matched := false
+		for _, p := range pats {
+			m := p.re.FindStringSubmatch(line)
+			if m == nil {
+				continue
+			}
+			d := Diagnostic{File: group(p.re, m, "file"), Symbol: group(p.re, m, "symbol"), Language: p.lang.ID}
+			d.Line, _ = strconv.Atoi(group(p.re, m, "line"))
+			d.Col, _ = strconv.Atoi(group(p.re, m, "col"))
+			if d.File == "" || d.Line == 0 {
+				break
+			}
+			matched = true
+			key := d.File + ":" + strconv.Itoa(d.Line)
+			if seen[key] {
+				break
+			}
+			seen[key] = true
+			if p.lang.FramesInnermostLast {
+				block = append(block, d)
+			} else {
+				flush()
+				res = append(res, d)
+			}
+			break
+		}
+		if !matched && len(block) > 0 && !strings.HasPrefix(line, " ") {
+			flush()
+		}
+	}
+	flush()
+	if max > 0 && len(res) > max {
+		res = res[:max]
+	}
+	return res
 }

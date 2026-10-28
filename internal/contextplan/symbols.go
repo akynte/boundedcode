@@ -43,6 +43,10 @@ type IntelStats struct {
 	Seeds          []string `json:"seeds,omitempty"`
 	DiagnosticHits int      `json:"diagnostic_hits"`
 	Demoted        []string `json:"demoted,omitempty"`
+	// Retrieval lists the strategies ("repo:strategy") that located the
+	// failures' sources, RetrievalMillis their time (internal/retrieve).
+	Retrieval       []string `json:"retrieval,omitempty"`
+	RetrievalMillis float64  `json:"retrieval_ms,omitempty"`
 }
 
 // Limits keep symbol context compact: the point of LSP navigation is to send
@@ -480,6 +484,8 @@ func isDocFile(p string) bool {
 func looksLikePath(s string) bool {
 	return pathRE.MatchString(s) && pathRE.FindString(s) == s || fileNameRE.MatchString(s)
 }
+
+var pathRE = regexp.MustCompile(`\b((?:[\w.-]+/)+[\w.-]+\.[a-z]{1,5})\b`)
 
 var fileNameRE = regexp.MustCompile(`^[\w-]+\.(go|ts|tsx|js|jsx|mjs|cjs|py|rs|java|vue|rb|c|h|cc|cpp|yaml|yml|json|toml|tf)$`)
 

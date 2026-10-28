@@ -71,6 +71,10 @@ type TaskSpec struct {
 	InterruptAfter config.Duration `yaml:"interrupt_after"`
 	// Source records where the task comes from (dataset and instance id).
 	Source string `yaml:"source"`
+	// ReadOnly runs the direct-mode task with the read-only tool set (no
+	// edits, only safe commands): for questions about third-party code
+	// that must not be built or run.
+	ReadOnly bool `yaml:"read_only,omitempty"`
 }
 
 // Turn is one follow-up message of a direct-mode session task.

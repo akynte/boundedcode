@@ -166,3 +166,11 @@ func (r *Runner) seedMatches(ctx context.Context, root, name string) string {
 	}
 	return fmt.Sprintf("- %s: %s", name, strings.Join(parts, ", "))
 }
+
+// SeedPackFor is the block a new session's first message would carry for
+// request in root, with no session state: the retrieval benchmark's
+// baseline.
+func SeedPackFor(ctx context.Context, root, request string) string {
+	r := &Runner{Opts: Options{Root: root}}
+	return r.seedPack(ctx, request)
+}

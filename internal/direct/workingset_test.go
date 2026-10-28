@@ -271,6 +271,7 @@ func roles(ms []Message) []string {
 func TestSeedPackFindsTheNamedCode(t *testing.T) {
 	up := &scripted{replies: []reply{{text: "ok"}}}
 	r, root, _ := newRunner(t, up, ApprovalAuto)
+	r.Opts.Retrieval = "basic"
 	if err := os.MkdirAll(filepath.Join(root, "internal/ledger"), 0o755); err != nil {
 		t.Fatal(err)
 	}

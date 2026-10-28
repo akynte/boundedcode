@@ -24,6 +24,28 @@ func re(s ...string) []*regexp.Regexp {
 	return out
 }
 
+// Stack-frame formats (Language.Frames). A frame names the file, the line
+// and, where the runtime prints it, the function.
+var (
+	goFrames = re(`^\s+(?P<file>\S+\.go):(?P<line>\d+)(?: \+0x[0-9a-f]+)?\s*$`)
+	jsFrames = re(`^\s*at (?:async )?(?:(?P<symbol>[^\s(]+) \()?(?:file://)?(?P<file>[^\s()]+?\.(?:[cm]?[jt]sx?|vue|svelte)):(?P<line>\d+):(?P<col>\d+)\)?`)
+	pyFrames = re(`^\s*File "(?P<file>[^"]+)", line (?P<line>\d+)(?:, in (?P<symbol>[\w<>.]+))?`)
+	// rustc prints "panicked at src/x.rs:2:5" (and, before 1.73, the
+	// message first); backtraces print "at ./src/x.rs:5:5".
+	rustFrames = re(`panicked at (?:'[^']*', )?(?P<file>[^\s:']+\.rs):(?P<line>\d+):(?P<col>\d+)`,
+		`^\s+at (?:\./)?(?P<file>[^\s:]+\.rs):(?P<line>\d+):(?P<col>\d+)`)
+	// The JVM prints the class's file name only; its package is in the
+	// symbol ("at com.acme.Orders.total(Orders.java:42)").
+	jvmFrames    = re(`^\s*at (?P<symbol>[\w$.<>/]+)\((?P<file>[\w$-]+\.(?:java|kt|kts|scala|groovy)):(?P<line>\d+)\)`)
+	nativeFrames = re(`#\d+\s+0x[0-9a-f]+ in (?P<symbol>\S+) (?:\([^)]*\) )?(?P<file>\S+\.(?:c|cc|cpp|cxx|h|hh|hpp)):(?P<line>\d+)`)
+	csFrames     = re("^\\s*at (?P<symbol>[\\w.<>`+\\[\\], ]+)\\(.*\\) in (?P<file>.+?\\.cs):line (?P<line>\\d+)")
+	phpFrames    = re(`^#\d+ (?P<file>[^\s(]+\.php)\((?P<line>\d+)\): (?P<symbol>[\w\\:>-]+)`, ` in (?P<file>\S+\.php):(?P<line>\d+)`)
+	rubyFrames   = re("^\\s*(?:from )?(?P<file>[^\\s:]+\\.rb):(?P<line>\\d+):in [`'](?:[\\w:]+[#.])?(?P<symbol>[^'`]+)'")
+	swiftFrames  = re(`^\d+\s+\S+\s+0x[0-9a-f]+ (?P<symbol>.+?) \+ \d+ at (?P<file>\S+\.swift):(?P<line>\d+)`, `file (?P<file>\S+\.swift), line (?P<line>\d+)`)
+	dartFrames   = re(`^#\d+\s+(?P<symbol>\S+) \((?:package:\w+/|file://)?(?P<file>[^\s:]+\.dart):(?P<line>\d+)(?::(?P<col>\d+))?\)`)
+	elixirFrames = re(`^\s*(?:\([\w ]+[\d.]*\) )?(?P<file>[\w/.-]+\.exs?):(?P<line>\d+): (?P<symbol>[\w.]+/\d+)`)
+)
+
 // pyParse parses a Python file without importing it or writing bytecode.
 const pyParse = "import ast,sys\nsrc=open(sys.argv[1],'rb').read()\nast.parse(src, sys.argv[1])\n"
 
@@ -40,7 +62,7 @@ func init() {
 // Note says so.
 func builtins() []Language {
 	return []Language{
-		{ID: "go", Mutation: "go", Skips: re(`\bt\.Skip(?:f|Now)?\(`, `^//go:build\s`, `^// \+build\s`), Name: "Go", Kind: KindProgramming, Extensions: []string{".go"},
+		{ID: "go", Frames: goFrames, Mutation: "go", Skips: re(`\bt\.Skip(?:f|Now)?\(`, `^//go:build\s`, `^// \+build\s`), Name: "Go", Kind: KindProgramming, Extensions: []string{".go"},
 			Definitions: re(`^func\s+(?:\([^)]*\)\s*)?(?P<name>\w+)`, `^type\s+(?P<name>\w+)`, `^(?:var|const)\s+(?P<name>\w+)`,
 				`^\t(?P<name>[A-Za-z_]\w*)\s+(?:struct|interface)\b`),
 			Tests:   re(`_test\.go$`),
@@ -51,7 +73,7 @@ func builtins() []Language {
 			Format: []Tool{{Name: "gofmt", Bin: "gofmt", Args: []string{"-w", "{file}"}, Mutates: true}},
 			Lint:   []Tool{{Name: "golangci-lint", Bin: "golangci-lint", Args: []string{"run", "{dir}"}}, {Name: "staticcheck", Bin: "staticcheck", Args: []string{"{pkg}"}}},
 			LSP:    []Tool{{Name: "gopls", Bin: "gopls"}}},
-		{ID: "javascript", Mutation: "c-family", Skips: jsSkips, Name: "JavaScript", Kind: KindProgramming, Extensions: []string{".js", ".mjs", ".cjs", ".jsx"}, Shebangs: []string{"node", "nodejs", "bun", "deno"},
+		{ID: "javascript", Frames: jsFrames, Mutation: "c-family", Skips: jsSkips, Name: "JavaScript", Kind: KindProgramming, Extensions: []string{".js", ".mjs", ".cjs", ".jsx"}, Shebangs: []string{"node", "nodejs", "bun", "deno"},
 			Definitions: jsDefinitions,
 			Tests:       re(`\.(test|spec)\.[cm]?jsx?$`, `(^|/)__tests__/`),
 			Check:       &Check{What: "node parse", Tools: []string{"node"}, Args: []string{"--check", "{file}"}, Only: []string{".js", ".mjs", ".cjs"}},
@@ -59,7 +81,7 @@ func builtins() []Language {
 			Lint:        []Tool{{Name: "eslint", Bin: "eslint", Args: []string{"{file}"}}},
 			LSP:         []Tool{{Name: "typescript-language-server", Bin: "typescript-language-server", Args: []string{"--stdio"}}},
 			Note:        "JSX is not parsed by node; the project's build or tests check it"},
-		{ID: "typescript", Mutation: "c-family", Skips: jsSkips, Name: "TypeScript", Kind: KindProgramming, Extensions: []string{".ts", ".tsx", ".mts", ".cts", ".d.ts"},
+		{ID: "typescript", Frames: jsFrames, Mutation: "c-family", Skips: jsSkips, Name: "TypeScript", Kind: KindProgramming, Extensions: []string{".ts", ".tsx", ".mts", ".cts", ".d.ts"},
 			Definitions: append(re(`^(?:export\s+)?(?:declare\s+)?(?:abstract\s+)?(?:interface|type|enum|namespace|module)\s+(?P<name>[\w$]+)`), jsDefinitions...),
 			Tests:       re(`\.(test|spec)\.[cm]?tsx?$`, `(^|/)__tests__/`),
 			Format:      []Tool{{Name: "prettier", Bin: "prettier", Args: []string{"--write", "{file}"}, Mutates: true}},
@@ -67,7 +89,7 @@ func builtins() []Language {
 			LSP:         []Tool{{Name: "typescript-language-server", Bin: "typescript-language-server", Args: []string{"--stdio"}}},
 			Diagnostics: re(`^(?P<file>[^\s(]+\.[cm]?tsx?)\((?P<line>\d+),(?P<col>\d+)\):\s*(?P<msg>.*)`),
 			Note:        "no per-file check: types need the project (its typecheck or build script, tsc --noEmit)"},
-		{ID: "python", Mutation: "python", Skips: re(`@pytest\.mark\.(?:skip|skipif|xfail)\b`, `\bpytest\.(?:skip|xfail)\(`, `@unittest\.(?:skip|skipIf|skipUnless|expectedFailure)\b`, `\.skipTest\(`, `__test__\s*=\s*False`), Name: "Python", Kind: KindProgramming, Extensions: []string{".py", ".pyi", ".pyw"}, Shebangs: []string{"python", "python3", "python2", "pypy", "pypy3"},
+		{ID: "python", Frames: pyFrames, FramesInnermostLast: true, Mutation: "python", Skips: re(`@pytest\.mark\.(?:skip|skipif|xfail)\b`, `\bpytest\.(?:skip|xfail)\(`, `@unittest\.(?:skip|skipIf|skipUnless|expectedFailure)\b`, `\.skipTest\(`, `__test__\s*=\s*False`), Name: "Python", Kind: KindProgramming, Extensions: []string{".py", ".pyi", ".pyw"}, Shebangs: []string{"python", "python3", "python2", "pypy", "pypy3"},
 			Definitions: re(`^\s*(?:async\s+)?def\s+(?P<name>\w+)`, `^\s*class\s+(?P<name>\w+)`, `^(?P<name>[A-Z][A-Z0-9_]+)\s*(?::[^=]+)?=`),
 			Tests:       re(`(^|/)test_[^/]*\.py$`, `_tests?\.py$`, `(^|/)tests?/.*\.py$`, `(^|/)conftest\.py$`),
 			Check:       &Check{What: "python parse", Tools: []string{"python3", "python"}, Args: []string{"-c", pyParse, "{file}"}},
@@ -75,7 +97,7 @@ func builtins() []Language {
 			Lint:        []Tool{{Name: "ruff", Bin: "ruff", Args: []string{"check", "{file}"}}, {Name: "flake8", Bin: "flake8", Args: []string{"{file}"}}, {Name: "pylint", Bin: "pylint", Args: []string{"{file}"}}},
 			LSP:         []Tool{{Name: "pyright", Bin: "pyright-langserver", Args: []string{"--stdio"}}, {Name: "pylsp", Bin: "pylsp"}, {Name: "jedi-language-server", Bin: "jedi-language-server"}},
 			Diagnostics: re(`File "(?P<file>[^"]+)", line (?P<line>\d+)`)},
-		{ID: "rust", Mutation: "c-family", Skips: re(`#\[ignore\b`, `#\[cfg\(not\(test\)\)\]`), Name: "Rust", Kind: KindProgramming, Extensions: []string{".rs"},
+		{ID: "rust", Frames: rustFrames, Mutation: "c-family", Skips: re(`#\[ignore\b`, `#\[cfg\(not\(test\)\)\]`), Name: "Rust", Kind: KindProgramming, Extensions: []string{".rs"},
 			Definitions: re(`^\s*(?:pub(?:\([^)]*\))?\s+)?(?:default\s+)?(?:const\s+)?(?:async\s+)?(?:unsafe\s+)?(?:extern\s+"[^"]*"\s+)?fn\s+(?P<name>\w+)`,
 				`^\s*(?:pub(?:\([^)]*\))?\s+)?(?:struct|enum|trait|union|type|mod)\s+(?P<name>\w+)`,
 				`^\s*(?:unsafe\s+)?impl(?:<[^>]*>)?\s+(?:[\w:<>, ]+\s+for\s+)?(?P<name>[\w:]+)`, `^\s*macro_rules!\s*(?P<name>\w+)`),
@@ -85,7 +107,7 @@ func builtins() []Language {
 			LSP:         []Tool{{Name: "rust-analyzer", Bin: "rust-analyzer"}},
 			Diagnostics: re(`-->\s*(?P<file>[^:\s]+\.rs):(?P<line>\d+):(?P<col>\d+)`),
 			Note:        "no per-file check: cargo check (the project's build) is the check"},
-		{ID: "java", Mutation: "c-family", Skips: re(`@(?:Ignore|Disabled|DisabledIf\w*|EnabledIf\w*)\b`, `\bAssumptions?\.assume\w*\(`, `\bAssume\.assume\w*\(`), Name: "Java", Kind: KindProgramming, Extensions: []string{".java"},
+		{ID: "java", Frames: jvmFrames, Mutation: "c-family", Skips: re(`@(?:Ignore|Disabled|DisabledIf\w*|EnabledIf\w*)\b`, `\bAssumptions?\.assume\w*\(`, `\bAssume\.assume\w*\(`), Name: "Java", Kind: KindProgramming, Extensions: []string{".java"},
 			Definitions: re(`^\s*(?:(?:public|protected|private|static|final|abstract|sealed|non-sealed|strictfp)\s+)*(?:class|interface|enum|record|@interface)\s+(?P<name>\w+)`,
 				`^\s+(?:(?:public|protected|private|static|final|abstract|synchronized|native|default)\s+)+(?:<[^>]+>\s+)?[\w<>\[\],.? ]+\s+(?P<name>\w+)\s*\(`),
 			Tests:  re(`(^|/)src/test/.*\.java$`, `Tests?\.java$`, `IT\.java$`),
@@ -94,28 +116,28 @@ func builtins() []Language {
 			Diagnostics: re(`^(?P<file>[^:\s]+\.java):(?P<line>\d+): (?:error|warning): (?P<msg>.*)`,
 				`\[(?:ERROR|WARNING)\] (?P<file>[^:\s\[]+\.java):\[(?P<line>\d+),(?P<col>\d+)\] (?P<msg>.*)`),
 			Note: "no per-file check: compiling needs the class path (the project's Maven or Gradle build)"},
-		{ID: "kotlin", Mutation: "c-family", Skips: re(`@(?:Ignore|Disabled)\b`, `\bassume\w*\(`), Name: "Kotlin", Kind: KindProgramming, Extensions: []string{".kt", ".kts"},
+		{ID: "kotlin", Frames: jvmFrames, Mutation: "c-family", Skips: re(`@(?:Ignore|Disabled)\b`, `\bassume\w*\(`), Name: "Kotlin", Kind: KindProgramming, Extensions: []string{".kt", ".kts"},
 			Definitions: re(`^\s*(?:(?:public|private|internal|protected|open|abstract|sealed|data|inline|value|enum|annotation|override|suspend|operator|infix|tailrec|external|const|lateinit)\s+)*(?:class|interface|object|fun|typealias|val|var)\s+(?:<[^>]*>\s*)?(?:[\w.]+\.)?(?P<name>\w+)`),
 			Tests:       re(`(^|/)src/test/.*\.kts?$`, `Tests?\.kt$`),
 			Lint:        []Tool{{Name: "ktlint", Bin: "ktlint", Args: []string{"{file}"}}},
 			LSP:         []Tool{{Name: "kotlin-language-server", Bin: "kotlin-language-server"}},
 			Diagnostics: re(`^(?:e|w|error|warning): (?:file://)?(?P<file>[^:\s]+\.kts?):(?P<line>\d+):(?P<col>\d+):? (?P<msg>.*)`),
 			Note:        "no per-file check: compiling needs the project's Gradle or Maven build"},
-		{ID: "c", Mutation: "c-family", Skips: cSkips, Name: "C", Kind: KindProgramming, Extensions: []string{".c", ".h"},
+		{ID: "c", Frames: nativeFrames, Mutation: "c-family", Skips: cSkips, Name: "C", Kind: KindProgramming, Extensions: []string{".c", ".h"},
 			Definitions: cDefinitions,
 			Tests:       re(`(^|/)tests?/.*\.[ch]$`, `_test\.c$`, `(^|/)test_[^/]*\.c$`),
 			Format:      []Tool{{Name: "clang-format", Bin: "clang-format", Args: []string{"-i", "{file}"}, Mutates: true}},
 			Lint:        []Tool{{Name: "clang-tidy", Bin: "clang-tidy", Args: []string{"{file}"}}, {Name: "cppcheck", Bin: "cppcheck", Args: []string{"{file}"}}},
 			LSP:         []Tool{{Name: "clangd", Bin: "clangd"}},
 			Note:        "no per-file check: include paths and flags come from the build (CMake, Meson, Make)"},
-		{ID: "cpp", Mutation: "c-family", Skips: cSkips, Name: "C++", Kind: KindProgramming, Extensions: []string{".cc", ".cpp", ".cxx", ".c++", ".hpp", ".hh", ".hxx", ".ipp", ".tpp", ".cu"},
+		{ID: "cpp", Frames: nativeFrames, Mutation: "c-family", Skips: cSkips, Name: "C++", Kind: KindProgramming, Extensions: []string{".cc", ".cpp", ".cxx", ".c++", ".hpp", ".hh", ".hxx", ".ipp", ".tpp", ".cu"},
 			Definitions: append(re(`^\s*(?:template\s*<[^>]*>\s*)?(?:class|struct|union|namespace|enum(?:\s+class)?|concept)\s+(?P<name>\w+)`), cDefinitions...),
 			Tests:       re(`(^|/)tests?/.*\.(cc|cpp|cxx)$`, `_test\.(cc|cpp|cxx)$`, `(^|/)test_[^/]*\.(cc|cpp)$`),
 			Format:      []Tool{{Name: "clang-format", Bin: "clang-format", Args: []string{"-i", "{file}"}, Mutates: true}},
 			Lint:        []Tool{{Name: "clang-tidy", Bin: "clang-tidy", Args: []string{"{file}"}}, {Name: "cppcheck", Bin: "cppcheck", Args: []string{"{file}"}}},
 			LSP:         []Tool{{Name: "clangd", Bin: "clangd"}},
 			Note:        "no per-file check: include paths and flags come from the build (CMake, Meson, Make)"},
-		{ID: "csharp", Mutation: "c-family", Skips: re(`\[(?:Ignore|Explicit)\b`, `\bSkip\s*=`, `Assert\.Inconclusive\(`), Name: "C#", Kind: KindProgramming, Extensions: []string{".cs", ".csx"},
+		{ID: "csharp", Frames: csFrames, Mutation: "c-family", Skips: re(`\[(?:Ignore|Explicit)\b`, `\bSkip\s*=`, `Assert\.Inconclusive\(`), Name: "C#", Kind: KindProgramming, Extensions: []string{".cs", ".csx"},
 			Definitions: re(`^\s*(?:(?:public|private|protected|internal|static|sealed|abstract|partial|readonly|ref|unsafe|file|new)\s+)*(?:class|struct|interface|enum|record(?:\s+struct|\s+class)?|namespace)\s+(?P<name>[\w.]+)`,
 				`^\s+(?:(?:public|private|protected|internal|static|virtual|override|abstract|async|sealed|extern|partial|new|unsafe)\s+)+[\w<>\[\],.? ]+\s+(?P<name>\w+)\s*[(<]`),
 			Tests:       re(`(^|/)[^/]*\.Tests?/.*\.cs$`, `Tests?\.cs$`),
@@ -125,7 +147,7 @@ func builtins() []Language {
 			Note:        "no per-file check: dotnet build is the check"},
 		{ID: "fsharp", Name: "F#", Kind: KindProgramming, Extensions: []string{".fs", ".fsi", ".fsx"},
 			Definitions: re(`^\s*(?:let|member|type|module)\s+(?:rec\s+|inline\s+|private\s+)*(?P<name>[\w.]+)`)},
-		{ID: "php", Mutation: "c-family-hash", Skips: re(`markTest(?:Skipped|Incomplete)\(`, `@group\s+(?:skip|disabled)`, `#\[Group\(`), Name: "PHP", Kind: KindProgramming, Extensions: []string{".php", ".phtml"}, Shebangs: []string{"php"},
+		{ID: "php", Frames: phpFrames, Mutation: "c-family-hash", Skips: re(`markTest(?:Skipped|Incomplete)\(`, `@group\s+(?:skip|disabled)`, `#\[Group\(`), Name: "PHP", Kind: KindProgramming, Extensions: []string{".php", ".phtml"}, Shebangs: []string{"php"},
 			Definitions: re(`^\s*(?:(?:abstract|final|readonly)\s+)*(?:class|interface|trait|enum)\s+(?P<name>\w+)`,
 				`^\s*(?:(?:public|private|protected|static|abstract|final)\s+)*function\s+&?(?P<name>\w+)`),
 			Tests:       re(`Test\.php$`, `(^|/)tests?/.*\.php$`),
@@ -134,20 +156,20 @@ func builtins() []Language {
 			Format:      []Tool{{Name: "php-cs-fixer", Bin: "php-cs-fixer", Args: []string{"fix", "{file}"}, Mutates: true}},
 			LSP:         []Tool{{Name: "intelephense", Bin: "intelephense", Args: []string{"--stdio"}}, {Name: "phpactor", Bin: "phpactor", Args: []string{"language-server"}}},
 			Diagnostics: re(`in (?P<file>\S+\.php) on line (?P<line>\d+)`)},
-		{ID: "ruby", Skips: re(`^\s*skip\b`, `^\s*x(?:it|describe|context|specify)\b`, `^\s*pending\b`), Name: "Ruby", Kind: KindProgramming, Extensions: []string{".rb", ".rake", ".gemspec", ".ru"}, Filenames: []string{"Rakefile", "Gemfile", "Guardfile", "Podfile"},
+		{ID: "ruby", Frames: rubyFrames, Skips: re(`^\s*skip\b`, `^\s*x(?:it|describe|context|specify)\b`, `^\s*pending\b`), Name: "Ruby", Kind: KindProgramming, Extensions: []string{".rb", ".rake", ".gemspec", ".ru"}, Filenames: []string{"Rakefile", "Gemfile", "Guardfile", "Podfile"},
 			Shebangs:    []string{"ruby"},
 			Definitions: re(`^\s*def\s+(?:self\.)?(?P<name>[\w?!=]+)`, `^\s*(?:class|module)\s+(?P<name>[\w:]+)`),
 			Tests:       re(`_test\.rb$`, `_spec\.rb$`, `(^|/)(test|spec)/.*\.rb$`),
 			Check:       &Check{What: "ruby parse", Tools: []string{"ruby"}, Args: []string{"-c", "{file}"}},
 			Lint:        []Tool{{Name: "rubocop", Bin: "rubocop", Args: []string{"{file}"}}},
 			LSP:         []Tool{{Name: "ruby-lsp", Bin: "ruby-lsp"}, {Name: "solargraph", Bin: "solargraph", Args: []string{"stdio"}}}},
-		{ID: "swift", Mutation: "c-family", Skips: re(`\bXCTSkip\w*\(`, `\.disabled\(`), Name: "Swift", Kind: KindProgramming, Extensions: []string{".swift"},
+		{ID: "swift", Frames: swiftFrames, Mutation: "c-family", Skips: re(`\bXCTSkip\w*\(`, `\.disabled\(`), Name: "Swift", Kind: KindProgramming, Extensions: []string{".swift"},
 			Definitions: re(`^\s*(?:(?:public|private|fileprivate|internal|open|final|static|class|override|mutating|nonisolated|@\w+(?:\([^)]*\))?)\s+)*(?:func|class|struct|enum|protocol|extension|actor|typealias)\s+(?P<name>[\w.]+)`),
 			Tests:       re(`(^|/)Tests/.*\.swift$`, `Tests?\.swift$`),
 			Format:      []Tool{{Name: "swift-format", Bin: "swift-format", Args: []string{"-i", "{file}"}, Mutates: true}},
 			LSP:         []Tool{{Name: "sourcekit-lsp", Bin: "sourcekit-lsp"}},
 			Note:        "no per-file check: swift build is the check"},
-		{ID: "dart", Mutation: "c-family", Skips: re(`\bskip:\s*(?:true|\x27|")`, `@Skip\(`), Name: "Dart", Kind: KindProgramming, Extensions: []string{".dart"},
+		{ID: "dart", Frames: dartFrames, Mutation: "c-family", Skips: re(`\bskip:\s*(?:true|\x27|")`, `@Skip\(`), Name: "Dart", Kind: KindProgramming, Extensions: []string{".dart"},
 			Definitions: re(`^\s*(?:(?:abstract|sealed|base|final|interface|mixin)\s+)*(?:class|mixin|enum|extension|typedef)\s+(?P<name>\w+)`,
 				`^(?:[\w<>?,]+\s+)?(?P<name>[a-z_]\w*)\s*\([^;]*\)\s*(?:async\*?\s*|sync\*\s*)?(?:\{|=>)`),
 			Tests:  re(`_test\.dart$`),
@@ -210,12 +232,12 @@ func builtins() []Language {
 			Definitions: re(`^(?P<name>[A-Za-z0-9_./%-]+)\s*:(?:[^=]|$)`)},
 		{ID: "cmake", Name: "CMake", Kind: KindInfra, Filenames: []string{"CMakeLists.txt"}, Extensions: []string{".cmake"},
 			Definitions: re(`(?i)^\s*(?:function|macro)\s*\(\s*(?P<name>\w+)`, `(?i)^\s*add_(?:library|executable)\s*\(\s*(?P<name>[\w.-]+)`)},
-		{ID: "groovy", Mutation: "c-family", Name: "Groovy", Kind: KindProgramming, Extensions: []string{".groovy", ".gradle", ".gvy"},
+		{ID: "groovy", Frames: jvmFrames, Mutation: "c-family", Name: "Groovy", Kind: KindProgramming, Extensions: []string{".groovy", ".gradle", ".gvy"},
 			Definitions: re(`^\s*(?:(?:public|private|protected|static|final|abstract|def)\s+)*(?:class|interface|trait|enum)\s+(?P<name>\w+)`, `^\s*def\s+(?P<name>\w+)\s*\(`)},
-		{ID: "scala", Mutation: "c-family", Name: "Scala", Kind: KindProgramming, Extensions: []string{".scala", ".sc", ".sbt"},
+		{ID: "scala", Frames: jvmFrames, Mutation: "c-family", Name: "Scala", Kind: KindProgramming, Extensions: []string{".scala", ".sc", ".sbt"},
 			Definitions: re(`^\s*(?:(?:private|protected|final|sealed|abstract|implicit|lazy|override|case)\s+)*(?:class|object|trait|enum|def|val|type|given)\s+(?P<name>\w+)`),
 			Tests:       re(`(^|/)src/test/`, `(Spec|Test|Suite)\.scala$`)},
-		{ID: "elixir", Skips: re(`@tag\s+:skip`, `@moduletag\s+:skip`), Name: "Elixir", Kind: KindProgramming, Extensions: []string{".ex", ".exs"}, Shebangs: []string{"elixir"},
+		{ID: "elixir", Frames: elixirFrames, Skips: re(`@tag\s+:skip`, `@moduletag\s+:skip`), Name: "Elixir", Kind: KindProgramming, Extensions: []string{".ex", ".exs"}, Shebangs: []string{"elixir"},
 			Definitions: re(`^\s*(?:defmodule|def|defp|defmacro|defmacrop|defprotocol|defimpl|defstruct|defguard)\s+(?P<name>[\w.?!]+)`),
 			Tests:       re(`_test\.exs$`)},
 		{ID: "erlang", Name: "Erlang", Kind: KindProgramming, Extensions: []string{".erl", ".hrl"}, Shebangs: []string{"escript"},

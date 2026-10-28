@@ -147,15 +147,27 @@ func recallTool() Tool {
 			if r.Session == nil || id == "" {
 				return "", errors.New("no such result")
 			}
+			// The live history first, then what a summary replaced: a
+			// compaction keeps the originals (Session.Archive).
 			found := false
-			for i := range r.Session.Messages {
-				m := &r.Session.Messages[i]
-				if m.Role != "tool" || m.ToolCallID != id {
-					continue
-				}
-				found = true
-				if m.Elided != "" {
-					return m.Elided, nil
+			for k, ms := range [][]Message{r.Session.Messages, r.Session.Archive} {
+				archived := k == 1
+				for i := range ms {
+					m := &ms[i]
+					if m.Role != "tool" || m.ToolCallID != id {
+						continue
+					}
+					found = true
+					text := m.Content
+					if m.Elided != "" {
+						text = m.Elided
+					} else if !archived {
+						continue // still in the conversation: nothing to bring back
+					}
+					if stale := r.staleIn(m); len(stale) > 0 {
+						text = "[note: " + strings.Join(stale, ", ") + " changed since this result was produced; read it again for the current content]\n" + text
+					}
+					return text, nil
 				}
 			}
 			if found {

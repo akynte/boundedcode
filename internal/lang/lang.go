@@ -49,6 +49,12 @@ type Language struct {
 	// Diagnostics match the tool output lines that locate a problem, with
 	// groups "file", "line", optionally "col" and "msg".
 	Diagnostics []*regexp.Regexp
+	// Frames match the lines of a stack trace (a panic, an exception, a
+	// failed test's trace), with groups "file", "line", optionally "col"
+	// and "symbol". FramesInnermostLast is set where the runtime prints the
+	// failing call last (Python).
+	Frames              []*regexp.Regexp
+	FramesInnermostLast bool
 	// Note says what a check cannot cover for this language.
 	Note string
 	// Outline lists the lines of a file's top-level definitions more

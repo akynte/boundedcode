@@ -237,6 +237,10 @@ func WithFallback(primary Navigator) Navigator {
 	if primary == nil {
 		return TextNavigator{}
 	}
+	if _, ok := primary.(Coverage); ok {
+		// A language server per language: route by each file's language.
+		return Composite{Providers: []Navigator{primary}}
+	}
 	return fallback{primary: primary}
 }
 

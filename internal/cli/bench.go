@@ -30,7 +30,7 @@ import (
 func newBenchCmd(app *App) *cobra.Command {
 	cmd := &cobra.Command{Use: "bench", Short: "Run reproducible benchmarks"}
 	cmd.AddCommand(newBenchVerifyCmd(app))
-	cmd.AddCommand(newBenchInfraCmd(app), newBenchTasksCmd(app), newBenchDirectCmd(app), newBenchIntelCmd(app), newBenchLeaseCmd(app), newBenchTrailCmd(app), newBenchCompareCmd(app))
+	cmd.AddCommand(newBenchInfraCmd(app), newBenchTasksCmd(app), newBenchDirectCmd(app), newBenchIntelCmd(app), newBenchLeaseCmd(app), newBenchTrailCmd(app), newBenchCompareCmd(app), newBenchRetrievalCmd(app))
 	return cmd
 }
 
@@ -273,6 +273,7 @@ func newBenchDirectCmd(app *App) *cobra.Command {
 		timeout                  time.Duration
 		workingSet               int
 		noHistoryNotes           bool
+		retrieval                string
 	)
 	cmd := &cobra.Command{
 		Use:   "direct",
@@ -350,9 +351,15 @@ aside and recalled, summaries, broken edits caught by the check, and time.`,
 				off := false
 				dc.HistoryNotes = &off
 			}
+			if retrieval != "" {
+				dc.Retrieval = retrieval
+			}
+			if dc.Retrieval == "" {
+				dc.Retrieval = "adaptive"
+			}
 			dr := &benchmark.DirectRunner{FixturesDir: fixtures, WorkRoot: work, Rules: app.riskRules(), Timeout: timeout,
 				Tokenize: ep.tokenize, Model: ep.pin, TaskDirs: dirs,
-				Settings: map[string]any{"approval": approval, "working_set_tokens": dc.WorkingSetTokens, "max_tool_output": dc.MaxToolOutput, "checks": dc.ChecksOn(), "seed_pack": dc.SeedPackOn(), "history_notes": dc.HistoryNotesOn(), "context_tokens": ep.ctxSize, "provider": ep.provider},
+				Settings: map[string]any{"approval": approval, "working_set_tokens": dc.WorkingSetTokens, "max_tool_output": dc.MaxToolOutput, "checks": dc.ChecksOn(), "seed_pack": dc.SeedPackOn(), "retrieval": dc.Retrieval, "history_notes": dc.HistoryNotesOn(), "context_tokens": ep.ctxSize, "provider": ep.provider},
 				Progress: func(s string) { fmt.Fprintf(app.Err, "%s %s\n", time.Now().Format("15:04:05"), s) },
 				NewRunner: func(ctx context.Context, root, stateDir string) (*direct.Runner, func(), error) {
 					sess, err := direct.NewSession(filepath.Join(stateDir, "sessions"), root, ep.provider, ep.model)
@@ -371,6 +378,7 @@ aside and recalled, summaries, broken edits caught by the check, and time.`,
 						opts.WorkingSetTokens = workingSet
 					}
 					opts.NoHistoryNotes = opts.NoHistoryNotes || noHistoryNotes
+					opts.Retrieval = dc.Retrieval
 					r := &direct.Runner{Gateway: ep.newGateway(sess.ID), Session: sess, Opts: opts}
 					return r, func() { r.Close() }, nil
 				}}
@@ -402,6 +410,7 @@ aside and recalled, summaries, broken edits caught by the check, and time.`,
 	f.StringSliceVar(&compare, "compare", nil, "compare two saved reports (OLD.json,NEW.json) instead of running")
 	f.IntVar(&workingSet, "working-set", 0, "history budget in tokens for this run (0 = direct.working_set_tokens)")
 	f.BoolVar(&noHistoryNotes, "no-history-notes", false, "turn off history notes for this run (direct.history_notes)")
+	f.StringVar(&retrieval, "retrieval", "", "adaptive or basic for this run (direct.retrieval)")
 	return cmd
 }
 
@@ -705,5 +714,64 @@ counted on each side.`,
 	f := cmd.Flags()
 	f.StringSliceVar(&base, "base", nil, "baseline report (repeatable)")
 	f.StringSliceVar(&cand, "candidate", nil, "candidate report (repeatable)")
+	return cmd
+}
+
+func newBenchRetrievalCmd(app *App) *cobra.Command {
+	var tasksPath, reposDir, split, out string
+	var arms, only []string
+	var tokens int
+	cmd := &cobra.Command{
+		Use:   "retrieval",
+		Short: "Score retrieval approaches on real issues: recall and precision of the files the fix changed, context size, latency",
+		Long: `For each instance prepared by benchmarks/retrieval/prepare.py (real
+issues with the patch that fixed them), check out the base commit and run
+each retrieval approach on the issue's text: the seed pack direct mode
+sends today ("basic") and internal/retrieve ("adaptive"), optionally with
+the failing tests as evidence ("+tests") and ablations ("adaptive-<strategy>",
+"adaptive+<strategy>"). Score the files each puts in front of the model
+against the code files the fix changed. No model is involved.`,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			raw, err := os.ReadFile(tasksPath)
+			if err != nil {
+				return err
+			}
+			var tasks []benchmark.RetrievalTask
+			if err := json.Unmarshal(raw, &tasks); err != nil {
+				return fmt.Errorf("%s: %w", tasksPath, err)
+			}
+			b := &benchmark.RetrievalBench{Tasks: tasks, ReposDir: reposDir, Arms: arms, Split: split, Only: only, Tokens: tokens,
+				Progress: func(s string) { fmt.Fprintf(app.Err, "%s %s\n", time.Now().Format("15:04:05"), s) }}
+			rep, err := b.Run(cmd.Context())
+			if err != nil {
+				return err
+			}
+			var md bytes.Buffer
+			benchmark.WriteRetrievalMarkdown(&md, rep)
+			if out != "" {
+				j, err := benchmark.MarshalRetrieval(rep)
+				if err != nil {
+					return err
+				}
+				if err := config.WriteFileAtomic(out, j, 0o644); err != nil {
+					return err
+				}
+				if err := os.WriteFile(strings.TrimSuffix(out, ".json")+".md", md.Bytes(), 0o644); err != nil {
+					return err
+				}
+			}
+			app.printf("%s", md.String())
+			return nil
+		},
+	}
+	home, _ := os.UserHomeDir()
+	f := cmd.Flags()
+	f.StringVar(&tasksPath, "tasks", filepath.Join(home, ".cache", "bc-retrieval", "tasks.json"), "tasks file (prepare.py)")
+	f.StringVar(&reposDir, "repos", filepath.Join(home, ".cache", "bc-retrieval", "repos"), "directory of checkouts (prepare.py)")
+	f.StringVar(&split, "split", "dev", "dev, heldout or \"\" for all")
+	f.StringSliceVar(&arms, "arms", []string{"basic", "adaptive"}, "approaches to run")
+	f.StringSliceVar(&only, "only", nil, "instance ids or repositories to run")
+	f.IntVar(&tokens, "tokens", 1200, "token budget of a retrieval block")
+	f.StringVar(&out, "out", "", "report path (.json; .md written alongside)")
 	return cmd
 }

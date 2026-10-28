@@ -28,6 +28,20 @@ var _ repointel.Navigator = (*Navigator)(nil)
 // Name implements repointel.Navigator.
 func (n *Navigator) Name() string { return "serena" }
 
+// langIDs are the internal/lang ids each Serena language server serves.
+var langIDs = map[string][]string{"go": {"go"}, "typescript": {"typescript", "javascript"}, "python": {"python"}, "rust": {"rust"}}
+
+// Covers implements repointel.Coverage: the languages Serena's servers
+// answer for under root (detected there and supported); the text
+// navigator answers for the rest.
+func (n *Navigator) Covers(root string) []string {
+	var out []string
+	for _, l := range n.project(root).Languages {
+		out = append(out, langIDs[l]...)
+	}
+	return out
+}
+
 // project returns the instance definition for root. Languages are detected
 // once per root unless the caller registered the project explicitly.
 func (n *Navigator) project(root string) Project {

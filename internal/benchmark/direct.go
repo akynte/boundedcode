@@ -108,6 +108,13 @@ type DirectResult struct {
 	// HistoryNotes counts notes naming files the repository's history
 	// changes together with a changed file.
 	HistoryNotes int `json:"history_notes,omitempty"`
+	// FilesRead counts the distinct files the agent's results showed;
+	// RedundantReads the reads of a region whose unchanged content the
+	// history still showed verbatim (direct/freshness.go); Retrieved the
+	// places the retrieval block listed with the first message.
+	FilesRead      int `json:"files_read"`
+	RedundantReads int `json:"redundant_reads"`
+	Retrieved      int `json:"retrieved,omitempty"`
 	// Nudged: the model described a plan without acting and was asked to
 	// continue.
 	Nudged       bool     `json:"nudged,omitempty"`
@@ -201,6 +208,9 @@ type DirectSummary struct {
 	GuardRefusals   int     `json:"guard_refusals,omitempty"`
 	HistoryNotes    int     `json:"history_notes"`
 	Errors          int     `json:"errors"`
+	// Files the agent read, and redundant reads, per task.
+	MeanFilesRead      float64 `json:"files_read_per_task"`
+	MeanRedundantReads float64 `json:"redundant_reads_per_task"`
 
 	Language string `json:"language,omitempty"`
 	Skipped  int    `json:"skipped,omitempty"` // not run (environment); not in Tasks
@@ -404,6 +414,9 @@ func (d *DirectRunner) runOne(ctx context.Context, model string, spec TaskSpec) 
 		return res
 	}
 	defer cleanup()
+	if spec.ReadOnly {
+		r.Opts.ReadOnly = true
+	}
 	if r.Session != nil {
 		res.SessionID = r.Session.ID
 	}
@@ -535,6 +548,19 @@ func (d *DirectRunner) runOne(ctx context.Context, model string, spec TaskSpec) 
 		}
 	}
 	res.AgentSeconds = time.Since(agentStart).Seconds()
+	res.RedundantReads = r.RedundantReads()
+	read := map[string]bool{}
+	for _, m := range append(append([]direct.Message{}, r.Session.Archive...), r.Session.Messages...) {
+		for _, st := range m.Stamps {
+			if st.Op == "read" {
+				read[st.Path] = true
+			}
+		}
+		if m.Retrieval != nil && res.Retrieved == 0 {
+			res.Retrieved = len(m.Retrieval.Items)
+		}
+	}
+	res.FilesRead = len(read)
 	res.Resources = stopSampling()
 	res.Answer = tailStr(answer, 4000)
 	d.attribute(ctx, r, &res, sections, rewrites)
@@ -705,7 +731,7 @@ func hostCheck(ctx context.Context, spec TaskSpec, dir string, run []string) (st
 func summarizeDirect(category string, rs []DirectResult) DirectSummary {
 	s := DirectSummary{Category: category}
 	var prompt, cached int
-	var calls, tools, gen, bytes int
+	var calls, tools, gen, bytes, filesRead, redundant int
 	var wall, agent, inf, tool, harness, reasoning float64
 	var passTok, passSec, failTok, failSec float64
 	var ttfts []float64
@@ -775,6 +801,8 @@ func summarizeDirect(category string, rs []DirectResult) DirectSummary {
 		s.GuardRefusals += r.GuardRefusals
 		s.HistoryNotes += r.HistoryNotes
 		s.PeakPrompt = max(s.PeakPrompt, r.PeakPrompt)
+		filesRead += r.FilesRead
+		redundant += r.RedundantReads
 	}
 	if s.Tasks == 0 {
 		return s
@@ -787,6 +815,7 @@ func summarizeDirect(category string, rs []DirectResult) DirectSummary {
 	s.MeanGenerated = float64(gen) / n
 	s.MeanResultBytes = float64(bytes) / n
 	s.MeanWallSeconds = wall / n
+	s.MeanFilesRead, s.MeanRedundantReads = float64(filesRead)/n, float64(redundant)/n
 	if prompt > 0 {
 		s.CacheHitRate = float64(cached) / float64(prompt)
 	}
@@ -977,6 +1006,8 @@ func CompareDirect(w io.Writer, a, b *DirectReport) {
 	row("recalls", float64(sa.Recalls), float64(sb.Recalls), "%.0f")
 	row("summaries", float64(sa.Compactions), float64(sb.Compactions), "%.0f")
 	row("checks caught", float64(sa.ChecksCaught), float64(sb.ChecksCaught), "%.0f")
+	row("files read per task", sa.MeanFilesRead, sb.MeanFilesRead, "%.1f")
+	row("redundant reads per task", sa.MeanRedundantReads, sb.MeanRedundantReads, "%.2f")
 	fmt.Fprintln(w)
 	byID := map[string]DirectResult{}
 	for _, r := range b.Results {

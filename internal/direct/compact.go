@@ -86,7 +86,7 @@ func (r *Runner) compact(ctx context.Context) error {
 	}
 	// A summary is derived from everything before it, tool output
 	// included: it is data, never the user's words.
-	summary := Message{Role: "user", Content: "[Earlier conversation, summarised to save context]\n\n" + strings.TrimSpace(m.Content) + "\n\n[End of summary. The conversation continues below.]",
+	summary := Message{Role: "user", Content: "[Earlier conversation, summarised to save context]\n\n" + strings.TrimSpace(m.Content) + recallIndex(r.toolList(), head) + "\n\n[End of summary. The conversation continues below.]",
 		Provenance: untrusted(SourceSummary, "")}
 	if err := r.Session.replace(summary, append([]Message(nil), tail...)); err != nil {
 		return err
@@ -103,4 +103,42 @@ func (r *Runner) Compact(ctx context.Context) error {
 		return nil
 	}
 	return r.compact(ctx)
+}
+
+// recallIndex lists the larger tool results a summary replaces, so the
+// model can bring any of them back with recall (the originals stay in the
+// session's archive): the details a summary drops stay recoverable.
+func recallIndex(tools []Tool, head []Message) string {
+	byName := map[string]Tool{}
+	for _, t := range tools {
+		byName[t.Name] = t
+	}
+	what := map[string]string{}
+	for _, m := range head {
+		for _, tc := range m.ToolCalls {
+			if t, ok := byName[tc.Function.Name]; ok && t.Summary != nil {
+				what[tc.ID] = t.Summary(callArgs(tc))
+			} else {
+				what[tc.ID] = tc.Function.Name
+			}
+		}
+	}
+	var lines []string
+	for _, m := range head {
+		text := m.Content
+		if m.Elided != "" {
+			text = m.Elided
+		}
+		if m.Role != "tool" || len(text) < elideMin || strings.HasPrefix(text, "error:") {
+			continue
+		}
+		lines = append(lines, fmt.Sprintf("- %s: %s (%d bytes)", m.ToolCallID, oneLine(what[m.ToolCallID], 100), len(text)))
+	}
+	if len(lines) == 0 {
+		return ""
+	}
+	if len(lines) > 40 {
+		lines = append(lines[:40:40], fmt.Sprintf("- … %d more", len(lines)-40))
+	}
+	return "\n\nEarlier tool results kept in full; call recall with the id to see one again:\n" + strings.Join(lines, "\n")
 }

@@ -29,6 +29,10 @@ type Session struct {
 	Compactions int `json:"compactions,omitempty"`
 
 	Messages []Message `json:"-"`
+	// Archive holds the messages a compaction replaced with its summary:
+	// recall can still bring their results back, and their stamps still
+	// say what the model was shown.
+	Archive []Message `json:"-"`
 	// Path is the file the session is appended to ("" = in memory).
 	Path string `json:"-"`
 }
@@ -95,6 +99,7 @@ func (s *Session) Append(m Message) error {
 
 // replace installs a compacted history: summary, then the kept tail.
 func (s *Session) replace(summary Message, keep []Message) error {
+	s.Archive = append(s.Archive, s.Messages[:len(s.Messages)-len(keep)]...)
 	s.Messages = append([]Message{summary}, keep...)
 	s.Compactions++
 	s.Updated = time.Now().UTC()
@@ -175,6 +180,7 @@ func LoadSession(path string) (*Session, error) {
 				return nil, fmt.Errorf("%s line %d: compaction before header", path, n)
 			}
 			if l.Keep < len(s.Messages) {
+				s.Archive = append(s.Archive, s.Messages[:len(s.Messages)-l.Keep]...)
 				s.Messages = append([]Message(nil), s.Messages[len(s.Messages)-l.Keep:]...)
 			}
 			s.Compactions++
