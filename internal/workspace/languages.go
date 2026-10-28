@@ -5,46 +5,51 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/akynte/boundedcode/internal/lang"
 )
 
-var extLang = map[string]string{
-	".go": "go", ".ts": "typescript", ".tsx": "typescript", ".js": "javascript", ".jsx": "javascript",
-	".py": "python", ".java": "java", ".kt": "kotlin", ".rs": "rust", ".rb": "ruby", ".cs": "csharp",
-	".sql": "sql", ".proto": "protobuf", ".tf": "terraform", ".php": "php", ".c": "c", ".cpp": "cpp", ".h": "c",
-}
-
-var skipDirs = map[string]bool{".git": true, "node_modules": true, "vendor": true, ".venv": true, "dist": true, "build": true, "target": true}
-
-// DetectLanguages returns languages present in root (bounded walk) plus
-// infrastructure markers (dockerfile, helm, kubernetes).
+// DetectLanguages returns the languages present in root (internal/lang
+// IDs: code, SQL, protobuf and infrastructure; not prose or data formats),
+// plus infrastructure markers (docker, helm, kustomize).
 func DetectLanguages(root string) []string {
 	found := map[string]bool{}
+	counts, _, _ := lang.Census(root, lang.CensusOptions{})
+	for _, c := range counts {
+		switch c.Language.Kind {
+		case lang.KindProgramming, lang.KindInfra:
+			found[c.Language.ID] = true
+		case lang.KindData:
+			if c.Language.ID == "sql" || c.Language.ID == "protobuf" || c.Language.ID == "graphql" {
+				found[c.Language.ID] = true
+			}
+		}
+	}
+	delete(found, "make")
+	delete(found, "cmake")
+	if found["dockerfile"] {
+		delete(found, "dockerfile")
+		found["docker"] = true
+	}
 	n := 0
 	_ = filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return nil //nolint:nilerr // unreadable entries are skipped
 		}
 		if d.IsDir() {
-			if skipDirs[d.Name()] {
+			if p != root && lang.SkipDirs[d.Name()] {
 				return filepath.SkipDir
 			}
 			return nil
 		}
-		n++
-		if n > 50000 {
+		if n++; n > 50000 {
 			return filepath.SkipAll
 		}
-		name := strings.ToLower(d.Name())
-		switch {
-		case name == "dockerfile" || strings.HasSuffix(name, ".dockerfile"):
-			found["docker"] = true
-		case name == "chart.yaml":
+		switch strings.ToLower(d.Name()) {
+		case "chart.yaml":
 			found["helm"] = true
-		case name == "kustomization.yaml":
+		case "kustomization.yaml":
 			found["kustomize"] = true
-		}
-		if l, ok := extLang[filepath.Ext(name)]; ok {
-			found[l] = true
 		}
 		return nil
 	})

@@ -2,9 +2,7 @@ package direct
 
 import (
 	"fmt"
-	"go/ast"
-	"go/parser"
-	"go/token"
+	"github.com/akynte/boundedcode/internal/lang"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -19,12 +17,21 @@ const maxOutlineEntries = 150
 
 // outline returns a line-numbered list of a long file's definitions, so
 // the model can pick the region to read instead of loading the whole
-// file into its context. Go files are parsed; other languages use a
-// definition-line pattern. ok is false when nothing useful was found.
+// file into its context. A language's own outliner or definition patterns
+// (internal/lang) are used, and for any other text a generic definition
+// pattern. ok is false when nothing useful was found.
 func outline(rel string, lines []string) (string, bool) {
 	var entries []int
-	if strings.HasSuffix(strings.ToLower(rel), ".go") {
-		entries = goOutline(strings.Join(lines, "\n"))
+	l := lang.ForPath(rel, "")
+	if l != nil && l.Outline != nil {
+		entries = l.Outline(strings.Join(lines, "\n"))
+	}
+	if len(entries) == 0 && l != nil && len(l.Definitions) > 0 {
+		for i, line := range lines {
+			if _, ok := l.Definition(line); ok {
+				entries = append(entries, i+1)
+			}
+		}
 	}
 	if len(entries) == 0 {
 		entries = patternOutline(rel, lines)
@@ -46,40 +53,6 @@ func outline(rel string, lines []string) (string, bool) {
 		fmt.Fprintf(&b, "%6d\t%s\n", ln, text)
 	}
 	return b.String(), true
-}
-
-// goOutline lists the lines of top-level declarations (each spec of a
-// grouped declaration) in Go source; nil when it does not parse.
-func goOutline(src string) []int {
-	fset := token.NewFileSet()
-	f, err := parser.ParseFile(fset, "", src, parser.SkipObjectResolution)
-	if err != nil || f == nil {
-		return nil
-	}
-	var out []int
-	for _, d := range f.Decls {
-		switch d := d.(type) {
-		case *ast.FuncDecl:
-			out = append(out, fset.Position(d.Pos()).Line)
-		case *ast.GenDecl:
-			if d.Tok == token.IMPORT {
-				continue
-			}
-			if !d.Lparen.IsValid() {
-				out = append(out, fset.Position(d.Pos()).Line)
-				continue
-			}
-			for _, s := range d.Specs {
-				switch s := s.(type) {
-				case *ast.TypeSpec:
-					out = append(out, fset.Position(s.Pos()).Line)
-				case *ast.ValueSpec:
-					out = append(out, fset.Position(s.Pos()).Line)
-				}
-			}
-		}
-	}
-	return out
 }
 
 var (

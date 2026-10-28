@@ -67,14 +67,29 @@ func TestPresetSubprojects(t *testing.T) {
 		t.Error("the monorepo now runs tests")
 	}
 
-	// A root project, or a root Makefile, keeps the root's stages only.
-	for _, root := range []string{"go.mod", "Makefile"} {
-		c := presetFor(set(root, "api/go.mod", "web/package.json"))
-		for _, s := range c.Stages {
-			if s.Dir != "" {
-				t.Errorf("root %s: subproject stage %s", root, s.Name)
-			}
+	// A root Makefile orchestrates its subprojects: the root's stages only.
+	for _, s := range presetFor(set("Makefile", "api/go.mod", "web/package.json")).Stages {
+		if s.Dir != "" {
+			t.Errorf("root Makefile: subproject stage %s", s.Name)
 		}
+	}
+	// A root Go module still gets a nested web package's stages (another
+	// ecosystem) and a nested Go module's (./... stops at it); the root's
+	// gofmt already covers the nested module's changed files.
+	st = stageIndex(presetFor(set("go.mod", "main.go", "main_test.go", "api/go.mod", "api/x_test.go", "web/package.json")))
+	for _, name := range []string{"go-test", "api/go-test", "api/go-build", "web/npm-test"} {
+		if _, ok := st[name]; !ok {
+			t.Errorf("polyglot root: no %s stage", name)
+		}
+	}
+	if _, ok := st["api/gofmt"]; ok {
+		t.Error("gofmt twice")
+	}
+	// A nested package of the root's own ecosystem is the root's (a
+	// workspace): no second stage.
+	st = stageIndex(presetFor(set("package.json", "test/a.test.js", "packages/ui/package.json")))
+	if _, ok := st["packages/ui/npm-test"]; ok {
+		t.Error("a nested package of the root's ecosystem got its own stage")
 	}
 }
 
@@ -252,5 +267,38 @@ func TestEvidenceCustomGoTestStage(t *testing.T) {
 	}
 	if !ev.Verified || len(ev.Tests) != 1 || ev.Tests[0] != "TestClampNegative" {
 		t.Fatalf("evidence = %+v", ev)
+	}
+}
+
+// A stage that did not pass says why: the code, a missing tool, or a
+// timeout (not verified); a missing tool is never reported as failing code.
+func TestStageCauses(t *testing.T) {
+	ctx := context.Background()
+	repo, base := commitRepo(t, map[string]string{
+		"README.md": "x\n",
+		ConfigPath: "version: 1\nstages:\n" +
+			"  - {name: tool, run: [sh, -c, 'exit 127']}\n" +
+			"  - {name: optional-tool, run: [sh, -c, 'exit 127'], optional: true}\n" +
+			"  - {name: code, run: [sh, -c, 'echo FAIL; exit 1']}\n" +
+			"  - {name: slow, run: [sh, -c, 'sleep 5'], timeout: 1s}\n" +
+			"  - {name: ok, run: [sh, -c, 'true']}\n",
+	})
+	e := &Engine{Sandbox: sandbox.None{}, CacheDir: t.TempDir()}
+	res, err := e.Run(ctx, RepoTarget{Name: "r", Worktree: repo, Base: base, TaskID: "t", Source: repo}, Full)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]string{}
+	for _, s := range res.Stages {
+		got[s.Name] = s.Status + "/" + s.Cause
+	}
+	for name, want := range map[string]string{"tool": "error/missing tool", "optional-tool": "skipped/missing tool", "code": "fail/code",
+		"slow": "fail/timeout", "ok": "pass/"} {
+		if got[name] != want {
+			t.Errorf("%s: %s, want %s", name, got[name], want)
+		}
+	}
+	if res.Passed {
+		t.Fatal("passed")
 	}
 }

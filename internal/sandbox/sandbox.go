@@ -82,6 +82,7 @@ func (None) Command(ctx context.Context, s Spec) (*exec.Cmd, error) {
 	cmd := exec.CommandContext(ctx, s.Argv[0], s.Argv[1:]...)
 	cmd.Dir = s.Workdir
 	cmd.Env = append(scrubbedEnv(), envList(s.Env)...)
+	ownGroup(cmd)
 	return cmd, nil
 }
 

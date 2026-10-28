@@ -55,6 +55,7 @@ func (a *App) load() error {
 		return err
 	}
 	a.Config = cfg
+	registerLanguages(&a.Config)
 	cat, err := model.LoadCatalog(configs.FS, "models", filepath.Join(p.Config, "models"))
 	if err != nil {
 		return err

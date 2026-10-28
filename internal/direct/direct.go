@@ -16,6 +16,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/akynte/boundedcode/internal/execbox"
+	"github.com/akynte/boundedcode/internal/lang"
 	"github.com/akynte/boundedcode/internal/policy"
 	"net/http"
 	"os"
@@ -307,6 +308,11 @@ type Runner struct {
 	writtenMu sync.Mutex
 	writtenBy *Runner
 	sbx       *sandboxState
+	// Post-edit checks: host tools found, and what was said once.
+	finderOnce   sync.Once
+	toolFinder   *lang.Finder
+	checkNotesMu sync.Mutex
+	checkNotes   map[string]bool
 	// directOK: the user approved making this turn's change directly
 	// although it was meant for verification (verify_fallback ask).
 	directOK bool

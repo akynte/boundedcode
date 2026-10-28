@@ -252,7 +252,7 @@ func TestGoBuildCheckInAModule(t *testing.T) {
 		if err := os.WriteFile(filepath.Join(root, "s.py"), []byte("def f(:\n  pass\n"), 0o644); err != nil {
 			t.Fatal(err)
 		}
-		if diag := r.checkFile(context.Background(), filepath.Join(root, "s.py"), "s.py", nil); !strings.Contains(diag, "check: python3 reports") || !strings.Contains(diag, "SyntaxError") {
+		if diag := r.checkFile(context.Background(), filepath.Join(root, "s.py"), "s.py", nil); !strings.Contains(diag, "check: python parse failed") || !strings.Contains(diag, "SyntaxError") {
 			t.Fatalf("python: %q", diag)
 		}
 	}

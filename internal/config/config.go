@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"time"
@@ -37,6 +38,45 @@ type Config struct {
 	Escalation   EscalationConfig `yaml:"escalation"`
 	Task         TaskConfig       `yaml:"task"`
 	Direct       DirectConfig     `yaml:"direct"`
+	// Languages and BuildSystems add to the built-in ones (internal/lang,
+	// internal/ecosystem). Only the user's configuration sets them: their
+	// commands run after every edit.
+	Languages    []LanguageConfig    `yaml:"languages,omitempty"`
+	BuildSystems []BuildSystemConfig `yaml:"build_systems,omitempty"`
+}
+
+// LanguageConfig describes a language: how its files are recognised, its
+// definitions and tests (regular expressions; a group named "name" is the
+// symbol), the check run after each edit, and its tools.
+type LanguageConfig struct {
+	ID          string   `yaml:"id"`
+	Name        string   `yaml:"name"`
+	Extensions  []string `yaml:"extensions,omitempty"`
+	Filenames   []string `yaml:"filenames,omitempty"`
+	Shebangs    []string `yaml:"shebangs,omitempty"`
+	Definitions []string `yaml:"definitions,omitempty"`
+	Tests       []string `yaml:"tests,omitempty"`
+	Check       *struct {
+		What  string   `yaml:"what"`
+		Tools []string `yaml:"tools"`
+		Args  []string `yaml:"args"`
+		Root  []string `yaml:"root,omitempty"`
+	} `yaml:"check,omitempty"`
+	Format []string `yaml:"format,omitempty"` // executables
+	Lint   []string `yaml:"lint,omitempty"`
+	LSP    []string `yaml:"lsp,omitempty"`
+}
+
+// BuildSystemConfig describes a build system: projects are directories
+// with one of Markers.
+type BuildSystemConfig struct {
+	ID        string   `yaml:"id"`
+	Kind      string   `yaml:"kind"`
+	Markers   []string `yaml:"markers"`
+	Languages []string `yaml:"languages,omitempty"`
+	Tool      string   `yaml:"tool"`
+	Build     string   `yaml:"build,omitempty"`
+	Test      string   `yaml:"test,omitempty"`
 }
 
 // DirectConfig configures direct mode: the native agent loop that works in
@@ -521,6 +561,24 @@ func (c Config) Validate() error {
 	}
 	if c.Direct.MaxToolOutput < 0 {
 		errs = append(errs, errors.New("direct.max_tool_output: must not be negative"))
+	}
+	for i, l := range c.Languages {
+		if l.ID == "" || len(l.Extensions)+len(l.Filenames)+len(l.Shebangs) == 0 {
+			errs = append(errs, fmt.Errorf("languages[%d]: id and at least one of extensions, filenames, shebangs are required", i))
+		}
+		for _, p := range append(append([]string{}, l.Definitions...), l.Tests...) {
+			if _, err := regexp.Compile(p); err != nil {
+				errs = append(errs, fmt.Errorf("languages[%d] (%s): %w", i, l.ID, err))
+			}
+		}
+		if l.Check != nil && (len(l.Check.Tools) == 0 || len(l.Check.Args) == 0) {
+			errs = append(errs, fmt.Errorf("languages[%d] (%s): check needs tools and args", i, l.ID))
+		}
+	}
+	for i, b := range c.BuildSystems {
+		if b.ID == "" || len(b.Markers) == 0 || b.Tool == "" {
+			errs = append(errs, fmt.Errorf("build_systems[%d]: id, markers and tool are required", i))
+		}
 	}
 	sb := c.Direct.Sandbox
 	for _, v := range []struct{ key, val, ok string }{{"mode", sb.Mode, "|auto|off|"}, {"backend", sb.Backend, "|bwrap|landlock|none|"},

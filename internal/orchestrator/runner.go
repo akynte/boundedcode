@@ -710,6 +710,15 @@ func (r *Runner) Run(ctx context.Context, taskID string, opt RunOptions) (*task.
 			return t, nil
 		}
 
+		// Verification could not judge the change (a tool is missing from the
+		// sandbox, the engine failed): not the change's fault, and nothing
+		// the agent can fix. Incomplete, not failed.
+		if notTheChange(failSummary) {
+			t.VerificationState = "incomplete"
+			_ = r.Ledger.ResolveStrategy(ctx, stratID, "rejected", "verification incomplete: "+failSummary)
+			r.Rec.Emit(ctx, t.ID, "verify.incomplete", map[string]any{"summary": trunc(failSummary, 500)})
+			return t, r.block(t, save, "verification could not run (missing tool or environment, not the change): "+trunc(failSummary, 300))
+		}
 		// Failure path.
 		t.ReopenStep("verify (targeted)")
 		consecutive++
@@ -814,6 +823,21 @@ func (r *Runner) block(t *task.Task, save func() error, reason string) error {
 	return nil
 }
 
+// notTheChange reports a failed verification whose every failure is a
+// missing tool or the environment: the change was not judged, and another
+// attempt by the agent cannot help.
+func notTheChange(summary string) bool {
+	if summary == "" {
+		return false
+	}
+	for _, part := range strings.Split(summary, "; ") {
+		if !strings.HasSuffix(part, "["+verify.CauseMissingTool+"]") && !strings.HasSuffix(part, "["+verify.CauseEnvironment+"]") {
+			return false
+		}
+	}
+	return true
+}
+
 // verifyAll verifies every repository with changes (all repos in full scope).
 func (r *Runner) verifyAll(ctx context.Context, t *task.Task, wts []task.Worktree, scope verify.Scope) (bool, string, string) {
 	passed := true
@@ -832,7 +856,11 @@ func (r *Runner) verifyAll(ctx context.Context, t *task.Task, wts []task.Worktre
 			passed = false
 			sigs = append(sigs, w.RepoName+":"+res.Signature())
 			for _, f := range res.Failures() {
-				summary = append(summary, fmt.Sprintf("%s/%s: %s", w.RepoName, f.Name, f.Headline()))
+				line := fmt.Sprintf("%s/%s: %s", w.RepoName, f.Name, f.Headline())
+				if f.Cause != "" && f.Cause != verify.CauseCode {
+					line += " [" + f.Cause + "]"
+				}
+				summary = append(summary, line)
 			}
 		}
 	}

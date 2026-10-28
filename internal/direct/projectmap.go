@@ -2,6 +2,7 @@ package direct
 
 import (
 	"fmt"
+	"github.com/akynte/boundedcode/internal/lang"
 	"os"
 	"path/filepath"
 	"sort"
@@ -24,10 +25,18 @@ const (
 	projectMapMaxFile = 400 // files counted per directory before stopping
 )
 
-var sourceExt = map[string]string{
-	".go": "Go", ".ts": "TypeScript", ".tsx": "TypeScript", ".js": "JavaScript", ".jsx": "JavaScript", ".mjs": "JavaScript", ".cjs": "JavaScript",
-	".py": "Python", ".rs": "Rust", ".java": "Java", ".kt": "Kotlin", ".rb": "Ruby", ".php": "PHP", ".cs": "C#", ".c": "C", ".h": "C", ".cc": "C++", ".cpp": "C++", ".hpp": "C++",
-	".swift": "Swift", ".scala": "Scala", ".ex": "Elixir", ".exs": "Elixir", ".sh": "shell", ".sql": "SQL", ".proto": "protobuf", ".tf": "Terraform", ".yaml": "YAML", ".yml": "YAML",
+// sourceLanguage is the language of a file the map counts as source: code,
+// SQL, infrastructure and YAML, not prose or data formats.
+func sourceLanguage(name string) *lang.Language {
+	l := lang.ForPath(name, "")
+	if l == nil || l.Kind == lang.KindMarkup {
+		return nil
+	}
+	switch l.ID {
+	case "json", "jsonc", "xml", "toml", "make", "cmake":
+		return nil
+	}
+	return l
 }
 
 // projectMap describes the project at root in a few lines ("" when root
@@ -53,6 +62,7 @@ func (r *Runner) projectMap() string {
 	}
 	var dirs []dirInfo
 	var files []string
+	found := map[string]*lang.Language{}
 	for _, e := range entries {
 		name := e.Name()
 		if skippedDirs[name] || strings.HasPrefix(name, ".") {
@@ -60,6 +70,9 @@ func (r *Runner) projectMap() string {
 		}
 		if !e.IsDir() {
 			files = append(files, name)
+			if l := sourceLanguage(name); l != nil {
+				found[l.ID] = l
+			}
 			continue
 		}
 		di := dirInfo{name: name, langs: map[string]int{}}
@@ -73,9 +86,10 @@ func (r *Runner) projectMap() string {
 				}
 				return nil
 			}
-			if lang, ok := sourceExt[strings.ToLower(filepath.Ext(d.Name()))]; ok {
+			if l := sourceLanguage(d.Name()); l != nil {
 				di.files++
-				di.langs[lang]++
+				di.langs[l.Name]++
+				found[l.ID] = l
 				if di.files >= projectMapMaxFile {
 					return errStop
 				}
@@ -116,7 +130,44 @@ func (r *Runner) projectMap() string {
 		}
 		fmt.Fprintf(&b, "- top-level files: %s\n", strings.Join(files, ", "))
 	}
+	if line := r.checkCoverage(found); line != "" {
+		b.WriteString("- " + line + "\n")
+	}
 	return strings.TrimRight(b.String(), "\n")
+}
+
+// checkCoverage says which of the languages found are checked after each
+// edit here, and which are not and why.
+func (r *Runner) checkCoverage(found map[string]*lang.Language) string {
+	var checked, missing, none []string
+	ids := make([]string, 0, len(found))
+	for id := range found {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	for _, id := range ids {
+		l := found[id]
+		c, _, st := r.finder().FindCheck(l, "")
+		switch {
+		case st == lang.Available:
+			checked = append(checked, l.Name)
+		case st == lang.MissingTool:
+			missing = append(missing, l.Name+" ("+strings.Join(c.Tools, "/")+" not installed)")
+		case l.Kind == lang.KindProgramming:
+			none = append(none, l.Name)
+		}
+	}
+	var parts []string
+	if len(checked) > 0 {
+		parts = append(parts, "checked after each edit: "+strings.Join(checked, ", "))
+	}
+	if len(missing) > 0 {
+		parts = append(parts, "not checked, missing tool: "+strings.Join(missing, ", "))
+	}
+	if len(none) > 0 {
+		parts = append(parts, "no per-file check (build or test the project): "+strings.Join(none, ", "))
+	}
+	return strings.Join(parts, "; ")
 }
 
 // projectLines lists the projects found under root (in any language,

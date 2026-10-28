@@ -368,12 +368,16 @@ func saveMemoryTool() Tool {
 	}
 }
 
-// ---- symbols (language server through Serena, when enabled)
+// ---- symbols: a language server (Serena) where one serves the language,
+// definition patterns of internal/lang everywhere else
+
+// navigator is the language server with the text fallback.
+func (r *Runner) navigator() repointel.Navigator { return repointel.WithFallback(r.Nav) }
 
 func findSymbolTool() Tool {
 	return Tool{
 		Name:        "find_symbol",
-		Description: "Find a symbol (function, type, method) by name with a language server: file, lines and optionally its body. More precise than grep.",
+		Description: "Find where a symbol (function, type, method, class, table, resource) is defined, in any language: file, lines and optionally its body. Uses a language server where one is available, definition patterns otherwise. More precise than grep.",
 		Schema: schema(map[string]any{
 			"name":         prop("string", "Symbol name or name path (Type/Method)"),
 			"include_body": prop("boolean", "Return the symbol's source"),
@@ -381,7 +385,7 @@ func findSymbolTool() Tool {
 		}, "name"),
 		Summary: func(a map[string]any) string { return "symbol " + str(a, "name") },
 		Run: func(ctx context.Context, r *Runner, a map[string]any) (string, error) {
-			syms, err := r.Nav.FindSymbol(ctx, r.Opts.Root, str(a, "name"), repointel.FindOptions{IncludeBody: boolean(a, "include_body"), Within: str(a, "within")})
+			syms, err := r.navigator().FindSymbol(ctx, r.Opts.Root, str(a, "name"), repointel.FindOptions{IncludeBody: boolean(a, "include_body"), Within: str(a, "within")})
 			if err != nil {
 				return "", err
 			}
@@ -393,11 +397,11 @@ func findSymbolTool() Tool {
 func findReferencesTool() Tool {
 	return Tool{
 		Name:        "find_references",
-		Description: "List the places that reference a symbol (from find_symbol: its name_path and file).",
+		Description: "List the places that reference a symbol (from find_symbol: its name_path and file), in any language.",
 		Schema:      schema(map[string]any{"name_path": prop("string", "The symbol's name path"), "file": prop("string", "The file that defines it")}, "name_path", "file"),
 		Summary:     func(a map[string]any) string { return "references of " + str(a, "name_path") },
 		Run: func(ctx context.Context, r *Runner, a map[string]any) (string, error) {
-			refs, err := r.Nav.References(ctx, r.Opts.Root, repointel.Symbol{NamePath: str(a, "name_path"), File: str(a, "file")})
+			refs, err := r.navigator().References(ctx, r.Opts.Root, repointel.Symbol{NamePath: str(a, "name_path"), File: str(a, "file")})
 			if err != nil {
 				return "", err
 			}

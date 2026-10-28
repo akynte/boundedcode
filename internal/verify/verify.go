@@ -83,8 +83,13 @@ type Config struct {
 
 // StageResult is the outcome of one stage.
 type StageResult struct {
-	Name       string `json:"name"`
-	Status     string `json:"status"` // pass | fail | skipped | error
+	Name   string `json:"name"`
+	Status string `json:"status"` // pass | fail | skipped | error
+	// Cause says why a stage did not pass: "code" (the project's own
+	// build or tests failed), "missing tool", "timeout" (not verified:
+	// the change or the environment may be slow), "environment" (the
+	// sandbox or engine). "" for a stage that passed.
+	Cause      string `json:"cause,omitempty"`
 	ExitCode   int    `json:"exit_code"`
 	DurationMS int64  `json:"duration_ms"`
 	Command    string `json:"command"`
@@ -594,6 +599,14 @@ func (e *Engine) runStageFull(ctx context.Context, t RepoTarget, st Stage, packa
 	return e.execStage(ctx, st, argv, spec, sr)
 }
 
+// Causes of a stage that did not pass.
+const (
+	CauseCode        = "code"
+	CauseMissingTool = "missing tool"
+	CauseTimeout     = "timeout"
+	CauseEnvironment = "environment"
+)
+
 // execStage runs a stage's expanded command with a prepared sandbox spec and
 // classifies the outcome.
 func (e *Engine) execStage(ctx context.Context, st Stage, argv []string, spec sandbox.Spec, sr StageResult) (StageResult, string) {
@@ -624,33 +637,39 @@ func (e *Engine) execStage(ctx context.Context, st Stage, argv []string, spec sa
 	case errors.Is(err, exec.ErrNotFound) && e.Sandbox.Isolated():
 		// The container engine itself is missing: an environment error,
 		// never the stage's tool, and never skipped.
-		sr.Status, sr.Output = "error", e.engineMissing(ctx, err)
+		sr.Status, sr.Cause, sr.Output = "error", CauseEnvironment, e.engineMissing(ctx, err)
 	case errors.Is(err, exec.ErrNotFound):
 		// Host execution (sandbox none) of a tool that is not installed.
+		sr.Cause = CauseMissingTool
 		if st.Optional {
 			sr.Status, sr.Output = "skipped", argv[0]+" not installed"
 		} else {
 			sr.Status, sr.Output = "error", argv[0]+" not installed (required by stage "+st.Name+")"
 		}
 	case sctx.Err() != nil:
-		sr.Status, sr.Output = "fail", "timeout after "+timeout.String()+"\n"+sr.Output
+		sr.Status, sr.Cause, sr.Output = "fail", CauseTimeout, "timeout after "+timeout.String()+" (not verified)\n"+sr.Output
 	case errors.As(err, &ee) && ee.ExitCode() == 125 && e.Sandbox.Isolated():
 		sr.ExitCode = ee.ExitCode()
 		// The engine could not start the stage (daemon down, image missing):
 		// an environment error, not the change's fault. Either way the
 		// stage does not pass.
 		if msg, ok := e.engineFailure(ctx, err, full); ok {
-			sr.Status, sr.Output = "error", msg+"\n"+sr.Output
+			sr.Status, sr.Cause, sr.Output = "error", CauseEnvironment, msg+"\n"+sr.Output
 		} else {
-			sr.Status = "fail"
+			sr.Status, sr.Cause = "fail", CauseCode
 		}
 	case errors.As(err, &ee):
 		sr.ExitCode = ee.ExitCode()
-		// 127 = command not found (in the sandbox, docker reports 127 too).
-		if st.Optional && (sr.ExitCode == 127 || strings.Contains(sr.Output, "executable file not found")) {
-			sr.Status = "skipped"
-		} else {
-			sr.Status = "fail"
+		// 127 = command not found (in the sandbox, docker reports 127 too):
+		// the tool is missing, which says nothing about the code.
+		notFound := sr.ExitCode == 127 || strings.Contains(sr.Output, "executable file not found")
+		switch {
+		case notFound && st.Optional:
+			sr.Status, sr.Cause = "skipped", CauseMissingTool
+		case notFound:
+			sr.Status, sr.Cause = "error", CauseMissingTool
+		default:
+			sr.Status, sr.Cause = "fail", CauseCode
 		}
 	default:
 		sr.Status = "error"

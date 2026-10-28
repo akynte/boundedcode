@@ -28,6 +28,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/akynte/boundedcode/internal/ecosystem"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -403,7 +404,7 @@ func (b *Box) allowedHosts(s Spec) []string {
 	}
 	if b.cfg.Registries {
 		for _, t := range append(b.projectTools(), s.Tools...) {
-			for _, h := range registries[t] {
+			for _, h := range ecosystem.Registries(t) {
 				set[h] = true
 			}
 		}
@@ -416,40 +417,9 @@ func (b *Box) allowedHosts(s Spec) []string {
 	return out
 }
 
-// registries are the hosts package managers download from.
-var registries = map[string][]string{
-	"go":       {"proxy.golang.org", "sum.golang.org", "storage.googleapis.com"},
-	"npm":      {"registry.npmjs.org"},
-	"npx":      {"registry.npmjs.org"},
-	"pnpm":     {"registry.npmjs.org"},
-	"yarn":     {"registry.yarnpkg.com", "registry.npmjs.org", "repo.yarnpkg.com"},
-	"bun":      {"registry.npmjs.org"},
-	"deno":     {"deno.land", "jsr.io", "registry.npmjs.org"},
-	"pip":      {"pypi.org", "files.pythonhosted.org"},
-	"pip3":     {"pypi.org", "files.pythonhosted.org"},
-	"python":   {"pypi.org", "files.pythonhosted.org"},
-	"python3":  {"pypi.org", "files.pythonhosted.org"},
-	"uv":       {"pypi.org", "files.pythonhosted.org"},
-	"poetry":   {"pypi.org", "files.pythonhosted.org"},
-	"pipenv":   {"pypi.org", "files.pythonhosted.org"},
-	"pdm":      {"pypi.org", "files.pythonhosted.org"},
-	"cargo":    {"index.crates.io", "static.crates.io", "crates.io"},
-	"mvn":      {"repo.maven.apache.org", "repo1.maven.org"},
-	"mvnw":     {"repo.maven.apache.org", "repo1.maven.org"},
-	"gradle":   {"repo.maven.apache.org", "repo1.maven.org", "plugins.gradle.org", "services.gradle.org", "downloads.gradle.org"},
-	"gradlew":  {"repo.maven.apache.org", "repo1.maven.org", "plugins.gradle.org", "services.gradle.org", "downloads.gradle.org"},
-	"dotnet":   {"api.nuget.org"},
-	"gem":      {"rubygems.org", "index.rubygems.org"},
-	"bundle":   {"rubygems.org", "index.rubygems.org"},
-	"composer": {"repo.packagist.org", "packagist.org"},
-	"mix":      {"repo.hex.pm", "hex.pm"},
-	"dart":     {"pub.dev"},
-	"flutter":  {"pub.dev"},
-	"swift":    {"github.com"},
-}
-
-// Registries returns the hosts of a tool's package registry.
-func Registries(tool string) []string { return registries[tool] }
+// Registries returns the hosts of a tool's package registry (from the
+// build systems of internal/ecosystem).
+func Registries(tool string) []string { return ecosystem.Registries(tool) }
 
 var unsupportedOS = map[string]string{
 	"darwin":  "macOS: sandbox-exec (Seatbelt) is deprecated and is not verified by this project; no operating-system containment is claimed",

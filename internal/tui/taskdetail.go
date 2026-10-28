@@ -755,6 +755,9 @@ func (v *taskView) verifyLines(w int) []string {
 		}
 		for _, s := range r.Stages {
 			line := fmt.Sprintf("    %s %s %s", statusIcon(s.Status), fit(s.Name, 16), sFaint.Render(fit(fmt.Sprintf("%dms", s.DurationMS), 9)))
+			if s.Cause != "" && s.Cause != "code" {
+				line += sWarn.Render("[" + s.Cause + "] ")
+			}
 			out = append(out, line+sMuted.Render(trunc(s.Command, w-34)))
 			if s.Status == "fail" || s.Status == "error" {
 				body := s.Output

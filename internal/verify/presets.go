@@ -32,10 +32,28 @@ import (
 // is no project of its own and has no Makefile, a monorepo of projects in
 // subdirectories, gets each outermost project's stages, run in its
 // directory.
+//
+// A root that runs tests of its own still gets the stages of nested
+// projects in ecosystems the root's stages do not cover (a web/ package
+// beside a root Go module) and of nested Go modules (./... stops at a
+// module boundary): a polyglot repository is verified in every language,
+// not only its root's.
 func presetFor(files map[string]bool) Config {
 	c := presetRoot(files)
-	if !c.runsTests() && !files["Makefile"] {
+	switch {
+	case !c.runsTests() && !files["Makefile"]:
 		c.Stages = append(c.Stages, subprojectStages(files)...)
+	case c.runsTests() && !files["Makefile"]: // a root Makefile orchestrates its subprojects
+		covered := map[string]bool{}
+		for _, st := range c.Stages {
+			covered[st.Name] = true
+		}
+		for _, st := range subprojectStages(files) {
+			base := strings.TrimPrefix(st.Name, st.Dir+"/")
+			if !covered[base] || strings.HasPrefix(base, "go-") && files[path.Join(st.Dir, "go.mod")] {
+				c.Stages = append(c.Stages, st)
+			}
+		}
 	}
 	return c
 }
@@ -307,7 +325,7 @@ func pythonTestFile(f string) bool {
 // before the tool was added).
 func need(tool string) string {
 	return `command -v ` + tool + ` >/dev/null 2>&1 || { echo "` + tool + ` is not installed in the sandbox image; rebuild it with ` +
-		"`" + buildinfo.Command() + " sandbox build`" + `"; exit 1; }; `
+		"`" + buildinfo.Command() + " sandbox build`" + `"; exit 127; }; `
 }
 
 // buildDir is a per-task build directory for this source tree, outside it

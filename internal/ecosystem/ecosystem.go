@@ -41,6 +41,10 @@ type Project struct {
 	Missing bool     // Tool is not installed (not on PATH, no wrapper script)
 	Members int      // nested projects of the same build counted under this one
 	Note    string   // a detail, such as the targets of a Makefile
+	// System is the build system's ID ("go", "node", "maven"); Languages
+	// are the internal/lang IDs its code is in (none for a Makefile).
+	System    string
+	Languages []string
 
 	group      string // projects fold into an aggregate of the same group
 	aggregates bool
@@ -269,193 +273,440 @@ var (
 	pomModulesRE = regexp.MustCompile(`<modules>`)
 )
 
-// detectDir returns the projects whose manifests are in one directory.
-func (d *detector) detectDir(abs, rel string, names map[string]bool) []*Project {
-	var out []*Project
-	add := func(p *Project) *Project {
-		p.Dir = rel
-		out = append(out, p)
-		return p
+// dirInfo is one directory being examined.
+type dirInfo struct {
+	abs, rel string
+	names    map[string]bool
+}
+
+func (di dirInfo) has(n ...string) bool {
+	for _, x := range n {
+		if di.names[x] {
+			return true
+		}
 	}
-	has := func(n ...string) bool {
-		for _, x := range n {
-			if names[x] {
+	return false
+}
+
+func (di dirInfo) anyExt(ext ...string) bool {
+	for n := range di.names {
+		for _, e := range ext {
+			if strings.HasSuffix(n, e) {
 				return true
 			}
 		}
-		return false
 	}
-	anyExt := func(ext ...string) bool {
-		for n := range names {
-			for _, e := range ext {
-				if strings.HasSuffix(n, e) {
-					return true
-				}
+	return false
+}
+
+func (di dirInfo) read(name string) string { return read(di.abs, name) }
+
+// BuildSystem is one way projects are built: how its projects are
+// recognised, the languages they hold, the tools they run and the package
+// registries those download from. Adding a build system is adding one;
+// nothing else changes.
+type BuildSystem struct {
+	ID         string
+	Languages  []string // internal/lang IDs
+	Tools      []string // executables its commands run
+	Registries []string // hosts its package managers download from
+	detect     func(d *detector, di dirInfo) []*Project
+}
+
+// BuildSystems returns the known build systems, in detection order.
+func BuildSystems() []BuildSystem { return append([]BuildSystem(nil), buildSystems...) }
+
+// Registries returns the package registries a tool downloads from.
+func Registries(tool string) []string {
+	var out []string
+	for _, bs := range buildSystems {
+		for _, t := range bs.Tools {
+			if t == tool {
+				out = append(out, bs.Registries...)
 			}
 		}
-		return false
 	}
+	return out
+}
 
-	if has("go.mod") {
-		p := add(&Project{Kind: "Go module", Build: "go build ./...", Test: "go test ./..."})
-		if m := goModuleRE.FindStringSubmatch(read(abs, "go.mod")); m != nil {
-			p.Name = m[1]
-		}
-		d.needs(p, "go")
-	}
-	if has("package.json") {
-		d.node(add(&Project{Kind: "Node package", group: "node"}), abs)
-	} else if has("deno.json", "deno.jsonc") {
-		d.needs(add(&Project{Kind: "Deno project", Build: "deno check .", Test: "deno test"}), "deno")
-	}
+func one(p *Project) []*Project { return []*Project{p} }
+
+var (
+	pypi    = []string{"pypi.org", "files.pythonhosted.org"}
+	npmjs   = []string{"registry.npmjs.org", "registry.yarnpkg.com", "repo.yarnpkg.com"}
+	maven   = []string{"repo.maven.apache.org", "repo1.maven.org"}
+	gradleR = []string{"repo.maven.apache.org", "repo1.maven.org", "plugins.gradle.org", "services.gradle.org", "downloads.gradle.org"}
+)
+
+var buildSystems = []BuildSystem{
+	{ID: "go", Languages: []string{"go"}, Tools: []string{"go"}, Registries: []string{"proxy.golang.org", "sum.golang.org", "storage.googleapis.com"},
+		detect: func(d *detector, di dirInfo) []*Project {
+			if !di.has("go.mod") {
+				return nil
+			}
+			p := &Project{Kind: "Go module", Build: "go build ./...", Test: "go test ./..."}
+			if m := goModuleRE.FindStringSubmatch(di.read("go.mod")); m != nil {
+				p.Name = m[1]
+			}
+			d.needs(p, "go")
+			return one(p)
+		}},
+	{ID: "node", Languages: []string{"javascript", "typescript"}, Tools: []string{"npm", "npx", "pnpm", "yarn", "bun"}, Registries: npmjs,
+		detect: func(d *detector, di dirInfo) []*Project {
+			if !di.has("package.json") {
+				return nil
+			}
+			p := &Project{Kind: "Node package", group: "node"}
+			d.node(p, di.abs)
+			if fileIn(di.abs, "tsconfig.json") {
+				p.Languages = []string{"typescript", "javascript"}
+			}
+			return one(p)
+		}},
+	{ID: "deno", Languages: []string{"typescript", "javascript"}, Tools: []string{"deno"}, Registries: []string{"deno.land", "jsr.io", "registry.npmjs.org"},
+		detect: func(d *detector, di dirInfo) []*Project {
+			if di.has("package.json") || !di.has("deno.json", "deno.jsonc") {
+				return nil
+			}
+			p := &Project{Kind: "Deno project", Build: "deno check .", Test: "deno test"}
+			d.needs(p, "deno")
+			return one(p)
+		}},
 	// A requirements.txt alone marks a Python project at the root or beside
 	// Python code, not a docs or tooling directory.
-	if has("pyproject.toml", "setup.py", "setup.cfg", "Pipfile") || has("requirements.txt") && (rel == "." || anyExt(".py")) {
-		d.python(add(&Project{Kind: "Python project"}), abs, names)
-	}
-	if has("Cargo.toml") {
-		s := read(abs, "Cargo.toml")
-		p := add(&Project{Kind: "Rust crate", Build: "cargo build", Test: "cargo test", group: "cargo"})
-		if cargoWsRE.MatchString(s) {
-			p.Kind, p.aggregates = "Rust workspace", true
+	{ID: "python", Languages: []string{"python"}, Tools: []string{"pip", "pip3", "python", "python3", "uv", "poetry", "pipenv", "pdm"}, Registries: pypi,
+		detect: func(d *detector, di dirInfo) []*Project {
+			if !di.has("pyproject.toml", "setup.py", "setup.cfg", "Pipfile") && !(di.has("requirements.txt") && (di.rel == "." || di.anyExt(".py"))) {
+				return nil
+			}
+			p := &Project{Kind: "Python project"}
+			d.python(p, di.abs, di.names)
+			return one(p)
+		}},
+	{ID: "cargo", Languages: []string{"rust"}, Tools: []string{"cargo"}, Registries: []string{"index.crates.io", "static.crates.io", "crates.io"},
+		detect: func(d *detector, di dirInfo) []*Project {
+			if !di.has("Cargo.toml") {
+				return nil
+			}
+			s := di.read("Cargo.toml")
+			p := &Project{Kind: "Rust crate", Build: "cargo build", Test: "cargo test", group: "cargo"}
+			if cargoWsRE.MatchString(s) {
+				p.Kind, p.aggregates = "Rust workspace", true
+			}
+			if m := cargoPkgRE.FindStringSubmatch(s); m != nil {
+				p.Name = m[1]
+			}
+			d.needs(p, "cargo")
+			return one(p)
+		}},
+	{ID: "maven", Languages: []string{"java", "kotlin"}, Tools: []string{"mvn", "mvnw"}, Registries: maven,
+		detect: func(d *detector, di dirInfo) []*Project {
+			if !di.has("pom.xml") {
+				return nil
+			}
+			p := &Project{Kind: "Maven project", group: "maven", aggregates: pomModulesRE.MatchString(di.read("pom.xml"))}
+			mvn := d.wrapper(di.abs, "mvnw", "mvnw.cmd")
+			if mvn == "" {
+				mvn = "mvn"
+				d.needs(p, "mvn")
+			}
+			p.Build, p.Test = mvn+" compile", mvn+" test"
+			return one(p)
+		}},
+	{ID: "gradle", Languages: []string{"java", "kotlin", "groovy"}, Tools: []string{"gradle", "gradlew"}, Registries: gradleR,
+		detect: func(d *detector, di dirInfo) []*Project {
+			if !di.has("build.gradle", "build.gradle.kts", "settings.gradle", "settings.gradle.kts") {
+				return nil
+			}
+			p := &Project{Kind: "Gradle project", group: "gradle", aggregates: di.has("settings.gradle", "settings.gradle.kts")}
+			gradle := d.wrapper(di.abs, "gradlew", "gradlew.bat")
+			if gradle == "" {
+				gradle = "gradle"
+				d.needs(p, "gradle")
+			}
+			p.Build, p.Test = gradle+" assemble", gradle+" test"
+			if di.has("build.gradle.kts", "settings.gradle.kts") {
+				p.Languages = []string{"kotlin", "java"}
+			}
+			return one(p)
+		}},
+	{ID: "sbt", Languages: []string{"scala"}, Tools: []string{"sbt"}, Registries: maven,
+		detect: func(d *detector, di dirInfo) []*Project {
+			if !di.has("build.sbt") {
+				return nil
+			}
+			p := &Project{Kind: "sbt project", Build: "sbt compile", Test: "sbt test"}
+			d.needs(p, "sbt")
+			return one(p)
+		}},
+	{ID: "dotnet", Languages: []string{"csharp", "fsharp"}, Tools: []string{"dotnet"}, Registries: []string{"api.nuget.org"},
+		detect: func(d *detector, di dirInfo) []*Project {
+			sln := di.anyExt(".sln", ".slnx")
+			if !sln && !di.anyExt(".csproj", ".fsproj", ".vbproj") {
+				return nil
+			}
+			p := &Project{Kind: ".NET project", Build: "dotnet build", Test: "dotnet test", group: "dotnet", aggregates: sln}
+			if sln {
+				p.Kind = ".NET solution"
+			}
+			if di.anyExt(".fsproj") && !di.anyExt(".csproj") {
+				p.Languages = []string{"fsharp"}
+			}
+			d.needs(p, "dotnet")
+			return one(p)
+		}},
+	{ID: "bundler", Languages: []string{"ruby"}, Tools: []string{"bundle", "gem"}, Registries: []string{"rubygems.org", "index.rubygems.org"},
+		detect: func(d *detector, di dirInfo) []*Project {
+			if !di.has("Gemfile") {
+				return nil
+			}
+			p := &Project{Kind: "Ruby project", Test: "bundle exec rake test"}
+			if di.has("spec", ".rspec") {
+				p.Test = "bundle exec rspec"
+			}
+			d.needs(p, "bundle")
+			return one(p)
+		}},
+	{ID: "composer", Languages: []string{"php"}, Tools: []string{"composer"}, Registries: []string{"repo.packagist.org", "packagist.org"},
+		detect: func(d *detector, di dirInfo) []*Project {
+			if !di.has("composer.json") {
+				return nil
+			}
+			p := &Project{Kind: "PHP project"}
+			d.php(p, di.abs, di.names)
+			return one(p)
+		}},
+	{ID: "mix", Languages: []string{"elixir"}, Tools: []string{"mix"}, Registries: []string{"repo.hex.pm", "hex.pm"},
+		detect: func(d *detector, di dirInfo) []*Project {
+			if !di.has("mix.exs") {
+				return nil
+			}
+			s := di.read("mix.exs")
+			p := &Project{Kind: "Elixir project", Build: "mix compile", Test: "mix test", group: "mix", aggregates: strings.Contains(s, "apps_path")}
+			if m := mixAppRE.FindStringSubmatch(s); m != nil {
+				p.Name = m[1]
+			}
+			d.needs(p, "mix")
+			return one(p)
+		}},
+	{ID: "swiftpm", Languages: []string{"swift"}, Tools: []string{"swift"},
+		detect: func(d *detector, di dirInfo) []*Project {
+			if !di.has("Package.swift") {
+				return nil
+			}
+			p := &Project{Kind: "Swift package", Build: "swift build", Test: "swift test"}
+			d.needs(p, "swift")
+			return one(p)
+		}},
+	{ID: "pub", Languages: []string{"dart"}, Tools: []string{"dart", "flutter"}, Registries: []string{"pub.dev"},
+		detect: func(d *detector, di dirInfo) []*Project {
+			if !di.has("pubspec.yaml") {
+				return nil
+			}
+			s := di.read("pubspec.yaml")
+			p := &Project{Kind: "Dart package", Build: "dart analyze", Test: "dart test"}
+			tool := "dart"
+			if strings.Contains(s, "sdk: flutter") {
+				p.Kind, p.Build, p.Test, tool = "Flutter package", "flutter analyze", "flutter test", "flutter"
+			}
+			if m := pubNameRE.FindStringSubmatch(s); m != nil {
+				p.Name = m[1]
+			}
+			d.needs(p, tool)
+			return one(p)
+		}},
+	{ID: "zig", Languages: []string{"zig"}, Tools: []string{"zig"},
+		detect: func(d *detector, di dirInfo) []*Project {
+			if !di.has("build.zig") {
+				return nil
+			}
+			p := &Project{Kind: "Zig project", Build: "zig build", Test: "zig build test"}
+			d.needs(p, "zig")
+			return one(p)
+		}},
+	{ID: "haskell", Languages: []string{"haskell"}, Tools: []string{"stack", "cabal"}, Registries: []string{"hackage.haskell.org"},
+		detect: func(d *detector, di dirInfo) []*Project {
+			switch {
+			case di.has("stack.yaml"):
+				p := &Project{Kind: "Haskell project", Build: "stack build", Test: "stack test", group: "haskell", aggregates: true}
+				d.needs(p, "stack")
+				return one(p)
+			case di.has("cabal.project") || di.anyExt(".cabal"):
+				p := &Project{Kind: "Haskell project", Build: "cabal build", Test: "cabal test", group: "haskell", aggregates: true}
+				d.needs(p, "cabal")
+				return one(p)
+			}
+			return nil
+		}},
+	{ID: "dune", Languages: []string{"ocaml"}, Tools: []string{"dune"},
+		detect: func(d *detector, di dirInfo) []*Project {
+			if !di.has("dune-project") {
+				return nil
+			}
+			p := &Project{Kind: "OCaml project", Build: "dune build", Test: "dune test", group: "dune", aggregates: true}
+			d.needs(p, "dune")
+			return one(p)
+		}},
+	{ID: "clojure", Languages: []string{"clojure"}, Tools: []string{"lein", "clojure"}, Registries: []string{"repo.clojars.org", "repo.maven.apache.org"},
+		detect: func(d *detector, di dirInfo) []*Project {
+			switch {
+			case di.has("project.clj"):
+				p := &Project{Kind: "Clojure project", Test: "lein test"}
+				d.needs(p, "lein")
+				return one(p)
+			case di.has("deps.edn"):
+				p := &Project{Kind: "Clojure project"}
+				d.needs(p, "clojure")
+				return one(p)
+			}
+			return nil
+		}},
+	{ID: "bazel", Tools: []string{"bazel", "bazelisk"},
+		detect: func(d *detector, di dirInfo) []*Project {
+			if !di.has("MODULE.bazel", "WORKSPACE", "WORKSPACE.bazel") {
+				return nil
+			}
+			p := &Project{Kind: "Bazel workspace", Build: "bazel build //...", Test: "bazel test //...", group: "bazel", aggregates: true}
+			d.needs(p, "bazel")
+			return one(p)
+		}},
+	{ID: "cmake", Languages: []string{"c", "cpp"}, Tools: []string{"cmake", "ctest"},
+		detect: func(d *detector, di dirInfo) []*Project {
+			if !di.has("CMakeLists.txt") {
+				return nil
+			}
+			p := &Project{Kind: "CMake project", Build: "cmake -S . -B build && cmake --build build", Test: "ctest --test-dir build", group: "cmake", aggregates: true}
+			d.needs(p, "cmake")
+			return one(p)
+		}},
+	{ID: "meson", Languages: []string{"c", "cpp"}, Tools: []string{"meson"},
+		detect: func(d *detector, di dirInfo) []*Project {
+			if !di.has("meson.build") {
+				return nil
+			}
+			p := &Project{Kind: "Meson project", Build: "meson setup build && meson compile -C build", Test: "meson test -C build", group: "meson", aggregates: true}
+			d.needs(p, "meson")
+			return one(p)
+		}},
+	{ID: "autotools", Languages: []string{"c", "cpp"}, Tools: []string{"make"},
+		detect: func(d *detector, di dirInfo) []*Project {
+			if !di.has("configure.ac", "configure.in") {
+				return nil
+			}
+			p := &Project{Kind: "Autotools project", Build: "./configure && make", Test: "make check", group: "make", aggregates: true}
+			d.needs(p, "make")
+			return one(p)
+		}},
+	// A Makefile builds whatever its rules say: no language is assumed.
+	{ID: "make", Tools: []string{"make"},
+		detect: func(d *detector, di dirInfo) []*Project {
+			if !di.has("Makefile", "makefile", "GNUmakefile") {
+				return nil
+			}
+			name := "Makefile"
+			for _, n := range []string{"GNUmakefile", "makefile"} {
+				if di.names[n] {
+					name = n
+				}
+			}
+			targets := targetsOf(filepath.Join(di.abs, name))
+			p := &Project{Kind: "Makefile", Build: "make", group: "make", aggregates: true}
+			p.Note = "targets: none found"
+			if len(targets) > 0 {
+				p.Note = "targets: " + strings.Join(targets, ", ")
+			}
+			for _, t := range targets {
+				if t == "test" || t == "check" {
+					p.Test = "make " + t
+					break
+				}
+			}
+			d.needs(p, "make")
+			return one(p)
+		}},
+	{ID: "just", Tools: []string{"just"},
+		detect: func(d *detector, di dirInfo) []*Project {
+			if !di.has("justfile", "Justfile", ".justfile") {
+				return nil
+			}
+			name := "justfile"
+			for _, n := range []string{"Justfile", ".justfile"} {
+				if di.names[n] {
+					name = n
+				}
+			}
+			p := &Project{Kind: "justfile"}
+			if recipes := targetsOf(filepath.Join(di.abs, name)); len(recipes) > 0 {
+				p.Note = "recipes: " + strings.Join(recipes, ", ")
+			}
+			d.needs(p, "just")
+			return one(p)
+		}},
+	{ID: "terraform", Languages: []string{"terraform"}, Tools: []string{"terraform", "tofu"}, Registries: []string{"registry.terraform.io", "releases.hashicorp.com"},
+		detect: func(d *detector, di dirInfo) []*Project {
+			if !di.anyExt(".tf") {
+				return nil
+			}
+			p := &Project{Kind: "Terraform configuration", Build: "terraform init -backend=false && terraform validate", group: "terraform", aggregates: true}
+			if di.anyExt(".tftest.hcl") {
+				p.Test = "terraform test"
+			}
+			d.needs(p, "terraform")
+			return one(p)
+		}},
+	{ID: "helm", Languages: []string{"yaml"}, Tools: []string{"helm"},
+		detect: func(d *detector, di dirInfo) []*Project {
+			if !di.has("Chart.yaml") {
+				return nil
+			}
+			p := &Project{Kind: "Helm chart", Build: "helm lint ."}
+			d.needs(p, "helm")
+			return one(p)
+		}},
+}
+
+// RegisterBuildSystem adds a build system recognised by marker files (from
+// the user's configuration): projects in directories with any of markers
+// (file names, or "*.ext"),
+// built and tested with the commands given.
+func RegisterBuildSystem(id, kind string, markers, languages []string, tool, build, test string) {
+	var names, exts []string
+	for _, m := range markers {
+		if e, ok := strings.CutPrefix(m, "*"); ok {
+			exts = append(exts, e) // "*.nimble"
+		} else {
+			names = append(names, m)
 		}
-		if m := cargoPkgRE.FindStringSubmatch(s); m != nil {
-			p.Name = m[1]
+	}
+	bs := BuildSystem{ID: id, Languages: languages, Tools: []string{tool}, detect: func(d *detector, di dirInfo) []*Project {
+		if !di.has(names...) && (len(exts) == 0 || !di.anyExt(exts...)) {
+			return nil
 		}
-		d.needs(p, "cargo")
-	}
-	if has("pom.xml") {
-		p := add(&Project{Kind: "Maven project", group: "maven", aggregates: pomModulesRE.MatchString(read(abs, "pom.xml"))})
-		mvn := d.wrapper(abs, "mvnw", "mvnw.cmd")
-		if mvn == "" {
-			mvn = "mvn"
-			d.needs(p, "mvn")
-		}
-		p.Build, p.Test = mvn+" compile", mvn+" test"
-	}
-	if has("build.gradle", "build.gradle.kts", "settings.gradle", "settings.gradle.kts") {
-		p := add(&Project{Kind: "Gradle project", group: "gradle", aggregates: has("settings.gradle", "settings.gradle.kts")})
-		gradle := d.wrapper(abs, "gradlew", "gradlew.bat")
-		if gradle == "" {
-			gradle = "gradle"
-			d.needs(p, "gradle")
-		}
-		p.Build, p.Test = gradle+" assemble", gradle+" test"
-	}
-	if has("build.sbt") {
-		d.needs(add(&Project{Kind: "sbt project", Build: "sbt compile", Test: "sbt test"}), "sbt")
-	}
-	if sln := anyExt(".sln", ".slnx"); sln || anyExt(".csproj", ".fsproj", ".vbproj") {
-		p := add(&Project{Kind: ".NET project", Build: "dotnet build", Test: "dotnet test", group: "dotnet", aggregates: sln})
-		if sln {
-			p.Kind = ".NET solution"
-		}
-		d.needs(p, "dotnet")
-	}
-	if has("Gemfile") {
-		p := add(&Project{Kind: "Ruby project", Test: "bundle exec rake test"})
-		if has("spec", ".rspec") {
-			p.Test = "bundle exec rspec"
-		}
-		d.needs(p, "bundle")
-	}
-	if has("composer.json") {
-		d.php(add(&Project{Kind: "PHP project"}), abs, names)
-	}
-	if has("mix.exs") {
-		s := read(abs, "mix.exs")
-		p := add(&Project{Kind: "Elixir project", Build: "mix compile", Test: "mix test", group: "mix", aggregates: strings.Contains(s, "apps_path")})
-		if m := mixAppRE.FindStringSubmatch(s); m != nil {
-			p.Name = m[1]
-		}
-		d.needs(p, "mix")
-	}
-	if has("Package.swift") {
-		d.needs(add(&Project{Kind: "Swift package", Build: "swift build", Test: "swift test"}), "swift")
-	}
-	if has("pubspec.yaml") {
-		s := read(abs, "pubspec.yaml")
-		p := add(&Project{Kind: "Dart package", Build: "dart analyze", Test: "dart test"})
-		tool := "dart"
-		if strings.Contains(s, "sdk: flutter") {
-			p.Kind, p.Build, p.Test, tool = "Flutter package", "flutter analyze", "flutter test", "flutter"
-		}
-		if m := pubNameRE.FindStringSubmatch(s); m != nil {
-			p.Name = m[1]
-		}
+		p := &Project{Kind: kind, Build: build, Test: test}
 		d.needs(p, tool)
+		return one(p)
+	}}
+	for i, b := range buildSystems {
+		if b.ID == id {
+			buildSystems[i] = bs
+			return
+		}
 	}
-	if has("build.zig") {
-		d.needs(add(&Project{Kind: "Zig project", Build: "zig build", Test: "zig build test"}), "zig")
-	}
-	if has("stack.yaml") {
-		d.needs(add(&Project{Kind: "Haskell project", Build: "stack build", Test: "stack test", group: "haskell", aggregates: true}), "stack")
-	} else if has("cabal.project") || anyExt(".cabal") {
-		d.needs(add(&Project{Kind: "Haskell project", Build: "cabal build", Test: "cabal test", group: "haskell", aggregates: true}), "cabal")
-	}
-	if has("dune-project") {
-		d.needs(add(&Project{Kind: "OCaml project", Build: "dune build", Test: "dune test", group: "dune", aggregates: true}), "dune")
-	}
-	if has("project.clj") {
-		d.needs(add(&Project{Kind: "Clojure project", Test: "lein test"}), "lein")
-	} else if has("deps.edn") {
-		d.needs(add(&Project{Kind: "Clojure project"}), "clojure")
-	}
-	if has("MODULE.bazel", "WORKSPACE", "WORKSPACE.bazel") {
-		d.needs(add(&Project{Kind: "Bazel workspace", Build: "bazel build //...", Test: "bazel test //...", group: "bazel", aggregates: true}), "bazel")
-	}
-	if has("CMakeLists.txt") {
-		d.needs(add(&Project{Kind: "CMake project", Build: "cmake -S . -B build && cmake --build build", Test: "ctest --test-dir build", group: "cmake", aggregates: true}), "cmake")
-	}
-	if has("meson.build") {
-		d.needs(add(&Project{Kind: "Meson project", Build: "meson setup build && meson compile -C build", Test: "meson test -C build", group: "meson", aggregates: true}), "meson")
-	}
-	if has("configure.ac", "configure.in") {
-		d.needs(add(&Project{Kind: "Autotools project", Build: "./configure && make", Test: "make check", group: "make", aggregates: true}), "make")
-	}
-	if has("Makefile", "makefile", "GNUmakefile") {
-		name := "Makefile"
-		for _, n := range []string{"GNUmakefile", "makefile"} {
-			if names[n] {
-				name = n
+	buildSystems = append(buildSystems, bs)
+}
+
+// detectDir returns the projects whose manifests are in one directory.
+func (d *detector) detectDir(abs, rel string, names map[string]bool) []*Project {
+	di := dirInfo{abs: abs, rel: rel, names: names}
+	var out []*Project
+	for _, bs := range buildSystems {
+		for _, p := range bs.detect(d, di) {
+			p.Dir, p.System = rel, bs.ID
+			if p.Languages == nil {
+				p.Languages = bs.Languages
 			}
+			out = append(out, p)
 		}
-		targets := targetsOf(filepath.Join(abs, name))
-		p := add(&Project{Kind: "Makefile", Build: "make", group: "make", aggregates: true})
-		p.Note = "targets: none found"
-		if len(targets) > 0 {
-			p.Note = "targets: " + strings.Join(targets, ", ")
-		}
-		for _, t := range targets {
-			if t == "test" || t == "check" {
-				p.Test = "make " + t
-				break
-			}
-		}
-		d.needs(p, "make")
-	}
-	if has("justfile", "Justfile", ".justfile") {
-		name := "justfile"
-		for _, n := range []string{"Justfile", ".justfile"} {
-			if names[n] {
-				name = n
-			}
-		}
-		p := add(&Project{Kind: "justfile"})
-		if recipes := targetsOf(filepath.Join(abs, name)); len(recipes) > 0 {
-			p.Note = "recipes: " + strings.Join(recipes, ", ")
-		}
-		d.needs(p, "just")
-	}
-	if anyExt(".tf") {
-		p := add(&Project{Kind: "Terraform configuration", Build: "terraform init -backend=false && terraform validate", group: "terraform", aggregates: true})
-		if anyExt(".tftest.hcl") {
-			p.Test = "terraform test"
-		}
-		d.needs(p, "terraform")
-	}
-	if has("Chart.yaml") {
-		d.needs(add(&Project{Kind: "Helm chart", Build: "helm lint ."}), "helm")
 	}
 	return out
 }

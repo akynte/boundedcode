@@ -1,0 +1,7 @@
+cmake_minimum_required(VERSION 3.16)
+project(geom C)
+enable_testing()
+add_library(geom geom.c)
+add_executable(test_geom test_geom.c)
+target_link_libraries(test_geom geom)
+add_test(NAME geom COMMAND test_geom)

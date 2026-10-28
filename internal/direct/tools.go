@@ -89,8 +89,9 @@ func (r *Runner) buildTools() []Tool {
 	if !r.Opts.NoSubagents && !r.Opts.ReadOnly && r.Depth < 2 {
 		ts = append(ts, taskTool())
 	}
-	if r.Nav != nil {
-		ts = append(ts, findSymbolTool(), findReferencesTool(), findImplementationsTool())
+	ts = append(ts, findSymbolTool(), findReferencesTool())
+	if r.Nav != nil { // implementations need a language server
+		ts = append(ts, findImplementationsTool())
 	}
 	ts = append(ts, r.mcpTools()...)
 	if len(r.only) > 0 {

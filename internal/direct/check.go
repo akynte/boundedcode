@@ -3,28 +3,26 @@ package direct
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"go/parser"
-	"go/token"
+	"github.com/akynte/boundedcode/internal/lang"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
-
-	"go.yaml.in/yaml/v3"
 )
 
 // After a file change, the cheapest deterministic check for the file's
-// language runs and its verdict is appended to the tool result: a parse
-// for Go (then a build of its package when the Go toolchain is present),
-// a parse for Python, JavaScript, shell, Ruby and PHP when their
-// interpreters are present, and an in-process parse for JSON and YAML.
-// A small model misplaces braces and indentation often; catching that at
-// write time costs well under a second, a test run costs tens of seconds
-// and a whole turn of context.
+// language (internal/lang) runs and its verdict is appended to the tool
+// result: an in-process parse (Go, JSON, YAML, XML), the language's own
+// parse (Python, JavaScript, shell, Ruby, PHP) or a build of the file's
+// package (Go), with host tools only, in the session's sandbox. A small
+// model misplaces braces and indentation often; catching that at write
+// time costs well under a second, a test run costs tens of seconds and a
+// whole turn of context.
+//
+// When a language has no check, or its tool is not installed, the model is
+// told once per session, so "not checked" is never mistaken for "passed".
 
 const (
 	checkTimeout   = 60 * time.Second
@@ -32,123 +30,152 @@ const (
 	checkMaxOutput = 2000
 )
 
+// finder looks up host tools for checks (never the project's own).
+func (r *Runner) finder() *lang.Finder {
+	r.finderOnce.Do(func() {
+		root, err := filepath.EvalSymlinks(r.Opts.Root)
+		if err != nil {
+			root = r.Opts.Root
+		}
+		r.toolFinder = &lang.Finder{Exclude: root}
+	})
+	return r.toolFinder
+}
+
+// noteOnce returns msg the first time key is seen in the session.
+func (r *Runner) noteOnce(key, msg string) string {
+	r.checkNotesMu.Lock()
+	defer r.checkNotesMu.Unlock()
+	if r.checkNotes == nil {
+		r.checkNotes = map[string]bool{}
+	}
+	if r.checkNotes[key] {
+		return ""
+	}
+	r.checkNotes[key] = true
+	return msg
+}
+
 // checkFile checks a changed file and returns a line for the model:
-// "check: ok (what)" or the diagnostic; "" when no check applies. before
-// is a Go file's content before the change (nil when new), so notes about
-// mistakes that compile (goPitfalls) cover only what the change added.
+// "check: ok (what)", the diagnostic, or (once per language and session)
+// why it is not checked; "" when nothing applies. before is the file's
+// content before the change (nil when new), for notes that cover only
+// what the change added.
 func (r *Runner) checkFile(ctx context.Context, abs, rel string, before []byte) string {
 	ctx, cancel := context.WithTimeout(ctx, checkTimeout)
 	defer cancel()
-	switch strings.ToLower(filepath.Ext(abs)) {
-	case ".go":
-		return r.checkGo(ctx, abs, rel, before)
-	case ".py":
-		return r.checkWith(ctx, "python3", "python3", "-c", pyParse, abs)
-	case ".js", ".mjs", ".cjs":
-		return r.checkWith(ctx, "node", "node", "--check", abs)
-	case ".sh", ".bash":
-		return r.checkWith(ctx, "bash", "bash", "-n", abs)
-	case ".rb":
-		return r.checkWith(ctx, "ruby", "ruby", "-c", abs)
-	case ".php":
-		return r.checkWith(ctx, "php", "php", "-l", abs)
-	case ".json":
-		b, err := os.ReadFile(abs)
-		if err != nil {
+	l := lang.ForPath(rel, lang.FirstLine(abs))
+	if l == nil {
+		return "" // any text: edited and searched like the rest, nothing to check
+	}
+	c, bin, status := r.finder().FindCheck(l, abs)
+	switch status {
+	case lang.Unsupported:
+		if l.Kind != lang.KindProgramming {
 			return ""
 		}
-		if len(bytes.TrimSpace(b)) == 0 {
-			return "check: " + rel + " is empty, not JSON"
+		why := l.Note
+		if why == "" {
+			why = "BoundedCode has no check for it"
 		}
-		if !json.Valid(b) {
-			var v any
-			err := json.Unmarshal(b, &v)
-			return "check: " + rel + " is not valid JSON: " + errString(err)
-		}
-		return "check: ok (json)"
-	case ".yaml", ".yml":
-		b, err := os.ReadFile(abs)
-		if err != nil {
-			return ""
-		}
-		var v any
-		if err := yaml.Unmarshal(b, &v); err != nil {
-			return "check: " + rel + " is not valid YAML: " + err.Error()
-		}
-		return "check: ok (yaml)"
+		return r.noteOnce("unsupported "+l.ID, "check: "+l.Name+" files are not checked after edits ("+why+"); build or test the project to verify a change.")
+	case lang.MissingTool:
+		return r.noteOnce("missing "+l.ID, "check: "+l.Name+" files are not checked here: "+strings.Join(c.Tools, " or ")+
+			" is not installed (missing tool, not a problem in the file).")
 	}
-	return ""
-}
-
-// pyParse parses a Python file without importing it or writing bytecode.
-const pyParse = "import ast,sys\nsrc=open(sys.argv[1],'rb').read()\nast.parse(src, sys.argv[1])\n"
-
-// checkWith runs a syntax check with an interpreter when it is installed.
-func (r *Runner) checkWith(ctx context.Context, what, bin string, args ...string) string {
-	path, err := exec.LookPath(bin)
-	if err != nil {
-		return ""
-	}
-	out, err := r.runCheck(ctx, r.cwd(), path, args...)
-	switch {
-	case errors.Is(err, context.DeadlineExceeded):
-		return fmt.Sprintf("check: %s skipped (timed out)", what)
-	case err != nil:
-		return fmt.Sprintf("check: %s reports:\n%s\nFix this before going on.", what, out)
-	}
-	return "check: ok (" + what + " parse)"
-}
-
-// checkGo parses the file, then builds (or vets, for a test file) its
-// package when the Go toolchain is installed.
-func (r *Runner) checkGo(ctx context.Context, abs, rel string, before []byte) string {
 	src, err := os.ReadFile(abs)
 	if err != nil {
 		return ""
 	}
-	if _, perr := parser.ParseFile(token.NewFileSet(), rel, src, parser.SkipObjectResolution); perr != nil {
-		return "check: Go syntax error:\n" + perr.Error() + "\nFix this before going on."
-	}
-	verdict := r.buildGo(ctx, abs)
-	if notes := newPitfalls(rel, before, src); len(notes) > 0 {
+	verdict := r.runFileCheck(ctx, l, c, bin, abs, rel, src)
+	if notes := languageNotes(l.ID, rel, before, src); len(notes) > 0 && !strings.HasSuffix(verdict, "Fix this before going on.") {
 		verdict += "\ncheck note (compiles, but probably not what you meant):\n- " + strings.Join(notes, "\n- ")
 	}
 	return verdict
 }
 
-// buildGo builds (or vets, for a test file) a Go file's package when the
-// Go toolchain is installed.
-func (r *Runner) buildGo(ctx context.Context, abs string) string {
-	goBin, err := exec.LookPath("go")
-	if err != nil {
-		return "check: ok (Go parse)"
+// runFileCheck runs one check (and the one after it).
+func (r *Runner) runFileCheck(ctx context.Context, l *lang.Language, c *lang.Check, bin, abs, rel string, src []byte) string {
+	if c.InProcess != nil {
+		if err := c.InProcess(rel, src); err != nil {
+			if l.Kind == lang.KindProgramming {
+				return "check: " + l.Name + " syntax error:\n" + err.Error() + "\nFix this before going on."
+			}
+			return "check: " + rel + " is not valid " + l.Name + ": " + err.Error()
+		}
+		if c.Then == nil {
+			return "check: ok (" + c.What + ")"
+		}
+		then, thenBin, st := c.Then, "", lang.MissingTool
+		for _, t := range then.Tools {
+			if p := r.finder().Find(t); p != "" {
+				thenBin, st = p, lang.Available
+				break
+			}
+		}
+		if st != lang.Available {
+			return "check: ok (" + c.What + ")" + r.noteOnce("missing "+l.ID, "\ncheck: "+then.What+" did not run: "+strings.Join(then.Tools, " or ")+
+				" is not installed (missing tool).")
+		}
+		out := r.runToolCheck(ctx, l, then, thenBin, abs, rel)
+		if out == "" {
+			return "check: ok (" + c.What + ")"
+		}
+		return out
 	}
-	modRoot := findUp(filepath.Dir(abs), r.Opts.Root, "go.mod")
-	if modRoot == "" {
-		return "check: ok (Go parse)"
+	return r.runToolCheck(ctx, l, c, bin, abs, rel)
+}
+
+// runToolCheck runs a tool check in the directory its Root names; "" when
+// it cannot apply (no such root).
+func (r *Runner) runToolCheck(ctx context.Context, l *lang.Language, c *lang.Check, bin, abs, rel string) string {
+	dir := filepath.Dir(abs)
+	if len(c.Root) > 0 {
+		dir = ""
+		for _, marker := range c.Root {
+			if d := findUp(filepath.Dir(abs), r.Opts.Root, marker); d != "" {
+				dir = d
+				break
+			}
+		}
+		if dir == "" {
+			return ""
+		}
 	}
-	pkgRel, err := filepath.Rel(modRoot, filepath.Dir(abs))
+	pkgRel, err := filepath.Rel(dir, filepath.Dir(abs))
 	if err != nil {
-		return "check: ok (Go parse)"
+		return ""
 	}
 	pkg := "./" + filepath.ToSlash(pkgRel)
 	if pkgRel == "." {
 		pkg = "."
 	}
-	args := []string{"build", "-o", os.DevNull, pkg}
-	what := "go build " + pkg
-	if strings.HasSuffix(abs, "_test.go") {
-		args = []string{"vet", pkg}
-		what = "go vet " + pkg
+	args := c.Args
+	if len(c.TestArgs) > 0 && l.IsTest(rel) {
+		args = c.TestArgs
 	}
-	out, err := r.runCheck(ctx, modRoot, goBin, args...)
+	args = lang.Expand(args, map[string]string{"file": abs, "dir": filepath.Dir(abs), "pkg": pkg, "root": dir})
+	what := c.What
+	if strings.Contains(strings.Join(c.Args, " "), "{pkg}") {
+		what = filepath.Base(bin) + " " + args[0] + " " + pkg
+	}
+	out, err := r.runCheck(ctx, dir, bin, args...)
 	switch {
 	case errors.Is(err, context.DeadlineExceeded):
-		return fmt.Sprintf("check: %s skipped (timed out)", what)
+		return fmt.Sprintf("check: %s skipped (timed out: not verified)", what)
 	case err != nil:
 		return fmt.Sprintf("check: %s failed:\n%s\nFix this before going on.", what, out)
 	}
 	return "check: ok (" + what + ")"
+}
+
+// languageNotes are notes about code that compiles but is probably wrong,
+// by language.
+func languageNotes(id, rel string, before, after []byte) []string {
+	if id == "go" {
+		return newPitfalls(rel, before, after)
+	}
+	return nil
 }
 
 // runCheck runs a check command and returns its trimmed output (stdout and
