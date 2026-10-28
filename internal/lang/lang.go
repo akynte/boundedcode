@@ -54,6 +54,16 @@ type Language struct {
 	// Outline lists the lines of a file's top-level definitions more
 	// precisely than Definitions (a parser); nil uses Definitions.
 	Outline func(src string) []int
+	// Skips match a line that skips, disables or focuses tests (t.Skip,
+	// @pytest.mark.skip, it.only, @Disabled, #[ignore]): added to a test,
+	// it can make verification pass without testing anything.
+	Skips []*regexp.Regexp
+	// Mutation names the mutation provider that applies to the language's
+	// files (internal/verify): "go" (its AST), "python" (its tokenizer and
+	// parser), "c-family" (a lexer for C-like syntax: strings and comments
+	// are never mutated), "c-family-hash" (the same, with # comments);
+	// "" when mutation testing is unavailable.
+	Mutation string
 }
 
 // Check is a per-file check.

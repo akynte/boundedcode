@@ -214,4 +214,8 @@ CREATE INDEX compat_results_eval ON compat_results(evaluation_id);
 ALTER TABLE model_calls ADD COLUMN reasoning_tokens INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE model_calls ADD COLUMN ttft_ms REAL NOT NULL DEFAULT 0;
 `,
+	// 8: what each verification layer established for a task's candidate.
+	`
+ALTER TABLE tasks ADD COLUMN evidence TEXT NOT NULL DEFAULT '[]';
+`,
 }

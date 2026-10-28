@@ -64,6 +64,9 @@ type Stage struct {
 	// root (a project inside a monorepo); Requires are relative to it, and
 	// {packages} lists the packages under it. "" is the root.
 	Dir string `yaml:"dir,omitempty"`
+	// Kind is the layer the stage serves (kinds.go): syntax, build, test,
+	// lint; "" infers it from the name.
+	Kind string `yaml:"kind,omitempty"`
 
 	preset bool // built in (presetFor): Tests is authoritative
 }
@@ -109,6 +112,9 @@ type Result struct {
 	Started    time.Time     `json:"started"`
 	Duration   time.Duration `json:"duration_ns"`
 	Packages   []string      `json:"packages,omitempty"`
+	// Integrity are the ways the change may weaken verification
+	// (integrity.go); blocking ones also fail the test-integrity stage.
+	Integrity []IntegrityFinding `json:"integrity,omitempty"`
 }
 
 // Failures returns the failing stages.
@@ -395,6 +401,8 @@ func (e *Engine) Run(ctx context.Context, t RepoTarget, scope Scope) (Result, er
 	}
 	t.Changed = changed
 	res.Stages = append(res.Stages, diffScope(changed, cfg))
+	res.Integrity = e.Integrity(ctx, t, changed)
+	res.Stages = append(res.Stages, integrityStage(res.Integrity))
 	res.Stages = append(res.Stages, e.secretScan(ctx, t, scope))
 	if st, ok := e.buildTagsStage(ctx, t, changed); ok {
 		res.Stages = append(res.Stages, st)
@@ -605,6 +613,8 @@ const (
 	CauseMissingTool = "missing tool"
 	CauseTimeout     = "timeout"
 	CauseEnvironment = "environment"
+	// CauseIntegrity: the change redefines how its own tests run.
+	CauseIntegrity = "integrity"
 )
 
 // execStage runs a stage's expanded command with a prepared sandbox spec and

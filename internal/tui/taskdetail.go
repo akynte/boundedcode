@@ -734,6 +734,22 @@ func (v *taskView) verifyLines(w int) []string {
 	if len(out) > 0 {
 		out = append(out, "")
 	}
+	// What each verification layer established for the candidate.
+	if v.d != nil && v.d.Task != nil && len(v.d.Task.Evidence) > 0 {
+		out = append(out, sBold.Render("Verification layers"))
+		for _, l := range v.d.Task.Evidence {
+			req := ""
+			if l.Required {
+				req = " (required)"
+			}
+			line := fmt.Sprintf("    %s L%d %s %s", statusIcon(l.Status), l.Layer, fit(l.Name, 24), lipgloss.NewStyle().Foreground(statusColor(l.Status)).Render(l.Status+req))
+			if l.Detail != "" {
+				line += sFaint.Render("  " + trunc(l.Detail, max(w-60, 20)))
+			}
+			out = append(out, line)
+		}
+		out = append(out, "")
+	}
 	for i, r := range v.verifs {
 		icon, st := sOK.Render("✔"), sOK
 		verdict := "passed"

@@ -44,28 +44,31 @@ const (
 
 // Task is the canonical record.
 type Task struct {
-	ID                  string     `json:"id"`
-	WorkspaceID         string     `json:"workspace_id"`
-	OriginalRequest     string     `json:"original_request"`
-	Goal                string     `json:"goal"`
-	AcceptanceCriteria  []string   `json:"acceptance_criteria"`
-	Status              Status     `json:"status"`
-	Phase               Phase      `json:"phase"`
-	CompletedSteps      []string   `json:"completed_steps"`
-	RemainingSteps      []string   `json:"remaining_steps"`
-	AttemptCount        int        `json:"attempt_count"`
-	Decisions           []Decision `json:"decisions"`
-	VerificationState   string     `json:"verification_state"` // none | failing | targeted_pass | tests_green | task_verified
-	ChangedRepositories []string   `json:"changed_repositories"`
-	ChangedFiles        []string   `json:"changed_files"`
-	ChangedSymbols      []string   `json:"changed_symbols"`
-	AgentRuntime        string     `json:"agent_runtime"`
-	AgentSessionID      string     `json:"agent_session_id"`
-	ModelProfile        string     `json:"model_profile"`
-	Budget              Budget     `json:"budget"`
-	CreatedAt           string     `json:"created_at"`
-	UpdatedAt           string     `json:"updated_at"`
-	FinishedAt          string     `json:"finished_at"`
+	ID                 string     `json:"id"`
+	WorkspaceID        string     `json:"workspace_id"`
+	OriginalRequest    string     `json:"original_request"`
+	Goal               string     `json:"goal"`
+	AcceptanceCriteria []string   `json:"acceptance_criteria"`
+	Status             Status     `json:"status"`
+	Phase              Phase      `json:"phase"`
+	CompletedSteps     []string   `json:"completed_steps"`
+	RemainingSteps     []string   `json:"remaining_steps"`
+	AttemptCount       int        `json:"attempt_count"`
+	Decisions          []Decision `json:"decisions"`
+	VerificationState  string     `json:"verification_state"` // none | failing | incomplete | targeted_pass | tests_green | task_verified
+	// Evidence is what each verification layer established for the
+	// completed candidate (internal/verify Classify), per repository.
+	Evidence            []EvidenceLayer `json:"evidence,omitempty"`
+	ChangedRepositories []string        `json:"changed_repositories"`
+	ChangedFiles        []string        `json:"changed_files"`
+	ChangedSymbols      []string        `json:"changed_symbols"`
+	AgentRuntime        string          `json:"agent_runtime"`
+	AgentSessionID      string          `json:"agent_session_id"`
+	ModelProfile        string          `json:"model_profile"`
+	Budget              Budget          `json:"budget"`
+	CreatedAt           string          `json:"created_at"`
+	UpdatedAt           string          `json:"updated_at"`
+	FinishedAt          string          `json:"finished_at"`
 }
 
 // Decision is an important choice made during the task.
@@ -112,6 +115,16 @@ const (
 	VerificationTestsGreen   = "tests_green"
 	VerificationTaskVerified = "task_verified"
 )
+
+// EvidenceLayer is one verification layer's outcome for one repository.
+type EvidenceLayer struct {
+	Repo     string `json:"repo"`
+	Layer    int    `json:"layer"`
+	Name     string `json:"name"`
+	Status   string `json:"status"`
+	Detail   string `json:"detail,omitempty"`
+	Required bool   `json:"required,omitempty"`
+}
 
 // Strategy is one approach tried in an attempt.
 type Strategy struct {
@@ -160,11 +173,11 @@ func (l Ledger) Save(ctx context.Context, t *Task) error {
 	j := func(v any) string { b, _ := json.Marshal(v); return string(b) }
 	res, err := l.DB.ExecContext(ctx, `UPDATE tasks SET goal=?, acceptance_criteria=?, status=?, phase=?, completed_steps=?,
 		remaining_steps=?, attempt_count=?, decisions=?, verification_state=?, changed_repositories=?, changed_files=?,
-		changed_symbols=?, agent_runtime=?, agent_session_id=?, model_profile=?, budget=?, updated_at=?, finished_at=?
+		changed_symbols=?, agent_runtime=?, agent_session_id=?, model_profile=?, budget=?, updated_at=?, finished_at=?, evidence=?
 		WHERE id=? AND (status != 'cancelled' OR ? = 'cancelled')`,
 		t.Goal, j(nonNil(t.AcceptanceCriteria)), t.Status, t.Phase, j(nonNil(t.CompletedSteps)), j(nonNil(t.RemainingSteps)),
 		t.AttemptCount, j(nonNilD(t.Decisions)), t.VerificationState, j(nonNil(t.ChangedRepositories)), j(nonNil(t.ChangedFiles)),
-		j(nonNil(t.ChangedSymbols)), t.AgentRuntime, t.AgentSessionID, t.ModelProfile, j(t.Budget), t.UpdatedAt, t.FinishedAt, t.ID,
+		j(nonNil(t.ChangedSymbols)), t.AgentRuntime, t.AgentSessionID, t.ModelProfile, j(t.Budget), t.UpdatedAt, t.FinishedAt, j(nonNilE(t.Evidence)), t.ID,
 		string(t.Status))
 	if err != nil {
 		return err
@@ -274,16 +287,23 @@ func nonNilD(s []Decision) []Decision {
 	return s
 }
 
+func nonNilE(e []EvidenceLayer) []EvidenceLayer {
+	if e == nil {
+		return []EvidenceLayer{}
+	}
+	return e
+}
+
 const taskCols = `id, workspace_id, original_request, goal, acceptance_criteria, status, phase, completed_steps, remaining_steps,
 	attempt_count, decisions, verification_state, changed_repositories, changed_files, changed_symbols, agent_runtime,
-	agent_session_id, model_profile, budget, created_at, updated_at, finished_at`
+	agent_session_id, model_profile, budget, created_at, updated_at, finished_at, evidence`
 
 func scanTask(sc interface{ Scan(...any) error }) (*Task, error) {
 	var t Task
-	var ac, cs, rs, dec, cr, cf, csym, bud string
+	var ac, cs, rs, dec, cr, cf, csym, bud, evid string
 	err := sc.Scan(&t.ID, &t.WorkspaceID, &t.OriginalRequest, &t.Goal, &ac, &t.Status, &t.Phase, &cs, &rs, &t.AttemptCount,
 		&dec, &t.VerificationState, &cr, &cf, &csym, &t.AgentRuntime, &t.AgentSessionID, &t.ModelProfile, &bud,
-		&t.CreatedAt, &t.UpdatedAt, &t.FinishedAt)
+		&t.CreatedAt, &t.UpdatedAt, &t.FinishedAt, &evid)
 	if err != nil {
 		return nil, err
 	}
@@ -291,7 +311,7 @@ func scanTask(sc interface{ Scan(...any) error }) (*Task, error) {
 		s string
 		v any
 	}{{ac, &t.AcceptanceCriteria}, {cs, &t.CompletedSteps}, {rs, &t.RemainingSteps}, {dec, &t.Decisions},
-		{cr, &t.ChangedRepositories}, {cf, &t.ChangedFiles}, {csym, &t.ChangedSymbols}, {bud, &t.Budget}} {
+		{cr, &t.ChangedRepositories}, {cf, &t.ChangedFiles}, {csym, &t.ChangedSymbols}, {bud, &t.Budget}, {evid, &t.Evidence}} {
 		if err := json.Unmarshal([]byte(x.s), x.v); err != nil {
 			return nil, fmt.Errorf("task %s: corrupt column: %w", t.ID, err)
 		}

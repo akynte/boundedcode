@@ -5,7 +5,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/akynte/boundedcode/internal/sandbox"
+	"github.com/akynte/boundedcode/internal/verify"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -26,6 +29,7 @@ import (
 
 func newBenchCmd(app *App) *cobra.Command {
 	cmd := &cobra.Command{Use: "bench", Short: "Run reproducible benchmarks"}
+	cmd.AddCommand(newBenchVerifyCmd(app))
 	cmd.AddCommand(newBenchInfraCmd(app), newBenchTasksCmd(app), newBenchDirectCmd(app), newBenchIntelCmd(app), newBenchLeaseCmd(app), newBenchTrailCmd(app), newBenchCompareCmd(app))
 	return cmd
 }
@@ -471,6 +475,77 @@ func newBenchIntelCmd(app *App) *cobra.Command {
 	f.StringVar(&fixtures, "fixtures", "benchmarks/fixtures", "fixtures directory")
 	f.StringSliceVar(&only, "only", nil, "study ids to run")
 	f.StringVar(&out, "out", "", "report path (.json; .md written alongside)")
+	return cmd
+}
+
+func newBenchVerifyCmd(app *App) *cobra.Command {
+	var out, sb, mavenRepo, work string
+	var only []string
+	var mutants int
+	var budget time.Duration
+	cmd := &cobra.Command{
+		Use:   "verify",
+		Short: "Measure the verification pipeline's false acceptance and false rejection across languages",
+		Long: `Runs the verification corpus (one specification, in Go, Python, JavaScript,
+TypeScript, Rust, Java and a mixed repository; correct and wrong changes with
+strong, weak and weakened tests) through the gate, behavioural evidence,
+the test-integrity layer and mutation assessment, in the configured sandbox.
+Each change's correctness is checked with hidden acceptance tests. Reports
+false acceptance and false rejection per pipeline, and time.`,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			ctx := cmd.Context()
+			if mavenRepo != "" {
+				_ = os.Setenv("BC_MAVEN_REPOSITORY", mavenRepo)
+			}
+			var box sandbox.Sandbox = sandbox.None{}
+			if sb != "none" {
+				b, err := app.sandbox(false)
+				if err != nil {
+					return err
+				}
+				box = b
+			}
+			if work == "" {
+				work = filepath.Join(app.Paths.Cache, "bench-verify")
+			}
+			if err := os.MkdirAll(work, 0o755); err != nil {
+				return err
+			}
+			gomodcache, _ := exec.CommandContext(ctx, "go", "env", "GOMODCACHE").Output()
+			e := &verify.Engine{Sandbox: box, CacheDir: filepath.Join(app.Paths.Cache, "build"), GoModCache: strings.TrimSpace(string(gomodcache)),
+				Packages: sandbox.HostPackageCaches()}
+			bench := &benchmark.VerifyBench{Engine: e, WorkDir: work, Only: only, Mutation: verify.MutationOptions{MaxMutants: mutants, Budget: budget},
+				Progress: func(s string) { fmt.Fprintf(app.Err, "%s %s\n", time.Now().Format("15:04:05"), s) }}
+			rep, err := bench.Run(ctx)
+			if err != nil {
+				return err
+			}
+			var md bytes.Buffer
+			benchmark.WriteVerifyMarkdown(&md, rep)
+			if out != "" {
+				b, err := benchmark.MarshalVerify(rep)
+				if err != nil {
+					return err
+				}
+				if err := config.WriteFileAtomic(out, b, 0o644); err != nil {
+					return err
+				}
+				if err := os.WriteFile(strings.TrimSuffix(out, ".json")+".md", md.Bytes(), 0o644); err != nil {
+					return err
+				}
+			}
+			app.printf("%s", md.String())
+			return nil
+		},
+	}
+	f := cmd.Flags()
+	f.StringVar(&out, "out", "", "report path (.json; .md written alongside)")
+	f.StringVar(&sb, "sandbox", "", "\"none\" runs stages on the host (default: the configured sandbox)")
+	f.StringVar(&mavenRepo, "maven-repo", "", "a local Maven repository with the plugins the Java cases need (verification is offline)")
+	f.StringVar(&work, "work", "", "scratch directory (default: the cache)")
+	f.StringSliceVar(&only, "only", nil, "run only cases whose ID starts with this (repeatable)")
+	f.IntVar(&mutants, "mutants", 8, "mutants per case")
+	f.DurationVar(&budget, "mutation-budget", 10*time.Minute, "mutation time per case")
 	return cmd
 }
 

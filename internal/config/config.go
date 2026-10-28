@@ -241,6 +241,42 @@ type TaskConfig struct {
 	// clarifies it (task run --clarify); "proceed" records SPEC_AMBIGUOUS and
 	// has the agent state and demonstrate its reading (benchmarks).
 	Ambiguity string `yaml:"ambiguity"`
+	// Verification configures the optional verification layers.
+	Verification VerificationLayers `yaml:"verification,omitempty"`
+}
+
+// VerificationLayers configures mutation assessment (Layer 6) and
+// counterexample checks (Layer 7) of a bounded task's change: "off", "on"
+// (run, and report; the label is not lowered) or "required" (the label is
+// task_verified only when the layer holds).
+type VerificationLayers struct {
+	// Mutation: default "on"; "strict" is "required" with every boundary
+	// mutant killed as well.
+	Mutation string `yaml:"mutation,omitempty"`
+	// MutationMutants bounds the mutants per repository (default 8);
+	// MutationBudget the time per repository (default 5m).
+	MutationMutants int      `yaml:"mutation_mutants,omitempty"`
+	MutationBudget  Duration `yaml:"mutation_budget,omitempty"`
+	// Counterexamples: default "off". When on, the task's model, in a
+	// context of its own (the request and the diff, not the author's
+	// conversation), proposes tests; they run on the change and the base.
+	Counterexamples string `yaml:"counterexamples,omitempty"`
+}
+
+// MutationMode is the mutation setting with its default.
+func (v VerificationLayers) MutationMode() string {
+	if v.Mutation == "" {
+		return "on"
+	}
+	return v.Mutation
+}
+
+// CounterexampleMode is the counterexample setting with its default.
+func (v VerificationLayers) CounterexampleMode() string {
+	if v.Counterexamples == "" {
+		return "off"
+	}
+	return v.Counterexamples
 }
 
 // InferenceConfig selects the model provider and configures the local
@@ -578,6 +614,18 @@ func (c Config) Validate() error {
 	for i, b := range c.BuildSystems {
 		if b.ID == "" || len(b.Markers) == 0 || b.Tool == "" {
 			errs = append(errs, fmt.Errorf("build_systems[%d]: id, markers and tool are required", i))
+		}
+	}
+	for _, v := range []struct{ key, val string }{{"task.verification.mutation", c.Task.Verification.Mutation},
+		{"task.verification.counterexamples", c.Task.Verification.Counterexamples}} {
+		switch v.val {
+		case "", "off", "on", "required":
+		case "strict":
+			if v.key != "task.verification.mutation" {
+				errs = append(errs, fmt.Errorf("%s: %q is not off|on|required", v.key, v.val))
+			}
+		default:
+			errs = append(errs, fmt.Errorf("%s: %q is not off|on|required", v.key, v.val))
 		}
 	}
 	sb := c.Direct.Sandbox

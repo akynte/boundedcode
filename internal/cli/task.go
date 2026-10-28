@@ -357,6 +357,16 @@ func newTaskCmd(app *App) *cobra.Command {
 			for _, d := range t.Decisions {
 				app.printf("  decision [%s] %s\n", d.Source, oneLine(d.Text, 120))
 			}
+			if len(t.Evidence) > 0 {
+				app.printf("verification layers:\n")
+				for _, l := range t.Evidence {
+					req := ""
+					if l.Required {
+						req = " (required)"
+					}
+					app.printf("  %s L%d %-24s %-16s%s %s\n", l.Repo, l.Layer, l.Name, l.Status, req, oneLine(l.Detail, 100))
+				}
+			}
 			if gated {
 				lines := gate.Lines()
 				if gate.Stale() {

@@ -577,15 +577,16 @@ func (r *Runner) Run(ctx context.Context, taskID string, opt RunOptions) (*task.
 		}
 
 		passed, sig, failSummary := false, "", ""
+		var fullResults map[string]verify.Result
 		var gate *compat.Report // the cross-repository gate's report, when it ran
 		if !changedAny {
 			sig, failSummary = "no-changes", "the agent made no changes"
 		} else {
-			passed, sig, failSummary = r.verifyAll(ctx, t, wts, verify.Targeted)
+			passed, sig, failSummary, _ = r.verifyAll(ctx, t, wts, verify.Targeted)
 			if passed {
 				t.VerificationState = "targeted_pass"
 				t.MarkStep("verify (targeted)")
-				passed, sig, failSummary = r.verifyAll(ctx, t, wts, verify.Full)
+				passed, sig, failSummary, fullResults = r.verifyAll(ctx, t, wts, verify.Full)
 			}
 			// Each repository passes on its own; the affected contract links
 			// must also hold across the task's repositories (see
@@ -649,7 +650,7 @@ func (r *Runner) Run(ctx context.Context, taskID string, opt RunOptions) (*task.
 			}
 			// Green checks are not proof that the requested behaviour exists:
 			// ask once for a test that demonstrates it (see verify/delta.go).
-			verified, why := r.behaviourEvidence(ctx, t, wts, changedRepos)
+			verified, why, evidence := r.behaviourEvidence(ctx, t, wts, changedRepos)
 			if !verified && roundsLeft && !r.hasEvent(ctx, t.ID, "verify.evidence_requested") {
 				r.Rec.Emit(ctx, t.ID, "verify.evidence_requested", map[string]any{"reason": why})
 				r.say("verification passed but %s; asking the agent for a test that demonstrates the change", why)
@@ -679,6 +680,29 @@ func (r *Runner) Run(ctx context.Context, taskID string, opt RunOptions) (*task.
 					why += "; and " + compatGap(*gate)
 				}
 				verified = false
+			}
+			// Layers 3 (integrity), 6 (mutation) and 7 (counterexamples), and
+			// the classification of every layer (layers.go): each can ask the
+			// agent once, and can withhold task_verified.
+			la := r.assessLayers(ctx, t, wts, changedRepos, fullResults, evidence, gate, roundsLeft)
+			if la.advice != "" {
+				_ = r.Ledger.ResolveStrategy(ctx, stratID, "succeeded", "verification passed; "+la.adviceKind+" requested")
+				_ = r.updateStrategySummary(ctx, stratID, summary)
+				advice = la.advice
+				mode = contextplan.ModeRetry
+				continue
+			}
+			t.Evidence = la.layers
+			if len(la.withheld) > 0 {
+				if verified {
+					why = strings.Join(la.withheld, "; ")
+				} else {
+					why += "; and " + strings.Join(la.withheld, "; ")
+				}
+				verified = false
+			}
+			if la.strength != "" {
+				t.Decide("policy", "verification strength: "+la.strength)
 			}
 			_ = r.Ledger.ResolveStrategy(ctx, stratID, "succeeded", "verification passed (targeted + full)")
 			_ = r.updateStrategySummary(ctx, stratID, summary)
@@ -839,9 +863,10 @@ func notTheChange(summary string) bool {
 }
 
 // verifyAll verifies every repository with changes (all repos in full scope).
-func (r *Runner) verifyAll(ctx context.Context, t *task.Task, wts []task.Worktree, scope verify.Scope) (bool, string, string) {
+func (r *Runner) verifyAll(ctx context.Context, t *task.Task, wts []task.Worktree, scope verify.Scope) (bool, string, string, map[string]verify.Result) {
 	passed := true
 	var sigs, summary []string
+	results := map[string]verify.Result{}
 	for _, w := range wts {
 		files, _ := gitops.ChangedFiles(ctx, w.Path, w.BaseCommit)
 		if len(files) == 0 && scope == verify.Targeted {
@@ -849,8 +874,9 @@ func (r *Runner) verifyAll(ctx context.Context, t *task.Task, wts []task.Worktre
 		}
 		res, err := r.Verify.Run(ctx, verify.RepoTarget{Name: w.RepoName, Worktree: w.Path, Base: w.BaseCommit, TaskID: t.ID, Source: w.RepoPath}, scope)
 		if err != nil {
-			return false, "verify-error", err.Error()
+			return false, "verify-error", err.Error(), results
 		}
+		results[w.RepoName] = res
 		r.say("verify %s %s: passed=%v (%s)", scope, w.RepoName, res.Passed, res.Duration.Round(time.Millisecond))
 		if !res.Passed {
 			passed = false
@@ -864,7 +890,7 @@ func (r *Runner) verifyAll(ctx context.Context, t *task.Task, wts []task.Worktre
 			}
 		}
 	}
-	return passed, strings.Join(sigs, ";"), strings.Join(summary, "; ")
+	return passed, strings.Join(sigs, ";"), strings.Join(summary, "; "), results
 }
 
 // latestVerification returns the most recent result per repository.
@@ -954,7 +980,8 @@ func secretMasks(workDir string, wts []task.Worktree) ([]string, error) {
 // service's test while the other service's code was wrong). When no
 // repository changed more than tests or documentation, a demonstrating test
 // in any of them suffices, as before.
-func (r *Runner) behaviourEvidence(ctx context.Context, t *task.Task, wts []task.Worktree, changedRepos []string) (bool, string) {
+func (r *Runner) behaviourEvidence(ctx context.Context, t *task.Task, wts []task.Worktree, changedRepos []string) (bool, string, map[string]repoEvidence) {
+	evs := map[string]repoEvidence{}
 	type repo struct {
 		w      task.Worktree
 		needed bool
@@ -978,6 +1005,9 @@ func (r *Runner) behaviourEvidence(ctx context.Context, t *task.Task, wts []task
 		w := rp.w
 		why := ""
 		ev, err := r.Verify.BehaviourEvidence(ctx, verify.RepoTarget{Name: w.RepoName, Worktree: w.Path, Base: w.BaseCommit, TaskID: t.ID, Source: w.RepoPath})
+		if err == nil {
+			evs[w.RepoName] = repoEvidence{ev: ev, needed: rp.needed}
+		}
 		if err != nil {
 			r.Log.Warn("behavioural evidence", "repo", w.RepoName, "err", err)
 			why = "the behavioural check failed to run: " + trunc(err.Error(), 200)
@@ -987,7 +1017,7 @@ func (r *Runner) behaviourEvidence(ctx context.Context, t *task.Task, wts []task
 			if ev.Verified {
 				shown = append(shown, w.RepoName+": "+ev.Reason)
 				if !anyNeeded {
-					return true, ev.Reason
+					return true, ev.Reason, evs
 				}
 				continue
 			}
@@ -1002,13 +1032,13 @@ func (r *Runner) behaviourEvidence(ctx context.Context, t *task.Task, wts []task
 	case len(missing) == 0 && len(shown) > 0:
 		if len(shown) == 1 {
 			_, reason, _ := strings.Cut(shown[0], ": ")
-			return true, reason
+			return true, reason, evs
 		}
-		return true, strings.Join(shown, "; ")
+		return true, strings.Join(shown, "; "), evs
 	case len(missing) == 0:
-		return false, "no test demonstrates the change"
+		return false, "no test demonstrates the change", evs
 	}
-	return false, strings.Join(missing, "; ")
+	return false, strings.Join(missing, "; "), evs
 }
 
 // evidenceRequest is the retry instruction when checks pass without

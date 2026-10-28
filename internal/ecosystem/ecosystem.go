@@ -310,7 +310,17 @@ type BuildSystem struct {
 	Languages  []string // internal/lang IDs
 	Tools      []string // executables its commands run
 	Registries []string // hosts its package managers download from
-	detect     func(d *detector, di dirInfo) []*Project
+	// Wrappers decide which tool a build or test command runs (gradlew,
+	// mvnw, .cargo/config.toml, .npmrc): a change to one can make tests
+	// "pass" without running them. Paths relative to a project, a trailing
+	// "/" for a directory.
+	Wrappers []string
+	// RunnerConfig configure what the test runner runs and skips
+	// (pytest.ini, conftest.py, jest.config.*): a change to one is legitimate
+	// sometimes, and needs a reviewer's eye before evidence is trusted. "*"
+	// matches within a name.
+	RunnerConfig []string
+	detect       func(d *detector, di dirInfo) []*Project
 }
 
 // BuildSystems returns the known build systems, in detection order.
@@ -339,7 +349,7 @@ var (
 )
 
 var buildSystems = []BuildSystem{
-	{ID: "go", Languages: []string{"go"}, Tools: []string{"go"}, Registries: []string{"proxy.golang.org", "sum.golang.org", "storage.googleapis.com"},
+	{ID: "go", RunnerConfig: []string{"go.work"}, Languages: []string{"go"}, Tools: []string{"go"}, Registries: []string{"proxy.golang.org", "sum.golang.org", "storage.googleapis.com"},
 		detect: func(d *detector, di dirInfo) []*Project {
 			if !di.has("go.mod") {
 				return nil
@@ -351,7 +361,7 @@ var buildSystems = []BuildSystem{
 			d.needs(p, "go")
 			return one(p)
 		}},
-	{ID: "node", Languages: []string{"javascript", "typescript"}, Tools: []string{"npm", "npx", "pnpm", "yarn", "bun"}, Registries: npmjs,
+	{ID: "node", Wrappers: []string{".npmrc", ".yarnrc", ".yarnrc.yml", ".pnpmfile.cjs", "bunfig.toml", ".yarn/releases/"}, RunnerConfig: []string{"jest.config.*", "vitest.config.*", "vitest.workspace.*", ".mocharc*", "karma.conf.*", "playwright.config.*", "ava.config.*", ".c8rc*", ".nycrc*"}, Languages: []string{"javascript", "typescript"}, Tools: []string{"npm", "npx", "pnpm", "yarn", "bun"}, Registries: npmjs,
 		detect: func(d *detector, di dirInfo) []*Project {
 			if !di.has("package.json") {
 				return nil
@@ -363,7 +373,7 @@ var buildSystems = []BuildSystem{
 			}
 			return one(p)
 		}},
-	{ID: "deno", Languages: []string{"typescript", "javascript"}, Tools: []string{"deno"}, Registries: []string{"deno.land", "jsr.io", "registry.npmjs.org"},
+	{ID: "deno", RunnerConfig: []string{"deno.json", "deno.jsonc"}, Languages: []string{"typescript", "javascript"}, Tools: []string{"deno"}, Registries: []string{"deno.land", "jsr.io", "registry.npmjs.org"},
 		detect: func(d *detector, di dirInfo) []*Project {
 			if di.has("package.json") || !di.has("deno.json", "deno.jsonc") {
 				return nil
@@ -374,7 +384,7 @@ var buildSystems = []BuildSystem{
 		}},
 	// A requirements.txt alone marks a Python project at the root or beside
 	// Python code, not a docs or tooling directory.
-	{ID: "python", Languages: []string{"python"}, Tools: []string{"pip", "pip3", "python", "python3", "uv", "poetry", "pipenv", "pdm"}, Registries: pypi,
+	{ID: "python", RunnerConfig: []string{"pytest.ini", "conftest.py", "tox.ini", "noxfile.py", ".coveragerc"}, Languages: []string{"python"}, Tools: []string{"pip", "pip3", "python", "python3", "uv", "poetry", "pipenv", "pdm"}, Registries: pypi,
 		detect: func(d *detector, di dirInfo) []*Project {
 			if !di.has("pyproject.toml", "setup.py", "setup.cfg", "Pipfile") && !(di.has("requirements.txt") && (di.rel == "." || di.anyExt(".py"))) {
 				return nil
@@ -383,7 +393,7 @@ var buildSystems = []BuildSystem{
 			d.python(p, di.abs, di.names)
 			return one(p)
 		}},
-	{ID: "cargo", Languages: []string{"rust"}, Tools: []string{"cargo"}, Registries: []string{"index.crates.io", "static.crates.io", "crates.io"},
+	{ID: "cargo", Wrappers: []string{".cargo/config", ".cargo/config.toml", "rust-toolchain", "rust-toolchain.toml"}, Languages: []string{"rust"}, Tools: []string{"cargo"}, Registries: []string{"index.crates.io", "static.crates.io", "crates.io"},
 		detect: func(d *detector, di dirInfo) []*Project {
 			if !di.has("Cargo.toml") {
 				return nil
@@ -399,7 +409,7 @@ var buildSystems = []BuildSystem{
 			d.needs(p, "cargo")
 			return one(p)
 		}},
-	{ID: "maven", Languages: []string{"java", "kotlin"}, Tools: []string{"mvn", "mvnw"}, Registries: maven,
+	{ID: "maven", Wrappers: []string{"mvnw", "mvnw.cmd", ".mvn/"}, Languages: []string{"java", "kotlin"}, Tools: []string{"mvn", "mvnw"}, Registries: maven,
 		detect: func(d *detector, di dirInfo) []*Project {
 			if !di.has("pom.xml") {
 				return nil
@@ -413,7 +423,7 @@ var buildSystems = []BuildSystem{
 			p.Build, p.Test = mvn+" compile", mvn+" test"
 			return one(p)
 		}},
-	{ID: "gradle", Languages: []string{"java", "kotlin", "groovy"}, Tools: []string{"gradle", "gradlew"}, Registries: gradleR,
+	{ID: "gradle", Wrappers: []string{"gradlew", "gradlew.bat", "gradle/wrapper/"}, RunnerConfig: []string{"gradle.properties"}, Languages: []string{"java", "kotlin", "groovy"}, Tools: []string{"gradle", "gradlew"}, Registries: gradleR,
 		detect: func(d *detector, di dirInfo) []*Project {
 			if !di.has("build.gradle", "build.gradle.kts", "settings.gradle", "settings.gradle.kts") {
 				return nil
@@ -439,7 +449,7 @@ var buildSystems = []BuildSystem{
 			d.needs(p, "sbt")
 			return one(p)
 		}},
-	{ID: "dotnet", Languages: []string{"csharp", "fsharp"}, Tools: []string{"dotnet"}, Registries: []string{"api.nuget.org"},
+	{ID: "dotnet", Wrappers: []string{"global.json", "Directory.Build.rsp"}, RunnerConfig: []string{"*.runsettings", "Directory.Build.props", "Directory.Build.targets"}, Languages: []string{"csharp", "fsharp"}, Tools: []string{"dotnet"}, Registries: []string{"api.nuget.org"},
 		detect: func(d *detector, di dirInfo) []*Project {
 			sln := di.anyExt(".sln", ".slnx")
 			if !sln && !di.anyExt(".csproj", ".fsproj", ".vbproj") {
@@ -455,7 +465,7 @@ var buildSystems = []BuildSystem{
 			d.needs(p, "dotnet")
 			return one(p)
 		}},
-	{ID: "bundler", Languages: []string{"ruby"}, Tools: []string{"bundle", "gem"}, Registries: []string{"rubygems.org", "index.rubygems.org"},
+	{ID: "bundler", Wrappers: []string{".bundle/config"}, RunnerConfig: []string{".rspec", "Rakefile"}, Languages: []string{"ruby"}, Tools: []string{"bundle", "gem"}, Registries: []string{"rubygems.org", "index.rubygems.org"},
 		detect: func(d *detector, di dirInfo) []*Project {
 			if !di.has("Gemfile") {
 				return nil
@@ -467,7 +477,7 @@ var buildSystems = []BuildSystem{
 			d.needs(p, "bundle")
 			return one(p)
 		}},
-	{ID: "composer", Languages: []string{"php"}, Tools: []string{"composer"}, Registries: []string{"repo.packagist.org", "packagist.org"},
+	{ID: "composer", RunnerConfig: []string{"phpunit.xml", "phpunit.xml.dist", "phpunit.dist.xml"}, Languages: []string{"php"}, Tools: []string{"composer"}, Registries: []string{"repo.packagist.org", "packagist.org"},
 		detect: func(d *detector, di dirInfo) []*Project {
 			if !di.has("composer.json") {
 				return nil
@@ -561,7 +571,7 @@ var buildSystems = []BuildSystem{
 			}
 			return nil
 		}},
-	{ID: "bazel", Tools: []string{"bazel", "bazelisk"},
+	{ID: "bazel", Wrappers: []string{".bazelrc", ".bazelversion"}, Tools: []string{"bazel", "bazelisk"},
 		detect: func(d *detector, di dirInfo) []*Project {
 			if !di.has("MODULE.bazel", "WORKSPACE", "WORKSPACE.bazel") {
 				return nil
@@ -570,7 +580,7 @@ var buildSystems = []BuildSystem{
 			d.needs(p, "bazel")
 			return one(p)
 		}},
-	{ID: "cmake", Languages: []string{"c", "cpp"}, Tools: []string{"cmake", "ctest"},
+	{ID: "cmake", RunnerConfig: []string{"CTestTestfile.cmake", "CTestConfig.cmake"}, Languages: []string{"c", "cpp"}, Tools: []string{"cmake", "ctest"},
 		detect: func(d *detector, di dirInfo) []*Project {
 			if !di.has("CMakeLists.txt") {
 				return nil
