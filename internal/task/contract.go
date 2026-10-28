@@ -306,3 +306,22 @@ func oneLineN(s string, n int) string {
 	}
 	return s
 }
+
+// ContractSchema is the JSON schema of a contract reply, in the order the
+// prompt lists the fields (structured output; see inference.JSONSchemaFormat).
+var ContractSchema = json.RawMessage(`{"type":"object","additionalProperties":false,
+"required":["required","acceptable_alternatives","constraints","explicitly_not_required","unknown_or_ambiguous","acceptance_evidence"],
+"properties":{
+"required":{"type":"array","items":{"type":"string"}},
+"acceptable_alternatives":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["point","options"],
+  "properties":{"point":{"type":"string"},"options":{"type":"array","items":{"type":"string"}}}}},
+"constraints":{"type":"array","items":{"type":"string"}},
+"explicitly_not_required":{"type":"array","items":{"type":"string"}},
+"unknown_or_ambiguous":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["question","interpretations","affects","material"],
+  "properties":{"question":{"type":"string"},"interpretations":{"type":"array","items":{"type":"string"}},"affects":{"type":"string"},"material":{"type":"boolean"}}}},
+"acceptance_evidence":{"type":"array","items":{"type":"string"}}}}`)
+
+// GroundingSchema is the JSON schema of a grounding reply.
+var GroundingSchema = json.RawMessage(`{"type":"object","additionalProperties":false,"required":["points"],
+"properties":{"points":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["id","settled","settled_by","readings"],
+  "properties":{"id":{"type":"integer"},"settled":{"type":"boolean"},"settled_by":{"type":"string"},"readings":{"type":"array","items":{"type":"string"}}}}}}}`)

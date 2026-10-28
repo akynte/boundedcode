@@ -85,18 +85,28 @@ func (u *GeminiUpstream) Complete(ctx context.Context, body map[string]any) (int
 		return http.StatusBadRequest, errorBody(err.Error(), "invalid_request_error"), nil
 	}
 	payload := u.translate(req)
-	raw, err := json.Marshal(payload)
-	if err != nil {
-		return 0, nil, err
-	}
 	var resp []byte
-	status, err := u.Retry.Do(ctx, func() (int, error) {
-		var e error
-		resp, _, e = u.client.Raw(ctx, u.modelPath()+":generateContent", raw)
-		return statusOf(e)
-	})
-	if err != nil {
-		return 0, nil, err
+	var status int
+	for formatted := req.schema() != nil; ; formatted = false {
+		raw, err := json.Marshal(payload)
+		if err != nil {
+			return 0, nil, err
+		}
+		status, err = u.Retry.Do(ctx, func() (int, error) {
+			var e error
+			resp, _, e = u.client.Raw(ctx, u.modelPath()+":generateContent", raw)
+			return statusOf(e)
+		})
+		if err != nil {
+			return 0, nil, err
+		}
+		if formatted && status == http.StatusBadRequest && formatRejected(resp) {
+			// A model without JSON-schema output: the prompt asks for the
+			// JSON on its own.
+			withoutFormat(payload)
+			continue
+		}
+		break
 	}
 	if status != http.StatusOK {
 		return status, errorBody(errMessage(resp), "upstream_error"), nil
@@ -163,7 +173,7 @@ func foldGemini(r io.Reader, onDelta func(Delta)) ([]byte, error) {
 	out := map[string]any{}
 	var parts []map[string]any
 	var finish, finishMsg any
-	err := sseData(r, func(data []byte) (bool, error) {
+	_, err := sseData(r, func(data []byte) (bool, error) {
 		var ch struct {
 			Candidates []struct {
 				Content struct {
@@ -225,6 +235,11 @@ func foldGemini(r io.Reader, onDelta func(Delta)) ([]byte, error) {
 	})
 	if err != nil {
 		return nil, err
+	}
+	if finish == nil {
+		// Gemini sends no end marker: the last chunk carries the finish
+		// reason, so a stream without one was cut off.
+		return nil, ErrStreamInterrupted
 	}
 	if parts != nil || finish != nil {
 		cand := map[string]any{"content": map[string]any{"role": "model", "parts": parts}}
@@ -344,6 +359,10 @@ func (u *GeminiUpstream) translate(r oaRequest) map[string]any {
 	}
 	if u.Effort != "" {
 		gen["thinkingConfig"] = map[string]any{"thinkingLevel": strings.ToUpper(u.Effort)}
+	}
+	if schema := r.schema(); schema != nil {
+		gen["responseMimeType"] = "application/json"
+		gen["responseJsonSchema"] = cloneJSON(schema)
 	}
 	if len(gen) > 0 {
 		payload["generationConfig"] = gen

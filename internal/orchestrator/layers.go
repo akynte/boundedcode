@@ -189,23 +189,25 @@ Answer with one JSON object and nothing else:
 
 var jsonObjectRE = regexp.MustCompile(`(?s)\{.*\}`)
 
-// counterexamples asks the task's model, in a context of its own, for tests
-// meant to expose the change, and runs them (verify.Counterexamples).
-func (r *Runner) counterexamples(ctx context.Context, t *task.Task, w task.Worktree, target verify.RepoTarget) verify.CounterexampleReport {
-	diff, err := gitops.Diff(ctx, w.Path, w.BaseCommit, false)
-	if err != nil {
-		return verify.CounterexampleReport{Status: verify.CounterUnavailable, Reason: "no diff: " + err.Error()}
-	}
-	example := exampleTest(w.Path, t.ChangedFiles)
-	prompt := counterexamplePrompt + "\nRequest:\n" + contractInput(t) + "\n\nThe change (diff against the base):\n" + trunc(diff, 12000)
+// counterexampleSchema is the JSON schema of a counterexample reply.
+var counterexampleSchema = json.RawMessage(`{"type":"object","additionalProperties":false,"required":["tests"],
+"properties":{"tests":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["path","content"],
+  "properties":{"path":{"type":"string"},"content":{"type":"string"}}}}}}`)
+
+// CounterexampleProposal is the call that asks for tests meant to expose
+// the change diff to the request req; example is an existing test of the
+// project ("" when none was found).
+func CounterexampleProposal(req, diff, example string) ContractCall {
+	prompt := counterexamplePrompt + "\nRequest:\n" + req + "\n\nThe change (diff against the base):\n" + trunc(diff, 12000)
 	if example != "" {
 		prompt += "\n\nAn existing test of this project, for its conventions:\n" + example
 	}
-	reply, err := r.chatReader(ctx, t, ContractCall{Purpose: ContractCallCounterexample, Request: contractInput(t),
-		Messages: []ChatMessage{{Role: "user", Content: prompt}}}, 3000, 0.2)
-	if err != nil {
-		return verify.CounterexampleReport{Status: verify.CounterUnavailable, Reason: "the verifier model is unavailable: " + trunc(err.Error(), 200)}
-	}
+	return ContractCall{Purpose: ContractCallCounterexample, Request: req, Messages: []ChatMessage{{Role: "user", Content: prompt}}, Schema: counterexampleSchema}
+}
+
+// ParseCounterexamples reads the proposed test files (at most two, path to
+// content) from a reply; ok is false when it has none.
+func ParseCounterexamples(reply string) (files map[string]string, ok bool) {
 	var out struct {
 		Tests []struct {
 			Path    string `json:"path"`
@@ -213,14 +215,35 @@ func (r *Runner) counterexamples(ctx context.Context, t *task.Task, w task.Workt
 		} `json:"tests"`
 	}
 	if m := jsonObjectRE.FindString(reply); m == "" || json.Unmarshal([]byte(m), &out) != nil || len(out.Tests) == 0 {
-		return verify.CounterexampleReport{Status: verify.CounterInconclusive, Reason: "the verifier proposed no usable test", Generator: "task model (independent context)"}
+		return nil, false
 	}
-	files := map[string]string{}
+	files = map[string]string{}
 	for i, tc := range out.Tests {
 		if i == 2 {
 			break
 		}
-		files[tc.Path] = tc.Content
+		if strings.TrimSpace(tc.Path) != "" && strings.TrimSpace(tc.Content) != "" {
+			files[tc.Path] = tc.Content
+		}
+	}
+	return files, len(files) > 0
+}
+
+// counterexamples asks the task's model, in a context of its own, for tests
+// meant to expose the change, and runs them (verify.Counterexamples).
+func (r *Runner) counterexamples(ctx context.Context, t *task.Task, w task.Worktree, target verify.RepoTarget) verify.CounterexampleReport {
+	diff, err := gitops.Diff(ctx, w.Path, w.BaseCommit, false)
+	if err != nil {
+		return verify.CounterexampleReport{Status: verify.CounterUnavailable, Reason: "no diff: " + err.Error()}
+	}
+	call := CounterexampleProposal(contractInput(t), diff, exampleTest(w.Path, t.ChangedFiles))
+	reply, err := r.chatReader(ctx, t, call, 3000, 0.2)
+	if err != nil {
+		return verify.CounterexampleReport{Status: verify.CounterUnavailable, Reason: "the verifier model is unavailable: " + trunc(err.Error(), 200)}
+	}
+	files, ok := ParseCounterexamples(reply)
+	if !ok {
+		return verify.CounterexampleReport{Status: verify.CounterInconclusive, Reason: "the verifier proposed no usable test", Generator: "task model (independent context)"}
 	}
 	rep, err := r.Verify.Counterexamples(ctx, target, files)
 	if err != nil {

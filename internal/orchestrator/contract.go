@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/akynte/boundedcode/internal/config"
+	"github.com/akynte/boundedcode/internal/inference"
 	"github.com/akynte/boundedcode/internal/task"
 	"github.com/akynte/boundedcode/internal/telemetry"
 )
@@ -32,6 +33,10 @@ type ContractCall struct {
 	Purpose  string
 	Request  string        // the request text the call reads (HTML comments removed)
 	Messages []ChatMessage // the chat as sent, in order
+	// Schema is the JSON schema the reply must follow, sent as structured
+	// output where the provider supports it (task.structured_output); the
+	// prompt describes the same JSON for those that do not.
+	Schema json.RawMessage
 }
 
 // ChatMessage is one chat turn.
@@ -89,12 +94,7 @@ func (r *Runner) chatReader(ctx context.Context, t *task.Task, call ContractCall
 		return "", errors.New("no model client")
 	}
 	gw.Source = "planner"
-	body := map[string]any{
-		"messages":             call.Messages,
-		"max_tokens":           maxTokens,
-		"temperature":          temperature,
-		"chat_template_kwargs": map[string]any{"enable_thinking": false},
-	}
+	body := ReaderBody(call, maxTokens, temperature, r.Cfg.Task.StructuredOutputOn() && gw.Capabilities(ctx).StructuredOutput)
 	status, out, err := gw.Forward(ctx, "/v1/chat/completions", body)
 	if err != nil {
 		return "", err
@@ -113,13 +113,59 @@ func (r *Runner) chatReader(ctx context.Context, t *task.Task, call ContractCall
 	return resp.Choices[0].Message.Content, nil
 }
 
+// ReaderBody is the chat request of a request-reading call: no thinking,
+// and the reply's JSON schema as structured output when structured is set.
+func ReaderBody(call ContractCall, maxTokens int, temperature float64, structured bool) map[string]any {
+	body := map[string]any{
+		"messages":             call.Messages,
+		"max_tokens":           maxTokens,
+		"temperature":          temperature,
+		"chat_template_kwargs": map[string]any{"enable_thinking": false},
+	}
+	if structured && call.Schema != nil {
+		body["response_format"] = inference.JSONSchemaFormat(call.Purpose, call.Schema)
+	}
+	return body
+}
+
+// ContractDerivation is the call that derives a contract from req.
+func ContractDerivation(req string) ContractCall {
+	return ContractCall{Purpose: ContractCallDerive, Request: req, Messages: []ChatMessage{{Role: "user", Content: contractPrompt + req}},
+		Schema: task.ContractSchema}
+}
+
+// GroundingCheck is the call that checks c's unchecked material
+// ambiguities against req, and the indexes of the ambiguities it numbers
+// 1..n; ok is false when there is nothing to check.
+func GroundingCheck(req string, c *task.Contract) (call ContractCall, idx []int, ok bool) {
+	for i, a := range c.Ambiguities {
+		if a.IsMaterial() && a.Grounding == nil {
+			idx = append(idx, i)
+		}
+	}
+	if len(idx) == 0 {
+		return call, nil, false
+	}
+	var b strings.Builder
+	b.WriteString(groundingPrompt + req + "\n\nPoints:\n")
+	for k, i := range idx {
+		a := c.Ambiguities[i]
+		fmt.Fprintf(&b, "%d. question: %s\n", k+1, a.Question)
+		for j, in := range a.Interpretations {
+			fmt.Fprintf(&b, "   interpretation %d: %s\n", j+1, in)
+		}
+	}
+	return ContractCall{Purpose: ContractCallGround, Request: req, Messages: []ChatMessage{{Role: "user", Content: b.String()}}, Schema: task.GroundingSchema}, idx, true
+}
+
 // deriveContract asks the local model for the task contract. A contract
 // that names nothing required is asked for once more with a corrective
 // follow-up. It returns the last raw reply (for diagnosis) and whether it
 // retried.
 func (r *Runner) deriveContract(ctx context.Context, t *task.Task, req string) (c task.Contract, reply string, retried bool, err error) {
-	msgs := []ChatMessage{{Role: "user", Content: contractPrompt + req}}
-	reply, err = r.chatReader(ctx, t, ContractCall{Purpose: ContractCallDerive, Request: req, Messages: msgs}, 1500, 0.2)
+	call := ContractDerivation(req)
+	msgs := call.Messages
+	reply, err = r.chatReader(ctx, t, call, 1500, 0.2)
 	if err != nil {
 		return c, "", false, err
 	}
@@ -128,7 +174,7 @@ func (r *Runner) deriveContract(ctx context.Context, t *task.Task, req string) (
 		return c, reply, false, err
 	}
 	msgs = append(msgs, ChatMessage{Role: "assistant", Content: reply}, ChatMessage{Role: "user", Content: contractRetryPrompt})
-	again, cerr := r.chatReader(ctx, t, ContractCall{Purpose: ContractCallDerive, Request: req, Messages: msgs}, 1500, 0.2)
+	again, cerr := r.chatReader(ctx, t, ContractCall{Purpose: ContractCallDerive, Request: req, Messages: msgs, Schema: task.ContractSchema}, 1500, 0.2)
 	if cerr != nil {
 		return c, reply, true, fmt.Errorf("%w; retry: %w", err, cerr)
 	}
@@ -226,25 +272,10 @@ func (r *Runner) ensureContract(ctx context.Context, t *task.Task) *task.Contrac
 // call fails, the ambiguities stay material (fail safe) and stay unchecked,
 // so a later run checks them again. It reports whether c changed.
 func (r *Runner) groundAmbiguities(ctx context.Context, t *task.Task, c *task.Contract, req string) bool {
-	var idx []int
-	for i, a := range c.Ambiguities {
-		if a.IsMaterial() && a.Grounding == nil {
-			idx = append(idx, i)
-		}
-	}
-	if len(idx) == 0 {
+	call, idx, ok := GroundingCheck(req, c)
+	if !ok {
 		return false
 	}
-	var b strings.Builder
-	b.WriteString(groundingPrompt + req + "\n\nPoints:\n")
-	for k, i := range idx {
-		a := c.Ambiguities[i]
-		fmt.Fprintf(&b, "%d. question: %s\n", k+1, a.Question)
-		for j, in := range a.Interpretations {
-			fmt.Fprintf(&b, "   interpretation %d: %s\n", j+1, in)
-		}
-	}
-	call := ContractCall{Purpose: ContractCallGround, Request: req, Messages: []ChatMessage{{Role: "user", Content: b.String()}}}
 	reply, err := r.chatReader(ctx, t, call, 1000, 0)
 	var answers []task.GroundingAnswer
 	if err == nil {

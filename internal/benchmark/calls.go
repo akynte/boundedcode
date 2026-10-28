@@ -34,9 +34,12 @@ type CallSummary struct {
 	Invalidations    int `json:"cache_invalidations"`
 	AfterRewrite     int `json:"cache_invalidations_after_rewrite"`
 	RecomputedTokens int `json:"recomputed_prompt_tokens"`
-	Failed           int `json:"failed_calls,omitempty"`
-	PromptTokens     int `json:"prompt_tokens,omitempty"` // all calls' prompts, cached included (bounded reports)
-	PeakCall         int `json:"peak_call"`               // index of the largest prompt
+	// EvaluatedTokens are the prompt tokens the server processed (not
+	// served from its cache), over all calls.
+	EvaluatedTokens int `json:"evaluated_prompt_tokens,omitempty"`
+	Failed          int `json:"failed_calls,omitempty"`
+	PromptTokens    int `json:"prompt_tokens,omitempty"` // all calls' prompts, cached included (bounded reports)
+	PeakCall        int `json:"peak_call"`               // index of the largest prompt
 }
 
 // invalidationSlack: the end of the previous prompt (the generation
@@ -71,6 +74,7 @@ func summarizeCalls(log []inference.CallStat, rewrites map[int]bool) CallSummary
 		s.InferenceSeconds += c.TotalMS / 1000
 		s.PrefillSeconds += c.PrefillMS / 1000
 		s.DecodeSeconds += c.DecodeMS / 1000
+		s.EvaluatedTokens += c.Evaluated
 		if c.Status != "ok" {
 			s.Failed++
 		}
@@ -91,7 +95,9 @@ func summarizeCalls(log []inference.CallStat, rewrites map[int]bool) CallSummary
 		if c.Cached+invalidationSlack < shared {
 			s.Invalidations++
 			s.RecomputedTokens += shared - c.Cached
-			if rewrites[i] {
+			// The gateway names the first message a request changed;
+			// the caller's own marks cover what it rewrote.
+			if rewrites[i] || c.Changed > 0 {
 				s.AfterRewrite++
 			}
 		}

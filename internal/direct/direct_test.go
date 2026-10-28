@@ -26,11 +26,22 @@ type scripted struct {
 	requests []map[string]any
 	status   int
 	errBody  string
+	// caps, when set, is what the upstream reports it supports.
+	caps *inference.Capabilities
+}
+
+// Capabilities implements inference.CapabilityReporter.
+func (s *scripted) Capabilities(context.Context) inference.Capabilities {
+	if s.caps != nil {
+		return *s.caps
+	}
+	return inference.Capabilities{Streaming: true, ToolCalls: true, Source: "assumed"}
 }
 
 type reply struct {
-	text  string
-	calls []call
+	text      string
+	reasoning string
+	calls     []call
 	// summary marks a reply to a compaction request.
 }
 
@@ -79,6 +90,9 @@ func (s *scripted) Complete(_ context.Context, body map[string]any) (int, []byte
 	r := s.replies[0]
 	s.replies = s.replies[1:]
 	msg := map[string]any{"role": "assistant", "content": r.text}
+	if r.reasoning != "" {
+		msg["reasoning_content"] = r.reasoning
+	}
 	if len(r.calls) > 0 {
 		var tcs []map[string]any
 		for i, c := range r.calls {
@@ -788,5 +802,33 @@ func TestEmptyAnswerIsAskedForOnce(t *testing.T) {
 	}
 	if n := len(up2.requests); n != 2 {
 		t.Fatalf("model calls = %d, want 2", n)
+	}
+}
+
+// The model's reasoning goes back with the history (the upstream decides
+// whether the model gets it), and counts toward the history's size only
+// where it is kept.
+func TestReasoningTravelsWithHistory(t *testing.T) {
+	up := &scripted{replies: []reply{
+		{reasoning: "list first", calls: []call{{name: "bash", args: map[string]any{"command": "ls"}}}},
+		{text: "There is nothing here.", reasoning: "empty dir"},
+	}}
+	r, _, _ := newRunner(t, up, ApprovalAuto)
+	if _, err := r.Send(context.Background(), "what is in this directory?"); err != nil {
+		t.Fatal(err)
+	}
+	var sent string
+	for _, m := range up.lastMessages(t) {
+		if m["role"] == "assistant" {
+			sent, _ = m["reasoning_content"].(string)
+		}
+	}
+	if sent != "list first" {
+		t.Fatalf("reasoning sent back = %q", sent)
+	}
+	without := r.estimateTokens()
+	up.caps = &inference.Capabilities{ReasoningRoundTrip: true}
+	if with := r.estimateTokens(); with <= without {
+		t.Fatalf("estimate with reasoning %d, without %d", with, without)
 	}
 }

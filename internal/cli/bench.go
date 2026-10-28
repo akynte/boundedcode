@@ -30,7 +30,7 @@ import (
 func newBenchCmd(app *App) *cobra.Command {
 	cmd := &cobra.Command{Use: "bench", Short: "Run reproducible benchmarks"}
 	cmd.AddCommand(newBenchVerifyCmd(app))
-	cmd.AddCommand(newBenchInfraCmd(app), newBenchTasksCmd(app), newBenchDirectCmd(app), newBenchIntelCmd(app), newBenchLeaseCmd(app), newBenchTrailCmd(app), newBenchCompareCmd(app), newBenchRetrievalCmd(app))
+	cmd.AddCommand(newBenchInfraCmd(app), newBenchTasksCmd(app), newBenchDirectCmd(app), newBenchIntelCmd(app), newBenchLeaseCmd(app), newBenchTrailCmd(app), newBenchCompareCmd(app), newBenchRetrievalCmd(app), newBenchStructuredCmd(app))
 	return cmd
 }
 
@@ -162,6 +162,7 @@ func newBenchTasksCmd(app *App) *cobra.Command {
 	var (
 		dir, out, fixtures string
 		screenGold         string
+		reasoningHistory   string
 		baseline           bool
 		only               []string
 		rf                 runFlags
@@ -171,6 +172,9 @@ func newBenchTasksCmd(app *App) *cobra.Command {
 		Short: "Run the engineering benchmark suite (hidden acceptance checks) with the real agent",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx := cmd.Context()
+			if reasoningHistory != "" {
+				app.Config.Inference.ReasoningHistory = reasoningHistory
+			}
 			tasks, err := benchmark.LoadTasks(dir)
 			if err != nil {
 				return err
@@ -260,6 +264,7 @@ func newBenchTasksCmd(app *App) *cobra.Command {
 	f.StringVar(&out, "out", "", "report path (.json; .md written alongside)")
 	f.BoolVar(&baseline, "baseline", false, "run the plain agent runtime with the same model and no control plane (comparison baseline)")
 	f.StringVar(&screenGold, "screen-gold", "", "validate tasks instead of running them: acceptance must fail on base and pass with DIR/<id>.patch applied")
+	f.StringVar(&reasoningHistory, "reasoning-history", "", "auto, keep or drop for this run (inference.reasoning_history)")
 	addRunFlags(cmd, &rf)
 	return cmd
 }
@@ -274,6 +279,7 @@ func newBenchDirectCmd(app *App) *cobra.Command {
 		workingSet               int
 		noHistoryNotes           bool
 		retrieval                string
+		reasoningHistory         string
 	)
 	cmd := &cobra.Command{
 		Use:   "direct",
@@ -328,6 +334,9 @@ aside and recalled, summaries, broken edits caught by the check, and time.`,
 			default:
 				return fmt.Errorf("approval %q is not ask|edits|auto", approval)
 			}
+			if reasoningHistory != "" {
+				app.Config.Inference.ReasoningHistory = reasoningHistory
+			}
 			ep, err := app.directEndpoint(ctx, modelName)
 			if err != nil {
 				return err
@@ -359,7 +368,8 @@ aside and recalled, summaries, broken edits caught by the check, and time.`,
 			}
 			dr := &benchmark.DirectRunner{FixturesDir: fixtures, WorkRoot: work, Rules: app.riskRules(), Timeout: timeout,
 				Tokenize: ep.tokenize, Model: ep.pin, TaskDirs: dirs,
-				Settings: map[string]any{"approval": approval, "working_set_tokens": dc.WorkingSetTokens, "max_tool_output": dc.MaxToolOutput, "checks": dc.ChecksOn(), "seed_pack": dc.SeedPackOn(), "retrieval": dc.Retrieval, "history_notes": dc.HistoryNotesOn(), "context_tokens": ep.ctxSize, "provider": ep.provider},
+				Settings: map[string]any{"approval": approval, "working_set_tokens": dc.WorkingSetTokens, "max_tool_output": dc.MaxToolOutput, "checks": dc.ChecksOn(), "seed_pack": dc.SeedPackOn(), "retrieval": dc.Retrieval, "history_notes": dc.HistoryNotesOn(), "context_tokens": ep.ctxSize, "provider": ep.provider,
+					"reasoning_history": reasoningSetting(app.Config.Inference.ReasoningHistory), "reasoning_round_trip": ep.newGateway("probe").Capabilities(ctx).ReasoningRoundTrip},
 				Progress: func(s string) { fmt.Fprintf(app.Err, "%s %s\n", time.Now().Format("15:04:05"), s) },
 				NewRunner: func(ctx context.Context, root, stateDir string) (*direct.Runner, func(), error) {
 					sess, err := direct.NewSession(filepath.Join(stateDir, "sessions"), root, ep.provider, ep.model)
@@ -411,6 +421,7 @@ aside and recalled, summaries, broken edits caught by the check, and time.`,
 	f.IntVar(&workingSet, "working-set", 0, "history budget in tokens for this run (0 = direct.working_set_tokens)")
 	f.BoolVar(&noHistoryNotes, "no-history-notes", false, "turn off history notes for this run (direct.history_notes)")
 	f.StringVar(&retrieval, "retrieval", "", "adaptive or basic for this run (direct.retrieval)")
+	f.StringVar(&reasoningHistory, "reasoning-history", "", "auto, keep or drop for this run (inference.reasoning_history)")
 	return cmd
 }
 
@@ -774,4 +785,75 @@ against the code files the fix changed. No model is involved.`,
 	f.IntVar(&tokens, "tokens", 1200, "token budget of a retrieval block")
 	f.StringVar(&out, "out", "", "report path (.json; .md written alongside)")
 	return cmd
+}
+
+func newBenchStructuredCmd(app *App) *cobra.Command {
+	var tasksPath, split, out, modelName string
+	var perLanguage int
+	var arms []string
+	cmd := &cobra.Command{
+		Use:   "structured",
+		Short: "Score structured output: can the control plane use the model's JSON (contracts, grounding, counterexamples) with and without a schema",
+		Long: `For real issues (the tasks file of benchmarks/retrieval/prepare.py), run
+the calls whose JSON the control plane parses: the task contract, the
+ambiguity grounding check when the contract has material ambiguities, and a
+counterexample proposal against the issue's fix. Each runs once with only
+the prompt asking for JSON ("prompt") and once with the reply constrained to
+its JSON schema ("schema"). A reply counts as usable when the parser a task
+run uses accepts it.`,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			raw, err := os.ReadFile(tasksPath)
+			if err != nil {
+				return err
+			}
+			var tasks []benchmark.RetrievalTask
+			if err := json.Unmarshal(raw, &tasks); err != nil {
+				return fmt.Errorf("%s: %w", tasksPath, err)
+			}
+			ep, err := app.directEndpoint(cmd.Context(), modelName)
+			if err != nil {
+				return err
+			}
+			b := &benchmark.StructuredBench{Tasks: tasks, Split: split, PerLanguage: perLanguage, Arms: arms,
+				NewGateway: func() *inference.Gateway { return ep.newGateway("bench-structured") },
+				Progress:   func(s string) { fmt.Fprintf(app.Err, "%s %s\n", time.Now().Format("15:04:05"), s) }}
+			rep, err := b.Run(cmd.Context())
+			if err != nil {
+				return err
+			}
+			var md bytes.Buffer
+			benchmark.WriteStructuredMarkdown(&md, rep)
+			if out != "" {
+				j, err := json.MarshalIndent(rep, "", " ")
+				if err != nil {
+					return err
+				}
+				if err := config.WriteFileAtomic(out, j, 0o644); err != nil {
+					return err
+				}
+				if err := os.WriteFile(strings.TrimSuffix(out, ".json")+".md", md.Bytes(), 0o644); err != nil {
+					return err
+				}
+			}
+			app.printf("%s", md.String())
+			return nil
+		},
+	}
+	home, _ := os.UserHomeDir()
+	f := cmd.Flags()
+	f.StringVar(&tasksPath, "tasks", filepath.Join(home, ".cache", "bc-retrieval", "tasks.json"), "tasks file (prepare.py)")
+	f.StringVar(&split, "split", "heldout", "dev, heldout or \"\" for all")
+	f.IntVar(&perLanguage, "per-language", 4, "instances per language, in seeded order (0 = all)")
+	f.StringSliceVar(&arms, "arms", []string{benchmark.ArmPrompt, benchmark.ArmSchema}, "arms to run")
+	f.StringVar(&modelName, "model", "", "model profile (local) or model id (cloud); default: the configured one")
+	f.StringVar(&out, "out", "", "report path (.json; .md written alongside)")
+	return cmd
+}
+
+// reasoningSetting is inference.reasoning_history as a report shows it.
+func reasoningSetting(v string) string {
+	if v == "" {
+		return inference.ReasoningAuto
+	}
+	return v
 }

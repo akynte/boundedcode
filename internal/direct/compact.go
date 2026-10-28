@@ -72,7 +72,7 @@ func (r *Runner) compact(ctx context.Context) error {
 		},
 		"max_tokens": 2000,
 	}
-	status, resp, err := r.Gateway.Forward(ctx, "/v1/chat/completions", body)
+	status, resp, err := r.Gateway.ForwardFor(ctx, "compaction", "/v1/chat/completions", body)
 	if err != nil {
 		return err
 	}

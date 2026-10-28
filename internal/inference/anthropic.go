@@ -136,6 +136,12 @@ func (u *AnthropicUpstream) complete(ctx context.Context, body map[string]any, s
 		stripThinking(payload)
 		status, resp, err = send(ctx, payload, betas)
 	}
+	if err == nil && status == http.StatusBadRequest && req.schema() != nil && formatRejected(resp) {
+		// A model without structured outputs: the prompt asks for the
+		// JSON on its own.
+		withoutFormat(payload)
+		status, resp, err = send(ctx, payload, betas)
+	}
 	if err != nil || status != http.StatusOK {
 		return status, resp, err
 	}
@@ -184,6 +190,9 @@ func (u *AnthropicUpstream) sendStream(ctx context.Context, payload map[string]a
 		return anthropicFailure(err)
 	}
 	out, err := acc.message()
+	if errors.Is(err, ErrStreamInterrupted) {
+		return 0, nil, err
+	}
 	if err != nil {
 		return http.StatusBadGateway, errorBody(err.Error(), "upstream_error"), nil
 	}
@@ -323,6 +332,11 @@ func (a *anthropicFold) message() ([]byte, error) {
 	if a.msg == nil {
 		return nil, errors.New("anthropic stream ended without a message")
 	}
+	if a.msg["stop_reason"] == nil {
+		// message_delta carries the stop reason; a stream without one was
+		// cut off.
+		return nil, ErrStreamInterrupted
+	}
 	blocks := make([]any, 0, len(a.blocks))
 	for _, b := range a.blocks {
 		blocks = append(blocks, b)
@@ -448,6 +462,14 @@ func (u *AnthropicUpstream) translate(r oaRequest) (map[string]any, []string) {
 	payload["max_tokens"] = maxTokens
 	if u.Effort != "" {
 		payload["output_config"] = map[string]any{"effort": u.Effort}
+	}
+	if schema := r.schema(); schema != nil {
+		oc, _ := payload["output_config"].(map[string]any)
+		if oc == nil {
+			oc = map[string]any{}
+		}
+		oc["format"] = map[string]any{"type": "json_schema", "schema": cloneJSON(schema)}
+		payload["output_config"] = oc
 	}
 	if stops := r.stops(); len(stops) > 0 {
 		payload["stop_sequences"] = stops

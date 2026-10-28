@@ -220,11 +220,12 @@ func TestGeminiFoldKeepsTrailingSignature(t *testing.T) {
 func TestSSEDataFraming(t *testing.T) {
 	var got []string
 	body := ": comment\r\ndata: {\"a\":\r\ndata: 1}\r\n\r\nevent: x\ndata: {\"b\":2}\ndata: {\"c\":3}\n\ndata: [DONE]\n\ndata: {\"d\":4}\n\n"
-	if err := sseData(strings.NewReader(body), func(d []byte) (bool, error) {
+	done, err := sseData(strings.NewReader(body), func(d []byte) (bool, error) {
 		got = append(got, string(d))
 		return true, nil
-	}); err != nil {
-		t.Fatal(err)
+	})
+	if err != nil || !done {
+		t.Fatal(done, err)
 	}
 	if strings.Join(got, "|") != "{\"a\":\n1}|{\"b\":2}|{\"c\":3}" {
 		t.Fatalf("events %q", got)

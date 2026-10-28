@@ -40,6 +40,10 @@ type Gateway struct {
 	calls     int // requests forwarded
 	peak      int // the largest prompt of one request, cached tokens included
 	log       []CallStat
+	prev      map[string][]string // per purpose, the previous request's message hashes (history.go)
+
+	localMu sync.Mutex
+	local   *OpenAIUpstream
 }
 
 // CallStat is one model call as the gateway measured it.
@@ -68,6 +72,19 @@ type CallStat struct {
 	// turn ("condenser": summarising the history); the ledger records the
 	// call's source as "source:purpose".
 	Purpose string `json:"purpose,omitempty"`
+	// Evaluated is the prompt tokens the server processed (llama.cpp
+	// timings.prompt_n); Prompt - Cached where it reports no timings.
+	Evaluated int `json:"evaluated_tokens,omitempty"`
+	// Messages is the request's message count, and Changed the index of
+	// the first message that differs from the previous request of the same
+	// purpose (-1: the history only grew, so the server's cache can serve
+	// all of it; 0 with no previous request). A changed earlier message
+	// (history set aside, summarised or rewritten) explains a cache miss
+	// that a growing history does not.
+	Messages int `json:"messages,omitempty"`
+	Changed  int `json:"changed"`
+	// Retried counts re-sent requests: a stream cut off before its end.
+	Retried int `json:"retried,omitempty"`
 }
 
 // CallLog returns the calls so far (KeepLog only).
@@ -135,15 +152,17 @@ func (g *Gateway) ForwardFor(ctx context.Context, purpose, path string, body map
 	body["model"] = g.Model
 	delete(body, "stream")
 	delete(body, "stream_options")
+	n, changed := g.history(purpose, body)
 	start := time.Now()
 	status, resp, err := g.upstream().Complete(ctx, body)
 	total := time.Since(start)
 	if err != nil {
 		// Transport errors become a 502 for the agent, not a Go error.
-		g.record(ctx, CallStat{TotalMS: ms(total), Status: "transport_error", Purpose: purpose})
+		g.record(ctx, CallStat{TotalMS: ms(total), Status: "transport_error", Purpose: purpose, Messages: n, Changed: changed})
 		return http.StatusBadGateway, map[string]any{"error": map[string]any{"message": err.Error()}}, nil //nolint:nilerr // see above
 	}
-	return g.account(ctx, status, resp, CallStat{TotalMS: ms(total), Purpose: purpose}), g.decode(resp), nil
+	status, resp = normalize(status, resp)
+	return g.account(ctx, status, resp, CallStat{TotalMS: ms(total), Purpose: purpose, Messages: n, Changed: changed}), g.decode(resp), nil
 }
 
 // validPurpose accepts a short lowercase word: the purpose comes from the
@@ -204,8 +223,10 @@ func (g *Gateway) account(ctx context.Context, status int, resp []byte, cs CallS
 		cs.Status = fmt.Sprintf("http_%d", status)
 	}
 	cs.Prompt, cs.Completion, cs.Cached = parsed.Usage.PromptTokens, parsed.Usage.CompletionTokens, cached
+	cs.Evaluated = max(parsed.Usage.PromptTokens-cached, 0)
 	if parsed.Timings != nil {
 		cs.PrefillMS, cs.DecodeMS = parsed.Timings.PromptMS, parsed.Timings.PredictedMS
+		cs.Evaluated = parsed.Timings.PromptN
 	}
 	if c := parsed.Usage.Completion; c != nil && c.Reasoning > 0 {
 		cs.Reasoning, cs.ReasoningSource = c.Reasoning, "provider"
@@ -234,11 +255,38 @@ func (g *Gateway) upstream() Upstream {
 	if g.Upstream != nil {
 		return g.Upstream
 	}
-	return &OpenAIUpstream{Client: g.Client, Name: ProviderLocal}
+	// One upstream per client: it holds the server's capabilities and
+	// the reasoning of earlier answers.
+	g.localMu.Lock()
+	defer g.localMu.Unlock()
+	if g.local == nil || g.local.Client != g.Client {
+		g.local = LocalUpstream(g.Client, "", nil)
+	}
+	return g.local
+}
+
+// LocalUpstream is the upstream of a local server (llama.cpp's, or another
+// OpenAI-compatible one at inference.external_url): requests are
+// replayable and retried as LocalRetry says, and reasoning travels with
+// the history as reasoning says (ReasoningAuto when ""). replay may be nil
+// (in memory); a task passes a file so a resumed run keeps it.
+func LocalUpstream(c *Client, reasoning string, replay ReplayStore) *OpenAIUpstream {
+	if c != nil {
+		c.Replayable = true
+	}
+	if reasoning == "" {
+		reasoning = ReasoningAuto
+	}
+	return &OpenAIUpstream{Client: c, Name: ProviderLocal, Retry: LocalRetry, Reasoning: reasoning, Replay: replay}
 }
 
 // Provider names the gateway's provider.
-func (g *Gateway) Provider() string { return g.upstream().Provider() }
+func (g *Gateway) Provider() string {
+	if g.Upstream == nil {
+		return ProviderLocal
+	}
+	return g.Upstream.Provider()
+}
 
 func (g *Gateway) record(ctx context.Context, cs CallStat) {
 	if g.KeepLog {

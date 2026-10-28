@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 )
 
@@ -64,9 +66,19 @@ type OpenAIUpstream struct {
 	Cloud bool
 	// Retry bounds retries of rate-limited and overloaded answers.
 	Retry RetryPolicy
+	// Reasoning is how the model's reasoning travels with the history
+	// (config inference.reasoning_history): ReasoningAuto, ReasoningKeep
+	// or ReasoningDrop. See reasoning.go.
+	Reasoning string
+	// Replay keeps each answer's reasoning so it can be put back into a
+	// history that dropped it (the agent runtime's does); nil = in memory.
+	Replay ReplayStore
 
 	mu      sync.Mutex
 	dropped map[string]bool // parameters the provider rejected
+
+	capsOnce sync.Once
+	caps     Capabilities
 }
 
 // Provider implements Upstream.
@@ -77,12 +89,7 @@ func (u *OpenAIUpstream) Provider() string { return u.Name }
 // models reject temperature, top_p and max_tokens) drops or renames it and
 // retries once, and the parameter stays dropped for this upstream's life.
 func (u *OpenAIUpstream) Complete(ctx context.Context, body map[string]any) (int, []byte, error) {
-	if u.Cloud {
-		for _, k := range llamaOnly {
-			delete(body, k)
-		}
-		u.applyDropped(body)
-	}
+	u.prepare(ctx, body)
 	for adapted := false; ; adapted = true {
 		raw, err := json.Marshal(body)
 		if err != nil {
@@ -97,13 +104,29 @@ func (u *OpenAIUpstream) Complete(ctx context.Context, body map[string]any) (int
 		if err != nil {
 			return 0, nil, err
 		}
-		if status == http.StatusBadRequest && u.Cloud && !adapted {
+		if status == http.StatusBadRequest && !adapted {
 			if param := rejectedParam(resp); param != "" && u.drop(body, param) {
 				continue
 			}
 		}
+		if status == http.StatusOK {
+			u.remember(resp)
+		}
 		return status, resp, nil
 	}
+}
+
+// prepare adapts a request to the provider: llama.cpp-only fields and
+// parameters it rejected before are removed, and the history's reasoning
+// is kept, restored or removed (reasoning.go).
+func (u *OpenAIUpstream) prepare(ctx context.Context, body map[string]any) {
+	if u.Cloud {
+		for _, k := range llamaOnly {
+			delete(body, k)
+		}
+	}
+	u.applyDropped(body)
+	u.reasoningHistory(ctx, body)
 }
 
 func (u *OpenAIUpstream) path() string {
@@ -153,10 +176,13 @@ func rejectedParam(resp []byte) string {
 	return e.Error.Param
 }
 
-// adaptable are the parameters a cloud upstream may drop or rename when the
-// provider rejects them.
+// adaptable are the parameters an upstream may drop or rename when the
+// provider rejects them. A rejected response_format leaves the caller's
+// prompt to ask for JSON, as it does for providers without structured
+// output.
 var adaptable = map[string]bool{"temperature": true, "top_p": true, "max_tokens": true, "stop": true,
-	"seed": true, "presence_penalty": true, "frequency_penalty": true, "reasoning_effort": true}
+	"seed": true, "presence_penalty": true, "frequency_penalty": true, "reasoning_effort": true,
+	"response_format": true}
 
 func (u *OpenAIUpstream) drop(body map[string]any, param string) bool {
 	if !adaptable[param] {
@@ -201,10 +227,20 @@ type RetryPolicy struct {
 	Attempts int           // total attempts (<= 1: no retry)
 	Base     time.Duration // first backoff (default 2s)
 	Max      time.Duration // longest single wait (default 60s)
+	// Transport also retries a connection that failed before any answer
+	// (refused, reset, closed): a local server restarting or closing an
+	// idle connection.
+	Transport bool
 }
 
 // CloudRetry is the policy for cloud providers.
 var CloudRetry = RetryPolicy{Attempts: 4, Base: 2 * time.Second, Max: 60 * time.Second}
+
+// LocalRetry is the policy for a local server. A 500 from llama.cpp is
+// most often a tool call the model wrote malformed ("Failed to parse tool
+// call arguments as JSON"): the request is sampled again. Connection
+// failures before an answer are retried too.
+var LocalRetry = RetryPolicy{Attempts: 3, Base: 500 * time.Millisecond, Max: 4 * time.Second, Transport: true}
 
 // Retryable reports whether a status is worth retrying.
 func Retryable(status int) bool {
@@ -227,9 +263,10 @@ func (p RetryPolicy) Do(ctx context.Context, f func() (int, error)) (int, error)
 		status, err := f()
 		var hint *retryHint
 		if err != nil && !errors.As(err, &hint) {
-			return 0, err
-		}
-		if !Retryable(status) || attempt >= p.Attempts {
+			if !p.Transport || !connectionFailure(err) || attempt >= p.Attempts || ctx.Err() != nil {
+				return 0, err
+			}
+		} else if !Retryable(status) || attempt >= p.Attempts {
 			return status, nil
 		}
 		wait := base << (attempt - 1)
@@ -243,6 +280,13 @@ func (p RetryPolicy) Do(ctx context.Context, f func() (int, error)) (int, error)
 		case <-time.After(wait):
 		}
 	}
+}
+
+// connectionFailure reports an error that came before any answer: the
+// connection was refused, reset or closed.
+func connectionFailure(err error) bool {
+	return errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) ||
+		errors.Is(err, syscall.ECONNREFUSED) || errors.Is(err, syscall.ECONNRESET) || errors.Is(err, syscall.EPIPE)
 }
 
 // ModelLimits are what a provider reports about a model.

@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -99,7 +100,7 @@ func (m *Manager) Ensure(ctx context.Context, p model.Profile) (inference.Endpoi
 		return ep, fmt.Errorf("model file for %s: %w", p.Name, err)
 	}
 	args := m.ServerArgs(p, modelPath)
-	hash := ArgsHash(m.Binary, args)
+	hash := ArgsHash(m.Binary, append(slices.Clone(args), ServerEnv(p)...))
 
 	st, err := m.readState()
 	if err != nil {
@@ -138,7 +139,7 @@ func (m *Manager) Start(ctx context.Context, p model.Profile, args []string) (ti
 	if st, _ := m.readState(); st != nil && alive(st.PID) {
 		return 0, fmt.Errorf("llama-server already running (pid %d)", st.PID)
 	}
-	return m.start(ctx, p, args, ArgsHash(m.Binary, args))
+	return m.start(ctx, p, args, ArgsHash(m.Binary, append(slices.Clone(args), ServerEnv(p)...)))
 }
 
 func (m *Manager) start(ctx context.Context, p model.Profile, args []string, hash string) (time.Duration, error) {
@@ -163,7 +164,7 @@ func (m *Manager) start(ctx context.Context, p model.Profile, args []string, has
 	cmd.Stdout, cmd.Stderr = logf, logf
 	cmd.SysProcAttr = detachedAttr()
 	// Prebuilt release archives ship shared libraries next to the binary.
-	cmd.Env = libraryEnv(bin)
+	cmd.Env = append(libraryEnv(bin), ServerEnv(p)...)
 	started := time.Now()
 	if err := cmd.Start(); err != nil {
 		return 0, fmt.Errorf("start llama-server: %w", err)

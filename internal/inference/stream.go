@@ -16,11 +16,31 @@ import (
 // Delta is one piece of a streamed answer. ToolCall marks the start or a
 // piece of a tool call (no text): it times the first token of an answer
 // that is only tool calls, and is not passed on to Gateway.Stream callers.
+// Progress reports prompt processing before the first token (llama.cpp's
+// prompt_progress). Reset tells the caller that the text streamed so far
+// is void: the stream broke off and the request is being sent again.
 type Delta struct {
 	Text      string
 	Reasoning string
 	ToolCall  bool
+	Progress  *PromptProgress
+	Reset     bool
 }
+
+// PromptProgress is how far the server is through the prompt: of Total
+// tokens, Cache came from its prompt cache and Processed have been
+// evaluated so far, in TimeMS.
+type PromptProgress struct {
+	Total     int     `json:"total"`
+	Cache     int     `json:"cache"`
+	Processed int     `json:"processed"`
+	TimeMS    float64 `json:"time_ms"`
+}
+
+// ErrStreamInterrupted is a streamed answer that ended before it was
+// complete: no finish reason and no end marker. Its partial text and tool
+// calls must not be taken for an answer.
+var ErrStreamInterrupted = errors.New("the model's answer stream ended before the answer was complete")
 
 // Streamer is an Upstream that can stream a completion. The callback
 // receives text as it is generated; the returned body is the complete
@@ -35,14 +55,12 @@ type Streamer interface {
 // sent with stream=true and stream_options.include_usage, the server-sent
 // events are folded into one response.
 func (u *OpenAIUpstream) Stream(ctx context.Context, body map[string]any, onDelta func(Delta)) (int, []byte, error) {
-	if u.Cloud {
-		for _, k := range llamaOnly {
-			delete(body, k)
-		}
-		u.applyDropped(body)
-	}
+	u.prepare(ctx, body)
 	body["stream"] = true
 	body["stream_options"] = map[string]any{"include_usage": true}
+	if u.progress(ctx) {
+		body["return_progress"] = true
+	}
 	for adapted := false; ; adapted = true {
 		raw, err := json.Marshal(body)
 		if err != nil {
@@ -61,7 +79,7 @@ func (u *OpenAIUpstream) Stream(ctx context.Context, body map[string]any, onDelt
 			// A non-2xx answer: an OpenAI-style error body.
 			var he *HTTPError
 			if errors.As(last, &he) {
-				if status == http.StatusBadRequest && u.Cloud && !adapted {
+				if status == http.StatusBadRequest && !adapted {
 					if param := rejectedParam([]byte(he.Body)); param != "" && u.drop(body, param) {
 						continue
 					}
@@ -70,11 +88,15 @@ func (u *OpenAIUpstream) Stream(ctx context.Context, body map[string]any, onDelt
 			}
 			return status, errorBody("no answer", "upstream_error"), nil
 		}
-		out, err := foldSSE(resp.Body, onDelta)
+		out, failed, err := foldSSE(resp.Body, onDelta)
 		resp.Body.Close()
 		if err != nil {
 			return 0, nil, err
 		}
+		if failed != 0 {
+			return failed, out, nil
+		}
+		u.remember(out)
 		return http.StatusOK, out, nil
 	}
 }
@@ -131,14 +153,18 @@ type sseChunk struct {
 		} `json:"delta"`
 		FinishReason *string `json:"finish_reason"`
 	} `json:"choices"`
-	Usage   *json.RawMessage `json:"usage"`
-	Timings *json.RawMessage `json:"timings"`
-	Error   *json.RawMessage `json:"error"`
+	Usage          *json.RawMessage `json:"usage"`
+	Timings        *json.RawMessage `json:"timings"`
+	Error          *json.RawMessage `json:"error"`
+	PromptProgress *PromptProgress  `json:"prompt_progress"`
 }
 
 // foldSSE reads server-sent events until [DONE] (or the end of the body)
-// and returns the answer in the non-streaming shape.
-func foldSSE(r io.Reader, onDelta func(Delta)) ([]byte, error) {
+// and returns the answer in the non-streaming shape. An error event ends
+// the stream as an error answer: its body and an HTTP status (failed).
+// A stream that ends with neither [DONE] nor a finish reason is
+// ErrStreamInterrupted.
+func foldSSE(r io.Reader, onDelta func(Delta)) (out []byte, failed int, err error) {
 	type toolCall struct {
 		ID, Type, Name string
 		Args           strings.Builder
@@ -150,15 +176,18 @@ func foldSSE(r io.Reader, onDelta func(Delta)) ([]byte, error) {
 		usage, timings     json.RawMessage
 		model              string
 	)
-	var failed []byte
-	err := sseData(r, func(data []byte) (bool, error) {
+	var errBody []byte
+	done, err := sseData(r, func(data []byte) (bool, error) {
 		var ch sseChunk
 		if err := json.Unmarshal(data, &ch); err != nil {
 			return false, fmt.Errorf("decode stream chunk: %w", err)
 		}
 		if ch.Error != nil {
-			failed = []byte(`{"error":` + string(*ch.Error) + `}`)
+			errBody = []byte(`{"error":` + string(*ch.Error) + `}`)
 			return false, nil
+		}
+		if ch.PromptProgress != nil && onDelta != nil {
+			onDelta(Delta{Progress: ch.PromptProgress})
 		}
 		if ch.Model != "" {
 			model = ch.Model
@@ -208,10 +237,13 @@ func foldSSE(r io.Reader, onDelta func(Delta)) ([]byte, error) {
 		return true, nil
 	})
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
-	if failed != nil {
-		return failed, nil
+	if errBody != nil {
+		return errBody, errorStatus(errBody), nil
+	}
+	if !done && finish == "" {
+		return nil, 0, ErrStreamInterrupted
 	}
 	msg := map[string]any{"role": "assistant", "content": content.String()}
 	if reasoning.Len() > 0 {
@@ -231,25 +263,43 @@ func foldSSE(r io.Reader, onDelta func(Delta)) ([]byte, error) {
 	if finish == "" {
 		finish = "stop"
 	}
-	out := map[string]any{
+	whole := map[string]any{
 		"object":  "chat.completion",
 		"created": time.Now().Unix(),
 		"model":   model,
 		"choices": []map[string]any{{"index": 0, "message": msg, "finish_reason": finish}},
 	}
 	if len(usage) > 0 {
-		out["usage"] = usage
+		whole["usage"] = usage
 	}
 	if len(timings) > 0 {
-		out["timings"] = timings
+		whole["timings"] = timings
 	}
-	return json.Marshal(out)
+	b, err := json.Marshal(whole)
+	return b, 0, err
+}
+
+// errorStatus is the HTTP status an error event stands for: its numeric
+// code when it has one in the 4xx-5xx range, else 500.
+func errorStatus(body []byte) int {
+	var e struct {
+		Error struct {
+			Code any `json:"code"`
+		} `json:"error"`
+	}
+	if json.Unmarshal(body, &e) == nil {
+		if c, ok := e.Error.Code.(float64); ok && c >= 400 && c < 600 {
+			return int(c)
+		}
+	}
+	return http.StatusInternalServerError
 }
 
 // sseData calls fn with the data of each server-sent event until fn
 // returns false, the stream sends [DONE], or the body ends. Events whose
-// data spans several lines are joined as the specification says.
-func sseData(r io.Reader, fn func(data []byte) (more bool, err error)) error {
+// data spans several lines are joined as the specification says. done
+// reports a [DONE] marker.
+func sseData(r io.Reader, fn func(data []byte) (more bool, err error)) (done bool, err error) {
 	sc := bufio.NewScanner(r)
 	sc.Buffer(make([]byte, 64<<10), 16<<20)
 	var data []string
@@ -260,6 +310,7 @@ func sseData(r io.Reader, fn func(data []byte) (more bool, err error)) error {
 		d := strings.Join(data, "\n")
 		data = data[:0]
 		if strings.TrimSpace(d) == "[DONE]" {
+			done = true
 			return false, nil
 		}
 		return fn([]byte(d))
@@ -269,7 +320,7 @@ func sseData(r io.Reader, fn func(data []byte) (more bool, err error)) error {
 		if line == "" {
 			more, err := flush()
 			if err != nil || !more {
-				return err
+				return done, err
 			}
 			continue
 		}
@@ -282,17 +333,17 @@ func sseData(r io.Reader, fn func(data []byte) (more bool, err error)) error {
 			if len(data) > 0 && json.Valid([]byte(strings.Join(data, "\n"))) {
 				more, err := flush()
 				if err != nil || !more {
-					return err
+					return done, err
 				}
 			}
 			data = append(data, strings.TrimPrefix(d, " "))
 		}
 	}
 	if err := sc.Err(); err != nil {
-		return fmt.Errorf("read stream: %w", err)
+		return done, fmt.Errorf("%w: read: %w", ErrStreamInterrupted, err)
 	}
-	_, err := flush()
-	return err
+	_, err = flush()
+	return done, err
 }
 
 // Stream forwards a chat-completions request and streams the answer's
@@ -316,20 +367,55 @@ func (g *Gateway) Stream(ctx context.Context, path string, body map[string]any, 
 	body["model"] = g.Model
 	delete(body, "stream")
 	delete(body, "stream_options")
+	n, changed := g.history("", body)
 	start := time.Now()
 	var first time.Duration
-	status, resp, err := s.Stream(ctx, body, func(d Delta) {
+	streamed := false
+	relay := func(d Delta) {
+		if d.Progress != nil {
+			if onDelta != nil {
+				onDelta(d)
+			}
+			return
+		}
 		if first == 0 {
 			first = max(time.Since(start), time.Nanosecond)
 		}
-		if onDelta != nil && (d.Text != "" || d.Reasoning != "") {
-			onDelta(d)
+		if d.Text != "" || d.Reasoning != "" {
+			streamed = true
+			if onDelta != nil {
+				onDelta(d)
+			}
 		}
-	})
+	}
+	status, resp, err := s.Stream(ctx, copyBody(body), relay)
+	retried := 0
+	if err != nil && ctx.Err() == nil && (errors.Is(err, ErrStreamInterrupted) || connectionFailure(err)) {
+		// The answer broke off (the server closed the connection, or the
+		// stream ended without its end): what was streamed is void, and
+		// the request is sent once more.
+		retried = 1
+		if streamed && onDelta != nil {
+			onDelta(Delta{Reset: true})
+		}
+		first, streamed = 0, false
+		status, resp, err = s.Stream(ctx, body, relay)
+	}
 	total := time.Since(start)
 	if err != nil {
-		g.record(ctx, CallStat{TotalMS: ms(total), TTFTMS: ms(first), Streamed: true, Status: "transport_error"})
+		g.record(ctx, CallStat{TotalMS: ms(total), TTFTMS: ms(first), Streamed: true, Status: "transport_error", Messages: n, Changed: changed, Retried: retried})
 		return http.StatusBadGateway, map[string]any{"error": map[string]any{"message": err.Error()}}, nil //nolint:nilerr // transport errors become a 502 for the caller
 	}
-	return g.account(ctx, status, resp, CallStat{TotalMS: ms(total), TTFTMS: ms(first), Streamed: true}), g.decode(resp), nil
+	status, resp = normalize(status, resp)
+	return g.account(ctx, status, resp, CallStat{TotalMS: ms(total), TTFTMS: ms(first), Streamed: true, Messages: n, Changed: changed, Retried: retried}), g.decode(resp), nil
+}
+
+// copyBody copies a request's top level, so a first attempt's changes
+// (stream flags, dropped parameters) do not leak into the second.
+func copyBody(body map[string]any) map[string]any {
+	c := make(map[string]any, len(body))
+	for k, v := range body {
+		c[k] = v
+	}
+	return c
 }

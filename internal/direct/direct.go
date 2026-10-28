@@ -47,8 +47,9 @@ type Message struct {
 	Name       string     `json:"name,omitempty"`
 	ToolCallID string     `json:"tool_call_id,omitempty"`
 	ToolCalls  []ToolCall `json:"tool_calls,omitempty"`
-	// Reasoning is the model's reasoning text (llama.cpp reasoning_content),
-	// kept for display and not sent back.
+	// Reasoning is the model's reasoning text (llama.cpp reasoning_content).
+	// It is sent back with the history where the model reads it
+	// (inference.reasoning_history) and shown otherwise.
 	Reasoning string `json:"reasoning,omitempty"`
 	// Parts, when set, is multipart content (text and inline images) sent
 	// instead of Content.
@@ -108,6 +109,13 @@ const (
 	// EventText (or EventReasoning) when the model call ends.
 	EventTextDelta      EventKind = "text_delta"
 	EventReasoningDelta EventKind = "reasoning_delta"
+	// EventStreamReset voids the deltas streamed so far: the answer broke
+	// off and the request was sent again.
+	EventStreamReset EventKind = "stream_reset"
+	// EventPromptProgress reports a local server working through the
+	// prompt before the first token: Args has total, cached and processed
+	// tokens.
+	EventPromptProgress EventKind = "prompt_progress"
 )
 
 // Event is what a Sink receives while a message is processed.
@@ -609,6 +617,13 @@ func (r *Runner) complete(ctx context.Context, tools []Tool) (Message, error) {
 		status, resp, err = r.Gateway.Forward(ctx, "/v1/chat/completions", body)
 	} else {
 		status, resp, err = r.Gateway.Stream(ctx, "/v1/chat/completions", body, func(d inference.Delta) {
+			switch {
+			case d.Reset:
+				r.emit(Event{Kind: EventStreamReset})
+			case d.Progress != nil:
+				r.emit(Event{Kind: EventPromptProgress, Args: map[string]any{
+					"total": d.Progress.Total, "cached": d.Progress.Cache, "processed": d.Progress.Processed}})
+			}
 			if d.Text != "" {
 				r.emit(Event{Kind: EventTextDelta, Text: d.Text})
 			}
@@ -663,6 +678,11 @@ func (r *Runner) wireMessages() []map[string]any {
 			w["content"] = m.Content
 			if len(m.ToolCalls) > 0 {
 				w["tool_calls"] = m.ToolCalls
+			}
+			if m.Reasoning != "" {
+				// The upstream keeps it only where the model reads it back
+				// (inference.reasoning_history); others remove it.
+				w["reasoning_content"] = m.Reasoning
 			}
 		default:
 			switch {
@@ -757,15 +777,23 @@ func errMessage(raw []byte) string {
 }
 
 func looksLikeContextOverflow(msg string) bool {
+	if inference.IsContextOverflow(msg) {
+		return true
+	}
 	m := strings.ToLower(msg)
 	return strings.Contains(m, "context") && (strings.Contains(m, "length") || strings.Contains(m, "window") || strings.Contains(m, "exceed") || strings.Contains(m, "too long") || strings.Contains(m, "maximum"))
 }
 
-// estimateTokens is the rough prompt size of the current history.
+// estimateTokens is the rough prompt size of the current history,
+// reasoning included where it is sent back.
 func (r *Runner) estimateTokens() int {
 	n := contextplan.EstimateTokens(r.systemPrompt())
+	reasoning := r.Gateway != nil && r.Gateway.Capabilities(context.Background()).ReasoningRoundTrip
 	for _, m := range r.Session.Messages {
 		n += contextplan.EstimateTokens(m.Content) + contextplan.EstimateTokens(m.Context) + 8
+		if reasoning {
+			n += contextplan.EstimateTokens(m.Reasoning)
+		}
 		for _, tc := range m.ToolCalls {
 			n += contextplan.EstimateTokens(tc.Function.Arguments) + 12
 		}

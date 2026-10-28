@@ -225,6 +225,10 @@ type DirectSummary struct {
 	Invalidations    int     `json:"cache_invalidations"`
 	AfterRewrite     int     `json:"cache_invalidations_after_rewrite"`
 	RecomputedTokens int     `json:"recomputed_prompt_tokens"`
+	// MeanEvaluated is the prompt tokens the server processed per task, and
+	// MeanPrefillSeconds the time it took (llama.cpp timings).
+	MeanEvaluated      float64 `json:"evaluated_prompt_tokens_per_task,omitempty"`
+	MeanPrefillSeconds float64 `json:"prefill_seconds_per_task,omitempty"`
 	// The cost of passed and failed tasks, apart: processed tokens
 	// (uncached prompt + generated) and seconds per task.
 	PassedTokens  float64        `json:"processed_tokens_per_passed_task"`
@@ -759,6 +763,8 @@ func summarizeDirect(category string, rs []DirectResult) DirectSummary {
 		s.Invalidations += r.CallStats.Invalidations
 		s.AfterRewrite += r.CallStats.AfterRewrite
 		s.RecomputedTokens += r.CallStats.RecomputedTokens
+		s.MeanEvaluated += float64(r.CallStats.EvaluatedTokens)
+		s.MeanPrefillSeconds += r.CallStats.PrefillSeconds
 		processed := float64(r.PromptTokens - r.CachedTokens + r.GeneratedTokens)
 		if r.Success {
 			passTok += processed
@@ -821,6 +827,8 @@ func summarizeDirect(category string, rs []DirectResult) DirectSummary {
 	}
 	s.MeanAgentSeconds, s.MeanInferenceSeconds, s.MeanToolSeconds, s.MeanHarnessSeconds = agent/n, inf/n, tool/n, harness/n
 	s.MeanReasoning = reasoning / n
+	s.MeanEvaluated /= n
+	s.MeanPrefillSeconds /= n
 	if len(ttfts) > 0 {
 		sort.Float64s(ttfts)
 		s.TTFTMedianMS = ttfts[len(ttfts)/2]
@@ -853,9 +861,9 @@ func WriteDirectMarkdown(w io.Writer, r *DirectReport) error {
 	fmt.Fprintf(w, "**%d/%d passed (%.0f%%)**, %.1f model calls and %.1f tool calls per task, %.0f prompt tokens per task with a %.0f%% prompt-cache hit rate, %.0f generated tokens per task, %.0f KB of tool results per task, %.0f s per task, %d tokens in the largest single prompt; %d results set aside, %d recalled, %d summaries, %d broken edits caught by the check, %d check notes, %d history notes, %d errors.\n\n",
 		s.Passed, s.Tasks, 100*s.PassRate, s.MeanCalls, s.MeanToolCalls, s.MeanPrompt, 100*s.CacheHitRate, s.MeanGenerated, s.MeanResultBytes/1024, s.MeanWallSeconds, s.PeakPrompt, s.Elided, s.Recalls, s.Compactions, s.ChecksCaught, s.CheckNotes, s.HistoryNotes, s.Errors)
 	if s.MeanAgentSeconds > 0 {
-		fmt.Fprintf(w, "Where the agent's time went, per task: %.1f s in model calls, %.1f s in tools (with the checks after edits), %.2f s in the harness itself; time to first token %.0f ms (median). %.0f reasoning tokens per task. %d prompt-cache invalidations (%d after the history was rewritten), %d prompt tokens recomputed. Cost of a passed task: %.0f processed tokens and %.0f s; of a failed one: %.0f and %.0f s. Peak memory: harness %.0f MiB, model server %.0f MiB, GPU %.0f MiB.\n\n",
+		fmt.Fprintf(w, "Where the agent's time went, per task: %.1f s in model calls, %.1f s in tools (with the checks after edits), %.2f s in the harness itself; time to first token %.0f ms (median). %.0f reasoning tokens per task. %d prompt-cache invalidations (%d after the history was rewritten), %d prompt tokens recomputed; %.0f prompt tokens evaluated by the server per task, in %.1f s. Cost of a passed task: %.0f processed tokens and %.0f s; of a failed one: %.0f and %.0f s. Peak memory: harness %.0f MiB, model server %.0f MiB, GPU %.0f MiB.\n\n",
 			s.MeanInferenceSeconds, s.MeanToolSeconds, s.MeanHarnessSeconds, s.TTFTMedianMS, s.MeanReasoning, s.Invalidations, s.AfterRewrite, s.RecomputedTokens,
-			s.PassedTokens, s.PassedSeconds, s.FailedTokens, s.FailedSeconds, s.PeakHarnessRSSMiB, s.PeakServerRSSMiB, s.PeakGPUMemMiB)
+			s.MeanEvaluated, s.MeanPrefillSeconds, s.PassedTokens, s.PassedSeconds, s.FailedTokens, s.FailedSeconds, s.PeakHarnessRSSMiB, s.PeakServerRSSMiB, s.PeakGPUMemMiB)
 	}
 	if len(s.Failures) > 0 || len(s.Stalls) > 0 {
 		fmt.Fprintf(w, "Failures by cause: %s. Stalls: %s.\n\n", countList(s.Failures), countList(s.Stalls))

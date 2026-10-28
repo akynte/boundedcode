@@ -247,6 +247,16 @@ type TaskConfig struct {
 	Ambiguity string `yaml:"ambiguity"`
 	// Verification configures the optional verification layers.
 	Verification VerificationLayers `yaml:"verification,omitempty"`
+	// StructuredOutput constrains the replies of the calls that read the
+	// request and propose counterexamples to their JSON schema where the
+	// provider supports it (unset: on). Off, the prompt alone asks for the
+	// JSON.
+	StructuredOutput *bool `yaml:"structured_output,omitempty"`
+}
+
+// StructuredOutputOn reports whether structured output is on (the default).
+func (t TaskConfig) StructuredOutputOn() bool {
+	return t.StructuredOutput == nil || *t.StructuredOutput
 }
 
 // VerificationLayers configures mutation assessment (Layer 6) and
@@ -308,6 +318,14 @@ type InferenceConfig struct {
 	// inactivity (llama-server --sleep-idle-seconds) and reload it on the
 	// next request, so an idle server does not hold RAM/VRAM. 0 disables.
 	IdleSleep Duration `yaml:"idle_sleep"`
+	// ReasoningHistory is how the model's reasoning travels with the
+	// conversation: "auto" (the default) sends it back where the local
+	// model's chat template renders it, so the model reads its earlier
+	// turns as it wrote them and the server's prompt cache stays valid;
+	// "keep" always sends it (an OpenAI-compatible service that asks for
+	// reasoning_content in tool-call turns); "drop" never does. Anthropic
+	// and Gemini replay their own thinking whatever this says.
+	ReasoningHistory string `yaml:"reasoning_history,omitempty"`
 }
 
 // ProviderConfig configures one cloud provider.
@@ -576,6 +594,11 @@ func (c Config) Validate() error {
 	errs = append(errs, c.Inference.validateProvider()...)
 	if c.Inference.IdleSleep < 0 {
 		errs = append(errs, errors.New("inference.idle_sleep: must be >= 0 (0 disables)"))
+	}
+	switch c.Inference.ReasoningHistory {
+	case "", "auto", "keep", "drop":
+	default:
+		errs = append(errs, fmt.Errorf("inference.reasoning_history: %q is not auto|keep|drop", c.Inference.ReasoningHistory))
 	}
 	// The scripted runtime exists for Go tests, which wire it directly; a
 	// config file can only select a runtime the CLI can run.

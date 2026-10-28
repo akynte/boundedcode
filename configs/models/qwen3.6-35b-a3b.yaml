@@ -43,6 +43,12 @@ server:
   # Cap thinking per response; see model.ServerFlags.ReasoningBudget.
   reasoning_budget: 4096
   reasoning_budget_message: "\n\nI have reasoned enough. I will now act on my best plan.\n"
+  # Prompt steps below 256 tokens compute the experts in system RAM on the
+  # CPU instead of copying them to the GPU (about 0.7 s per step with
+  # n_cpu_moe 35): 57-124 new tokens take 0.43-0.82 s instead of
+  # 0.80-1.15 s, and the same from about 170 tokens up
+  # (docs/benchmarks/inference-2026-10.md).
+  op_offload_min_batch: 256
 sampling:
   temperature: 0.6
   top_p: 0.95

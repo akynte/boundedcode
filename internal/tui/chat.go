@@ -73,6 +73,7 @@ type directRun struct {
 	activity []directActivity
 	text     string
 	partial  string // streamed text of the model call in progress
+	progress string // the server's progress through a long prompt
 	notes    []string
 	done     bool
 	err      error
@@ -1467,8 +1468,13 @@ func (r *directRun) apply(e direct.Event) {
 		r.activity = append(r.activity, directActivity{summary: e.Summary, err: e.Err, denied: true})
 	case direct.EventTextDelta:
 		r.partial += e.Text
-	case direct.EventText:
+		r.progress = ""
+	case direct.EventStreamReset:
 		r.partial = ""
+	case direct.EventPromptProgress:
+		r.progress = promptProgress(e.Args)
+	case direct.EventText:
+		r.partial, r.progress = "", ""
 		if r.text != "" {
 			r.text += "\n\n"
 		}
@@ -1498,6 +1504,26 @@ func (r *directRun) apply(e direct.Event) {
 		r.changed, r.inGit = e.Changed, e.Changed != nil
 	}
 	r.cacheN = -1 // invalidate
+}
+
+// promptProgress describes a local server's progress through the prompt,
+// or "" once it is done (the answer follows).
+func promptProgress(a map[string]any) string {
+	num := func(k string) int {
+		switch v := a[k].(type) {
+		case int:
+			return v
+		case float64:
+			return int(v)
+		}
+		return 0
+	}
+	total, cached, done := num("total"), num("cached"), num("processed")
+	todo := total - cached
+	if todo <= 0 || done >= todo {
+		return ""
+	}
+	return fmt.Sprintf("reading the conversation: %s of %s new tokens (%s cached)", human(done), human(todo), human(cached))
 }
 
 // lines renders the run: activity, answer, outcome.
@@ -1557,7 +1583,10 @@ func (r *directRun) lines(m *Model, w int) []string {
 	}
 	switch {
 	case !r.done:
-		if len(r.activity) == 0 && text == "" {
+		switch {
+		case r.progress != "" && !r.hasRunning():
+			out = append(out, "  "+m.spin.View()+sMuted.Render(" "+r.progress))
+		case len(r.activity) == 0 && text == "":
 			out = append(out, "  "+m.spin.View()+sMuted.Render(" thinking…"))
 		}
 	case r.err != nil:

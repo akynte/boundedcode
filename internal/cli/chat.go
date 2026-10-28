@@ -81,7 +81,8 @@ func (a *App) directEndpoint(ctx context.Context, modelOverride string) (*direct
 	return &directEndpoint{provider: inference.ProviderLocal, model: ep.Model, ctxSize: p.Server.CtxSize,
 		pin: modelPin(p), tokenize: inference.NewClient(ep.BaseURL, timeout).Tokenize,
 		newGateway: func(id string) *inference.Gateway {
-			return &inference.Gateway{Model: ep.Model, Client: inference.NewClient(ep.BaseURL, timeout), DB: db, TaskID: id, Source: "direct", MaxTokens: maxTokens}
+			return &inference.Gateway{Model: ep.Model, Upstream: inference.LocalUpstream(inference.NewClient(ep.BaseURL, timeout), a.Config.Inference.ReasoningHistory, nil),
+				DB: db, TaskID: id, Source: "direct", MaxTokens: maxTokens}
 		}}, nil
 }
 
@@ -622,6 +623,11 @@ func (a *App) runChat(ctx context.Context, o chatOptions) error {
 		case direct.EventTextDelta:
 			streamed = true
 			fmt.Fprint(a.Out, e.Text)
+		case direct.EventStreamReset:
+			if streamed {
+				fmt.Fprintln(a.Out)
+			}
+			fmt.Fprintln(a.Err, "· the answer broke off; asking the model again")
 		case direct.EventToolStart:
 			fmt.Fprintf(a.Err, "⚙ %s\n", e.Summary)
 		case direct.EventToolEnd:

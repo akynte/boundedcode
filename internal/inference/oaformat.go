@@ -40,15 +40,16 @@ type oaTool struct {
 // read. Fields they do not know are ignored (logged nowhere: requests carry
 // repository content).
 type oaRequest struct {
-	Messages            []oaMessage `json:"messages"`
-	Tools               []oaTool    `json:"tools"`
-	ToolChoice          any         `json:"tool_choice"`
-	ParallelToolCalls   *bool       `json:"parallel_tool_calls"`
-	MaxTokens           int         `json:"max_tokens"`
-	MaxCompletionTokens int         `json:"max_completion_tokens"`
-	Stop                any         `json:"stop"`
-	Temperature         *float64    `json:"temperature"`
-	TopP                *float64    `json:"top_p"`
+	Messages            []oaMessage       `json:"messages"`
+	Tools               []oaTool          `json:"tools"`
+	ToolChoice          any               `json:"tool_choice"`
+	ParallelToolCalls   *bool             `json:"parallel_tool_calls"`
+	MaxTokens           int               `json:"max_tokens"`
+	MaxCompletionTokens int               `json:"max_completion_tokens"`
+	Stop                any               `json:"stop"`
+	Temperature         *float64          `json:"temperature"`
+	TopP                *float64          `json:"top_p"`
+	ResponseFormat      *oaResponseFormat `json:"response_format"`
 }
 
 func parseOARequest(body map[string]any) (oaRequest, error) {

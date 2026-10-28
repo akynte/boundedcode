@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/akynte/boundedcode/configs"
 	"github.com/akynte/boundedcode/internal/model"
 )
 
@@ -72,5 +73,48 @@ func TestIdleSleepArgs(t *testing.T) {
 	m.IdleSleep = 0
 	if slices.Contains(m.ServerArgs(p, "/m.gguf"), "--sleep-idle-seconds") {
 		t.Error("disabled idle sleep emitted a flag")
+	}
+}
+
+// Prompt-cache settings map to the pinned release's flags only when set
+// (0 is a value for checkpoint spacing and the RAM cache), and the offload
+// threshold goes to the environment.
+func TestCacheSettingsArgs(t *testing.T) {
+	p := model.Profile{Name: "m", File: "m.gguf"}
+	plain := strings.Join(BuildArgs(p, "/m", "127.0.0.1", 1), " ")
+	for _, f := range []string{"--ctx-checkpoints", "--checkpoint-min-step", "--cache-ram", "reasoning-preserve"} {
+		if strings.Contains(plain, f) {
+			t.Fatalf("unset %s emitted: %q", f, plain)
+		}
+	}
+	if env := ServerEnv(p); len(env) != 0 {
+		t.Fatalf("env %q", env)
+	}
+	zero, off := 0, false
+	p.Server.CtxCheckpoints, p.Server.CheckpointMinStep, p.Server.CacheRAMMiB, p.Server.ReasoningPreserve = 16, &zero, &zero, &off
+	p.Server.OpOffloadMinBatch = 256
+	j := strings.Join(BuildArgs(p, "/m", "127.0.0.1", 1), " ")
+	for _, want := range []string{"--ctx-checkpoints 16", "--checkpoint-min-step 0", "--cache-ram 0", "--no-reasoning-preserve"} {
+		if !strings.Contains(j, want) {
+			t.Errorf("missing %q in %q", want, j)
+		}
+	}
+	if env := ServerEnv(p); len(env) != 1 || env[0] != "GGML_OP_OFFLOAD_MIN_BATCH=256" {
+		t.Fatalf("env %q", env)
+	}
+}
+
+// The measured offload threshold reaches the built-in profile's server.
+func TestBuiltinOffloadThreshold(t *testing.T) {
+	c, err := model.LoadCatalog(configs.FS, "models", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := c.Get("qwen3.6-35b-a3b")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if env := ServerEnv(p); !slices.Contains(env, "GGML_OP_OFFLOAD_MIN_BATCH=256") {
+		t.Fatalf("env %q", env)
 	}
 }

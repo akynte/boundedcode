@@ -3,6 +3,8 @@ package inference
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -20,6 +22,12 @@ type Client struct {
 	HTTP    *http.Client
 	// Header is added to every request (an API key for a cloud provider).
 	Header http.Header
+	// Replayable marks each request with an Idempotency-Key, which lets
+	// Go's transport send it again on a fresh connection when a reused
+	// one turns out to be closed: llama-server closes idle keep-alive
+	// connections, and a request racing that close otherwise fails with
+	// EOF before the server ever reads it.
+	Replayable bool
 }
 
 // NewClient returns a client with the given per-request timeout.
@@ -153,6 +161,11 @@ func (c *Client) Raw(ctx context.Context, path string, body []byte) ([]byte, tim
 }
 
 func (c *Client) addHeaders(req *http.Request) {
+	if c.Replayable && req.Method == http.MethodPost {
+		var b [12]byte
+		_, _ = rand.Read(b[:])
+		req.Header.Set("Idempotency-Key", hex.EncodeToString(b[:]))
+	}
 	for k, vs := range c.Header {
 		for _, v := range vs {
 			req.Header.Add(k, v)

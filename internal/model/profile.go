@@ -98,6 +98,28 @@ type ServerFlags struct {
 	// ReasoningBudgetMessage is injected before the end-of-thinking tag when
 	// the budget is spent, so the model moves on to act.
 	ReasoningBudgetMessage string `yaml:"reasoning_budget_message"`
+	// Prompt cache (llama-server, verified against the pinned release's
+	// --help; nil or 0 leaves the server default).
+	// CtxCheckpoints is how many context checkpoints a slot keeps
+	// (--ctx-checkpoints, default 32). A model with recurrent layers, such
+	// as Qwen3.6's, can only reuse a cached prefix up to a checkpoint.
+	CtxCheckpoints int `yaml:"ctx_checkpoints,omitempty"`
+	// CheckpointMinStep is the least spacing of checkpoints in tokens
+	// (--checkpoint-min-step, default 8192; 0 = no minimum).
+	CheckpointMinStep *int `yaml:"checkpoint_min_step,omitempty"`
+	// CacheRAMMiB caps the host-memory prompt cache that keeps other
+	// conversations' states (--cache-ram, default 8192; 0 disables, -1 no
+	// limit).
+	CacheRAMMiB *int `yaml:"cache_ram_mib,omitempty"`
+	// ReasoningPreserve keeps the reasoning of every earlier turn in the
+	// prompt where the chat template supports it (--reasoning-preserve,
+	// the server default; false = --no-reasoning-preserve, only the
+	// current turn's).
+	ReasoningPreserve *bool `yaml:"reasoning_preserve,omitempty"`
+	// OpOffloadMinBatch is the smallest batch whose host-resident weight
+	// operations (the experts kept in system RAM) are run on the GPU
+	// (GGML_OP_OFFLOAD_MIN_BATCH of the CUDA backend; 0 = its default).
+	OpOffloadMinBatch int `yaml:"op_offload_min_batch,omitempty"`
 	// ExtraArgs are appended verbatim; prefer typed fields.
 	ExtraArgs []string `yaml:"extra_args"`
 }

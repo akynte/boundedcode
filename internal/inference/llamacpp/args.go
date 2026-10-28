@@ -58,6 +58,20 @@ func BuildArgs(p model.Profile, modelPath, host string, port int) []string {
 	if s.Reasoning != "" {
 		args = append(args, "--reasoning", s.Reasoning)
 	}
+	addInt("--ctx-checkpoints", s.CtxCheckpoints)
+	if s.CheckpointMinStep != nil {
+		args = append(args, "--checkpoint-min-step", strconv.Itoa(*s.CheckpointMinStep))
+	}
+	if s.CacheRAMMiB != nil {
+		args = append(args, "--cache-ram", strconv.Itoa(*s.CacheRAMMiB))
+	}
+	if s.ReasoningPreserve != nil {
+		if *s.ReasoningPreserve {
+			args = append(args, "--reasoning-preserve")
+		} else {
+			args = append(args, "--no-reasoning-preserve")
+		}
+	}
 	if s.ReasoningBudget != 0 {
 		args = append(args, "--reasoning-budget", strconv.Itoa(s.ReasoningBudget))
 		if s.ReasoningBudgetMessage != "" {
@@ -86,6 +100,16 @@ func BuildArgs(p model.Profile, modelPath, host string, port int) []string {
 		args = append(args, "--repeat-penalty", ftoa(smp.RepeatPenalty))
 	}
 	return append(args, s.ExtraArgs...)
+}
+
+// ServerEnv is the environment a profile sets for llama-server beyond the
+// library path: backend settings that have no flag.
+func ServerEnv(p model.Profile) []string {
+	var env []string
+	if n := p.Server.OpOffloadMinBatch; n > 0 {
+		env = append(env, "GGML_OP_OFFLOAD_MIN_BATCH="+strconv.Itoa(n))
+	}
+	return env
 }
 
 // WithIdleSleep appends --sleep-idle-seconds when d is at least one second.

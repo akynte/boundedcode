@@ -128,7 +128,11 @@ func (a *App) buildRunnerWith(ctx context.Context, f runFlags, db *sql.DB, paths
 			// sandbox only sees the stdio tunnel (ADR-0010).
 			gw.Model, gw.Upstream = cloud.model, cloud.upstream(paths.TaskDir(taskID))
 		} else {
+			// The agent runtime's history drops the model's reasoning; the
+			// gateway keeps it per task, on disk so a resumed run has it.
 			gw.Client = inference.NewClient(ep.BaseURL, timeout)
+			gw.Upstream = inference.LocalUpstream(gw.Client, a.Config.Inference.ReasoningHistory,
+				&inference.FileReplay{Path: filepath.Join(paths.TaskDir(taskID), "local-replay.jsonl")})
 		}
 		return gw
 	}
