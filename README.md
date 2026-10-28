@@ -75,6 +75,17 @@ every edit, and, in a git repository, a note naming the files its history
 usually changes with the edited one. A suite of everyday tasks measures
 the result ([direct-mode results](#direct-mode)).
 
+BoundedCode works on code in any language. Reading, editing, searching,
+the shell and git are language-blind. Described languages add symbol
+search, outlines, a check after each edit and project detection. The
+ecosystems with a project in the language-support fixture are Go,
+JavaScript/TypeScript, Python, Rust, Java, Kotlin, C, C++, C#, PHP, Ruby,
+Swift, Dart, shell, SQL and infrastructure formats. For most of them the
+detected commands built and tested the fixture with native tools.
+C#, Swift, Dart and Terraform were detected but not run, because no
+toolchain was available. `bcode capabilities` shows what is found and
+installed in a repository; see [Languages](docs/usage/languages.md).
+
 **Bounded mode** (verify; also `/task` or `bcode task create`) is for
 changes that must be trusted. It does not implement a new agent loop. It wraps an existing
 one (the [OpenHands Software Agent SDK](https://github.com/OpenHands/software-agent-sdk))
@@ -515,6 +526,10 @@ See [ADR-0009](docs/architecture/adr/0009-frontier-escalation.md).
     - Its tasks in languages other than Go are one change and one question
       each, on small fixtures. Rust and Java changes were not run in direct
       mode, because this machine has no cargo or JDK.
+    - The language-support fixture's projects were built and tested with
+      their native tools (in the sandbox image), not changed by an agent.
+      C#, Swift, Dart and Terraform were not run at all, because no
+      toolchain was available.
     - The routing between chat, code and verify is not measured on real
       requests.
     - Streaming from Anthropic and Gemini is tested against recorded event

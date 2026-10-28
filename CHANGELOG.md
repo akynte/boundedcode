@@ -197,6 +197,48 @@ used on real work.
   verification counts) extends `ecosystem.IsTest` (what history notes
   count).
 
+### Languages: a capability architecture for any language
+
+- One registry of language descriptors (`internal/lang`), about 50
+  languages and formats. Each descriptor holds:
+  - recognition: extensions, file names, `#!` interpreters;
+  - definition patterns and test-file patterns;
+  - the per-file check after an edit;
+  - formatters, linters and language servers;
+  - diagnostic formats.
+
+  Project detection is a table of build systems (`internal/ecosystem`):
+  about 25 kinds, each with its languages, tools and package registries.
+  The agent loop has no language-specific code. A language, or a build
+  system, is added with one descriptor, or from the user's configuration
+  (`languages:`, `build_systems:`).
+- `find_symbol` and `find_references` work in every language. Serena is
+  used where it serves the language; elsewhere, a text navigator uses
+  definition patterns and skips secret files.
+- Post-edit checks come from the registry, with host tools only, in the
+  sandbox. A language with no per-file check, or whose tool is missing, is
+  named once per session instead of passing silently. JSON with comments
+  (tsconfig) is no longer flagged as invalid JSON. Every YAML document is
+  checked, and XML is checked too.
+- `bcode capabilities [dir]` reports, per language and per project
+  (nested ones too), what is available, what tool is missing and what is
+  unsupported.
+- Bounded-mode verification:
+  - a stage that did not pass has a cause: `code`, `missing tool`,
+    `timeout` or `environment`;
+  - a required stage whose tool is missing is an error, no longer
+    "failing code";
+  - a task whose verification failed only for those reasons is blocked as
+    incomplete, not retried;
+  - a polyglot root that runs its own tests also verifies nested projects
+    in other ecosystems, and nested Go modules;
+  - without a container, a stage's whole process tree ends on timeout.
+- Validated on a 15-project polyglot fixture. The detected commands built
+  and tested Go, JavaScript, Python, Rust, Java (Maven), Kotlin (Gradle),
+  C (CMake), C++ (Make), PHP (Composer) and Ruby (Bundler) with their
+  native tools in the sandbox image. C#, Swift, Dart and Terraform were
+  detected, and reported as missing tools; they were not run.
+
 ### Direct-mode command sandbox
 
 - Commands direct mode runs now run in an operating-system sandbox

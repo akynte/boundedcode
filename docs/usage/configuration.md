@@ -251,6 +251,20 @@ When a budget runs out, the task is parked as blocked. Work is never thrown away
 
 Run `boundedcode init` and read the generated file for the full keyword lists.
 
+### `languages` and `build_systems`
+
+Languages and build systems beyond the built-in ones: see
+[Languages](languages.md#adding-a-language). Only this file can set them.
+
+| Key | Meaning |
+|---|---|
+| `languages[].id`, `name` | Identifier and display name. |
+| `languages[].extensions`, `filenames`, `shebangs` | How its files are recognised (at least one). |
+| `languages[].definitions`, `tests` | Regular expressions: definition lines (a group named `name` is the symbol) and test file paths. |
+| `languages[].check` | `{what, tools, args, root}`: the check after each edit; `{file}`, `{dir}`, `{pkg}`, `{root}` are substituted. |
+| `languages[].format`, `lint`, `lsp` | Executables. |
+| `build_systems[].id`, `kind`, `markers`, `languages`, `tool`, `build`, `test` | Projects are directories with a marker (a file name or `*.ext`). |
+
 ## Workspace overrides
 
 A workspace can change task policy without touching the user config. Put the

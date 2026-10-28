@@ -8,6 +8,7 @@
 | [Terminal interface](usage/tui.md) | `bcode` chat (direct and bounded modes), first-run setup, views and keys |
 | [Verification](usage/verification.md) | Result states, behavioural evidence, cross-repository compatibility, known limits |
 | [Configuration](usage/configuration.md) | `config.yaml`, model providers, budgets, sandbox, repository verification presets |
+| [Languages](usage/languages.md) | What works for any language, the capability model, statuses, the validation matrix, adding a language |
 | [Direct-mode command sandbox](usage/direct-sandbox.md) | What commands can reach on each platform, the network proxy, the fallback when containment is weaker, mechanisms evaluated, residual risks |
 | [Direct-mode security policy](usage/security-policy.md) | Trust boundaries, sensitive operations and how they are authorized, the verification fallback, MCP trust and pinning, residual risks |
 | [Serena](usage/serena.md) | Optional LSP-backed symbol navigation |

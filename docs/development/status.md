@@ -62,6 +62,18 @@ Overhead:
 - `fix-balance-query`, a pitfall task, failed both runs because of a wrong model fix. It also failed in the Phase 00 fix-check run, before any prompt or sandbox change: 5 of 10 recorded runs pass.
 
 **macOS and Windows have no OS sandbox** (reported as "none"). The Windows job-object code is compiled, not run. Not used on real work. |
+| Languages: capability architecture (`internal/lang` registry of 50 languages and formats, `internal/ecosystem` table of 26 build systems), generic text navigator, registry-driven post-edit checks, `bcode capabilities`, verification causes | experimental | [Languages](../usage/languages.md). The polyglot fixture (15 projects) is detected exactly. The detected commands build and test Go, JavaScript, Python, Rust, Java (Maven), Kotlin (Gradle), C (CMake), C++ (Make), PHP (Composer) and Ruby (Bundler) with native tools in the sandbox image (`TestNativeToolchainsInSandboxImage`; Maven and Gradle with the network for plugins).
+
+**C#, Swift, Dart and Terraform were detected but never built or run**: no toolchain was available, and they are reported as missing tools. TypeScript type checking was not run (it needs `node_modules`).
+
+Direct-mode suite, two runs against the baseline (`benchmarks/reports/20261028-direct-languages-r{1,2}`):
+- 23/23 and 22/23 tasks passed;
+- time, calls and processed tokens are within noise;
+- prompt tokens are 1.12× (outside the noise band: the Phase 01 trust rules and the two symbol tools now always offered, all in the cached prefix);
+- `find_symbol` was used by the model on the large-repository task;
+- the one failure (`session-ledger`, an answer-wording check) also occurred in the baseline's repeat run.
+
+Not used on real work in languages other than Go. |
 | Daemon, GUI | planned | |
 | Release packaging, SBOM | implemented | `make dist` (binaries and SBOMs for linux, darwin and windows on amd64 and arm64, reproducible licenses archive, checksums), `scripts/sbom`; published as v0.1.0-alpha.1 (source), v0.1.0-alpha.2 (linux/amd64 binary) v0.1.0-alpha.3 (six binaries with SBOMs), v0.1.0-alpha.4 (the same, adding the cross-repository gate), v0.1.0-alpha.5 (built and attested by the `release` workflow from the tag; SBOMs reproducible) and v0.1.0-alpha.6 (licenses archive reproducible regardless of umask). The workflow only drafts a release; publishing needs maintainer approval. |
 | Local escalation tier (switch to a stronger local model before frontier) | planned | motivated by the 4/4 vs 1/4 result in ADR-0007 |
