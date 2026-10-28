@@ -1,0 +1,168 @@
+{
+  "id": "suite-20261028T201228Z",
+  "model": "qwen3.6-35b-a3b",
+  "started": "2026-10-28T20:12:28.668557356Z",
+  "finished": "2026-10-28T20:19:27.112603207Z",
+  "results": [
+    {
+      "id": "go-debug-ledger-balance-query",
+      "category": "debugging",
+      "model": "qwen3.6-35b-a3b",
+      "success": false,
+      "task_status": "completed",
+      "self_verified": true,
+      "tests_green": true,
+      "attempts": 2,
+      "local_tokens": 27645,
+      "generated_tokens": 11944,
+      "cached_prompt_tokens": 142381,
+      "escalations": 0,
+      "local_only": false,
+      "condensations": 0,
+      "resumes": 0,
+      "wall_seconds": 418.324966119,
+      "failed_checks": [
+        "ledger-service: sh .bench/check_tests_unchanged.sh: …rnal/ledger/ledger_test.go b/internal/ledger/ledger_test.go\nindex f9d467f..4d34973 100644\n--- a/internal/ledger/ledger_test.go\n+++ b/internal/ledger/ledger_test.go\n@@ -11,3 +11,13 @@ func TestBalance(t *testing.T) {\n \t\tt.Fatalf(\"balance(a) = %d, want 100\", got)\n \t}\n }\n+\n+func TestBalanceOtherAccount(t *testing.T) {\n+\tl := \u0026Ledger{}\n+\tif err := l.Post(Entry{AccountID: \"a\", AmountCents: 100, Currency: \"EUR\"}, Entry{AccountID: \"b\", AmountCents: -100, Currency: \"EUR\"}); err != nil {\n+\t\tt.Fatal(err)\n+\t}\n+\tif got := l.Balance(\"b\"); got != -100 {\n+\t\tt.Fatalf(\"balance(b) = %d, want -100\", got)\n+\t}\n+}\n"
+      ],
+      "task_id": "t20261028-73829c",
+      "state_dir": "~/.cache/boundedcode/bench-work/go-debug-ledger-balance-query-1793218348782188547/state",
+      "agent_patch": "~/.cache/boundedcode/bench-work/go-debug-ledger-balance-query-1793218348782188547/agent-ledger-service.patch",
+      "intel": {
+        "context_packs": 2,
+        "pack_tokens": 2104,
+        "code_tokens": 543,
+        "serena_calls": 0,
+        "serena_errors": 0,
+        "serena_ms": 0,
+        "graph_calls": 4,
+        "graph_ms": 46.443,
+        "serena_symbols": 0,
+        "graph_symbols": 2,
+        "fallbacks": 0,
+        "agent_tool_calls": 13,
+        "agent_tools": {
+          "file_editor": 6,
+          "finish": 2,
+          "terminal": 5
+        }
+      },
+      "language": "go",
+      "calls": {
+        "calls": 14,
+        "inference_seconds": 374.30166944999996,
+        "prefill_seconds": 36.643685,
+        "decode_seconds": 336.18632699999995,
+        "reasoning_tokens": 0,
+        "cache_invalidations": 1,
+        "cache_invalidations_after_rewrite": 1,
+        "recomputed_prompt_tokens": 424,
+        "prompt_tokens": 158506,
+        "peak_call": 13
+      },
+      "verify_seconds": 11.59,
+      "verify_runs": [
+        {
+          "repo": "ledger-service",
+          "scope": "targeted",
+          "passed": true,
+          "seconds": 5.862
+        },
+        {
+          "repo": "ledger-service",
+          "scope": "full",
+          "passed": true,
+          "seconds": 1.901
+        },
+        {
+          "repo": "ledger-service",
+          "scope": "targeted",
+          "passed": true,
+          "seconds": 1.945
+        },
+        {
+          "repo": "ledger-service",
+          "scope": "full",
+          "passed": true,
+          "seconds": 1.882
+        }
+      ],
+      "failure_class": "verification_false_pass",
+      "resources": {
+        "harness_rss_mib": 34.6640625,
+        "model_server_rss_mib": 29415.5390625,
+        "gpu_mem_used_mib": 7141,
+        "sandbox_mem_mib": 388.8,
+        "samples": 415
+      }
+    }
+  ],
+  "summary": {
+    "tasks": 1,
+    "verified": 0,
+    "success_rate": 0,
+    "local_only_completion_rate": 0,
+    "frontier_escalation_rate": 0,
+    "verified_tasks_per_hour": 0,
+    "attempts_per_successful_task": 0,
+    "wall_seconds_per_task": 418.324966119,
+    "local_tokens_per_task": 27645,
+    "self_verified_but_hidden_failed": 1
+  },
+  "environment": {
+    "build": "dev f95dd3463ef6-dirty",
+    "os": "linux/amd64",
+    "cpu": "13th Gen Intel(R) Core(TM) i7-13620H",
+    "cpus": 16,
+    "mem_mib": 62741,
+    "gpu": "NVIDIA GeForce RTX 4060 Laptop GPU, 8188 MiB, 595.99.02",
+    "model": {
+      "file": "Qwen3.6-35B-A3B-UD-Q4_K_M.gguf",
+      "profile": "qwen3.6-35b-a3b",
+      "provider": "local",
+      "repo": "unsloth/Qwen3.6-35B-A3B-GGUF",
+      "revision": "a483e9e6cbd595906af30beda3187c2663a1118c",
+      "sampling": {
+        "min_p": 0,
+        "presence_penalty": 0,
+        "repeat_penalty": 0,
+        "temperature": 0.6,
+        "top_k": 20,
+        "top_p": 0.95
+      },
+      "server": {
+        "batch_size": 2048,
+        "cache_reuse": 0,
+        "cache_type_k": "q8_0",
+        "cache_type_v": "q8_0",
+        "ctx_size": 131072,
+        "extra_args": [],
+        "flash_attn": "on",
+        "gpu_layers": 999,
+        "jinja": true,
+        "mlock": false,
+        "n_cpu_moe": 35,
+        "no_mmap": false,
+        "parallel": 1,
+        "reasoning": "",
+        "reasoning_budget": 0,
+        "reasoning_budget_message": "",
+        "threads": 8,
+        "ubatch_size": 2048
+      },
+      "sha256": "ac0e2c1189e055faa36eff361580e79c5bd6f8e76bffb4ce547f167d53e31a61",
+      "size_bytes": 22134528992
+    },
+    "server": "llama.cpp 0.5.0-dev (build 11146, commit 7fe450e19)",
+    "toolchains": {
+      "docker": "Docker version 29.9.1, build dfc520d",
+      "git": "git version 2.53.0",
+      "go": "go version go1.27.3 linux/amd64",
+      "node": "v24.22.0",
+      "python3": "Python 3.14.4"
+    },
+    "tasks_sha256": "99dd33b0a5b0a9a9",
+    "fixtures_sha256": {
+      "payment-platform": "c151d9d9d3c4dcd4"
+    }
+  }
+}

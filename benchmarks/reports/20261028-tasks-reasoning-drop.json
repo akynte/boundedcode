@@ -1,0 +1,1841 @@
+{
+  "id": "suite-20261028T170432Z",
+  "model": "qwen3.6-35b-a3b",
+  "started": "2026-10-28T17:04:32.051059012Z",
+  "finished": "2026-10-28T18:46:02.910920263Z",
+  "results": [
+    {
+      "id": "api-contract-description",
+      "category": "api-contract",
+      "model": "qwen3.6-35b-a3b",
+      "success": true,
+      "task_status": "completed",
+      "self_verified": false,
+      "tests_green": true,
+      "attempts": 2,
+      "local_tokens": 46531,
+      "generated_tokens": 11667,
+      "cached_prompt_tokens": 581609,
+      "escalations": 0,
+      "local_only": true,
+      "condensations": 0,
+      "resumes": 0,
+      "wall_seconds": 496.322348312,
+      "task_id": "t20261028-a6d557",
+      "state_dir": "~/.cache/boundedcode/bench-work/api-contract-description-1793207072153068519/state",
+      "agent_patch": "~/.cache/boundedcode/bench-work/api-contract-description-1793207072153068519/agent-payment-service.patch",
+      "intel": {
+        "context_packs": 2,
+        "pack_tokens": 4786,
+        "code_tokens": 652,
+        "serena_calls": 0,
+        "serena_errors": 0,
+        "serena_ms": 0,
+        "graph_calls": 8,
+        "graph_ms": 84.065,
+        "serena_symbols": 0,
+        "graph_symbols": 3,
+        "fallbacks": 0,
+        "agent_tool_calls": 38,
+        "agent_tools": {
+          "file_editor": 24,
+          "finish": 2,
+          "task_tracker": 7,
+          "terminal": 3,
+          "think": 2
+        }
+      },
+      "language": "go",
+      "calls": {
+        "calls": 34,
+        "inference_seconds": 425.57025896100004,
+        "prefill_seconds": 84.59487899999998,
+        "decode_seconds": 339.23407100000003,
+        "reasoning_tokens": 0,
+        "cache_invalidations": 2,
+        "cache_invalidations_after_rewrite": 1,
+        "recomputed_prompt_tokens": 640,
+        "prompt_tokens": 617272,
+        "peak_call": 33
+      },
+      "verify_seconds": 19.586,
+      "verify_runs": [
+        {
+          "repo": "payment-service",
+          "scope": "targeted",
+          "passed": true,
+          "seconds": 10.526
+        },
+        {
+          "repo": "shared-protos",
+          "scope": "targeted",
+          "passed": true,
+          "seconds": 0.299
+        },
+        {
+          "repo": "payment-service",
+          "scope": "full",
+          "passed": true,
+          "seconds": 2.597
+        },
+        {
+          "repo": "shared-protos",
+          "scope": "full",
+          "passed": true,
+          "seconds": 0.302
+        },
+        {
+          "repo": "payment-service",
+          "scope": "targeted",
+          "passed": true,
+          "seconds": 2.647
+        },
+        {
+          "repo": "shared-protos",
+          "scope": "targeted",
+          "passed": true,
+          "seconds": 0.301
+        },
+        {
+          "repo": "payment-service",
+          "scope": "full",
+          "passed": true,
+          "seconds": 2.62
+        },
+        {
+          "repo": "shared-protos",
+          "scope": "full",
+          "passed": true,
+          "seconds": 0.294
+        }
+      ],
+      "verification_missed": true,
+      "resources": {
+        "harness_rss_mib": 35.49609375,
+        "model_server_rss_mib": 28727.2109375,
+        "gpu_mem_used_mib": 7133,
+        "sandbox_mem_mib": 585.9,
+        "samples": 490
+      }
+    },
+    {
+      "id": "cross-service-idempotency",
+      "category": "cross-service",
+      "model": "qwen3.6-35b-a3b",
+      "success": true,
+      "task_status": "completed",
+      "self_verified": true,
+      "tests_green": true,
+      "attempts": 3,
+      "local_tokens": 177800,
+      "generated_tokens": 28320,
+      "cached_prompt_tokens": 1395686,
+      "escalations": 0,
+      "local_only": true,
+      "condensations": 2,
+      "resumes": 0,
+      "wall_seconds": 1237.232945562,
+      "task_id": "t20261028-e42c20",
+      "state_dir": "~/.cache/boundedcode/bench-work/cross-service-idempotency-1793207568480110127/state",
+      "agent_patch": "~/.cache/boundedcode/bench-work/cross-service-idempotency-1793207568480110127/agent-ledger-service.patch",
+      "intel": {
+        "context_packs": 3,
+        "pack_tokens": 15190,
+        "code_tokens": 1814,
+        "serena_calls": 0,
+        "serena_errors": 0,
+        "serena_ms": 0,
+        "graph_calls": 12,
+        "graph_ms": 133.79,
+        "serena_symbols": 0,
+        "graph_symbols": 6,
+        "fallbacks": 0,
+        "agent_tool_calls": 73,
+        "agent_tools": {
+          "file_editor": 37,
+          "finish": 2,
+          "terminal": 32,
+          "think": 2
+        }
+      },
+      "language": "go",
+      "calls": {
+        "calls": 50,
+        "inference_seconds": 1123.0611022870003,
+        "prefill_seconds": 257.52333200000004,
+        "decode_seconds": 859.3173349999996,
+        "reasoning_tokens": 0,
+        "cache_invalidations": 5,
+        "cache_invalidations_after_rewrite": 5,
+        "recomputed_prompt_tokens": 22946,
+        "prompt_tokens": 1545672,
+        "peak_call": 42
+      },
+      "verify_seconds": 31.961000000000006,
+      "verify_runs": [
+        {
+          "repo": "ledger-service",
+          "scope": "targeted",
+          "passed": true,
+          "seconds": 6.245
+        },
+        {
+          "repo": "payment-service",
+          "scope": "targeted",
+          "passed": false,
+          "seconds": 6.969
+        },
+        {
+          "repo": "ledger-service",
+          "scope": "targeted",
+          "passed": true,
+          "seconds": 2.008
+        },
+        {
+          "repo": "payment-service",
+          "scope": "targeted",
+          "passed": true,
+          "seconds": 2.88
+        },
+        {
+          "repo": "ledger-service",
+          "scope": "full",
+          "passed": true,
+          "seconds": 1.943
+        },
+        {
+          "repo": "payment-service",
+          "scope": "full",
+          "passed": true,
+          "seconds": 2.611
+        },
+        {
+          "repo": "ledger-service",
+          "scope": "targeted",
+          "passed": true,
+          "seconds": 2.041
+        },
+        {
+          "repo": "payment-service",
+          "scope": "targeted",
+          "passed": true,
+          "seconds": 2.686
+        },
+        {
+          "repo": "ledger-service",
+          "scope": "full",
+          "passed": true,
+          "seconds": 1.949
+        },
+        {
+          "repo": "payment-service",
+          "scope": "full",
+          "passed": true,
+          "seconds": 2.629
+        }
+      ],
+      "resources": {
+        "harness_rss_mib": 37.375,
+        "model_server_rss_mib": 29685.1328125,
+        "gpu_mem_used_mib": 7141,
+        "sandbox_mem_mib": 621.6,
+        "samples": 1223
+      }
+    },
+    {
+      "id": "docker-hardening",
+      "category": "docker",
+      "model": "qwen3.6-35b-a3b",
+      "success": true,
+      "task_status": "completed",
+      "self_verified": false,
+      "tests_green": true,
+      "attempts": 2,
+      "local_tokens": 24779,
+      "generated_tokens": 5502,
+      "cached_prompt_tokens": 312099,
+      "escalations": 0,
+      "local_only": true,
+      "condensations": 0,
+      "resumes": 0,
+      "wall_seconds": 250.283517097,
+      "task_id": "t20261028-4fc5e5",
+      "state_dir": "~/.cache/boundedcode/bench-work/docker-hardening-1793208805718020139/state",
+      "agent_patch": "~/.cache/boundedcode/bench-work/docker-hardening-1793208805718020139/agent-payment-service.patch",
+      "intel": {
+        "context_packs": 2,
+        "pack_tokens": 2092,
+        "code_tokens": 0,
+        "serena_calls": 0,
+        "serena_errors": 0,
+        "serena_ms": 0,
+        "graph_calls": 0,
+        "graph_ms": 0,
+        "serena_symbols": 0,
+        "graph_symbols": 0,
+        "fallbacks": 0,
+        "agent_tool_calls": 27,
+        "agent_tools": {
+          "file_editor": 8,
+          "finish": 2,
+          "task_tracker": 3,
+          "terminal": 12,
+          "think": 2
+        }
+      },
+      "language": "dockerfile",
+      "calls": {
+        "calls": 24,
+        "inference_seconds": 211.29659159200006,
+        "prefill_seconds": 52.10133100000001,
+        "decode_seconds": 157.74760500000002,
+        "reasoning_tokens": 0,
+        "cache_invalidations": 1,
+        "cache_invalidations_after_rewrite": 1,
+        "recomputed_prompt_tokens": 453,
+        "prompt_tokens": 331829,
+        "peak_call": 23
+      },
+      "verify_seconds": 16.78,
+      "verify_runs": [
+        {
+          "repo": "payment-service",
+          "scope": "targeted",
+          "passed": true,
+          "seconds": 9.441
+        },
+        {
+          "repo": "payment-service",
+          "scope": "full",
+          "passed": true,
+          "seconds": 2.539
+        },
+        {
+          "repo": "payment-service",
+          "scope": "targeted",
+          "passed": true,
+          "seconds": 2.32
+        },
+        {
+          "repo": "payment-service",
+          "scope": "full",
+          "passed": true,
+          "seconds": 2.48
+        }
+      ],
+      "verification_missed": true,
+      "resources": {
+        "harness_rss_mib": 36.390625,
+        "model_server_rss_mib": 28248.734375,
+        "gpu_mem_used_mib": 7141,
+        "sandbox_mem_mib": 484.29999999999995,
+        "samples": 251
+      }
+    },
+    {
+      "id": "event-field-rename",
+      "category": "cross-service-discovery",
+      "model": "qwen3.6-35b-a3b",
+      "success": true,
+      "task_status": "completed",
+      "self_verified": true,
+      "tests_green": true,
+      "attempts": 3,
+      "local_tokens": 30313,
+      "generated_tokens": 6154,
+      "cached_prompt_tokens": 442360,
+      "escalations": 0,
+      "local_only": true,
+      "condensations": 0,
+      "resumes": 0,
+      "wall_seconds": 323.80652098,
+      "task_id": "t20261028-064d17",
+      "state_dir": "~/.cache/boundedcode/bench-work/event-field-rename-1793209056006116439/state",
+      "agent_patch": "~/.cache/boundedcode/bench-work/event-field-rename-1793209056006116439/agent-ledger-service.patch",
+      "intel": {
+        "context_packs": 3,
+        "pack_tokens": 4812,
+        "code_tokens": 691,
+        "serena_calls": 0,
+        "serena_errors": 0,
+        "serena_ms": 0,
+        "graph_calls": 6,
+        "graph_ms": 66.757,
+        "serena_symbols": 0,
+        "graph_symbols": 3,
+        "fallbacks": 0,
+        "agent_tool_calls": 29,
+        "agent_tools": {
+          "file_editor": 12,
+          "finish": 3,
+          "task_tracker": 4,
+          "terminal": 9,
+          "think": 1
+        }
+      },
+      "language": "go",
+      "calls": {
+        "calls": 30,
+        "inference_seconds": 242.96711896599996,
+        "prefill_seconds": 68.384395,
+        "decode_seconds": 172.51765799999998,
+        "reasoning_tokens": 0,
+        "cache_invalidations": 1,
+        "cache_invalidations_after_rewrite": 1,
+        "recomputed_prompt_tokens": 434,
+        "prompt_tokens": 466953,
+        "peak_call": 29
+      },
+      "verify_seconds": 32.478,
+      "verify_runs": [
+        {
+          "repo": "payment-service",
+          "scope": "targeted",
+          "passed": true,
+          "seconds": 9.885
+        },
+        {
+          "repo": "ledger-service",
+          "scope": "full",
+          "passed": true,
+          "seconds": 1.946
+        },
+        {
+          "repo": "payment-service",
+          "scope": "full",
+          "passed": true,
+          "seconds": 2.558
+        },
+        {
+          "repo": "ledger-service",
+          "scope": "targeted",
+          "passed": true,
+          "seconds": 2.003
+        },
+        {
+          "repo": "payment-service",
+          "scope": "targeted",
+          "passed": true,
+          "seconds": 2.588
+        },
+        {
+          "repo": "ledger-service",
+          "scope": "full",
+          "passed": true,
+          "seconds": 1.922
+        },
+        {
+          "repo": "payment-service",
+          "scope": "full",
+          "passed": true,
+          "seconds": 2.557
+        },
+        {
+          "repo": "ledger-service",
+          "scope": "targeted",
+          "passed": true,
+          "seconds": 1.926
+        },
+        {
+          "repo": "payment-service",
+          "scope": "targeted",
+          "passed": true,
+          "seconds": 2.59
+        },
+        {
+          "repo": "ledger-service",
+          "scope": "full",
+          "passed": true,
+          "seconds": 1.861
+        },
+        {
+          "repo": "payment-service",
+          "scope": "full",
+          "passed": true,
+          "seconds": 2.642
+        }
+      ],
+      "resources": {
+        "harness_rss_mib": 36.76171875,
+        "model_server_rss_mib": 27698.80859375,
+        "gpu_mem_used_mib": 7141,
+        "sandbox_mem_mib": 501.4,
+        "samples": 315
+      }
+    },
+    {
+      "id": "go-bugfix-ledger-balance",
+      "category": "go-bugfix",
+      "model": "qwen3.6-35b-a3b",
+      "success": true,
+      "task_status": "completed",
+      "self_verified": false,
+      "tests_green": true,
+      "attempts": 2,
+      "local_tokens": 20078,
+      "generated_tokens": 3714,
+      "cached_prompt_tokens": 170457,
+      "escalations": 0,
+      "local_only": true,
+      "condensations": 0,
+      "resumes": 0,
+      "wall_seconds": 185.205545368,
+      "task_id": "t20261028-3ced51",
+      "state_dir": "~/.cache/boundedcode/bench-work/go-bugfix-ledger-balance-1793209379818163288/state",
+      "agent_patch": "~/.cache/boundedcode/bench-work/go-bugfix-ledger-balance-1793209379818163288/agent-ledger-service.patch",
+      "intel": {
+        "context_packs": 2,
+        "pack_tokens": 2435,
+        "code_tokens": 731,
+        "serena_calls": 0,
+        "serena_errors": 0,
+        "serena_ms": 0,
+        "graph_calls": 4,
+        "graph_ms": 42.824,
+        "serena_symbols": 0,
+        "graph_symbols": 2,
+        "fallbacks": 0,
+        "agent_tool_calls": 16,
+        "agent_tools": {
+          "file_editor": 8,
+          "finish": 2,
+          "terminal": 6
+        }
+      },
+      "language": "go",
+      "calls": {
+        "calls": 16,
+        "inference_seconds": 145.278363865,
+        "prefill_seconds": 41.462505,
+        "decode_seconds": 102.49378599999997,
+        "reasoning_tokens": 0,
+        "cache_invalidations": 1,
+        "cache_invalidations_after_rewrite": 1,
+        "recomputed_prompt_tokens": 439,
+        "prompt_tokens": 187260,
+        "peak_call": 15
+      },
+      "verify_seconds": 11.466999999999999,
+      "verify_runs": [
+        {
+          "repo": "ledger-service",
+          "scope": "targeted",
+          "passed": true,
+          "seconds": 5.717
+        },
+        {
+          "repo": "ledger-service",
+          "scope": "full",
+          "passed": true,
+          "seconds": 1.875
+        },
+        {
+          "repo": "ledger-service",
+          "scope": "targeted",
+          "passed": true,
+          "seconds": 1.957
+        },
+        {
+          "repo": "ledger-service",
+          "scope": "full",
+          "passed": true,
+          "seconds": 1.918
+        }
+      ],
+      "verification_missed": true,
+      "resources": {
+        "harness_rss_mib": 36.7421875,
+        "model_server_rss_mib": 28913.66796875,
+        "gpu_mem_used_mib": 7141,
+        "sandbox_mem_mib": 342.5,
+        "samples": 182
+      }
+    },
+    {
+      "id": "go-debug-ledger-balance-query",
+      "category": "debugging",
+      "model": "qwen3.6-35b-a3b",
+      "success": true,
+      "task_status": "completed",
+      "self_verified": false,
+      "tests_green": true,
+      "attempts": 2,
+      "local_tokens": 22625,
+      "generated_tokens": 4487,
+      "cached_prompt_tokens": 226503,
+      "escalations": 0,
+      "local_only": true,
+      "condensations": 0,
+      "resumes": 0,
+      "wall_seconds": 215.247906431,
+      "task_id": "t20261028-81f175",
+      "state_dir": "~/.cache/boundedcode/bench-work/go-debug-ledger-balance-query-1793209565028185644/state",
+      "agent_patch": "~/.cache/boundedcode/bench-work/go-debug-ledger-balance-query-1793209565028185644/agent-ledger-service.patch",
+      "intel": {
+        "context_packs": 2,
+        "pack_tokens": 2050,
+        "code_tokens": 543,
+        "serena_calls": 0,
+        "serena_errors": 0,
+        "serena_ms": 0,
+        "graph_calls": 4,
+        "graph_ms": 46.043,
+        "serena_symbols": 0,
+        "graph_symbols": 2,
+        "fallbacks": 0,
+        "agent_tool_calls": 19,
+        "agent_tools": {
+          "file_editor": 7,
+          "finish": 2,
+          "terminal": 10
+        }
+      },
+      "language": "go",
+      "calls": {
+        "calls": 19,
+        "inference_seconds": 172.29060457799997,
+        "prefill_seconds": 47.128157,
+        "decode_seconds": 123.86456300000002,
+        "reasoning_tokens": 0,
+        "cache_invalidations": 1,
+        "cache_invalidations_after_rewrite": 1,
+        "recomputed_prompt_tokens": 424,
+        "prompt_tokens": 245065,
+        "peak_call": 18
+      },
+      "verify_seconds": 11.321,
+      "verify_runs": [
+        {
+          "repo": "ledger-service",
+          "scope": "targeted",
+          "passed": true,
+          "seconds": 5.618
+        },
+        {
+          "repo": "ledger-service",
+          "scope": "full",
+          "passed": true,
+          "seconds": 1.879
+        },
+        {
+          "repo": "ledger-service",
+          "scope": "targeted",
+          "passed": true,
+          "seconds": 1.93
+        },
+        {
+          "repo": "ledger-service",
+          "scope": "full",
+          "passed": true,
+          "seconds": 1.894
+        }
+      ],
+      "verification_missed": true,
+      "resources": {
+        "harness_rss_mib": 36.7734375,
+        "model_server_rss_mib": 28913.66796875,
+        "gpu_mem_used_mib": 7141,
+        "sandbox_mem_mib": 539.6,
+        "samples": 212
+      }
+    },
+    {
+      "id": "go-feature-currency-validation",
+      "category": "go-feature",
+      "model": "qwen3.6-35b-a3b",
+      "success": true,
+      "task_status": "completed",
+      "self_verified": true,
+      "tests_green": true,
+      "attempts": 1,
+      "local_tokens": 21083,
+      "generated_tokens": 2857,
+      "cached_prompt_tokens": 110198,
+      "escalations": 0,
+      "local_only": true,
+      "condensations": 0,
+      "resumes": 0,
+      "wall_seconds": 163.229672406,
+      "task_id": "t20261028-c26e23",
+      "state_dir": "~/.cache/boundedcode/bench-work/go-feature-currency-validation-1793209780281700277/state",
+      "agent_patch": "~/.cache/boundedcode/bench-work/go-feature-currency-validation-1793209780281700277/agent-payment-service.patch",
+      "intel": {
+        "context_packs": 1,
+        "pack_tokens": 729,
+        "code_tokens": 0,
+        "serena_calls": 0,
+        "serena_errors": 0,
+        "serena_ms": 0,
+        "graph_calls": 0,
+        "graph_ms": 0,
+        "serena_symbols": 0,
+        "graph_symbols": 0,
+        "fallbacks": 0,
+        "agent_tool_calls": 14,
+        "agent_tools": {
+          "file_editor": 11,
+          "finish": 1,
+          "terminal": 1,
+          "think": 1
+        }
+      },
+      "language": "go",
+      "calls": {
+        "calls": 11,
+        "inference_seconds": 119.648376802,
+        "prefill_seconds": 35.30455499999999,
+        "decode_seconds": 83.34770700000001,
+        "reasoning_tokens": 0,
+        "cache_invalidations": 1,
+        "cache_invalidations_after_rewrite": 1,
+        "recomputed_prompt_tokens": 444,
+        "prompt_tokens": 128868,
+        "peak_call": 10
+      },
+      "verify_seconds": 12.059000000000001,
+      "verify_runs": [
+        {
+          "repo": "payment-service",
+          "scope": "targeted",
+          "passed": true,
+          "seconds": 9.547
+        },
+        {
+          "repo": "payment-service",
+          "scope": "full",
+          "passed": true,
+          "seconds": 2.512
+        }
+      ],
+      "resources": {
+        "harness_rss_mib": 36.8125,
+        "model_server_rss_mib": 27959.265625,
+        "gpu_mem_used_mib": 7141,
+        "sandbox_mem_mib": 548.6,
+        "samples": 158
+      }
+    },
+    {
+      "id": "go-iface-add-method",
+      "category": "interface-change",
+      "model": "qwen3.6-35b-a3b",
+      "success": true,
+      "task_status": "completed",
+      "self_verified": false,
+      "tests_green": true,
+      "attempts": 2,
+      "local_tokens": 31892,
+      "generated_tokens": 6232,
+      "cached_prompt_tokens": 279757,
+      "escalations": 0,
+      "local_only": true,
+      "condensations": 0,
+      "resumes": 0,
+      "wall_seconds": 288.524848746,
+      "task_id": "t20261028-c2de95",
+      "state_dir": "~/.cache/boundedcode/bench-work/go-iface-add-method-1793209943517001121/state",
+      "agent_patch": "~/.cache/boundedcode/bench-work/go-iface-add-method-1793209943517001121/agent-billing-service.patch",
+      "intel": {
+        "context_packs": 2,
+        "pack_tokens": 3254,
+        "code_tokens": 526,
+        "serena_calls": 0,
+        "serena_errors": 0,
+        "serena_ms": 0,
+        "graph_calls": 6,
+        "graph_ms": 62.57000000000001,
+        "serena_symbols": 0,
+        "graph_symbols": 2,
+        "fallbacks": 0,
+        "agent_tool_calls": 26,
+        "agent_tools": {
+          "file_editor": 20,
+          "finish": 2,
+          "terminal": 3,
+          "think": 1
+        }
+      },
+      "language": "go",
+      "calls": {
+        "calls": 20,
+        "inference_seconds": 234.323418197,
+        "prefill_seconds": 56.54643200000001,
+        "decode_seconds": 176.450169,
+        "reasoning_tokens": 0,
+        "cache_invalidations": 1,
+        "cache_invalidations_after_rewrite": 1,
+        "recomputed_prompt_tokens": 482,
+        "prompt_tokens": 305899,
+        "peak_call": 19
+      },
+      "verify_seconds": 15.721,
+      "verify_runs": [
+        {
+          "repo": "billing-service",
+          "scope": "targeted",
+          "passed": true,
+          "seconds": 9.203
+        },
+        {
+          "repo": "billing-service",
+          "scope": "full",
+          "passed": true,
+          "seconds": 2.132
+        },
+        {
+          "repo": "billing-service",
+          "scope": "targeted",
+          "passed": true,
+          "seconds": 2.217
+        },
+        {
+          "repo": "billing-service",
+          "scope": "full",
+          "passed": true,
+          "seconds": 2.169
+        }
+      ],
+      "verification_missed": true,
+      "resources": {
+        "harness_rss_mib": 37.7421875,
+        "model_server_rss_mib": 27721.46875,
+        "gpu_mem_used_mib": 7141,
+        "sandbox_mem_mib": 486.6,
+        "samples": 283
+      }
+    },
+    {
+      "id": "go-large-iface-method",
+      "category": "interface-change-large-repo",
+      "model": "qwen3.6-35b-a3b",
+      "success": true,
+      "task_status": "completed",
+      "self_verified": false,
+      "tests_green": true,
+      "attempts": 2,
+      "local_tokens": 85356,
+      "generated_tokens": 9374,
+      "cached_prompt_tokens": 1148513,
+      "escalations": 0,
+      "local_only": true,
+      "condensations": 1,
+      "resumes": 0,
+      "wall_seconds": 587.82316925,
+      "task_id": "t20261028-3ed3a4",
+      "state_dir": "~/.cache/boundedcode/bench-work/go-large-iface-method-1793210232046428813/state",
+      "agent_patch": "~/.cache/boundedcode/bench-work/go-large-iface-method-1793210232046428813/agent-temporal-sdk.patch",
+      "intel": {
+        "context_packs": 2,
+        "pack_tokens": 6916,
+        "code_tokens": 3183,
+        "serena_calls": 0,
+        "serena_errors": 0,
+        "serena_ms": 0,
+        "graph_calls": 20,
+        "graph_ms": 252.935,
+        "serena_symbols": 0,
+        "graph_symbols": 10,
+        "fallbacks": 0,
+        "agent_tool_calls": 40,
+        "agent_tools": {
+          "file_editor": 19,
+          "finish": 2,
+          "task_tracker": 4,
+          "terminal": 13,
+          "think": 2
+        }
+      },
+      "language": "go",
+      "calls": {
+        "calls": 36,
+        "inference_seconds": 423.43940568500005,
+        "prefill_seconds": 145.76394200000001,
+        "decode_seconds": 273.7822819999999,
+        "reasoning_tokens": 0,
+        "cache_invalidations": 3,
+        "cache_invalidations_after_rewrite": 3,
+        "recomputed_prompt_tokens": 9993,
+        "prompt_tokens": 1224998,
+        "peak_call": 33
+      },
+      "verify_seconds": 32.711,
+      "verify_runs": [
+        {
+          "repo": "temporal-sdk",
+          "scope": "targeted",
+          "passed": true,
+          "seconds": 22.508
+        },
+        {
+          "repo": "temporal-sdk",
+          "scope": "full",
+          "passed": true,
+          "seconds": 3.239
+        },
+        {
+          "repo": "temporal-sdk",
+          "scope": "targeted",
+          "passed": true,
+          "seconds": 3.884
+        },
+        {
+          "repo": "temporal-sdk",
+          "scope": "full",
+          "passed": true,
+          "seconds": 3.08
+        }
+      ],
+      "verification_missed": true,
+      "resources": {
+        "harness_rss_mib": 60.61328125,
+        "model_server_rss_mib": 28208.98828125,
+        "gpu_mem_used_mib": 7141,
+        "sandbox_mem_mib": 1062.912,
+        "samples": 559
+      }
+    },
+    {
+      "id": "go-refactor-validate",
+      "category": "refactoring",
+      "model": "qwen3.6-35b-a3b",
+      "success": true,
+      "task_status": "completed",
+      "self_verified": false,
+      "tests_green": true,
+      "attempts": 2,
+      "local_tokens": 27581,
+      "generated_tokens": 4726,
+      "cached_prompt_tokens": 265111,
+      "escalations": 0,
+      "local_only": true,
+      "condensations": 0,
+      "resumes": 0,
+      "wall_seconds": 249.617154042,
+      "task_id": "t20261028-13e284",
+      "state_dir": "~/.cache/boundedcode/bench-work/go-refactor-validate-1793210819875438420/state",
+      "agent_patch": "~/.cache/boundedcode/bench-work/go-refactor-validate-1793210819875438420/agent-payment-service.patch",
+      "intel": {
+        "context_packs": 2,
+        "pack_tokens": 3412,
+        "code_tokens": 986,
+        "serena_calls": 0,
+        "serena_errors": 0,
+        "serena_ms": 0,
+        "graph_calls": 4,
+        "graph_ms": 39.555,
+        "serena_symbols": 0,
+        "graph_symbols": 2,
+        "fallbacks": 0,
+        "agent_tool_calls": 22,
+        "agent_tools": {
+          "file_editor": 11,
+          "finish": 2,
+          "terminal": 7,
+          "think": 2
+        }
+      },
+      "language": "go",
+      "calls": {
+        "calls": 21,
+        "inference_seconds": 188.73699824299996,
+        "prefill_seconds": 53.911768,
+        "decode_seconds": 133.819677,
+        "reasoning_tokens": 0,
+        "cache_invalidations": 1,
+        "cache_invalidations_after_rewrite": 1,
+        "recomputed_prompt_tokens": 460,
+        "prompt_tokens": 288426,
+        "peak_call": 20
+      },
+      "verify_seconds": 16.977,
+      "verify_runs": [
+        {
+          "repo": "payment-service",
+          "scope": "targeted",
+          "passed": true,
+          "seconds": 9.497
+        },
+        {
+          "repo": "payment-service",
+          "scope": "full",
+          "passed": true,
+          "seconds": 2.456
+        },
+        {
+          "repo": "payment-service",
+          "scope": "targeted",
+          "passed": true,
+          "seconds": 2.577
+        },
+        {
+          "repo": "payment-service",
+          "scope": "full",
+          "passed": true,
+          "seconds": 2.447
+        }
+      ],
+      "verification_missed": true,
+      "resources": {
+        "harness_rss_mib": 38.60546875,
+        "model_server_rss_mib": 29251.6796875,
+        "gpu_mem_used_mib": 7141,
+        "sandbox_mem_mib": 602.5,
+        "samples": 244
+      }
+    },
+    {
+      "id": "java-bugfix-paid-total",
+      "category": "java-bugfix",
+      "model": "qwen3.6-35b-a3b",
+      "success": true,
+      "task_status": "completed",
+      "self_verified": true,
+      "tests_green": true,
+      "attempts": 2,
+      "local_tokens": 20192,
+      "generated_tokens": 3073,
+      "cached_prompt_tokens": 180557,
+      "escalations": 0,
+      "local_only": true,
+      "condensations": 0,
+      "resumes": 0,
+      "wall_seconds": 160.724554163,
+      "task_id": "t20261028-0f54d1",
+      "state_dir": "~/.cache/boundedcode/bench-work/java-bugfix-paid-total-1793211069497228451/state",
+      "agent_patch": "~/.cache/boundedcode/bench-work/java-bugfix-paid-total-1793211069497228451/agent-java-orders.patch",
+      "intel": {
+        "context_packs": 2,
+        "pack_tokens": 3132,
+        "code_tokens": 1696,
+        "serena_calls": 0,
+        "serena_errors": 0,
+        "serena_ms": 0,
+        "graph_calls": 8,
+        "graph_ms": 84.643,
+        "serena_symbols": 0,
+        "graph_symbols": 4,
+        "fallbacks": 0,
+        "agent_tool_calls": 16,
+        "agent_tools": {
+          "file_editor": 8,
+          "finish": 2,
+          "terminal": 6
+        }
+      },
+      "language": "java",
+      "calls": {
+        "calls": 17,
+        "inference_seconds": 132.79935802,
+        "prefill_seconds": 44.59102000000001,
+        "decode_seconds": 86.851956,
+        "reasoning_tokens": 0,
+        "cache_invalidations": 1,
+        "cache_invalidations_after_rewrite": 1,
+        "recomputed_prompt_tokens": 428,
+        "prompt_tokens": 198104,
+        "peak_call": 16
+      },
+      "verify_seconds": 3.6470000000000002,
+      "verify_runs": [
+        {
+          "repo": "java-orders",
+          "scope": "targeted",
+          "passed": true,
+          "seconds": 0.915
+        },
+        {
+          "repo": "java-orders",
+          "scope": "full",
+          "passed": true,
+          "seconds": 0.917
+        },
+        {
+          "repo": "java-orders",
+          "scope": "targeted",
+          "passed": true,
+          "seconds": 0.89
+        },
+        {
+          "repo": "java-orders",
+          "scope": "full",
+          "passed": true,
+          "seconds": 0.925
+        }
+      ],
+      "resources": {
+        "harness_rss_mib": 38.046875,
+        "model_server_rss_mib": 29251.6796875,
+        "gpu_mem_used_mib": 7141,
+        "sandbox_mem_mib": 406.5,
+        "samples": 161
+      }
+    },
+    {
+      "id": "k8s-health-and-resources",
+      "category": "kubernetes",
+      "model": "qwen3.6-35b-a3b",
+      "success": true,
+      "task_status": "completed",
+      "self_verified": true,
+      "tests_green": true,
+      "attempts": 2,
+      "local_tokens": 25653,
+      "generated_tokens": 3969,
+      "cached_prompt_tokens": 204779,
+      "escalations": 0,
+      "local_only": true,
+      "condensations": 0,
+      "resumes": 0,
+      "wall_seconds": 212.494043544,
+      "task_id": "t20261028-dbd626",
+      "state_dir": "~/.cache/boundedcode/bench-work/k8s-health-and-resources-1793211230227422792/state",
+      "agent_patch": "~/.cache/boundedcode/bench-work/k8s-health-and-resources-1793211230227422792/agent-payment-service.patch",
+      "intel": {
+        "context_packs": 2,
+        "pack_tokens": 2515,
+        "code_tokens": 0,
+        "serena_calls": 0,
+        "serena_errors": 0,
+        "serena_ms": 0,
+        "graph_calls": 4,
+        "graph_ms": 44.995000000000005,
+        "serena_symbols": 0,
+        "graph_symbols": 0,
+        "fallbacks": 0,
+        "agent_tool_calls": 20,
+        "agent_tools": {
+          "file_editor": 16,
+          "finish": 1,
+          "terminal": 2,
+          "think": 1
+        }
+      },
+      "language": "yaml",
+      "calls": {
+        "calls": 16,
+        "inference_seconds": 160.10878000200003,
+        "prefill_seconds": 44.37590600000001,
+        "decode_seconds": 114.554342,
+        "reasoning_tokens": 0,
+        "cache_invalidations": 1,
+        "cache_invalidations_after_rewrite": 1,
+        "recomputed_prompt_tokens": 489,
+        "prompt_tokens": 226952,
+        "peak_call": 15
+      },
+      "verify_seconds": 17.073,
+      "verify_runs": [
+        {
+          "repo": "payment-service",
+          "scope": "targeted",
+          "passed": true,
+          "seconds": 9.507
+        },
+        {
+          "repo": "payment-service",
+          "scope": "full",
+          "passed": true,
+          "seconds": 2.457
+        },
+        {
+          "repo": "payment-service",
+          "scope": "targeted",
+          "passed": true,
+          "seconds": 2.637
+        },
+        {
+          "repo": "payment-service",
+          "scope": "full",
+          "passed": true,
+          "seconds": 2.472
+        }
+      ],
+      "resources": {
+        "harness_rss_mib": 38.51953125,
+        "model_server_rss_mib": 28041.4609375,
+        "gpu_mem_used_mib": 7141,
+        "sandbox_mem_mib": 628.8,
+        "samples": 207
+      }
+    },
+    {
+      "id": "multi-feature-discount",
+      "category": "multi-language-feature",
+      "model": "qwen3.6-35b-a3b",
+      "success": true,
+      "task_status": "completed",
+      "self_verified": true,
+      "tests_green": true,
+      "attempts": 1,
+      "local_tokens": 28214,
+      "generated_tokens": 6813,
+      "cached_prompt_tokens": 245707,
+      "escalations": 0,
+      "local_only": true,
+      "condensations": 0,
+      "resumes": 0,
+      "wall_seconds": 290.773517441,
+      "task_id": "t20261028-0b4c25",
+      "state_dir": "~/.cache/boundedcode/bench-work/multi-feature-discount-1793211442726370338/state",
+      "agent_patch": "~/.cache/boundedcode/bench-work/multi-feature-discount-1793211442726370338/agent-shop-mono.patch",
+      "intel": {
+        "context_packs": 1,
+        "pack_tokens": 1195,
+        "code_tokens": 510,
+        "serena_calls": 0,
+        "serena_errors": 0,
+        "serena_ms": 0,
+        "graph_calls": 6,
+        "graph_ms": 62.241,
+        "serena_symbols": 0,
+        "graph_symbols": 3,
+        "fallbacks": 0,
+        "agent_tool_calls": 21,
+        "agent_tools": {
+          "file_editor": 14,
+          "finish": 1,
+          "task_tracker": 3,
+          "terminal": 2,
+          "think": 1
+        }
+      },
+      "language": "multi",
+      "calls": {
+        "calls": 18,
+        "inference_seconds": 240.56984996399999,
+        "prefill_seconds": 46.481429999999996,
+        "decode_seconds": 192.756942,
+        "reasoning_tokens": 0,
+        "cache_invalidations": 1,
+        "cache_invalidations_after_rewrite": 1,
+        "recomputed_prompt_tokens": 509,
+        "prompt_tokens": 267617,
+        "peak_call": 17
+      },
+      "verify_seconds": 12.907,
+      "verify_runs": [
+        {
+          "repo": "shop-mono",
+          "scope": "targeted",
+          "passed": true,
+          "seconds": 9.931
+        },
+        {
+          "repo": "shop-mono",
+          "scope": "full",
+          "passed": true,
+          "seconds": 2.976
+        }
+      ],
+      "resources": {
+        "harness_rss_mib": 38.47265625,
+        "model_server_rss_mib": 27511.84375,
+        "gpu_mem_used_mib": 7141,
+        "sandbox_mem_mib": 479.1,
+        "samples": 285
+      }
+    },
+    {
+      "id": "py-bugfix-inventory",
+      "category": "python-bugfix",
+      "model": "qwen3.6-35b-a3b",
+      "success": true,
+      "task_status": "completed",
+      "self_verified": true,
+      "tests_green": true,
+      "attempts": 2,
+      "local_tokens": 22531,
+      "generated_tokens": 3783,
+      "cached_prompt_tokens": 195198,
+      "escalations": 0,
+      "local_only": true,
+      "condensations": 0,
+      "resumes": 0,
+      "wall_seconds": 180.218439107,
+      "task_id": "t20261028-0dafa9",
+      "state_dir": "~/.cache/boundedcode/bench-work/py-bugfix-inventory-1793211733504739576/state",
+      "agent_patch": "~/.cache/boundedcode/bench-work/py-bugfix-inventory-1793211733504739576/agent-py-inventory.patch",
+      "intel": {
+        "context_packs": 2,
+        "pack_tokens": 2722,
+        "code_tokens": 436,
+        "serena_calls": 0,
+        "serena_errors": 0,
+        "serena_ms": 0,
+        "graph_calls": 4,
+        "graph_ms": 44.150999999999996,
+        "serena_symbols": 0,
+        "graph_symbols": 2,
+        "fallbacks": 0,
+        "agent_tool_calls": 19,
+        "agent_tools": {
+          "file_editor": 10,
+          "finish": 1,
+          "terminal": 7,
+          "think": 1
+        }
+      },
+      "language": "python",
+      "calls": {
+        "calls": 18,
+        "inference_seconds": 153.356614661,
+        "prefill_seconds": 45.813839,
+        "decode_seconds": 106.41008799999999,
+        "reasoning_tokens": 0,
+        "cache_invalidations": 1,
+        "cache_invalidations_after_rewrite": 1,
+        "recomputed_prompt_tokens": 435,
+        "prompt_tokens": 214381,
+        "peak_call": 17
+      },
+      "verify_seconds": 2.5330000000000004,
+      "verify_runs": [
+        {
+          "repo": "py-inventory",
+          "scope": "targeted",
+          "passed": true,
+          "seconds": 0.627
+        },
+        {
+          "repo": "py-inventory",
+          "scope": "full",
+          "passed": true,
+          "seconds": 0.623
+        },
+        {
+          "repo": "py-inventory",
+          "scope": "targeted",
+          "passed": true,
+          "seconds": 0.64
+        },
+        {
+          "repo": "py-inventory",
+          "scope": "full",
+          "passed": true,
+          "seconds": 0.643
+        }
+      ],
+      "resources": {
+        "harness_rss_mib": 38.51953125,
+        "model_server_rss_mib": 28072.09375,
+        "gpu_mem_used_mib": 7141,
+        "sandbox_mem_mib": 284.4,
+        "samples": 180
+      }
+    },
+    {
+      "id": "rust-bugfix-transfer",
+      "category": "rust-bugfix",
+      "model": "qwen3.6-35b-a3b",
+      "success": true,
+      "task_status": "completed",
+      "self_verified": true,
+      "tests_green": true,
+      "attempts": 2,
+      "local_tokens": 16507,
+      "generated_tokens": 2119,
+      "cached_prompt_tokens": 84462,
+      "escalations": 0,
+      "local_only": true,
+      "condensations": 0,
+      "resumes": 0,
+      "wall_seconds": 117.450552372,
+      "task_id": "t20261028-396580",
+      "state_dir": "~/.cache/boundedcode/bench-work/rust-bugfix-transfer-1793211913728190085/state",
+      "agent_patch": "~/.cache/boundedcode/bench-work/rust-bugfix-transfer-1793211913728190085/agent-rust-ledger.patch",
+      "intel": {
+        "context_packs": 2,
+        "pack_tokens": 1522,
+        "code_tokens": 0,
+        "serena_calls": 0,
+        "serena_errors": 0,
+        "serena_ms": 0,
+        "graph_calls": 2,
+        "graph_ms": 15.413,
+        "serena_symbols": 0,
+        "graph_symbols": 0,
+        "fallbacks": 0,
+        "agent_tool_calls": 9,
+        "agent_tools": {
+          "file_editor": 5,
+          "finish": 1,
+          "terminal": 2,
+          "think": 1
+        }
+      },
+      "language": "rust",
+      "calls": {
+        "calls": 10,
+        "inference_seconds": 90.27721169699998,
+        "prefill_seconds": 29.313197,
+        "decode_seconds": 60.04165899999999,
+        "reasoning_tokens": 0,
+        "cache_invalidations": 1,
+        "cache_invalidations_after_rewrite": 1,
+        "recomputed_prompt_tokens": 437,
+        "prompt_tokens": 99287,
+        "peak_call": 9
+      },
+      "verify_seconds": 3.598,
+      "verify_runs": [
+        {
+          "repo": "rust-ledger",
+          "scope": "targeted",
+          "passed": true,
+          "seconds": 1.021
+        },
+        {
+          "repo": "rust-ledger",
+          "scope": "full",
+          "passed": true,
+          "seconds": 0.82
+        },
+        {
+          "repo": "rust-ledger",
+          "scope": "targeted",
+          "passed": true,
+          "seconds": 0.914
+        },
+        {
+          "repo": "rust-ledger",
+          "scope": "full",
+          "passed": true,
+          "seconds": 0.843
+        }
+      ],
+      "resources": {
+        "harness_rss_mib": 38.36328125,
+        "model_server_rss_mib": 28218.7578125,
+        "gpu_mem_used_mib": 7141,
+        "sandbox_mem_mib": 767,
+        "samples": 117
+      }
+    },
+    {
+      "id": "sql-migration-idempotency-key",
+      "category": "database-migration",
+      "model": "qwen3.6-35b-a3b",
+      "success": true,
+      "task_status": "completed",
+      "self_verified": false,
+      "tests_green": true,
+      "attempts": 2,
+      "local_tokens": 22396,
+      "generated_tokens": 4083,
+      "cached_prompt_tokens": 272554,
+      "escalations": 0,
+      "local_only": true,
+      "condensations": 0,
+      "resumes": 0,
+      "wall_seconds": 213.780378407,
+      "task_id": "t20261028-b6e2e6",
+      "state_dir": "~/.cache/boundedcode/bench-work/sql-migration-idempotency-key-1793212031183825075/state",
+      "agent_patch": "~/.cache/boundedcode/bench-work/sql-migration-idempotency-key-1793212031183825075/agent-payment-service.patch",
+      "intel": {
+        "context_packs": 2,
+        "pack_tokens": 1893,
+        "code_tokens": 0,
+        "serena_calls": 0,
+        "serena_errors": 0,
+        "serena_ms": 0,
+        "graph_calls": 0,
+        "graph_ms": 0,
+        "serena_symbols": 0,
+        "graph_symbols": 0,
+        "fallbacks": 0,
+        "agent_tool_calls": 22,
+        "agent_tools": {
+          "file_editor": 10,
+          "finish": 2,
+          "task_tracker": 2,
+          "terminal": 7,
+          "think": 1
+        }
+      },
+      "language": "sql",
+      "calls": {
+        "calls": 22,
+        "inference_seconds": 168.51800602800003,
+        "prefill_seconds": 50.010538000000004,
+        "decode_seconds": 117.24970400000001,
+        "reasoning_tokens": 0,
+        "cache_invalidations": 1,
+        "cache_invalidations_after_rewrite": 1,
+        "recomputed_prompt_tokens": 445,
+        "prompt_tokens": 291312,
+        "peak_call": 21
+      },
+      "verify_seconds": 16.302,
+      "verify_runs": [
+        {
+          "repo": "payment-service",
+          "scope": "targeted",
+          "passed": true,
+          "seconds": 9.094
+        },
+        {
+          "repo": "payment-service",
+          "scope": "full",
+          "passed": true,
+          "seconds": 2.394
+        },
+        {
+          "repo": "payment-service",
+          "scope": "targeted",
+          "passed": true,
+          "seconds": 2.357
+        },
+        {
+          "repo": "payment-service",
+          "scope": "full",
+          "passed": true,
+          "seconds": 2.457
+        }
+      ],
+      "verification_missed": true,
+      "resources": {
+        "harness_rss_mib": 38.60546875,
+        "model_server_rss_mib": 28218.7578125,
+        "gpu_mem_used_mib": 7141,
+        "sandbox_mem_mib": 453.7,
+        "samples": 214
+      }
+    },
+    {
+      "id": "terraform-topics",
+      "category": "terraform",
+      "model": "qwen3.6-35b-a3b",
+      "success": true,
+      "task_status": "completed",
+      "self_verified": false,
+      "tests_green": true,
+      "attempts": 2,
+      "local_tokens": 19283,
+      "generated_tokens": 4218,
+      "cached_prompt_tokens": 133793,
+      "escalations": 0,
+      "local_only": true,
+      "condensations": 0,
+      "resumes": 0,
+      "wall_seconds": 180.479411899,
+      "task_id": "t20261028-adc0d6",
+      "state_dir": "~/.cache/boundedcode/bench-work/terraform-topics-1793212244969018631/state",
+      "agent_patch": "~/.cache/boundedcode/bench-work/terraform-topics-1793212244969018631/agent-infrastructure.patch",
+      "intel": {
+        "context_packs": 2,
+        "pack_tokens": 1615,
+        "code_tokens": 0,
+        "serena_calls": 0,
+        "serena_errors": 0,
+        "serena_ms": 0,
+        "graph_calls": 0,
+        "graph_ms": 0,
+        "serena_symbols": 0,
+        "graph_symbols": 0,
+        "fallbacks": 0,
+        "agent_tool_calls": 15,
+        "agent_tools": {
+          "file_editor": 6,
+          "finish": 2,
+          "terminal": 6,
+          "think": 1
+        }
+      },
+      "language": "terraform",
+      "calls": {
+        "calls": 14,
+        "inference_seconds": 157.37009584700004,
+        "prefill_seconds": 37.223462000000005,
+        "decode_seconds": 119.011941,
+        "reasoning_tokens": 0,
+        "cache_invalidations": 1,
+        "cache_invalidations_after_rewrite": 1,
+        "recomputed_prompt_tokens": 468,
+        "prompt_tokens": 149326,
+        "peak_call": 13
+      },
+      "verify_seconds": 2.1950000000000003,
+      "verify_runs": [
+        {
+          "repo": "infrastructure",
+          "scope": "targeted",
+          "passed": true,
+          "seconds": 0.547
+        },
+        {
+          "repo": "infrastructure",
+          "scope": "full",
+          "passed": true,
+          "seconds": 0.548
+        },
+        {
+          "repo": "infrastructure",
+          "scope": "targeted",
+          "passed": true,
+          "seconds": 0.552
+        },
+        {
+          "repo": "infrastructure",
+          "scope": "full",
+          "passed": true,
+          "seconds": 0.548
+        }
+      ],
+      "verification_missed": true,
+      "resources": {
+        "harness_rss_mib": 38.25,
+        "model_server_rss_mib": 28130.75,
+        "gpu_mem_used_mib": 7141,
+        "sandbox_mem_mib": 284.7,
+        "samples": 181
+      }
+    },
+    {
+      "id": "ts-bugfix-cart-discount",
+      "category": "typescript-bugfix",
+      "model": "qwen3.6-35b-a3b",
+      "success": true,
+      "task_status": "completed",
+      "self_verified": true,
+      "tests_green": true,
+      "attempts": 2,
+      "local_tokens": 16525,
+      "generated_tokens": 2058,
+      "cached_prompt_tokens": 97994,
+      "escalations": 0,
+      "local_only": true,
+      "condensations": 0,
+      "resumes": 0,
+      "wall_seconds": 117.715265013,
+      "task_id": "t20261028-a38427",
+      "state_dir": "~/.cache/boundedcode/bench-work/ts-bugfix-cart-discount-1793212425453921679/state",
+      "agent_patch": "~/.cache/boundedcode/bench-work/ts-bugfix-cart-discount-1793212425453921679/agent-ts-cart.patch",
+      "intel": {
+        "context_packs": 2,
+        "pack_tokens": 1333,
+        "code_tokens": 0,
+        "serena_calls": 0,
+        "serena_errors": 0,
+        "serena_ms": 0,
+        "graph_calls": 0,
+        "graph_ms": 0,
+        "serena_symbols": 0,
+        "graph_symbols": 0,
+        "fallbacks": 0,
+        "agent_tool_calls": 13,
+        "agent_tools": {
+          "file_editor": 9,
+          "finish": 2,
+          "terminal": 2
+        }
+      },
+      "language": "typescript",
+      "calls": {
+        "calls": 11,
+        "inference_seconds": 91.027798412,
+        "prefill_seconds": 32.501035,
+        "decode_seconds": 57.64309299999999,
+        "reasoning_tokens": 0,
+        "cache_invalidations": 1,
+        "cache_invalidations_after_rewrite": 1,
+        "recomputed_prompt_tokens": 436,
+        "prompt_tokens": 112897,
+        "peak_call": 10
+      },
+      "verify_seconds": 5.266,
+      "verify_runs": [
+        {
+          "repo": "ts-cart",
+          "scope": "targeted",
+          "passed": true,
+          "seconds": 1.206
+        },
+        {
+          "repo": "ts-cart",
+          "scope": "full",
+          "passed": true,
+          "seconds": 1.407
+        },
+        {
+          "repo": "ts-cart",
+          "scope": "targeted",
+          "passed": true,
+          "seconds": 1.191
+        },
+        {
+          "repo": "ts-cart",
+          "scope": "full",
+          "passed": true,
+          "seconds": 1.462
+        }
+      ],
+      "resources": {
+        "harness_rss_mib": 38.3984375,
+        "model_server_rss_mib": 27954.0390625,
+        "gpu_mem_used_mib": 7141,
+        "sandbox_mem_mib": 316.3,
+        "samples": 118
+      }
+    },
+    {
+      "id": "ts-retry-5xx",
+      "category": "typescript",
+      "model": "qwen3.6-35b-a3b",
+      "success": true,
+      "task_status": "completed",
+      "self_verified": false,
+      "tests_green": true,
+      "attempts": 2,
+      "local_tokens": 48962,
+      "generated_tokens": 17185,
+      "cached_prompt_tokens": 405783,
+      "escalations": 0,
+      "local_only": true,
+      "condensations": 0,
+      "resumes": 0,
+      "wall_seconds": 619.730644285,
+      "task_id": "t20261028-654172",
+      "state_dir": "~/.cache/boundedcode/bench-work/ts-retry-5xx-1793212543175079780/state",
+      "agent_patch": "~/.cache/boundedcode/bench-work/ts-retry-5xx-1793212543175079780/agent-gateway.patch",
+      "intel": {
+        "context_packs": 2,
+        "pack_tokens": 2716,
+        "code_tokens": 744,
+        "serena_calls": 0,
+        "serena_errors": 0,
+        "serena_ms": 0,
+        "graph_calls": 4,
+        "graph_ms": 42.19,
+        "serena_symbols": 0,
+        "graph_symbols": 2,
+        "fallbacks": 0,
+        "agent_tool_calls": 26,
+        "agent_tools": {
+          "file_editor": 13,
+          "finish": 2,
+          "terminal": 7,
+          "think": 4
+        }
+      },
+      "language": "typescript",
+      "calls": {
+        "calls": 24,
+        "inference_seconds": 562.329876189,
+        "prefill_seconds": 69.05047499999999,
+        "decode_seconds": 491.82288199999994,
+        "reasoning_tokens": 0,
+        "cache_invalidations": 1,
+        "cache_invalidations_after_rewrite": 1,
+        "recomputed_prompt_tokens": 445,
+        "prompt_tokens": 438005,
+        "peak_call": 23
+      },
+      "verify_seconds": 4.686999999999999,
+      "verify_runs": [
+        {
+          "repo": "gateway",
+          "scope": "targeted",
+          "passed": true,
+          "seconds": 1.053
+        },
+        {
+          "repo": "gateway",
+          "scope": "full",
+          "passed": true,
+          "seconds": 1.282
+        },
+        {
+          "repo": "gateway",
+          "scope": "targeted",
+          "passed": true,
+          "seconds": 1.057
+        },
+        {
+          "repo": "gateway",
+          "scope": "full",
+          "passed": true,
+          "seconds": 1.295
+        }
+      ],
+      "verification_missed": true,
+      "resources": {
+        "harness_rss_mib": 39.19140625,
+        "model_server_rss_mib": 29673.2421875,
+        "gpu_mem_used_mib": 7141,
+        "sandbox_mem_mib": 332.9,
+        "samples": 620
+      }
+    }
+  ],
+  "summary": {
+    "tasks": 19,
+    "verified": 19,
+    "success_rate": 1,
+    "local_only_completion_rate": 1,
+    "frontier_escalation_rate": 0,
+    "verified_tasks_per_hour": 11.230309214645525,
+    "attempts_per_successful_task": 2,
+    "wall_seconds_per_task": 320.5610754960527,
+    "local_tokens_per_task": 37279,
+    "self_verified_but_hidden_failed": 0
+  },
+  "environment": {
+    "build": "dev f95dd3463ef6-dirty",
+    "os": "linux/amd64",
+    "cpu": "13th Gen Intel(R) Core(TM) i7-13620H",
+    "cpus": 16,
+    "mem_mib": 62741,
+    "gpu": "NVIDIA GeForce RTX 4060 Laptop GPU, 8188 MiB, 595.99.02",
+    "model": {
+      "file": "Qwen3.6-35B-A3B-UD-Q4_K_M.gguf",
+      "profile": "qwen3.6-35b-a3b",
+      "provider": "local",
+      "repo": "unsloth/Qwen3.6-35B-A3B-GGUF",
+      "revision": "a483e9e6cbd595906af30beda3187c2663a1118c",
+      "sampling": {
+        "min_p": 0,
+        "presence_penalty": 0,
+        "repeat_penalty": 0,
+        "temperature": 0.6,
+        "top_k": 20,
+        "top_p": 0.95
+      },
+      "server": {
+        "batch_size": 2048,
+        "cache_reuse": 0,
+        "cache_type_k": "q8_0",
+        "cache_type_v": "q8_0",
+        "ctx_size": 131072,
+        "extra_args": [],
+        "flash_attn": "on",
+        "gpu_layers": 999,
+        "jinja": true,
+        "mlock": false,
+        "n_cpu_moe": 35,
+        "no_mmap": false,
+        "parallel": 1,
+        "reasoning": "",
+        "reasoning_budget": 0,
+        "reasoning_budget_message": "",
+        "threads": 8,
+        "ubatch_size": 2048
+      },
+      "sha256": "ac0e2c1189e055faa36eff361580e79c5bd6f8e76bffb4ce547f167d53e31a61",
+      "size_bytes": 22134528992
+    },
+    "server": "llama.cpp 0.5.0-dev (build 11146, commit 7fe450e19)",
+    "toolchains": {
+      "docker": "Docker version 29.9.1, build dfc520d",
+      "git": "git version 2.53.0",
+      "go": "go version go1.27.3 linux/amd64",
+      "node": "v24.22.0",
+      "python3": "Python 3.14.4"
+    },
+    "tasks_sha256": "99dd33b0a5b0a9a9",
+    "fixtures_sha256": {
+      "payment-platform": "c151d9d9d3c4dcd4",
+      "polyglot": "1379bbda7393ab7e",
+      "symbol-nav": "700db3cb08d9c1f2"
+    }
+  }
+}
