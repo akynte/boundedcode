@@ -197,6 +197,81 @@ used on real work.
   verification counts) extends `ecosystem.IsTest` (what history notes
   count).
 
+### Adaptive retrieval: strategies chosen from the task, ranked by reliability
+
+- Direct mode looks up the places a message points at before the model's
+  first call, in any language and in polyglot repositories, with or
+  without a language server ([reference](docs/usage/retrieval.md)).
+  `internal/retrieve` selects strategies from the message and the
+  evidence collected:
+  - stack traces in the formats of 17 languages and runtimes;
+  - compiler and runner locations;
+  - failing tests mapped to their implementation by each ecosystem's
+    naming convention and by the names the test calls;
+  - named paths and qualified module names;
+  - quoted messages and configuration keys;
+  - definitions of named symbols, and references for refactors;
+  - HTTP routes, to their API definition and handlers;
+  - environment variables;
+  - the files a named commit changed;
+  - path words, only as a fallback.
+
+  One bounded walk and one shared content scan serve them all (3 s, 50,000
+  files, 192 MiB). There is no index. Findings are ranked by the
+  strategy's reliability and the anchor's specificity, combined across
+  strategies.
+- **Measured on 267 real issues in ten languages**
+  ([benchmark](docs/benchmarks/retrieval-2026-10.md)). On 36 repositories
+  held out from all tuning:
+  - file recall 23% → 51%;
+  - precision 9% → 19%;
+  - a changed file listed first 12% → 35%;
+  - better on 58 issues, worse on 1.
+
+  Every request category and language gained. Blocks grew from 123 to 188
+  tokens, and the 95th-percentile time fell from 3 s to 0.17 s.
+  `direct.retrieval: basic` keeps the earlier name search.
+- **With the agent** (local model): the direct-mode suite passed 44 of 46
+  runs against 41 of 46 for basic (87 of 92 over four runs), with 18%
+  fewer prompt tokens and 5.4 tool calls per task instead of 6.6. On 16
+  held-out "which files need to change" questions there was no
+  measurable difference (41 of 64 runs against 20 of 32).
+- **Fixed before release**, after the suite showed a regression (38 of
+  46): a member written in prose (`Ledger.Balance`, `Model::replicate()`)
+  is now looked up, a path such as `internal/ledger` is no longer read as
+  the route `/ledger`, and each named thing keeps a place in the list when
+  another language's file scores far higher.
+- **Provenance.** Each retrieved item records the commit, the git blob id
+  of the content read, the strategies that found it, and when (stored as
+  `Message.Retrieval`).
+- **Freshness.**
+  - Tool results that show or change a file carry its blob id, and each
+    user message records the branch and commit.
+  - Before a message is sent, the model is told once about files changed
+    since the conversation last saw them, and about a checkout that moved.
+  - A file read earlier and unchanged is named on one line instead of
+    being listed again.
+  - Re-reads of unchanged files are counted (`redundant_reads` in `bench
+    direct`).
+- **Recoverable after compaction.**
+  - Summarised messages stay in an archive that `recall` searches, also
+    after the session is reloaded.
+  - The summary ends with an index of the tool results it replaced.
+  - `recall` says when the file behind a result has changed since.
+- **Language servers by language:** `repointel.Composite` routes each
+  symbol question to the provider that serves the file's language.
+  Definition patterns answer for other languages, and for a server that
+  is down. `find_symbol`, `find_references` and `find_implementations`
+  use the same routing.
+- **Bounded mode:** retry packs now locate failure output in any language
+  (frames, diagnostics, failing tests), with the lines around each place.
+  Before, only file paths with six extensions were recognised. The
+  request's own names still go through Serena and the code graph.
+- **Benchmark:** `bcode bench retrieval` measures retrieval with no model
+  against real fixes. Its datasets, split and freeze are in
+  `benchmarks/retrieval/`. `bcode bench direct --retrieval` compares the
+  approaches in the agent loop.
+
 ### Verification 2.0: layers, test integrity, mutation, counterexamples
 
 - Verification is eight capability-driven layers, each recorded per

@@ -141,7 +141,8 @@ Interfaces exist only where replacement is plausible:
 | — (concrete) **[exp]** | `internal/ecosystem` | projects in any language found in a tree (build system, commands, package manager, missing tools, CI) and test files by each language's conventions; used by direct mode's project map and history notes |
 | `repointel.Intelligence` | `internal/repointel` | `cbm` (codebase-memory-mcp) |
 | — (concrete) | `internal/stats` | success metrics from the ledger (`boundedcode stats`) |
-| `repointel.Navigator` | `internal/repointel` | `serena` (Serena v1.7.0 over language servers; keyed by checkout root) |
+| `repointel.Navigator` | `internal/repointel` | `serena` (Serena v1.7.0 over language servers; keyed by checkout root), `TextNavigator` (definition patterns of `internal/lang`), `Composite` (routes each question by the file's language: a server where one covers it, patterns elsewhere) |
+| — (concrete) **[exp]** | `internal/retrieve` | retrieval for a message or a retry: strategies selected from the request and the evidence, one bounded scan, ranking by reliability and specificity, provenance (revision, blob id, strategies); used by direct mode's retrieval block and bounded mode's failure sources ([Retrieval](../usage/retrieval.md)) |
 | `frontier.Provider` | `internal/frontier` | `codex` (subscription CLI) and a manual/clipboard provider (separate from the agent's model provider) |
 | `sandbox.Sandbox` | `internal/sandbox` | `docker` and `none` (development only, refused for autonomous tasks unless explicitly overridden) |
 
@@ -348,5 +349,6 @@ cross-service contracts (HTTP, OpenAPI, gRPC, protobuf, SQL, topics, env,
 Terraform) to complement the code graph. `compat` decides, for the links a
 change affects, whether the repositories' own checks show them compatible,
 using `xservice`, `verify` (composed sandbox runs) and `gitops`. `repointel/serena` manages Serena processes behind
-`repointel.Navigator`. Lower layers never import `cli` or
+`repointel.Navigator`. `retrieve` depends only on `lang`, `ecosystem`,
+`policy`, `repointel` and `execbox`; `contextplan` and `direct` use it. Lower layers never import `cli` or
 `orchestrator`.
