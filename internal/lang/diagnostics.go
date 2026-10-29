@@ -4,6 +4,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 // Diagnostic is one located problem in tool output.
@@ -155,4 +156,48 @@ func ParseFrames(out string, max int) []Diagnostic {
 		res = res[:max]
 	}
 	return res
+}
+
+var (
+	lineOnce   sync.Once
+	lineDiags  []*regexp.Regexp
+	lineFrames []*regexp.Regexp
+)
+
+// LineLocation reports the location one line of output names: a stack
+// frame (frame true) in any registered language's format, or a located
+// message of a compiler, linter or test runner. Lines without a digit
+// are not matched.
+func LineLocation(line string) (d Diagnostic, frame, ok bool) {
+	if !strings.ContainsAny(line, "0123456789") {
+		return Diagnostic{}, false, false
+	}
+	lineOnce.Do(func() {
+		lineDiags = append([]*regexp.Regexp{}, genericDiagnostics...)
+		for _, l := range All() {
+			lineDiags = append(lineDiags, l.Diagnostics...)
+			lineFrames = append(lineFrames, l.Frames...)
+		}
+	})
+	line = strings.TrimRight(line, "\r")
+	for _, re := range lineFrames {
+		if m := re.FindStringSubmatch(line); m != nil {
+			d := Diagnostic{File: group(re, m, "file"), Symbol: group(re, m, "symbol")}
+			d.Line, _ = strconv.Atoi(group(re, m, "line"))
+			if d.File != "" && d.Line > 0 {
+				return d, true, true
+			}
+		}
+	}
+	for _, re := range lineDiags {
+		if m := re.FindStringSubmatch(line); m != nil {
+			d := Diagnostic{File: group(re, m, "file"), Message: strings.TrimSpace(group(re, m, "msg"))}
+			d.Line, _ = strconv.Atoi(group(re, m, "line"))
+			d.Col, _ = strconv.Atoi(group(re, m, "col"))
+			if d.File != "" && d.Line > 0 && !strings.Contains(d.File, "://") {
+				return d, false, true
+			}
+		}
+	}
+	return Diagnostic{}, false, false
 }

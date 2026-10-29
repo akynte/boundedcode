@@ -81,6 +81,12 @@ type TaskSpec struct {
 type Turn struct {
 	Request string   `yaml:"request"`
 	Expect  []string `yaml:"expect,omitempty"`
+	// Edits change the checkout before the message is sent, as the user
+	// editing files between messages would (not committed).
+	Edits []Edit `yaml:"edits,omitempty"`
+	// Resume reads the session back from its file before the message, as
+	// a new process resuming it would.
+	Resume bool `yaml:"resume,omitempty"`
 }
 
 // Edit replaces text in a fixture file (or writes a file when Old is empty).
@@ -638,6 +644,31 @@ func collectIntel(ctx context.Context, db *sql.DB, taskID string) IntelMetrics {
 
 // materialize copies the fixture's repositories (and extra sources) into dst
 // as git repos, applies setup edits and commits them as the base.
+// applyEdits applies edits to the repositories by name.
+func applyEdits(repos map[string]string, edits []Edit) error {
+	for _, ed := range edits {
+		p := filepath.Join(repos[ed.Repo], ed.File)
+		if ed.Old == "" {
+			_ = os.MkdirAll(filepath.Dir(p), 0o755)
+			if err := os.WriteFile(p, []byte(ed.New), 0o644); err != nil {
+				return err
+			}
+			continue
+		}
+		b, err := os.ReadFile(p)
+		if err != nil {
+			return err
+		}
+		if !strings.Contains(string(b), ed.Old) {
+			return fmt.Errorf("edit: %q not found in %s", ed.Old, p)
+		}
+		if err := os.WriteFile(p, []byte(strings.Replace(string(b), ed.Old, ed.New, 1)), 0o644); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func materialize(ctx context.Context, fixture string, sources map[string]string, dst string, setup []Edit) (map[string]string, error) {
 	var entries []os.DirEntry
 	if fixture != "" {
@@ -688,25 +719,8 @@ func materialize(ctx context.Context, fixture string, sources map[string]string,
 		}
 		repos[e.Name()] = target
 	}
-	for _, ed := range setup {
-		p := filepath.Join(repos[ed.Repo], ed.File)
-		if ed.Old == "" {
-			_ = os.MkdirAll(filepath.Dir(p), 0o755)
-			if err := os.WriteFile(p, []byte(ed.New), 0o644); err != nil {
-				return nil, err
-			}
-			continue
-		}
-		b, err := os.ReadFile(p)
-		if err != nil {
-			return nil, err
-		}
-		if !strings.Contains(string(b), ed.Old) {
-			return nil, fmt.Errorf("setup edit: %q not found in %s", ed.Old, p)
-		}
-		if err := os.WriteFile(p, []byte(strings.Replace(string(b), ed.Old, ed.New, 1)), 0o644); err != nil {
-			return nil, err
-		}
+	if err := applyEdits(repos, setup); err != nil {
+		return nil, err
 	}
 	for _, path := range repos {
 		// A repository with history gets an empty base commit when the

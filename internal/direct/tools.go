@@ -269,10 +269,10 @@ hooks:
 		if out == "" {
 			return "error: " + err.Error()
 		}
-		return r.clip(out) + "\nerror: " + err.Error()
+		return r.observe(t.Name, call.ID, out) + "\nerror: " + err.Error()
 	}
 	r.emit(Event{Kind: EventToolEnd, Tool: t.Name, CallID: call.ID, Summary: summary, Output: out, Elapsed: el})
-	return r.clip(out)
+	return r.observe(t.Name, call.ID, out)
 }
 
 // clipOutput applies the package-wide cap; runTool applies the runner's

@@ -95,6 +95,25 @@ type DirectResult struct {
 	Recalls      int `json:"recalls"`
 	Compactions  int `json:"compactions"`
 	ChecksCaught int `json:"checks_caught"`
+	// The summaries' cost: the calls that wrote them (purpose
+	// "compaction"), their time, the prompt tokens the server evaluated
+	// for them, and what the first call after each summary evaluated; how
+	// each summary's notes were written ("conversation", "transcript",
+	// "none", "legacy").
+	CompactionCalls          int      `json:"compaction_calls,omitempty"`
+	CompactionSeconds        float64  `json:"compaction_seconds,omitempty"`
+	CompactionEvaluated      int      `json:"compaction_evaluated_tokens,omitempty"`
+	AfterCompactionEvaluated int      `json:"after_compaction_evaluated_tokens,omitempty"`
+	NotesSources             []string `json:"notes_sources,omitempty"`
+	// Pruned counts command outputs the model was shown shortened, with
+	// their bytes then and as shown; Cut the other results cut at the cap.
+	Pruned           int `json:"pruned_outputs,omitempty"`
+	PrunedBytes      int `json:"pruned_original_bytes,omitempty"`
+	PrunedShownBytes int `json:"pruned_shown_bytes,omitempty"`
+	Cut              int `json:"cut_outputs,omitempty"`
+	// FreshnessNotes counts notes that files or the checkout changed
+	// since the conversation saw them.
+	FreshnessNotes int `json:"freshness_notes,omitempty"`
 	// CheckNotes counts notes about code that compiles but is probably
 	// wrong (a pointer to a range loop's copy).
 	CheckNotes int `json:"check_notes,omitempty"`
@@ -203,11 +222,20 @@ type DirectSummary struct {
 	Elided          int     `json:"elided"`
 	Recalls         int     `json:"recalls"`
 	Compactions     int     `json:"compactions"`
-	ChecksCaught    int     `json:"checks_caught"`
-	CheckNotes      int     `json:"check_notes"`
-	GuardRefusals   int     `json:"guard_refusals,omitempty"`
-	HistoryNotes    int     `json:"history_notes"`
-	Errors          int     `json:"errors"`
+	// The summaries' cost over the run (DirectResult); pruned command
+	// outputs and their bytes; freshness notes.
+	CompactionSeconds        float64 `json:"compaction_seconds,omitempty"`
+	CompactionEvaluated      int     `json:"compaction_evaluated_tokens,omitempty"`
+	AfterCompactionEvaluated int     `json:"after_compaction_evaluated_tokens,omitempty"`
+	Pruned                   int     `json:"pruned_outputs,omitempty"`
+	PrunedBytes              int     `json:"pruned_original_bytes,omitempty"`
+	PrunedShownBytes         int     `json:"pruned_shown_bytes,omitempty"`
+	FreshnessNotes           int     `json:"freshness_notes,omitempty"`
+	ChecksCaught             int     `json:"checks_caught"`
+	CheckNotes               int     `json:"check_notes"`
+	GuardRefusals            int     `json:"guard_refusals,omitempty"`
+	HistoryNotes             int     `json:"history_notes"`
+	Errors                   int     `json:"errors"`
 	// Files the agent read, and redundant reads, per task.
 	MeanFilesRead      float64 `json:"files_read_per_task"`
 	MeanRedundantReads float64 `json:"redundant_reads_per_task"`
@@ -482,6 +510,14 @@ func (d *DirectRunner) runOne(ctx context.Context, model string, spec TaskSpec) 
 				}
 			case strings.HasPrefix(e.Text, "Summarised"):
 				res.Compactions++
+				src, _ := e.Args["notes"].(string)
+				switch {
+				case e.Args == nil:
+					src = "legacy"
+				case src == "":
+					src = "none"
+				}
+				res.NotesSources = append(res.NotesSources, src)
 			}
 		case direct.EventMode:
 			res.Switched = e.Text
@@ -495,6 +531,9 @@ func (d *DirectRunner) runOne(ctx context.Context, model string, spec TaskSpec) 
 			}
 			if strings.Contains(e.Text, "ended without an answer") {
 				res.Stalls = append(res.Stalls, "empty_answer")
+			}
+			if strings.HasPrefix(e.Text, "These files changed since") || strings.HasPrefix(e.Text, "The checkout changed") {
+				res.FreshnessNotes++
 			}
 		}
 	}
@@ -531,6 +570,16 @@ func (d *DirectRunner) runOne(ctx context.Context, model string, spec TaskSpec) 
 		if len(turns) > 1 {
 			d.progress("task %s: turn %d/%d (%s)", spec.ID, i+1, len(turns), dec.Mode)
 		}
+		if err := applyEdits(map[string]string{spec.Repos[0]: root}, t.Edits); err != nil {
+			sendErr = fmt.Errorf("turn %d: %w", i+1, err)
+			break
+		}
+		if t.Resume {
+			if err := r.Resume(); err != nil {
+				sendErr = fmt.Errorf("turn %d: resume: %w", i+1, err)
+				break
+			}
+		}
 		answer, sendErr = r.Send(tctx, t.Request)
 		if len(turns) > 1 {
 			res.TurnAnswers = append(res.TurnAnswers, tailStr(answer, 1500))
@@ -565,6 +614,21 @@ func (d *DirectRunner) runOne(ctx context.Context, model string, spec TaskSpec) 
 		}
 	}
 	res.FilesRead = len(read)
+	for _, m := range append(append([]direct.Message{}, r.Session.Archive...), r.Session.Messages...) {
+		switch {
+		case m.Full == nil:
+		case m.Full.Pruned:
+			res.Pruned++
+			res.PrunedBytes += m.Full.Bytes
+			shown := m.Content
+			if m.Elided != "" {
+				shown = m.Elided
+			}
+			res.PrunedShownBytes += len(shown)
+		default:
+			res.Cut++
+		}
+	}
 	res.Resources = stopSampling()
 	res.Answer = tailStr(answer, 4000)
 	d.attribute(ctx, r, &res, sections, rewrites)
@@ -654,6 +718,24 @@ func (d *DirectRunner) attribute(ctx context.Context, r *direct.Runner, res *Dir
 	res.CallStats = summarizeCalls(log, rewrites)
 	res.CallLog = log
 	res.HarnessSeconds = max(res.AgentSeconds-res.CallStats.InferenceSeconds-res.ToolSeconds, 0)
+	after := map[int]bool{} // the first call after each run of summary calls
+	for i, c := range log {
+		if c.Purpose != "compaction" {
+			continue
+		}
+		res.CompactionCalls++
+		res.CompactionSeconds += c.TotalMS / 1000
+		res.CompactionEvaluated += c.Evaluated
+		for j := i + 1; j < len(log); j++ {
+			if log[j].Purpose != "compaction" {
+				after[j] = true
+				break
+			}
+		}
+	}
+	for j := range after {
+		res.AfterCompactionEvaluated += log[j].Evaluated
+	}
 	res.PhaseSeconds = map[string]float64{}
 	for k, v := range r.Phases() {
 		res.PhaseSeconds[k] = v.Seconds()
@@ -802,6 +884,13 @@ func summarizeDirect(category string, rs []DirectResult) DirectSummary {
 		s.Elided += r.Elided
 		s.Recalls += r.Recalls
 		s.Compactions += r.Compactions
+		s.CompactionSeconds += r.CompactionSeconds
+		s.CompactionEvaluated += r.CompactionEvaluated
+		s.AfterCompactionEvaluated += r.AfterCompactionEvaluated
+		s.Pruned += r.Pruned
+		s.PrunedBytes += r.PrunedBytes
+		s.PrunedShownBytes += r.PrunedShownBytes
+		s.FreshnessNotes += r.FreshnessNotes
 		s.ChecksCaught += r.ChecksCaught
 		s.CheckNotes += r.CheckNotes
 		s.GuardRefusals += r.GuardRefusals
@@ -860,6 +949,10 @@ func WriteDirectMarkdown(w io.Writer, r *DirectReport) error {
 	}
 	fmt.Fprintf(w, "**%d/%d passed (%.0f%%)**, %.1f model calls and %.1f tool calls per task, %.0f prompt tokens per task with a %.0f%% prompt-cache hit rate, %.0f generated tokens per task, %.0f KB of tool results per task, %.0f s per task, %d tokens in the largest single prompt; %d results set aside, %d recalled, %d summaries, %d broken edits caught by the check, %d check notes, %d history notes, %d errors.\n\n",
 		s.Passed, s.Tasks, 100*s.PassRate, s.MeanCalls, s.MeanToolCalls, s.MeanPrompt, 100*s.CacheHitRate, s.MeanGenerated, s.MeanResultBytes/1024, s.MeanWallSeconds, s.PeakPrompt, s.Elided, s.Recalls, s.Compactions, s.ChecksCaught, s.CheckNotes, s.HistoryNotes, s.Errors)
+	if s.Compactions > 0 || s.Pruned > 0 || s.FreshnessNotes > 0 {
+		fmt.Fprintf(w, "Summaries: %d, %.1f s writing them, %d prompt tokens evaluated for them and %d by the first call after each. Command outputs pruned: %d, %d KB → %d KB. Freshness notes: %d.\n\n",
+			s.Compactions, s.CompactionSeconds, s.CompactionEvaluated, s.AfterCompactionEvaluated, s.Pruned, s.PrunedBytes/1024, s.PrunedShownBytes/1024, s.FreshnessNotes)
+	}
 	if s.MeanAgentSeconds > 0 {
 		fmt.Fprintf(w, "Where the agent's time went, per task: %.1f s in model calls, %.1f s in tools (with the checks after edits), %.2f s in the harness itself; time to first token %.0f ms (median). %.0f reasoning tokens per task. %d prompt-cache invalidations (%d after the history was rewritten), %d prompt tokens recomputed; %.0f prompt tokens evaluated by the server per task, in %.1f s. Cost of a passed task: %.0f processed tokens and %.0f s; of a failed one: %.0f and %.0f s. Peak memory: harness %.0f MiB, model server %.0f MiB, GPU %.0f MiB.\n\n",
 			s.MeanInferenceSeconds, s.MeanToolSeconds, s.MeanHarnessSeconds, s.TTFTMedianMS, s.MeanReasoning, s.Invalidations, s.AfterRewrite, s.RecomputedTokens,

@@ -30,7 +30,7 @@ import (
 func newBenchCmd(app *App) *cobra.Command {
 	cmd := &cobra.Command{Use: "bench", Short: "Run reproducible benchmarks"}
 	cmd.AddCommand(newBenchVerifyCmd(app))
-	cmd.AddCommand(newBenchInfraCmd(app), newBenchTasksCmd(app), newBenchDirectCmd(app), newBenchIntelCmd(app), newBenchLeaseCmd(app), newBenchTrailCmd(app), newBenchCompareCmd(app), newBenchRetrievalCmd(app), newBenchStructuredCmd(app))
+	cmd.AddCommand(newBenchInfraCmd(app), newBenchTasksCmd(app), newBenchDirectCmd(app), newBenchIntelCmd(app), newBenchLeaseCmd(app), newBenchTrailCmd(app), newBenchCompareCmd(app), newBenchRetrievalCmd(app), newBenchStructuredCmd(app), newBenchPruneCmd(app))
 	return cmd
 }
 
@@ -280,6 +280,8 @@ func newBenchDirectCmd(app *App) *cobra.Command {
 		noHistoryNotes           bool
 		retrieval                string
 		reasoningHistory         string
+		compaction, pruneMode    string
+		observationBytes         int
 	)
 	cmd := &cobra.Command{
 		Use:   "direct",
@@ -349,6 +351,23 @@ aside and recalled, summaries, broken edits caught by the check, and time.`,
 			if out == "" {
 				out = filepath.Join("benchmarks", "reports", fmt.Sprintf("%s-direct-%s.json", stamp, ep.model))
 			}
+			if compaction != "" {
+				app.Config.Direct.Compaction = compaction
+			}
+			switch pruneMode {
+			case "":
+			case "on", "off":
+				on := pruneMode == "on"
+				app.Config.Direct.Prune = &on
+			default:
+				return fmt.Errorf("--prune: %q is not on|off", pruneMode)
+			}
+			if observationBytes > 0 {
+				app.Config.Direct.ObservationBytes = observationBytes
+			}
+			if err := app.Config.Validate(); err != nil {
+				return err
+			}
 			dc := app.Config.Direct
 			if workingSet < 0 {
 				return fmt.Errorf("--working-set must be positive")
@@ -369,6 +388,7 @@ aside and recalled, summaries, broken edits caught by the check, and time.`,
 			dr := &benchmark.DirectRunner{FixturesDir: fixtures, WorkRoot: work, Rules: app.riskRules(), Timeout: timeout,
 				Tokenize: ep.tokenize, Model: ep.pin, TaskDirs: dirs,
 				Settings: map[string]any{"approval": approval, "working_set_tokens": dc.WorkingSetTokens, "max_tool_output": dc.MaxToolOutput, "checks": dc.ChecksOn(), "seed_pack": dc.SeedPackOn(), "retrieval": dc.Retrieval, "history_notes": dc.HistoryNotesOn(), "context_tokens": ep.ctxSize, "provider": ep.provider,
+					"compaction": compactionSetting(dc.Compaction), "prune": dc.PruneOn(), "observation_bytes": dc.ObservationBytes,
 					"reasoning_history": reasoningSetting(app.Config.Inference.ReasoningHistory), "reasoning_round_trip": ep.newGateway("probe").Capabilities(ctx).ReasoningRoundTrip},
 				Progress: func(s string) { fmt.Fprintf(app.Err, "%s %s\n", time.Now().Format("15:04:05"), s) },
 				NewRunner: func(ctx context.Context, root, stateDir string) (*direct.Runner, func(), error) {
@@ -422,7 +442,18 @@ aside and recalled, summaries, broken edits caught by the check, and time.`,
 	f.BoolVar(&noHistoryNotes, "no-history-notes", false, "turn off history notes for this run (direct.history_notes)")
 	f.StringVar(&retrieval, "retrieval", "", "adaptive or basic for this run (direct.retrieval)")
 	f.StringVar(&reasoningHistory, "reasoning-history", "", "auto, keep or drop for this run (inference.reasoning_history)")
+	f.StringVar(&compaction, "compaction", "", "structured or legacy for this run (direct.compaction)")
+	f.StringVar(&pruneMode, "prune", "", "on or off for this run (direct.prune)")
+	f.IntVar(&observationBytes, "observation-bytes", 0, "budget command output is pruned to, in bytes (direct.observation_bytes)")
 	return cmd
+}
+
+// compactionSetting is direct.compaction as a report shows it.
+func compactionSetting(v string) string {
+	if v == "" {
+		return direct.CompactionStructured
+	}
+	return v
 }
 
 func newBenchIntelCmd(app *App) *cobra.Command {
@@ -846,6 +877,76 @@ run uses accepts it.`,
 	f.IntVar(&perLanguage, "per-language", 4, "instances per language, in seeded order (0 = all)")
 	f.StringSliceVar(&arms, "arms", []string{benchmark.ArmPrompt, benchmark.ArmSchema}, "arms to run")
 	f.StringVar(&modelName, "model", "", "model profile (local) or model id (cloud); default: the configured one")
+	f.StringVar(&out, "out", "", "report path (.json; .md written alongside)")
+	return cmd
+}
+
+func newBenchPruneCmd(app *App) *cobra.Command {
+	var sets []string
+	var budgets []int
+	var strategies []string
+	var out, modelURL, modelNote string
+	cmd := &cobra.Command{
+		Use:   "prune",
+		Short: "Score how command output is shortened for the model: evidence kept, tokens saved, time (no agent)",
+		Long: `Fit each output of the pruning corpus (benchmarks/prune: real output of
+compilers, test runners, linters, package managers, stack traces and
+searches) to each budget with each strategy, and count the evidence its case
+says must survive. Strategies: clip (the head and the tail, as tool results
+were cut before), prune (deterministic, internal/prune) and model (a model
+picks the lines given the goal; --model-url names its OpenAI-compatible
+server; experimental).`,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			dirs := map[string]string{}
+			for _, s := range sets {
+				name, dir, ok := strings.Cut(s, "=")
+				if !ok {
+					return fmt.Errorf("--set %q: want name=dir", s)
+				}
+				dirs[name] = dir
+			}
+			cases, err := benchmark.LoadPruneCases(dirs)
+			if err != nil {
+				return err
+			}
+			b := &benchmark.PruneBench{Cases: cases, Budgets: budgets, Strategies: strategies,
+				Progress: func(s string) { fmt.Fprintf(app.Err, "%s %s\n", time.Now().Format("15:04:05"), s) }}
+			if modelURL != "" {
+				b.Model = benchmark.NewModelPruner(&inference.Gateway{Upstream: inference.LocalUpstream(inference.NewClient(modelURL, 15*time.Minute), "", nil), Model: "pruner"})
+			}
+			rep, err := b.Run(cmd.Context())
+			if err != nil {
+				return err
+			}
+			if modelURL != "" {
+				rep.Model = map[string]any{"url": modelURL, "note": modelNote}
+			}
+			var md bytes.Buffer
+			if err := benchmark.WritePruneMarkdown(&md, rep); err != nil {
+				return err
+			}
+			if out != "" {
+				j, err := json.MarshalIndent(rep, "", " ")
+				if err != nil {
+					return err
+				}
+				if err := config.WriteFileAtomic(out, j, 0o644); err != nil {
+					return err
+				}
+				if err := os.WriteFile(strings.TrimSuffix(out, ".json")+".md", md.Bytes(), 0o644); err != nil {
+					return err
+				}
+			}
+			app.printf("%s", md.String())
+			return nil
+		},
+	}
+	f := cmd.Flags()
+	f.StringSliceVar(&sets, "set", []string{"dev=benchmarks/prune"}, "case sets as name=dir (cases.yaml and corpus/ inside)")
+	f.IntSliceVar(&budgets, "budgets", []int{4096, 8192, 16384}, "budgets in bytes")
+	f.StringSliceVar(&strategies, "strategies", []string{benchmark.StrategyClip, benchmark.StrategyPrune}, "strategies to run")
+	f.StringVar(&modelURL, "model-url", "", "OpenAI-compatible server for the model strategy")
+	f.StringVar(&modelNote, "model-note", "", "what the model strategy runs on, recorded in the report")
 	f.StringVar(&out, "out", "", "report path (.json; .md written alongside)")
 	return cmd
 }

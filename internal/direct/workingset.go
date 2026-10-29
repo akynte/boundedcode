@@ -8,6 +8,7 @@ import (
 
 	"github.com/akynte/boundedcode/internal/contextplan"
 	"github.com/akynte/boundedcode/internal/inference"
+	"github.com/akynte/boundedcode/internal/prune"
 )
 
 // The working set is the part of the history the model is asked to attend
@@ -70,14 +71,7 @@ func (r *Runner) clip(s string) string {
 	return clipTo(s, r.maxToolOutput())
 }
 
-func clipTo(s string, n int) string {
-	if len(s) <= n {
-		return s
-	}
-	head := s[:n*2/3]
-	tail := s[len(s)-n/3:]
-	return head + fmt.Sprintf("\n… [%d bytes cut] …\n", len(s)-len(head)-len(tail)) + tail
-}
+func clipTo(s string, n int) string { return prune.Clip(s, n) }
 
 // elideIfNeeded replaces the oldest large tool results with placeholders
 // until the history is within the working set (with some headroom, so it
@@ -85,6 +79,7 @@ func clipTo(s string, n int) string {
 // (r.seen) are eligible, and the newest keepRecentResults never are. It
 // reports how many results were elided.
 func (r *Runner) elideIfNeeded() int {
+	r.setAside = nil
 	if r.Session == nil {
 		return 0
 	}
@@ -115,6 +110,10 @@ func (r *Runner) elideIfNeeded() int {
 		have -= contextplan.EstimateTokens(m.Content) - contextplan.EstimateTokens(stub)
 		bytes += len(m.Content)
 		m.Elided, m.Content = m.Content, stub
+		if r.setAside == nil {
+			r.setAside = map[int]bool{}
+		}
+		r.setAside[i] = true
 		if err := r.Session.elide(i, stub); err != nil {
 			r.emit(Event{Kind: EventNote, Text: "could not record the elision in the session file: " + err.Error()})
 		}
@@ -133,20 +132,33 @@ func elideStub(tool string, size int, id string) string {
 	return fmt.Sprintf("[%s result of %d bytes set aside to save context; call recall with id %q to see it again]", tool, size, id)
 }
 
-// recallTool brings back an elided tool result.
+// recallTool brings back an elided tool result, or any part of an
+// original output the model was shown a shorter version of.
 func recallTool() Tool {
 	return Tool{
 		Name:        "recall",
-		Description: "Bring back an earlier tool result that was set aside to save context, by the id in its placeholder.",
+		Description: "Bring back an earlier tool result that was set aside to save context, by the id in its placeholder; or show part of a command's whole output when it was shortened (lines from offset, or the lines matching a pattern).",
 		Schema: schema(map[string]any{
-			"id": prop("string", "The id given in the placeholder"),
+			"id":      prop("string", "The id given in the placeholder or the shortened output"),
+			"pattern": prop("string", "A regular expression: show the matching lines of the whole output, with two lines around each"),
+			"offset":  prop("integer", "The line of the whole output to start at (1-based)"),
+			"limit":   prop("integer", "How many lines to show (default 300)"),
 		}, "id"),
-		Summary: func(a map[string]any) string { return "recall " + str(a, "id") },
+		Summary: func(a map[string]any) string {
+			s := "recall " + str(a, "id")
+			if p := str(a, "pattern"); p != "" {
+				s += " /" + p + "/"
+			} else if o := num(a, "offset"); o > 0 {
+				s += fmt.Sprintf(" from line %d", o)
+			}
+			return s
+		},
 		Run: func(_ context.Context, r *Runner, a map[string]any) (string, error) {
 			id := str(a, "id")
 			if r.Session == nil || id == "" {
 				return "", errors.New("no such result")
 			}
+			pattern, offset, limit := str(a, "pattern"), num(a, "offset"), num(a, "limit")
 			// The live history first, then what a summary replaced: a
 			// compaction keeps the originals (Session.Archive).
 			found := false
@@ -161,13 +173,36 @@ func recallTool() Tool {
 					text := m.Content
 					if m.Elided != "" {
 						text = m.Elided
-					} else if !archived {
+					}
+					whole := m.Full != nil && m.Full.Stored
+					if whole {
+						if orig, ok := r.Session.Output(id); ok {
+							text = orig
+						} else {
+							whole = false
+						}
+					}
+					switch {
+					case pattern != "" || offset > 0:
+						w, err := window(text, pattern, offset, limit)
+						if err != nil {
+							return "", err
+						}
+						text = w
+					case m.Elided != "":
+						// What the model was shown before it was set aside
+						// (for a pruned output, its failures and outcome).
+						text = m.Elided
+					case whole:
+						w, _ := window(text, "", 1, limit)
+						text = w
+					case !archived:
 						continue // still in the conversation: nothing to bring back
 					}
 					if stale := r.staleIn(m); len(stale) > 0 {
 						text = "[note: " + strings.Join(stale, ", ") + " changed since this result was produced; read it again for the current content]\n" + text
 					}
-					return text, nil
+					return clipTo(text, r.maxToolOutput()), nil
 				}
 			}
 			if found {

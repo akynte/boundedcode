@@ -486,6 +486,7 @@ func TestCompactionWhenContextIsSmall(t *testing.T) {
 	}}
 	r, _, evs := newRunner(t, up, ApprovalAuto)
 	r.Opts.ContextTokens = 4000
+	r.Opts.Compaction = CompactionLegacy
 	for i := 0; i < 12; i++ {
 		_ = r.Session.Append(Message{Role: "user", Content: "q" + fmt.Sprint(i)})
 		_ = r.Session.Append(Message{Role: "assistant", Content: strings.Repeat("blah ", 60)})
@@ -526,6 +527,7 @@ func TestContextOverflowErrorCompactsAndRetries(t *testing.T) {
 		{text: "recovered"},
 	}, status: http.StatusBadRequest, errBody: "This model's maximum context length is 8192 tokens"}
 	r, _, _ := newRunner(t, up, ApprovalAuto)
+	r.Opts.Compaction = CompactionLegacy
 	for i := 0; i < 8; i++ {
 		_ = r.Session.Append(Message{Role: "user", Content: "q"})
 		_ = r.Session.Append(Message{Role: "assistant", Content: "a"})

@@ -129,6 +129,19 @@ type DirectConfig struct {
 	// MaxToolOutput caps one tool result in bytes (0 = 16 KiB for a local
 	// model, 48 KiB for a cloud provider).
 	MaxToolOutput int `yaml:"max_tool_output,omitempty"`
+	// Prune shortens command output that has errors, failing tests,
+	// stack traces, progress, downloads or passing tests to sort, keeping
+	// the failures, their locations and the outcome; the whole output stays
+	// available to recall (default true).
+	Prune *bool `yaml:"prune,omitempty"`
+	// ObservationBytes is the size such output is pruned to (0 = 8 KiB
+	// for a local model, 24 KiB for a cloud provider).
+	ObservationBytes int `yaml:"observation_bytes,omitempty"`
+	// Compaction is how the history is summarised when setting results
+	// aside is not enough: "structured" (the default: the session state,
+	// the session's record plus the model's notes) or "legacy" (a free-text
+	// summary of a transcript).
+	Compaction string `yaml:"compaction,omitempty"`
 	// Checks runs a syntax check (and for Go a build of the package) after
 	// every file change and tells the model the result (default true).
 	Checks *bool `yaml:"checks,omitempty"`
@@ -200,6 +213,9 @@ func (d DirectConfig) SeedPackOn() bool { return d.SeedPack == nil || *d.SeedPac
 
 // HistoryNotesOn reports whether history notes are enabled (default true).
 func (d DirectConfig) HistoryNotesOn() bool { return d.HistoryNotes == nil || *d.HistoryNotes }
+
+// PruneOn reports whether command output is pruned (default true).
+func (d DirectConfig) PruneOn() bool { return d.Prune == nil || *d.Prune }
 
 // StreamOn reports whether streaming is enabled (default true).
 func (d DirectConfig) StreamOn() bool { return d.Stream == nil || *d.Stream }
@@ -666,6 +682,14 @@ func (c Config) Validate() error {
 	case "", "adaptive", "basic":
 	default:
 		errs = append(errs, fmt.Errorf("direct.retrieval: %q is not adaptive|basic", c.Direct.Retrieval))
+	}
+	switch c.Direct.Compaction {
+	case "", "structured", "legacy":
+	default:
+		errs = append(errs, fmt.Errorf("direct.compaction: %q is not structured|legacy", c.Direct.Compaction))
+	}
+	if c.Direct.ObservationBytes < 0 {
+		errs = append(errs, fmt.Errorf("direct.observation_bytes: %d is negative", c.Direct.ObservationBytes))
 	}
 	switch c.Direct.VerifyFallback {
 	case "", "ask", "refuse", "allow":

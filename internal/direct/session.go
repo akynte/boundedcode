@@ -35,10 +35,15 @@ type Session struct {
 	Archive []Message `json:"-"`
 	// Path is the file the session is appended to ("" = in memory).
 	Path string `json:"-"`
+	// State is the session state of the latest structured compaction
+	// (state.go).
+	State *SessionState `json:"-"`
+	// outputs holds originals kept for recall when there is no file.
+	outputs map[string]string
 }
 
 type sessionLine struct {
-	Type    string   `json:"type"` // "session" | "message" | "compact" | "elide"
+	Type    string   `json:"type"` // "session" | "message" | "compact" | "elide" | "state"
 	Session *Session `json:"session,omitempty"`
 	Message *Message `json:"message,omitempty"`
 	// Keep is the number of trailing messages kept after a compaction;
@@ -49,6 +54,9 @@ type sessionLine struct {
 	// Elided and shows Stub instead.
 	Index int    `json:"index,omitempty"`
 	Stub  string `json:"stub,omitempty"`
+	// State is the session state a structured compaction made; the
+	// compaction itself follows.
+	State *SessionState `json:"state,omitempty"`
 }
 
 // NewSession creates a session for root, stored under dir (the sessions
@@ -110,6 +118,21 @@ func (s *Session) replace(summary Message, keep []Message) error {
 		return err
 	}
 	return s.writeLine(sessionLine{Type: "message", Message: &summary})
+}
+
+// replaceWithState records the session state, then installs the
+// compacted history.
+func (s *Session) replaceWithState(st *SessionState, summary Message, keep []Message) error {
+	if s.Path != "" {
+		if err := s.writeLine(sessionLine{Type: "state", State: st}); err != nil {
+			return err
+		}
+	}
+	if err := s.replace(summary, keep); err != nil {
+		return err
+	}
+	s.State = st
+	return nil
 }
 
 // elide records that the message at index i was set aside (its text is
@@ -185,6 +208,11 @@ func LoadSession(path string) (*Session, error) {
 			}
 			s.Compactions++
 			summaryNext = true
+		case "state":
+			if s == nil {
+				return nil, fmt.Errorf("%s line %d: state before header", path, n)
+			}
+			s.State = l.State
 		case "elide":
 			if s == nil || l.Index < 0 || l.Index >= len(s.Messages) {
 				return nil, fmt.Errorf("%s line %d: elision of message %d out of range", path, n, l.Index)
