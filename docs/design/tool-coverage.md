@@ -21,9 +21,10 @@ benchmark (design phase 23) has measured it.
 | Read notebooks | – | – | NotebookRead (legacy) | `notebook_read`; `read` on `.ipynb` |
 | Read PDFs | – | – | Read (pages) | not yet: `read` reports a PDF as binary; convert it first (`pdftotext`) |
 | Read several files / globs | – | read_many_files | – | `read_many` |
-| Create or overwrite a file | write | write_file | Write | `write` |
+| Create or overwrite a file | write | write_file | Write | `write` (atomic; refused when the file changed since the model read it) |
 | Replace text in a file | edit | edit (replace) | Edit | `edit` (exact match, indentation-tolerant fallback, `replace_all`) |
-| Several edits atomically | – | – | MultiEdit | `multi_edit` |
+| Several edits atomically | – | – | MultiEdit | `multi_edit`, in one file or several (each edit may name its `path`): all applied or none |
+| Replace a definition by name | – | – | – (LSP plugins) | `replace_symbol`, with a language server (Serena): the server gives the definition's exact range |
 | Edit a notebook cell | – | – | NotebookEdit | `notebook_edit` (replace, insert, delete) |
 | Run a shell command | bash | run_shell_command | Bash | `bash` (timeout, own process group, policy) |
 | Background commands | – | (background shell) | Bash `run_in_background`, BashOutput, KillShell | `bash run_in_background`, `bash_output`, `kill_shell` |
@@ -39,7 +40,8 @@ benchmark (design phase 23) has measured it.
 | Skills on demand | skills | skill | Skill, SlashCommand | `skill` tool loads a skill or runs a command template; `.boundedcode/skills/<name>/SKILL.md` (also `.agents/skills`, `.claude/skills`, user `<config>/skills`) |
 | Memory | – | save_memory | `#` memory / CLAUDE.md | `save_memory` into `<config>/AGENTS.md`; project `AGENTS.md`/`BOUNDEDCODE.md`/`CLAUDE.md` in the prompt |
 | Language-server symbols | – | LSP integration | LSP (plugins) | `find_symbol`, `find_references`, `find_implementations` through Serena when enabled (ADR-0008) |
-| MCP tools | – (extensions) | MCP servers | MCP servers | stdio MCP servers from `direct.mcp` or `.boundedcode/mcp.json` / `.mcp.json`, exposed as `mcp__server__tool` |
+| MCP tools | – (extensions) | MCP servers | MCP servers (tool search when many) | stdio MCP servers from `direct.mcp` or `.boundedcode/mcp.json` / `.mcp.json`, exposed as `mcp__server__tool`; past a tenth of the working set, found with `mcp_search` and run with `mcp_call` (`direct.mcp_tool_search`) |
+| Independent calls of one reply at once | – | – | read-only tools concurrently | reads, searches, symbol lookups and fetches of one reply run together (`direct.parallel_tools`); everything else in order ([capabilities](../architecture/capabilities.md)) |
 | Working set (older results set aside, recallable) | – | – | – (auto-compact) | `recall`: before each model call the oldest tool results the model has seen are replaced by a placeholder until the history fits `direct.working_set_tokens`; summarising comes only after that |
 | Check after a change | – | – | – (hooks) | built in: a syntax check (and `go build` of the package) after `write`, `edit`, `multi_edit`, reported to the model |
 

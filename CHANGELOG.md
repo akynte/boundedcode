@@ -197,6 +197,84 @@ used on real work.
   verification counts) extends `ecosystem.IsTest` (what history notes
   count).
 
+### Tool capabilities: one vocabulary for both modes, concurrent reads, safer edits
+
+- **What tools do, described once for both modes**
+  ([capabilities](docs/architecture/capabilities.md)).
+  - `internal/capability` describes each tool:
+    - its effects: read, write, exec, network, interact, delegate, state;
+    - whether calls of it may run together;
+    - what permission rules match;
+    - where its effects are enforced;
+    - the codes of refused and failed calls.
+  - Direct mode's tools and bounded mode's OpenHands tools are both
+    described. Bounded mode's governor classifies the agent's actions
+    through it instead of matching tool names.
+  - `bcode chat tools` lists each tool's effects and both modes' tools
+    (`--json` too).
+  - The modes keep their own executors and isolation. The page compares
+    them on tools, permissions, context, sessions, execution,
+    verification, errors, events, traces and accounting, and says what is
+    shared and what is not.
+- **Calls of one reply that change nothing run together**
+  (`direct.parallel_tools`, default 4; 1 turns it off).
+  - These are reads, searches, symbol lookups and fetches. Edits,
+    commands, questions, the task list, sub-agents and MCP tools always run
+    alone, in order.
+  - Approval, rules and hooks run before, in call order; checks, hooks and
+    results after, in call order.
+  - The session record is the same either way, and an interrupt answers
+    every call. The TUI pairs each call's end with its start by call id.
+  - Measured on one reply's calls: four 200 ms fetches 808 → 205 ms, four
+    searches over Go's source 1,384 → 502 ms, four symbol lookups 73 →
+    34 ms, six local reads 9.4 → 7.2 ms
+    ([orchestration benchmark](docs/benchmarks/orchestration-2026-10.md)).
+- **`runTool` in three stages** (prepare, execute, finish). Every refused
+  or failed call now carries a code on its event (`unknown_tool`,
+  `denied_by_rule`, `denied_by_policy`, `plan_mode`, `handed_off`,
+  `blocked_by_hook`, `not_approved`, `conflict`, `failed`, `canceled`).
+  `bench direct` counts each tool's calls by outcome, and the replies that
+  ran calls together.
+- **Editing** (`internal/fileedit`, shared by the file tools).
+  - Files are replaced atomically.
+  - `multi_edit` changes several files when its edits name their own
+    `path`: all or none, and a deny rule on any of its files refuses the
+    call.
+  - A `write` over a file that changed since the model read it is refused
+    (`conflict`). An `edit` whose text still matches goes ahead and says
+    the file changed.
+  - With a language server (Serena), `replace_symbol` replaces a
+    definition by the server's exact range. Without one it is not offered:
+    the text patterns know where a definition starts, not where it ends.
+- **MCP tools found on demand** (`direct.mcp_tool_search`, default
+  `auto`).
+  - When the servers' tool definitions would take more than a tenth of the
+    working set, the model finds them with `mcp_search` and runs them with
+    `mcp_call`. They run with the same trust pins, rules, approval,
+    provenance and data header.
+  - The tools sent stay the same all session, so the prompt cache keeps
+    its prefix.
+  - Measured (`bcode bench mcpsearch`, 60 tools, six requests, two runs):
+    12 of 12 passed with search and without. The server processed 2,564
+    prompt tokens per request instead of 8,096 (−68%), at 4.5 model calls
+    instead of 2.0. The system-prompt note names the deferred tools: with
+    only the server's name, the model searched the project instead.
+- **Fixes:**
+  - `grep` through ripgrep returned files in a different order each run;
+    it now sorts by path, and skips the directories the built-in search
+    skips (`node_modules`, `vendor`, `target`, …).
+  - File stamps of a session started in a subdirectory were not recorded:
+    the path was relative to the working directory, not the project root.
+  - A data race in the command sandbox: the cancel could read a process
+    group id that was still being written, and leave the group running.
+- **Measured in the agent loop:** no measurable change end to end. Tools
+  take about 0.2 s of a direct task's 30–60 s. The direct suite passed 25
+  of 26 tasks in both runs after and 24 in both before. Bounded mode passed
+  16 of 19 (18 the day before): one task did not start for Docker, and one
+  passes about half the time on both builds (reruns).
+- **Consistency:** a test checks that direct mode refuses to read exactly
+  the files bounded mode masks in its container.
+
 ### Context: session state and pruned observations
 
 - **Command output is pruned before it enters the history**

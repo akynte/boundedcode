@@ -88,7 +88,12 @@ history with the session state (`state.go`, `compact.go`); command output
 is pruned before it enters the history (`observe.go`, `internal/prune`),
 its original kept for recall; after each edit a cheap check runs (`check.go`) and, in
 a git repository, the files its history usually changes with the edited
-one are named (`cochange.go`). The answer streams through the gateway,
+one are named (`cochange.go`). Each tool call is prepared, run and
+finished in order, except that calls of one reply that change nothing run
+together (`batch.go`); file tools change files through `internal/fileedit`
+(atomic, all or nothing, conflicts detected), and every tool is described
+in the vocabulary both modes share (`capabilities.go`, `internal/capability`;
+[capabilities](capabilities.md)). The answer streams through the gateway,
 which folds the stream into one metered response.
 It has no container; bounded mode (tasks) keeps the sandbox, the checks and
 the evidence gate.
@@ -147,6 +152,8 @@ Interfaces exist only where replacement is plausible:
 | — (concrete) | `internal/stats` | success metrics from the ledger (`boundedcode stats`) |
 | `repointel.Navigator` | `internal/repointel` | `serena` (Serena v1.7.0 over language servers; keyed by checkout root), `TextNavigator` (definition patterns of `internal/lang`), `Composite` (routes each question by the file's language: a server where one covers it, patterns elsewhere) |
 | — (concrete) **[exp]** | `internal/retrieve` | retrieval for a message or a retry: strategies selected from the request and the evidence, one bounded scan, ranking by reliability and specificity, provenance (revision, blob id, strategies); used by direct mode's retrieval block and bounded mode's failure sources ([Retrieval](../usage/retrieval.md)) |
+| — (concrete) **[exp]** | `internal/capability` | what tools do, in both modes: effects, concurrency, the subject rules match, outcome codes, bounded mode's OpenHands tools and the classification of their actions ([capabilities](capabilities.md)) |
+| — (concrete) **[exp]** | `internal/fileedit` | the editing engine of the file tools: replacement (exact, then tolerant of indentation), changes to several files applied together or not at all, conflict detection against the content last seen, atomic replacement |
 | — (concrete) **[exp]** | `internal/prune` | deterministic, language-agnostic pruning of command output to a budget: failures, assertions, located messages, the project's stack frames and the outcome kept, what was dropped named; used by direct mode's observations and session state ([Context and session state](../usage/context.md)) |
 | `frontier.Provider` | `internal/frontier` | `codex` (subscription CLI) and a manual/clipboard provider (separate from the agent's model provider) |
 | `sandbox.Sandbox` | `internal/sandbox` | `docker` and `none` (development only, refused for autonomous tasks unless explicitly overridden) |

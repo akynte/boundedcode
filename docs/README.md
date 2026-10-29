@@ -21,6 +21,7 @@
 | Page | What it covers |
 |---|---|
 | [System architecture](architecture/system-architecture.md) | Processes, interfaces, control loop, context planning, package map |
+| [Tool capabilities](architecture/capabilities.md) | Direct and bounded mode compared (tools, permissions, context, sessions, execution, verification, errors, events, traces, accounting); what they share and keep apart; direct mode's tool pipeline, concurrent calls, editing, MCP discovery |
 | [Everyday development: direct mode](design/everyday-agent.md) | The two-mode product shape, the competitive gap, phases 17–23 and what phase 17 built |
 | [Tool coverage](design/tool-coverage.md) | Every Pi, Qwen Code and Claude Code tool and capability, and its BoundedCode equivalent |
 | [Sandbox design](design/sandbox.md) | Threat model, controls, adversarial tests, residual risks |
@@ -41,6 +42,7 @@
 | [Retrieval benchmark (2026-10)](benchmarks/retrieval-2026-10.md) | Retrieval measured apart from patch correctness on 267 real issues in ten languages (development and held-out repositories), then in the agent loop: recall, precision, context, latency, tool calls, redundant reads, completion |
 | [Inference benchmark (2026-10)](benchmarks/inference-2026-10.md) | Reasoning in the history, the offload threshold and structured output, each measured before and after: task results, prompt tokens the server evaluated, prompt time, time to the first token, parseable replies |
 | [Context benchmark (2026-10)](benchmarks/context-2026-10.md) | Command-output pruning on 42 real outputs (development and held out), the session state against the free-text summary in the agent loop, the cache-aligned notes request, and pruning by a model (rejected): evidence kept, tokens, pass rate, summary latency, cache |
+| [Orchestration benchmark (2026-10)](benchmarks/orchestration-2026-10.md) | Calls of one reply run together, MCP tools found on demand, and both modes' suites before and after the shared tool architecture: tool latency, tool calls, tokens, time, determinism and policy consistency |
 | [Direct-mode suite (2026-10)](benchmarks/direct-mode-suite-2026-10.md) | The everyday agent on 13 tasks and 2 sessions with the local model: pass rate, tool calls, cache hits, time, per change |
 | [Project detection](benchmarks/ecosystem-detection-2026-10.md) | Projects found in any language on 12 public repositories, with what was missed and fixed |
 | [Lease study](benchmarks/lease-study-2026-10.md) · [trail study](benchmarks/trail-study-2026-10.md) | Whether a request's text, or a repository's history, predicts what a change touches; measured on real commits before building on it |
