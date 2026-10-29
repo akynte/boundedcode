@@ -1,0 +1,206 @@
+{
+  "id": "suite-20261029T123611Z",
+  "model": "qwen3.6-35b-a3b",
+  "started": "2026-10-29T12:36:11.67367083Z",
+  "finished": "2026-10-29T12:54:13.438242147Z",
+  "results": [
+    {
+      "id": "cross-service-idempotency",
+      "category": "cross-service",
+      "model": "qwen3.6-35b-a3b",
+      "success": false,
+      "task_status": "completed",
+      "self_verified": false,
+      "tests_green": true,
+      "attempts": 3,
+      "local_tokens": 115843,
+      "generated_tokens": 26340,
+      "cached_prompt_tokens": 1440942,
+      "escalations": 0,
+      "local_only": false,
+      "condensations": 1,
+      "resumes": 0,
+      "wall_seconds": 1081.640004037,
+      "failed_checks": [
+        "payment-service: go test -race -count=3 ./...: ?   \texample.com/payment-service/cmd/server\t[no test files]\n--- FAIL: TestHiddenIdempotencyKeyConcurrent (0.00s)\n    hidden_accept_test.go:60: concurrent same-key requests: ids=2 events=2\nFAIL\nFAIL\texample.com/payment-service/internal/api\t0.014s\n?   \texample.com/payment-service/internal/config\t[no test files]\n?   \texample.com/payment-service/internal/events\t[no test files]\n?   \texample.com/payment-service/internal/store\t[no test files]\nFAIL\n",
+        "ledger-service: go test ./...: --- FAIL: TestHiddenDuplicateEvent (0.00s)\n    hidden_accept_test.go:19: balance=1500 entries=6\nFAIL\nFAIL\texample.com/ledger-service/internal/consumer\t0.001s\nok  \texample.com/ledger-service/internal/ledger\t0.002s\nFAIL\n"
+      ],
+      "task_id": "t20261029-cec6a2",
+      "state_dir": "~/.cache/boundedcode/bench-work/cross-service-idempotency-1793277371792608416/state",
+      "agent_patch": "~/.cache/boundedcode/bench-work/cross-service-idempotency-1793277371792608416/agent-ledger-service.patch",
+      "intel": {
+        "context_packs": 3,
+        "pack_tokens": 14925,
+        "code_tokens": 1814,
+        "serena_calls": 0,
+        "serena_errors": 0,
+        "serena_ms": 0,
+        "graph_calls": 12,
+        "graph_ms": 128.06,
+        "serena_symbols": 0,
+        "graph_symbols": 6,
+        "fallbacks": 0,
+        "agent_tool_calls": 55,
+        "agent_tools": {
+          "file_editor": 39,
+          "finish": 3,
+          "terminal": 12,
+          "think": 1
+        }
+      },
+      "language": "go",
+      "calls": {
+        "calls": 42,
+        "inference_seconds": 979.4046531460002,
+        "prefill_seconds": 168.70891000000006,
+        "decode_seconds": 806.2773589999998,
+        "reasoning_tokens": 0,
+        "cache_invalidations": 3,
+        "cache_invalidations_after_rewrite": 3,
+        "recomputed_prompt_tokens": 10924,
+        "prompt_tokens": 1530951,
+        "peak_call": 41
+      },
+      "verify_seconds": 29.245,
+      "verify_runs": [
+        {
+          "repo": "ledger-service",
+          "scope": "targeted",
+          "passed": false,
+          "seconds": 5.516
+        },
+        {
+          "repo": "payment-service",
+          "scope": "targeted",
+          "passed": false,
+          "seconds": 6.178
+        },
+        {
+          "repo": "ledger-service",
+          "scope": "targeted",
+          "passed": true,
+          "seconds": 1.898
+        },
+        {
+          "repo": "payment-service",
+          "scope": "targeted",
+          "passed": true,
+          "seconds": 2.597
+        },
+        {
+          "repo": "ledger-service",
+          "scope": "full",
+          "passed": true,
+          "seconds": 1.865
+        },
+        {
+          "repo": "payment-service",
+          "scope": "full",
+          "passed": true,
+          "seconds": 2.451
+        },
+        {
+          "repo": "ledger-service",
+          "scope": "targeted",
+          "passed": true,
+          "seconds": 1.935
+        },
+        {
+          "repo": "payment-service",
+          "scope": "targeted",
+          "passed": true,
+          "seconds": 2.487
+        },
+        {
+          "repo": "ledger-service",
+          "scope": "full",
+          "passed": true,
+          "seconds": 1.846
+        },
+        {
+          "repo": "payment-service",
+          "scope": "full",
+          "passed": true,
+          "seconds": 2.472
+        }
+      ],
+      "failure_class": "model",
+      "resources": {
+        "harness_rss_mib": 37.62109375,
+        "model_server_rss_mib": 27564.6015625,
+        "gpu_mem_used_mib": 7155,
+        "sandbox_mem_mib": 531.6,
+        "samples": 1069
+      }
+    }
+  ],
+  "summary": {
+    "tasks": 1,
+    "verified": 0,
+    "success_rate": 0,
+    "local_only_completion_rate": 0,
+    "frontier_escalation_rate": 0,
+    "verified_tasks_per_hour": 0,
+    "attempts_per_successful_task": 0,
+    "wall_seconds_per_task": 1081.640004037,
+    "local_tokens_per_task": 115843,
+    "self_verified_but_hidden_failed": 0
+  },
+  "environment": {
+    "build": "dev 74e6f0c1c132",
+    "os": "linux/amd64",
+    "cpu": "13th Gen Intel(R) Core(TM) i7-13620H",
+    "cpus": 16,
+    "mem_mib": 62741,
+    "gpu": "NVIDIA GeForce RTX 4060 Laptop GPU, 8188 MiB, 595.99.02",
+    "model": {
+      "file": "Qwen3.6-35B-A3B-UD-Q4_K_M.gguf",
+      "profile": "qwen3.6-35b-a3b",
+      "provider": "local",
+      "repo": "unsloth/Qwen3.6-35B-A3B-GGUF",
+      "revision": "a483e9e6cbd595906af30beda3187c2663a1118c",
+      "sampling": {
+        "min_p": 0,
+        "presence_penalty": 0,
+        "repeat_penalty": 0,
+        "temperature": 0.6,
+        "top_k": 20,
+        "top_p": 0.95
+      },
+      "server": {
+        "batch_size": 2048,
+        "cache_reuse": 0,
+        "cache_type_k": "q8_0",
+        "cache_type_v": "q8_0",
+        "ctx_size": 131072,
+        "extra_args": [],
+        "flash_attn": "on",
+        "gpu_layers": 999,
+        "jinja": true,
+        "mlock": false,
+        "n_cpu_moe": 35,
+        "no_mmap": false,
+        "parallel": 1,
+        "reasoning": "",
+        "reasoning_budget": 0,
+        "reasoning_budget_message": "",
+        "threads": 8,
+        "ubatch_size": 2048
+      },
+      "sha256": "ac0e2c1189e055faa36eff361580e79c5bd6f8e76bffb4ce547f167d53e31a61",
+      "size_bytes": 22134528992
+    },
+    "server": "llama.cpp 0.5.0-dev (build 11146, commit 7fe450e19)",
+    "toolchains": {
+      "docker": "Docker version 29.9.1, build dfc520d",
+      "git": "git version 2.53.0",
+      "go": "go version go1.27.3 linux/amd64",
+      "node": "v24.22.0",
+      "python3": "Python 3.14.4"
+    },
+    "tasks_sha256": "99dd33b0a5b0a9a9",
+    "fixtures_sha256": {
+      "payment-platform": "c151d9d9d3c4dcd4"
+    }
+  }
+}

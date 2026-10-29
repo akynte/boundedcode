@@ -1,0 +1,30 @@
+goos: linux
+goarch: amd64
+pkg: github.com/akynte/boundedcode/internal/direct
+cpu: 13th Gen Intel(R) Core(TM) i7-13620H
+BenchmarkReplyCalls/read6/parallel1-16         	       5	   9388520 ns/op	         9.000 ms/reply
+BenchmarkReplyCalls/read6/parallel1-16         	       5	   8920031 ns/op	         9.000 ms/reply
+BenchmarkReplyCalls/read6/parallel1-16         	       5	   9626812 ns/op	         9.000 ms/reply
+BenchmarkReplyCalls/read6/parallel4-16         	       5	   7322885 ns/op	         7.000 ms/reply
+BenchmarkReplyCalls/read6/parallel4-16         	       5	   7232819 ns/op	         7.000 ms/reply
+BenchmarkReplyCalls/read6/parallel4-16         	       5	   6834093 ns/op	         6.000 ms/reply
+BenchmarkReplyCalls/grep4/parallel1-16         	       5	1375903310 ns/op	      1383 ms/reply
+BenchmarkReplyCalls/grep4/parallel1-16         	       5	1383661182 ns/op	      1381 ms/reply
+BenchmarkReplyCalls/grep4/parallel1-16         	       5	1392838842 ns/op	      1382 ms/reply
+BenchmarkReplyCalls/grep4/parallel4-16         	       5	 503002977 ns/op	       506.0 ms/reply
+BenchmarkReplyCalls/grep4/parallel4-16         	       5	 499973226 ns/op	       509.0 ms/reply
+BenchmarkReplyCalls/grep4/parallel4-16         	       5	 502394326 ns/op	       501.0 ms/reply
+BenchmarkReplyCalls/symbols4/parallel1-16      	       5	  71782425 ns/op	        73.00 ms/reply
+BenchmarkReplyCalls/symbols4/parallel1-16      	       5	  74139095 ns/op	        74.00 ms/reply
+BenchmarkReplyCalls/symbols4/parallel1-16      	       5	  72903461 ns/op	        72.00 ms/reply
+BenchmarkReplyCalls/symbols4/parallel4-16      	       5	  33786159 ns/op	        33.00 ms/reply
+BenchmarkReplyCalls/symbols4/parallel4-16      	       5	  34114030 ns/op	        34.00 ms/reply
+BenchmarkReplyCalls/symbols4/parallel4-16      	       5	  35000162 ns/op	        34.00 ms/reply
+BenchmarkReplyCalls/fetch4/parallel1-16        	       5	 808011406 ns/op	       808.0 ms/reply
+BenchmarkReplyCalls/fetch4/parallel1-16        	       5	 807930658 ns/op	       808.0 ms/reply
+BenchmarkReplyCalls/fetch4/parallel1-16        	       5	 807794671 ns/op	       807.0 ms/reply
+BenchmarkReplyCalls/fetch4/parallel4-16        	       5	 205316043 ns/op	       205.0 ms/reply
+BenchmarkReplyCalls/fetch4/parallel4-16        	       5	 205588474 ns/op	       205.0 ms/reply
+BenchmarkReplyCalls/fetch4/parallel4-16        	       5	 205253649 ns/op	       205.0 ms/reply
+PASS
+ok  	github.com/akynte/boundedcode/internal/direct	54.487s

@@ -1,0 +1,434 @@
+{
+ "started": "2026-10-29T09:12:46.023345844Z",
+ "model": "qwen3.6-35b-a3b",
+ "outcomes": [
+  {
+   "case": "refund-status",
+   "arm": "off",
+   "run": 1,
+   "success": true,
+   "right_tool": true,
+   "model_calls": 2,
+   "tool_calls": 1,
+   "tools": [
+    "mcp__ops__get_refund"
+   ],
+   "prompt_tokens": 20758,
+   "evaluated_tokens": 8294,
+   "definition_tokens": 10548,
+   "seconds": 14.357521825,
+   "answer": "Refund R7 has status **approved** with an amount of **12.50 EUR**."
+  },
+  {
+   "case": "refund-status",
+   "arm": "on",
+   "run": 1,
+   "success": true,
+   "right_tool": true,
+   "model_calls": 9,
+   "tool_calls": 7,
+   "tools": [
+    "mcp_search",
+    "mcp_search",
+    "mcp__ops__search_refund",
+    "mcp__ops__list_refund",
+    "bash",
+    "bash",
+    "mcp__ops__get_refund"
+   ],
+   "prompt_tokens": 45352,
+   "evaluated_tokens": 2857,
+   "definition_tokens": 3748,
+   "seconds": 28.349712187,
+   "answer": "Refund **R7** has a status of **approved** with an amount of **12.50 EUR**."
+  },
+  {
+   "case": "shipment-location",
+   "arm": "off",
+   "run": 1,
+   "success": true,
+   "right_tool": true,
+   "model_calls": 2,
+   "tool_calls": 1,
+   "tools": [
+    "mcp__ops__get_shipment"
+   ],
+   "prompt_tokens": 20786,
+   "evaluated_tokens": 8093,
+   "definition_tokens": 10548,
+   "seconds": 14.444023806,
+   "answer": "Shipment S-1009 is currently in **Rotterdam** with an ETA of **2026-11-02**."
+  },
+  {
+   "case": "shipment-location",
+   "arm": "on",
+   "run": 1,
+   "success": true,
+   "right_tool": true,
+   "model_calls": 3,
+   "tool_calls": 3,
+   "tools": [
+    "mcp_search",
+    "ls",
+    "mcp__ops__get_shipment"
+   ],
+   "prompt_tokens": 14290,
+   "evaluated_tokens": 2517,
+   "definition_tokens": 3748,
+   "seconds": 13.945783633,
+   "answer": "Shipment **S-1009** is currently at **Rotterdam**, with an estimated arrival date of **2026-11-02**."
+  },
+  {
+   "case": "delete-alert",
+   "arm": "off",
+   "run": 1,
+   "success": true,
+   "right_tool": true,
+   "model_calls": 2,
+   "tool_calls": 1,
+   "tools": [
+    "mcp__ops__delete_alert"
+   ],
+   "prompt_tokens": 20754,
+   "evaluated_tokens": 8069,
+   "definition_tokens": 10548,
+   "seconds": 13.555120215,
+   "answer": "Done — alert A-77 has been deleted."
+  },
+  {
+   "case": "delete-alert",
+   "arm": "on",
+   "run": 1,
+   "success": true,
+   "right_tool": true,
+   "model_calls": 4,
+   "tool_calls": 2,
+   "tools": [
+    "mcp_search",
+    "mcp__ops__delete_alert"
+   ],
+   "prompt_tokens": 18705,
+   "evaluated_tokens": 2516,
+   "definition_tokens": 3748,
+   "seconds": 12.08630845,
+   "answer": "Alert A-77 has been deleted. Done."
+  },
+  {
+   "case": "metric-value",
+   "arm": "off",
+   "run": 1,
+   "success": true,
+   "right_tool": true,
+   "model_calls": 2,
+   "tool_calls": 1,
+   "tools": [
+    "mcp__ops__get_metric"
+   ],
+   "prompt_tokens": 20761,
+   "evaluated_tokens": 8075,
+   "definition_tokens": 10548,
+   "seconds": 13.955899114,
+   "answer": "The current value of metric **M-cpu** is **73%** (unit: percent)."
+  },
+  {
+   "case": "metric-value",
+   "arm": "on",
+   "run": 1,
+   "success": true,
+   "right_tool": true,
+   "model_calls": 3,
+   "tool_calls": 2,
+   "tools": [
+    "mcp_search",
+    "mcp__ops__get_metric"
+   ],
+   "prompt_tokens": 14151,
+   "evaluated_tokens": 2490,
+   "definition_tokens": 3748,
+   "seconds": 11.608399888,
+   "answer": "The current value of metric **M-cpu** is **73%**."
+  },
+  {
+   "case": "user-email",
+   "arm": "off",
+   "run": 1,
+   "success": true,
+   "right_tool": true,
+   "model_calls": 2,
+   "tool_calls": 1,
+   "tools": [
+    "mcp__ops__get_user"
+   ],
+   "prompt_tokens": 20773,
+   "evaluated_tokens": 8076,
+   "definition_tokens": 10548,
+   "seconds": 14.022198706,
+   "answer": "User U-5's email address is **dana@example.com**."
+  },
+  {
+   "case": "user-email",
+   "arm": "on",
+   "run": 1,
+   "success": true,
+   "right_tool": true,
+   "model_calls": 4,
+   "tool_calls": 2,
+   "tools": [
+    "mcp_search",
+    "mcp__ops__get_user"
+   ],
+   "prompt_tokens": 18722,
+   "evaluated_tokens": 2523,
+   "definition_tokens": 3748,
+   "seconds": 12.026769633,
+   "answer": "User U-5's email address is **dana@example.com**."
+  },
+  {
+   "case": "invoice-total",
+   "arm": "off",
+   "run": 1,
+   "success": true,
+   "right_tool": true,
+   "model_calls": 2,
+   "tool_calls": 1,
+   "tools": [
+    "mcp__ops__get_invoice"
+   ],
+   "prompt_tokens": 20775,
+   "evaluated_tokens": 8085,
+   "definition_tokens": 10548,
+   "seconds": 14.519062604,
+   "answer": "The total for invoice **INV-204** is **1,240.00 EUR** (status: paid)."
+  },
+  {
+   "case": "invoice-total",
+   "arm": "on",
+   "run": 1,
+   "success": true,
+   "right_tool": true,
+   "model_calls": 3,
+   "tool_calls": 2,
+   "tools": [
+    "mcp_search",
+    "mcp__ops__get_invoice"
+   ],
+   "prompt_tokens": 14118,
+   "evaluated_tokens": 2498,
+   "definition_tokens": 3748,
+   "seconds": 11.512083507,
+   "answer": "The total of invoice **INV-204** is **1,240.00 EUR** (status: paid)."
+  },
+  {
+   "case": "refund-status",
+   "arm": "off",
+   "run": 2,
+   "success": true,
+   "right_tool": true,
+   "model_calls": 2,
+   "tool_calls": 1,
+   "tools": [
+    "mcp__ops__get_refund"
+   ],
+   "prompt_tokens": 20767,
+   "evaluated_tokens": 8076,
+   "definition_tokens": 10548,
+   "seconds": 14.434997508,
+   "answer": "Refund **R7** has status **approved** with an amount of **12.50 EUR**."
+  },
+  {
+   "case": "refund-status",
+   "arm": "on",
+   "run": 2,
+   "success": true,
+   "right_tool": true,
+   "model_calls": 4,
+   "tool_calls": 2,
+   "tools": [
+    "mcp_search",
+    "mcp__ops__get_refund"
+   ],
+   "prompt_tokens": 18737,
+   "evaluated_tokens": 2525,
+   "definition_tokens": 3748,
+   "seconds": 12.656657791,
+   "answer": "Refund **R7** has status **approved** with an amount of **12.50 EUR**."
+  },
+  {
+   "case": "shipment-location",
+   "arm": "off",
+   "run": 2,
+   "success": true,
+   "right_tool": true,
+   "model_calls": 2,
+   "tool_calls": 1,
+   "tools": [
+    "mcp__ops__get_shipment"
+   ],
+   "prompt_tokens": 20785,
+   "evaluated_tokens": 8089,
+   "definition_tokens": 10548,
+   "seconds": 14.565492652,
+   "answer": "Shipment S-1009 is currently in **Rotterdam**, with an estimated arrival date of **2026-11-02**."
+  },
+  {
+   "case": "shipment-location",
+   "arm": "on",
+   "run": 2,
+   "success": true,
+   "right_tool": true,
+   "model_calls": 5,
+   "tool_calls": 2,
+   "tools": [
+    "mcp_search",
+    "mcp__ops__get_shipment"
+   ],
+   "prompt_tokens": 24293,
+   "evaluated_tokens": 2573,
+   "definition_tokens": 3748,
+   "seconds": 16.101119286,
+   "answer": "According to the operations system, shipment **S-1009** is currently at **Rotterdam**, with an estimated arrival (ETA) of **2026-11-02**."
+  },
+  {
+   "case": "delete-alert",
+   "arm": "off",
+   "run": 2,
+   "success": true,
+   "right_tool": true,
+   "model_calls": 2,
+   "tool_calls": 1,
+   "tools": [
+    "mcp__ops__delete_alert"
+   ],
+   "prompt_tokens": 20748,
+   "evaluated_tokens": 8069,
+   "definition_tokens": 10548,
+   "seconds": 13.373341008,
+   "answer": "Alert A-77 has been deleted."
+  },
+  {
+   "case": "delete-alert",
+   "arm": "on",
+   "run": 2,
+   "success": true,
+   "right_tool": true,
+   "model_calls": 5,
+   "tool_calls": 2,
+   "tools": [
+    "mcp_search",
+    "mcp__ops__delete_alert"
+   ],
+   "prompt_tokens": 23850,
+   "evaluated_tokens": 2550,
+   "definition_tokens": 3748,
+   "seconds": 14.565350222,
+   "answer": "Alert A-77 has been deleted from the operations system."
+  },
+  {
+   "case": "metric-value",
+   "arm": "off",
+   "run": 2,
+   "success": true,
+   "right_tool": true,
+   "model_calls": 2,
+   "tool_calls": 1,
+   "tools": [
+    "mcp__ops__get_metric"
+   ],
+   "prompt_tokens": 20761,
+   "evaluated_tokens": 8075,
+   "definition_tokens": 10548,
+   "seconds": 13.943312477,
+   "answer": "The current value of metric **M-cpu** is **73%** (unit: percent)."
+  },
+  {
+   "case": "metric-value",
+   "arm": "on",
+   "run": 2,
+   "success": true,
+   "right_tool": true,
+   "model_calls": 4,
+   "tool_calls": 2,
+   "tools": [
+    "mcp_search",
+    "mcp__ops__get_metric"
+   ],
+   "prompt_tokens": 19158,
+   "evaluated_tokens": 2524,
+   "definition_tokens": 3748,
+   "seconds": 13.120126831,
+   "answer": "The current value of metric **M-cpu** is **73%**."
+  },
+  {
+   "case": "user-email",
+   "arm": "off",
+   "run": 2,
+   "success": true,
+   "right_tool": true,
+   "model_calls": 2,
+   "tool_calls": 1,
+   "tools": [
+    "mcp__ops__get_user"
+   ],
+   "prompt_tokens": 20773,
+   "evaluated_tokens": 8076,
+   "definition_tokens": 10548,
+   "seconds": 14.077414414,
+   "answer": "User U-5's email address is **dana@example.com**."
+  },
+  {
+   "case": "user-email",
+   "arm": "on",
+   "run": 2,
+   "success": true,
+   "right_tool": true,
+   "model_calls": 3,
+   "tool_calls": 2,
+   "tools": [
+    "mcp_search",
+    "mcp__ops__get_user"
+   ],
+   "prompt_tokens": 14100,
+   "evaluated_tokens": 2491,
+   "definition_tokens": 3748,
+   "seconds": 10.51180321,
+   "answer": "User U-5's email address is **dana@example.com**."
+  },
+  {
+   "case": "invoice-total",
+   "arm": "off",
+   "run": 2,
+   "success": true,
+   "right_tool": true,
+   "model_calls": 2,
+   "tool_calls": 1,
+   "tools": [
+    "mcp__ops__get_invoice"
+   ],
+   "prompt_tokens": 20776,
+   "evaluated_tokens": 8085,
+   "definition_tokens": 10548,
+   "seconds": 14.617056883,
+   "answer": "The total of invoice **INV-204** is **1,240.00 EUR** (status: paid)."
+  },
+  {
+   "case": "invoice-total",
+   "arm": "on",
+   "run": 2,
+   "success": true,
+   "right_tool": true,
+   "model_calls": 7,
+   "tool_calls": 4,
+   "tools": [
+    "mcp_search",
+    "mcp_search",
+    "mcp__ops__search_invoice",
+    "mcp__ops__get_invoice"
+   ],
+   "prompt_tokens": 35162,
+   "evaluated_tokens": 2707,
+   "definition_tokens": 3748,
+   "seconds": 21.490118422,
+   "answer": "The total of invoice **INV-204** is **1,240.00 EUR** (status: paid)."
+  }
+ ]
+}
