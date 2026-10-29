@@ -83,7 +83,10 @@ from the chat (its default mode) and from `bcode chat -p` / `bcode -p`.
 The router (`router.go`, ADR-0012) sends each message to chat, code or
 verify. Before each model call the history is held to a working-set budget
 by setting older tool results aside (`workingset.go`, the `recall` tool
-brings one back); after each edit a cheap check runs (`check.go`) and, in
+brings one back) and, when that is not enough, by replacing the older
+history with the session state (`state.go`, `compact.go`); command output
+is pruned before it enters the history (`observe.go`, `internal/prune`),
+its original kept for recall; after each edit a cheap check runs (`check.go`) and, in
 a git repository, the files its history usually changes with the edited
 one are named (`cochange.go`). The answer streams through the gateway,
 which folds the stream into one metered response.
@@ -144,6 +147,7 @@ Interfaces exist only where replacement is plausible:
 | — (concrete) | `internal/stats` | success metrics from the ledger (`boundedcode stats`) |
 | `repointel.Navigator` | `internal/repointel` | `serena` (Serena v1.7.0 over language servers; keyed by checkout root), `TextNavigator` (definition patterns of `internal/lang`), `Composite` (routes each question by the file's language: a server where one covers it, patterns elsewhere) |
 | — (concrete) **[exp]** | `internal/retrieve` | retrieval for a message or a retry: strategies selected from the request and the evidence, one bounded scan, ranking by reliability and specificity, provenance (revision, blob id, strategies); used by direct mode's retrieval block and bounded mode's failure sources ([Retrieval](../usage/retrieval.md)) |
+| — (concrete) **[exp]** | `internal/prune` | deterministic, language-agnostic pruning of command output to a budget: failures, assertions, located messages, the project's stack frames and the outcome kept, what was dropped named; used by direct mode's observations and session state ([Context and session state](../usage/context.md)) |
 | `frontier.Provider` | `internal/frontier` | `codex` (subscription CLI) and a manual/clipboard provider (separate from the agent's model provider) |
 | `sandbox.Sandbox` | `internal/sandbox` | `docker` and `none` (development only, refused for autonomous tasks unless explicitly overridden) |
 

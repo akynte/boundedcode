@@ -12,6 +12,7 @@
 | [Direct-mode command sandbox](usage/direct-sandbox.md) | What commands can reach on each platform, the network proxy, the fallback when containment is weaker, mechanisms evaluated, residual risks |
 | [Direct-mode security policy](usage/security-policy.md) | Trust boundaries, sensitive operations and how they are authorized, the verification fallback, MCP trust and pinning, residual risks |
 | [Inference protocol](usage/inference.md) | What the gateway does with each request and answer, per provider: capabilities, reasoning in the history, structured output, failures it handles, what each call records, llama.cpp cache settings |
+| [Context and session state](usage/context.md) | How long sessions stay within the model's working set: command output pruning, setting results aside, the session state that replaces older history (record and model notes), trust, persistence, stale context |
 | [Retrieval](usage/retrieval.md) | What travels with each message and each retry: strategies, when each runs, ranking, language servers, provenance and staleness, compaction and recall, budgets, limits |
 | [Serena](usage/serena.md) | Optional LSP-backed symbol navigation |
 
@@ -39,6 +40,7 @@
 | [Verification benchmark (2026-10)](benchmarks/verification-benchmark-2026-10.md) | False acceptance and false rejection of the verification pipeline, before and after test integrity and mutation, in Go, Python, JavaScript, TypeScript, Rust, Java and a mixed repository |
 | [Retrieval benchmark (2026-10)](benchmarks/retrieval-2026-10.md) | Retrieval measured apart from patch correctness on 267 real issues in ten languages (development and held-out repositories), then in the agent loop: recall, precision, context, latency, tool calls, redundant reads, completion |
 | [Inference benchmark (2026-10)](benchmarks/inference-2026-10.md) | Reasoning in the history, the offload threshold and structured output, each measured before and after: task results, prompt tokens the server evaluated, prompt time, time to the first token, parseable replies |
+| [Context benchmark (2026-10)](benchmarks/context-2026-10.md) | Command-output pruning on 42 real outputs (development and held out), the session state against the free-text summary in the agent loop, the cache-aligned notes request, and pruning by a model (rejected): evidence kept, tokens, pass rate, summary latency, cache |
 | [Direct-mode suite (2026-10)](benchmarks/direct-mode-suite-2026-10.md) | The everyday agent on 13 tasks and 2 sessions with the local model: pass rate, tool calls, cache hits, time, per change |
 | [Project detection](benchmarks/ecosystem-detection-2026-10.md) | Projects found in any language on 12 public repositories, with what was missed and fixed |
 | [Lease study](benchmarks/lease-study-2026-10.md) · [trail study](benchmarks/trail-study-2026-10.md) | Whether a request's text, or a repository's history, predicts what a change touches; measured on real commits before building on it |

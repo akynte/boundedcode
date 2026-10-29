@@ -78,8 +78,11 @@ them, `/resume [ID]` continues one, `/new` starts another. When the
 history outgrows the working set (`direct.working_set_tokens`, 32K tokens
 for a local model), the oldest tool results the model has already seen are
 set aside behind a one-line placeholder, and the `recall` tool brings one
-back; only when that is not enough is the conversation summarised
-(`/compact` does it on request). `esc` interrupts a run; what was done so
+back; only when that is not enough is the conversation summarised into
+the session state, which quotes your requests and constraints and records
+the files, commands and the model's notes (`/compact` does it on request;
+[Context and session state](context.md)). Long command output is pruned to
+its failures and outcome, and `recall` shows the whole of it. `esc` interrupts a run; what was done so
 far is kept, and messages typed during a run are queued.
 
 The agent reads the project's instruction file (`AGENTS.md`,

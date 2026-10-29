@@ -197,6 +197,80 @@ used on real work.
   verification counts) extends `ecosystem.IsTest` (what history notes
   count).
 
+### Context: session state and pruned observations
+
+- **Command output is pruned before it enters the history**
+  ([reference](docs/usage/context.md)). Output with errors, failing tests,
+  stack traces, warnings, progress, downloads or passing tests to sort is
+  fitted to `direct.observation_bytes` (8 KiB local, 24 KiB cloud) by a
+  deterministic, language-agnostic pruner (`internal/prune`).
+  - It keeps the outcome at the end, the errors, failing tests and
+    assertions with their surroundings, the located messages and the
+    project's stack frames.
+  - It folds repeated lines and messages, and library frames.
+  - It drops progress, downloads and passing tests.
+  - It names what it dropped, and says so when errors did not fit.
+  - The original is kept next to the session file. `recall` shows any part
+    of it by line range or by pattern, also after a resume.
+  - Output with nothing to sort (a diff, a file) is left as it is under the
+    cap.
+  - `direct.prune: false` turns pruning off.
+- **Measured on 42 real outputs** of compilers, test runners, linters,
+  package managers, stack traces and searches in seven languages
+  ([benchmark](docs/benchmarks/context-2026-10.md)), against the 16 KiB
+  head-and-tail cut used before:
+  - every evidence line kept, in the development set and in the held-out
+    set;
+  - about half the tokens: −50% and −47%.
+- **The session state replaces the free-text summary**
+  (`direct.compaction: structured`; `legacy` keeps the old summary).
+  - The record is built from the session every time: the user's requests
+    and constraints in their own words, the files read and changed with
+    their git blobs (marked when they changed since), the symbols looked
+    up, the test and build runs with their failures (marked when later
+    edits superseded them), and the checkout.
+  - The model's notes cover the rest: status, findings, decisions, pending
+    actions, open questions and the next step.
+  - The notes request continues the conversation as the model last saw it
+    (the same tools, none callable, a JSON schema for the reply), so the
+    server's prompt cache serves it: 27 new prompt tokens instead of
+    6,924 on a 7K-token conversation. Results set aside in the same pass
+    are sent as the last call sent them, when the request fits; otherwise
+    the history changed near its start and the server processed it again.
+  - When the conversation does not fit, the notes come from a shortened
+    transcript. When no notes can be had, the record alone is the summary
+    and the session goes on.
+  - An interrupted compaction changes nothing.
+- **Trust.**
+  - Only the user's own typed messages fill the requests and constraints.
+  - Model and tool text is labelled, one line per item, and cannot open or
+    close a section.
+  - The summary never authorizes anything.
+- **Restored as it was.** The state is written to the session file, so a
+  resumed session, or one continued with another model, has it.
+- **Measured in the agent loop** (two runs per arm):
+  - the full suite at the defaults: 25 of 26 in both runs, against 23 and
+    24 before; on average 9% fewer prompt tokens per task (46.0k against
+    50.4k) and 8% less time;
+  - the five long-session tasks at a 6K working set, where most sessions
+    are summarised: 10 of 10 with the session state and pruning, 9 of 10
+    without pruning, 7 of 10 with the free-text summary, in 173 s per task
+    instead of 396 s;
+  - pruning is kept: it lost no task, and saved 11% of the tokens the
+    server processed;
+  - after the cache fix, the median summary processed 467 prompt tokens
+    instead of 3,971.
+- **Benchmarks:**
+  - `bcode bench prune` scores pruning strategies on the corpus.
+  - `bench direct` takes `--compaction`, `--prune` and
+    `--observation-bytes`, and reports each summary's cost (time, the
+    tokens the server evaluated for it and after it, how its notes were
+    written), pruned outputs and freshness notes.
+  - Session tasks can change files between messages (`edits`) and resume
+    the session from its file (`resume`).
+  - New session tasks: `session-noisy-tests`, `session-stale-config` and
+    `session-resume-constraints`.
+
 ### Inference protocol: reasoning in the history, recovered failures, structured output
 
 - **The model sees its own reasoning again** where its chat template

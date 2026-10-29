@@ -152,7 +152,8 @@ append-only. The summary ends with an index of the larger tool results it
 replaced (`call_12: read internal/x.go (4,120 bytes)`), so `recall` can
 bring any of them back. Recall searches the archive too, also after a
 session is reloaded from disk. Detail that a summary drops is therefore
-never lost, only set aside.
+never lost, only set aside. What the summary itself holds is in
+[Context and session state](context.md).
 
 ## Budgets and determinism
 
