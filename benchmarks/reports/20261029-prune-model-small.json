@@ -1,0 +1,1791 @@
+{
+ "started": "2026-10-29T01:47:16.328102977Z",
+ "budgets": [
+  4096
+ ],
+ "cases": [
+  {
+   "id": "go-test-verbose",
+   "category": "test failure",
+   "must": [
+    "--- FAIL: TestRoundHalfEven",
+    "round_test\\.go:\\d+: Round\\(100\\.5\\) = 101, want 100",
+    "^FAIL\\s+example\\.com/money",
+    "exit status 1"
+   ],
+   "set": "dev"
+  },
+  {
+   "id": "go-build-errors",
+   "category": "compiler",
+   "must": [
+    "build\\.go:6:3: invalid operation",
+    "build\\.go:8:9: cannot use t",
+    "undefined: logf",
+    "build\\.go:35:\\d+: cannot use 42",
+    "exit status 1"
+   ],
+   "set": "dev"
+  },
+  {
+   "id": "go-vet",
+   "category": "linter",
+   "must": [
+    "vet\\.go:3:24: fmt\\.Printf format %d has arg",
+    "vet\\.go:3:55: unreachable code"
+   ],
+   "set": "dev"
+  },
+  {
+   "id": "go-panic",
+   "category": "stack trace",
+   "must": [
+    "panic: runtime error: index out of range \\[5\\] with length 5",
+    "main\\.go:10$",
+    "main\\.go:14",
+    "exit status \\d"
+   ],
+   "set": "dev"
+  },
+  {
+   "id": "go-build-x",
+   "category": "large terminal output",
+   "must": [
+    "main\\.go:6:14: undefined: undefinedName",
+    "exit status 1"
+   ],
+   "set": "dev"
+  },
+  {
+   "id": "go-mod-download",
+   "category": "dependency resolution",
+   "must": [
+    "example\\.com/does-not-exist@v0\\.1\\.0: reading .*404 Not Found",
+    "exit status 1"
+   ],
+   "set": "dev"
+  },
+  {
+   "id": "pip-install",
+   "category": "dependency resolution",
+   "must": [
+    "Successfully installed .*pytest-8\\.3\\.3",
+    "exit status 0"
+   ],
+   "set": "dev"
+  },
+  {
+   "id": "pip-install-error",
+   "category": "dependency resolution",
+   "must": [
+    "Could not find a version that satisfies the requirement requests==0\\.0\\.999",
+    "No matching distribution found for requests==0\\.0\\.999",
+    "exit status 1"
+   ],
+   "set": "dev"
+  },
+  {
+   "id": "pytest-verbose",
+   "category": "test failure",
+   "must": [
+    "FAILED test_inventory\\.py::test_reorder_point",
+    "assert 7 == 8",
+    "test_reorder_zero_safety\\[5-2-10\\]",
+    "3 failed, 120 passed",
+    "test_inventory\\.py:\\d+"
+   ],
+   "set": "dev"
+  },
+  {
+   "id": "python-traceback",
+   "category": "stack trace",
+   "must": [
+    "KeyError: .sku.",
+    "inventory\\.py\", line 13",
+    "run\\.py\", line \\d+",
+    "DeprecationWarning: config key"
+   ],
+   "set": "dev"
+  },
+  {
+   "id": "npm-install",
+   "category": "dependency resolution",
+   "must": [
+    "added \\d+ packages",
+    "exit status 0"
+   ],
+   "set": "dev"
+  },
+  {
+   "id": "tsc-errors",
+   "category": "compiler",
+   "must": [
+    "cart\\.ts\\(3,3\\): error TS2322",
+    "cart\\.ts\\(7,19\\): error TS2363",
+    "TS2304: Cannot find name .logger."
+   ],
+   "set": "dev"
+  },
+  {
+   "id": "eslint-output",
+   "category": "linter",
+   "must": [
+    "41:35\\s+error\\s+.undefinedThing. is not defined",
+    "43:28\\s+error\\s+.x. is constant",
+    "83 problems \\(2 errors, 81 warnings\\)"
+   ],
+   "set": "dev"
+  },
+  {
+   "id": "node-test",
+   "category": "test failure",
+   "must": [
+    "discount applies",
+    "NaN !== 90",
+    "cart\\.test\\.js:54",
+    "fail 1"
+   ],
+   "set": "dev"
+  },
+  {
+   "id": "node-stack",
+   "category": "stack trace",
+   "must": [
+    "TypeError: Cannot read properties of undefined \\(reading .amount.\\)",
+    "app\\.js:2:71",
+    "at load .*app\\.js:3"
+   ],
+   "set": "dev"
+  },
+  {
+   "id": "cargo-build-deps",
+   "category": "compiler",
+   "must": [
+    "error\\[E0308\\]: mismatched types",
+    "src/lib\\.rs:9:25",
+    "could not compile .rledger."
+   ],
+   "set": "dev"
+  },
+  {
+   "id": "cargo-test-backtrace",
+   "category": "test failure",
+   "must": [
+    "test tests::transfer_keeps_total \\.\\.\\. FAILED",
+    "panicked at src/lib\\.rs:15:9",
+    "assertion .left == right. failed",
+    "left: 90",
+    "right: 100",
+    "test result: FAILED"
+   ],
+   "set": "dev"
+  },
+  {
+   "id": "mvn-test-downloads",
+   "category": "test failure",
+   "must": [
+    "expected: \u003c100\u003e but was: \u003c90\u003e",
+    "OrdersTest\\.java:6",
+    "Tests run: 2, Failures: 1",
+    "BUILD FAILURE"
+   ],
+   "set": "dev"
+  },
+  {
+   "id": "gradle-compile-errors",
+   "category": "compiler",
+   "must": [
+    "Orders\\.java:4: error: cannot find symbol",
+    "Orders\\.java:5: error: cannot find symbol",
+    "Orders\\.java:6: error: cannot find symbol",
+    "Compilation failed"
+   ],
+   "set": "dev"
+  },
+  {
+   "id": "java-exception",
+   "category": "stack trace",
+   "must": [
+    "Caused by: java\\.lang\\.IllegalStateException: no balance for account b",
+    "Main\\.java:6",
+    "Main\\.java:15"
+   ],
+   "set": "dev"
+  },
+  {
+   "id": "search-func",
+   "category": "search results",
+   "must": [
+    "String\\(\\) string"
+   ],
+   "set": "dev"
+  },
+  {
+   "id": "search-todo",
+   "category": "search results",
+   "must": [
+    "TODO"
+   ],
+   "set": "dev"
+  },
+  {
+   "id": "find-listing",
+   "category": "large terminal output",
+   "must": [
+    "exit status 0"
+   ],
+   "set": "dev"
+  },
+  {
+   "id": "make-c-errors",
+   "category": "compiler",
+   "must": [
+    "main\\.c:6:20: error: implicit declaration of function .variance.",
+    "stats\\.c:11:63: error: expected .;. before",
+    "main\\.c:5:14: warning: format",
+    "not remade because of errors"
+   ],
+   "set": "heldout"
+  },
+  {
+   "id": "go-test-race",
+   "category": "test failure",
+   "must": [
+    "WARNING: DATA RACE",
+    "counter\\.go:5",
+    "counter_test\\.go:13",
+    "race detected during execution of test|--- FAIL: TestConcurrentInc"
+   ],
+   "set": "heldout"
+  },
+  {
+   "id": "go-testify-diff",
+   "category": "test failure",
+   "must": [
+    "--- FAIL: TestNormalize",
+    "Error Trace:.*orders_test\\.go:41",
+    "expected: orders\\.Order",
+    "actual\\s*: orders\\.Order",
+    "Status: \\(string\\) \\(len=4\\) \"open\""
+   ],
+   "set": "heldout"
+  },
+  {
+   "id": "pip-install-mypy-ruff",
+   "category": "dependency resolution",
+   "must": [
+    "Successfully installed .*mypy-1\\.13\\.0",
+    "exit status 0"
+   ],
+   "set": "heldout"
+  },
+  {
+   "id": "mypy-errors",
+   "category": "linter",
+   "must": [
+    "billing\\.py:9: error: Unsupported operand types",
+    "billing\\.py:13: error: Incompatible return value type",
+    "Found 5 errors in 1 file"
+   ],
+   "set": "heldout"
+  },
+  {
+   "id": "ruff-check",
+   "category": "linter",
+   "must": [
+    "billing\\.py:17:5: F841",
+    "billing\\.py:7:9: E741",
+    "Found 16 errors"
+   ],
+   "set": "heldout"
+  },
+  {
+   "id": "unittest-verbose",
+   "category": "test failure",
+   "must": [
+    "ERROR: test_no_discount",
+    "billing\\.py\", line 9, in invoice_total",
+    "TypeError: unsupported operand type",
+    "FAILED \\(errors=1\\)"
+   ],
+   "set": "heldout"
+  },
+  {
+   "id": "python-log-flood",
+   "category": "large terminal output",
+   "must": [
+    "fatal: queue .billing. does not exist",
+    "upstream returned 503",
+    "exit status 1"
+   ],
+   "set": "heldout"
+  },
+  {
+   "id": "npm-install-jest",
+   "category": "dependency resolution",
+   "must": [
+    "added 267 packages",
+    "exit status 0"
+   ],
+   "set": "heldout"
+  },
+  {
+   "id": "jest-failures",
+   "category": "test failure",
+   "must": [
+    "✕ percent coupon",
+    "Expected: 900",
+    "Received: -9000",
+    "price\\.test\\.js:42",
+    "Received: \"\\$12\\.3\"",
+    "Tests:\\s+2 failed, 40 passed"
+   ],
+   "set": "heldout"
+  },
+  {
+   "id": "npm-install-missing",
+   "category": "dependency resolution",
+   "must": [
+    "npm error code E404",
+    "404 Not Found - GET https://registry\\.npmjs\\.org/left-padd-not-a-real-package-xyz",
+    "exit status 1"
+   ],
+   "set": "heldout"
+  },
+  {
+   "id": "tsc-project",
+   "category": "compiler",
+   "must": [
+    "src/app\\.ts\\(2,23\\): error TS2322",
+    "src/user\\.ts\\(2,69\\): error TS2345",
+    "src/user\\.ts\\(3,56\\): error TS2322",
+    "TS2339: Property .name. does not exist"
+   ],
+   "set": "heldout"
+  },
+  {
+   "id": "cargo-clippy",
+   "category": "linter",
+   "must": [
+    "unneeded .return. statement",
+    "src/lib\\.rs:6:5",
+    "generated 8 warnings"
+   ],
+   "set": "heldout"
+  },
+  {
+   "id": "cargo-test-two-failures",
+   "category": "test failure",
+   "must": [
+    "test tests::by_zero \\.\\.\\. FAILED",
+    "panicked at src/lib\\.rs:2:16",
+    "attempt to divide by zero",
+    "panicked at src/lib\\.rs:9:32",
+    "left: 9",
+    "test result: FAILED"
+   ],
+   "set": "heldout"
+  },
+  {
+   "id": "gradle-test-failure",
+   "category": "test failure",
+   "must": [
+    "StockTest \u003e takeUnknownSkuIsRejected\\(\\) FAILED",
+    "but was: \u003cjava\\.lang\\.NullPointerException\u003e",
+    "Stock\\.java:7",
+    "StockTest\\.java:7",
+    "2 tests completed, 1 failed"
+   ],
+   "set": "heldout"
+  },
+  {
+   "id": "mvn-compile-error",
+   "category": "compiler",
+   "must": [
+    "Report\\.java:\\[5,46\\] .;. expected",
+    "COMPILATION ERROR",
+    "BUILD FAILURE"
+   ],
+   "set": "heldout"
+  },
+  {
+   "id": "search-node-modules",
+   "category": "search results",
+   "must": [
+    "node_modules/jest-\\S+:\\d+:"
+   ],
+   "set": "heldout"
+  },
+  {
+   "id": "rg-python-stdlib",
+   "category": "search results",
+   "must": [
+    "def __repr__"
+   ],
+   "set": "heldout"
+  },
+  {
+   "id": "npm-ls-tree",
+   "category": "large terminal output",
+   "must": [
+    "nodejest@1\\.0\\.0",
+    "exit status 0"
+   ],
+   "set": "heldout"
+  }
+ ],
+ "outcomes": [
+  {
+   "case": "go-test-verbose",
+   "category": "test failure",
+   "set": "dev",
+   "strategy": "model",
+   "budget": 4096,
+   "bytes": 8739,
+   "out_bytes": 388,
+   "tokens": 2731,
+   "out_tokens": 122,
+   "must": 4,
+   "kept": 4,
+   "ms": 12151.513,
+   "prompt_tokens": 4397
+  },
+  {
+   "case": "go-test-verbose",
+   "category": "test failure",
+   "set": "dev",
+   "strategy": "prune",
+   "budget": 4096,
+   "bytes": 8739,
+   "out_bytes": 3292,
+   "tokens": 2731,
+   "out_tokens": 1029,
+   "must": 4,
+   "kept": 4,
+   "ms": 3.949
+  },
+  {
+   "case": "go-build-errors",
+   "category": "compiler",
+   "set": "dev",
+   "strategy": "model",
+   "budget": 4096,
+   "bytes": 1137,
+   "out_bytes": 17,
+   "tokens": 356,
+   "out_tokens": 6,
+   "must": 5,
+   "kept": 0,
+   "missing": [
+    "build\\.go:6:3: invalid operation",
+    "build\\.go:8:9: cannot use t",
+    "undefined: logf",
+    "build\\.go:35:\\d+: cannot use 42",
+    "exit status 1"
+   ],
+   "ms": 3220.756,
+   "prompt_tokens": 644
+  },
+  {
+   "case": "go-build-errors",
+   "category": "compiler",
+   "set": "dev",
+   "strategy": "prune",
+   "budget": 4096,
+   "bytes": 1137,
+   "out_bytes": 1136,
+   "tokens": 356,
+   "out_tokens": 355,
+   "must": 5,
+   "kept": 5,
+   "ms": 0.338
+  },
+  {
+   "case": "go-vet",
+   "category": "linter",
+   "set": "dev",
+   "strategy": "model",
+   "budget": 4096,
+   "bytes": 115,
+   "out_bytes": 16,
+   "tokens": 36,
+   "out_tokens": 5,
+   "must": 2,
+   "kept": 0,
+   "missing": [
+    "vet\\.go:3:24: fmt\\.Printf format %d has arg",
+    "vet\\.go:3:55: unreachable code"
+   ],
+   "ms": 2351.673,
+   "prompt_tokens": 146
+  },
+  {
+   "case": "go-vet",
+   "category": "linter",
+   "set": "dev",
+   "strategy": "prune",
+   "budget": 4096,
+   "bytes": 115,
+   "out_bytes": 114,
+   "tokens": 36,
+   "out_tokens": 36,
+   "must": 2,
+   "kept": 2,
+   "ms": 0.032
+  },
+  {
+   "case": "go-panic",
+   "category": "stack trace",
+   "set": "dev",
+   "strategy": "model",
+   "budget": 4096,
+   "bytes": 3420,
+   "out_bytes": 3328,
+   "tokens": 1069,
+   "out_tokens": 1040,
+   "must": 4,
+   "kept": 4,
+   "ms": 24128.604,
+   "prompt_tokens": 2274
+  },
+  {
+   "case": "go-panic",
+   "category": "stack trace",
+   "set": "dev",
+   "strategy": "prune",
+   "budget": 4096,
+   "bytes": 3420,
+   "out_bytes": 3419,
+   "tokens": 1069,
+   "out_tokens": 1069,
+   "must": 4,
+   "kept": 4,
+   "ms": 0.418
+  },
+  {
+   "case": "go-build-x",
+   "category": "large terminal output",
+   "set": "dev",
+   "strategy": "model",
+   "budget": 4096,
+   "bytes": 84909,
+   "out_bytes": 4122,
+   "tokens": 26535,
+   "out_tokens": 1289,
+   "must": 2,
+   "kept": 2,
+   "ms": 634002.338,
+   "prompt_tokens": 30254,
+   "error": "reply is not the schema's JSON: unexpected end of JSON input"
+  },
+  {
+   "case": "go-build-x",
+   "category": "large terminal output",
+   "set": "dev",
+   "strategy": "prune",
+   "budget": 4096,
+   "bytes": 84909,
+   "out_bytes": 3880,
+   "tokens": 26535,
+   "out_tokens": 1213,
+   "must": 2,
+   "kept": 2,
+   "ms": 35.724
+  },
+  {
+   "case": "go-mod-download",
+   "category": "dependency resolution",
+   "set": "dev",
+   "strategy": "model",
+   "budget": 4096,
+   "bytes": 6431,
+   "out_bytes": 6238,
+   "tokens": 2010,
+   "out_tokens": 1950,
+   "must": 2,
+   "kept": 2,
+   "ms": 7920.151,
+   "prompt_tokens": 3468
+  },
+  {
+   "case": "go-mod-download",
+   "category": "dependency resolution",
+   "set": "dev",
+   "strategy": "prune",
+   "budget": 4096,
+   "bytes": 6431,
+   "out_bytes": 3666,
+   "tokens": 2010,
+   "out_tokens": 1146,
+   "must": 2,
+   "kept": 2,
+   "ms": 4.727
+  },
+  {
+   "case": "pip-install",
+   "category": "dependency resolution",
+   "set": "dev",
+   "strategy": "model",
+   "budget": 4096,
+   "bytes": 1913,
+   "out_bytes": 17,
+   "tokens": 598,
+   "out_tokens": 6,
+   "must": 2,
+   "kept": 0,
+   "missing": [
+    "Successfully installed .*pytest-8\\.3\\.3",
+    "exit status 0"
+   ],
+   "ms": 1963.933,
+   "prompt_tokens": 980
+  },
+  {
+   "case": "pip-install",
+   "category": "dependency resolution",
+   "set": "dev",
+   "strategy": "prune",
+   "budget": 4096,
+   "bytes": 1913,
+   "out_bytes": 1912,
+   "tokens": 598,
+   "out_tokens": 598,
+   "must": 2,
+   "kept": 2,
+   "ms": 0.415
+  },
+  {
+   "case": "pip-install-error",
+   "category": "dependency resolution",
+   "set": "dev",
+   "strategy": "model",
+   "budget": 4096,
+   "bytes": 1568,
+   "out_bytes": 16,
+   "tokens": 490,
+   "out_tokens": 5,
+   "must": 3,
+   "kept": 0,
+   "missing": [
+    "Could not find a version that satisfies the requirement requests==0\\.0\\.999",
+    "No matching distribution found for requests==0\\.0\\.999",
+    "exit status 1"
+   ],
+   "ms": 1209.94,
+   "prompt_tokens": 448
+  },
+  {
+   "case": "pip-install-error",
+   "category": "dependency resolution",
+   "set": "dev",
+   "strategy": "prune",
+   "budget": 4096,
+   "bytes": 1568,
+   "out_bytes": 1567,
+   "tokens": 490,
+   "out_tokens": 490,
+   "must": 3,
+   "kept": 3,
+   "ms": 0.359
+  },
+  {
+   "case": "pytest-verbose",
+   "category": "test failure",
+   "set": "dev",
+   "strategy": "model",
+   "budget": 4096,
+   "bytes": 39662,
+   "out_bytes": 18,
+   "tokens": 12395,
+   "out_tokens": 6,
+   "must": 5,
+   "kept": 0,
+   "missing": [
+    "FAILED test_inventory\\.py::test_reorder_point",
+    "assert 7 == 8",
+    "test_reorder_zero_safety\\[5-2-10\\]",
+    "3 failed, 120 passed",
+    "test_inventory\\.py:\\d+"
+   ],
+   "ms": 19628.892,
+   "prompt_tokens": 10845
+  },
+  {
+   "case": "pytest-verbose",
+   "category": "test failure",
+   "set": "dev",
+   "strategy": "prune",
+   "budget": 4096,
+   "bytes": 39662,
+   "out_bytes": 3820,
+   "tokens": 12395,
+   "out_tokens": 1194,
+   "must": 5,
+   "kept": 5,
+   "ms": 19.676
+  },
+  {
+   "case": "python-traceback",
+   "category": "stack trace",
+   "set": "dev",
+   "strategy": "model",
+   "budget": 4096,
+   "bytes": 117322,
+   "out_bytes": 1527,
+   "tokens": 36664,
+   "out_tokens": 478,
+   "must": 4,
+   "kept": 3,
+   "missing": [
+    "DeprecationWarning: config key"
+   ],
+   "ms": 111269.428,
+   "prompt_tokens": 37117
+  },
+  {
+   "case": "python-traceback",
+   "category": "stack trace",
+   "set": "dev",
+   "strategy": "prune",
+   "budget": 4096,
+   "bytes": 117322,
+   "out_bytes": 3796,
+   "tokens": 36664,
+   "out_tokens": 1187,
+   "must": 4,
+   "kept": 4,
+   "ms": 49.205
+  },
+  {
+   "case": "npm-install",
+   "category": "dependency resolution",
+   "set": "dev",
+   "strategy": "model",
+   "budget": 4096,
+   "bytes": 27634,
+   "out_bytes": 658,
+   "tokens": 8636,
+   "out_tokens": 206,
+   "must": 2,
+   "kept": 2,
+   "ms": 31127.734,
+   "prompt_tokens": 10979
+  },
+  {
+   "case": "npm-install",
+   "category": "dependency resolution",
+   "set": "dev",
+   "strategy": "prune",
+   "budget": 4096,
+   "bytes": 27634,
+   "out_bytes": 1404,
+   "tokens": 8636,
+   "out_tokens": 439,
+   "must": 2,
+   "kept": 2,
+   "ms": 10.987
+  },
+  {
+   "case": "tsc-errors",
+   "category": "compiler",
+   "set": "dev",
+   "strategy": "model",
+   "budget": 4096,
+   "bytes": 1366,
+   "out_bytes": 17,
+   "tokens": 427,
+   "out_tokens": 6,
+   "must": 3,
+   "kept": 0,
+   "missing": [
+    "cart\\.ts\\(3,3\\): error TS2322",
+    "cart\\.ts\\(7,19\\): error TS2363",
+    "TS2304: Cannot find name .logger."
+   ],
+   "ms": 3822.822,
+   "prompt_tokens": 670
+  },
+  {
+   "case": "tsc-errors",
+   "category": "compiler",
+   "set": "dev",
+   "strategy": "prune",
+   "budget": 4096,
+   "bytes": 1366,
+   "out_bytes": 1365,
+   "tokens": 427,
+   "out_tokens": 427,
+   "must": 3,
+   "kept": 3,
+   "ms": 0.347
+  },
+  {
+   "case": "eslint-output",
+   "category": "linter",
+   "set": "dev",
+   "strategy": "model",
+   "budget": 4096,
+   "bytes": 6555,
+   "out_bytes": 269,
+   "tokens": 2049,
+   "out_tokens": 85,
+   "must": 3,
+   "kept": 2,
+   "missing": [
+    "83 problems \\(2 errors, 81 warnings\\)"
+   ],
+   "ms": 7539.466,
+   "prompt_tokens": 2194
+  },
+  {
+   "case": "eslint-output",
+   "category": "linter",
+   "set": "dev",
+   "strategy": "prune",
+   "budget": 4096,
+   "bytes": 6555,
+   "out_bytes": 3843,
+   "tokens": 2049,
+   "out_tokens": 1201,
+   "must": 3,
+   "kept": 3,
+   "ms": 3.762
+  },
+  {
+   "case": "node-test",
+   "category": "test failure",
+   "set": "dev",
+   "strategy": "model",
+   "budget": 4096,
+   "bytes": 2989,
+   "out_bytes": 818,
+   "tokens": 935,
+   "out_tokens": 256,
+   "must": 4,
+   "kept": 3,
+   "missing": [
+    "fail 1"
+   ],
+   "ms": 5120.059,
+   "prompt_tokens": 1606
+  },
+  {
+   "case": "node-test",
+   "category": "test failure",
+   "set": "dev",
+   "strategy": "prune",
+   "budget": 4096,
+   "bytes": 2989,
+   "out_bytes": 2984,
+   "tokens": 935,
+   "out_tokens": 933,
+   "must": 4,
+   "kept": 4,
+   "ms": 0.698
+  },
+  {
+   "case": "node-stack",
+   "category": "stack trace",
+   "set": "dev",
+   "strategy": "model",
+   "budget": 4096,
+   "bytes": 623,
+   "out_bytes": 17,
+   "tokens": 195,
+   "out_tokens": 6,
+   "must": 3,
+   "kept": 0,
+   "missing": [
+    "TypeError: Cannot read properties of undefined \\(reading .amount.\\)",
+    "app\\.js:2:71",
+    "at load .*app\\.js:3"
+   ],
+   "ms": 5365.784,
+   "prompt_tokens": 315
+  },
+  {
+   "case": "node-stack",
+   "category": "stack trace",
+   "set": "dev",
+   "strategy": "prune",
+   "budget": 4096,
+   "bytes": 623,
+   "out_bytes": 622,
+   "tokens": 195,
+   "out_tokens": 195,
+   "must": 3,
+   "kept": 3,
+   "ms": 0.133
+  },
+  {
+   "case": "cargo-build-deps",
+   "category": "compiler",
+   "set": "dev",
+   "strategy": "model",
+   "budget": 4096,
+   "bytes": 1613,
+   "out_bytes": 17,
+   "tokens": 505,
+   "out_tokens": 6,
+   "must": 3,
+   "kept": 0,
+   "missing": [
+    "error\\[E0308\\]: mismatched types",
+    "src/lib\\.rs:9:25",
+    "could not compile .rledger."
+   ],
+   "ms": 1638.47,
+   "prompt_tokens": 838
+  },
+  {
+   "case": "cargo-build-deps",
+   "category": "compiler",
+   "set": "dev",
+   "strategy": "prune",
+   "budget": 4096,
+   "bytes": 1613,
+   "out_bytes": 1612,
+   "tokens": 505,
+   "out_tokens": 504,
+   "must": 3,
+   "kept": 3,
+   "ms": 0.243
+  },
+  {
+   "case": "cargo-test-backtrace",
+   "category": "test failure",
+   "set": "dev",
+   "strategy": "model",
+   "budget": 4096,
+   "bytes": 12743,
+   "out_bytes": 10521,
+   "tokens": 3983,
+   "out_tokens": 3288,
+   "must": 6,
+   "kept": 5,
+   "missing": [
+    "test tests::transfer_keeps_total \\.\\.\\. FAILED"
+   ],
+   "ms": 29414.675,
+   "prompt_tokens": 6595
+  },
+  {
+   "case": "cargo-test-backtrace",
+   "category": "test failure",
+   "set": "dev",
+   "strategy": "prune",
+   "budget": 4096,
+   "bytes": 12743,
+   "out_bytes": 3162,
+   "tokens": 3983,
+   "out_tokens": 989,
+   "must": 6,
+   "kept": 6,
+   "ms": 7.157
+  },
+  {
+   "case": "mvn-test-downloads",
+   "category": "test failure",
+   "set": "dev",
+   "strategy": "model",
+   "budget": 4096,
+   "bytes": 61687,
+   "out_bytes": 2351,
+   "tokens": 19278,
+   "out_tokens": 735,
+   "must": 4,
+   "kept": 4,
+   "ms": 49305.755,
+   "prompt_tokens": 23001
+  },
+  {
+   "case": "mvn-test-downloads",
+   "category": "test failure",
+   "set": "dev",
+   "strategy": "prune",
+   "budget": 4096,
+   "bytes": 61687,
+   "out_bytes": 3820,
+   "tokens": 19278,
+   "out_tokens": 1194,
+   "must": 4,
+   "kept": 4,
+   "ms": 25.371
+  },
+  {
+   "case": "gradle-compile-errors",
+   "category": "compiler",
+   "set": "dev",
+   "strategy": "model",
+   "budget": 4096,
+   "bytes": 2509,
+   "out_bytes": 17,
+   "tokens": 785,
+   "out_tokens": 6,
+   "must": 4,
+   "kept": 0,
+   "missing": [
+    "Orders\\.java:4: error: cannot find symbol",
+    "Orders\\.java:5: error: cannot find symbol",
+    "Orders\\.java:6: error: cannot find symbol",
+    "Compilation failed"
+   ],
+   "ms": 6919.918,
+   "prompt_tokens": 808
+  },
+  {
+   "case": "gradle-compile-errors",
+   "category": "compiler",
+   "set": "dev",
+   "strategy": "prune",
+   "budget": 4096,
+   "bytes": 2509,
+   "out_bytes": 2508,
+   "tokens": 785,
+   "out_tokens": 784,
+   "must": 4,
+   "kept": 4,
+   "ms": 0.326
+  },
+  {
+   "case": "java-exception",
+   "category": "stack trace",
+   "set": "dev",
+   "strategy": "model",
+   "budget": 4096,
+   "bytes": 1177,
+   "out_bytes": 17,
+   "tokens": 368,
+   "out_tokens": 6,
+   "must": 3,
+   "kept": 0,
+   "missing": [
+    "Caused by: java\\.lang\\.IllegalStateException: no balance for account b",
+    "Main\\.java:6",
+    "Main\\.java:15"
+   ],
+   "ms": 11536.007,
+   "prompt_tokens": 450
+  },
+  {
+   "case": "java-exception",
+   "category": "stack trace",
+   "set": "dev",
+   "strategy": "prune",
+   "budget": 4096,
+   "bytes": 1177,
+   "out_bytes": 1176,
+   "tokens": 368,
+   "out_tokens": 368,
+   "must": 3,
+   "kept": 3,
+   "ms": 0.268
+  },
+  {
+   "case": "search-func",
+   "category": "search results",
+   "set": "dev",
+   "strategy": "model",
+   "budget": 4096,
+   "bytes": 99030,
+   "out_bytes": 99030,
+   "tokens": 30947,
+   "out_tokens": 30947,
+   "must": 1,
+   "kept": 1,
+   "ms": 99325.845,
+   "prompt_tokens": 36389
+  },
+  {
+   "case": "search-func",
+   "category": "search results",
+   "set": "dev",
+   "strategy": "prune",
+   "budget": 4096,
+   "bytes": 99030,
+   "out_bytes": 2984,
+   "tokens": 30947,
+   "out_tokens": 933,
+   "must": 1,
+   "kept": 1,
+   "ms": 34.899
+  },
+  {
+   "case": "search-todo",
+   "category": "search results",
+   "set": "dev",
+   "strategy": "model",
+   "budget": 4096,
+   "bytes": 38352,
+   "out_bytes": 4122,
+   "tokens": 11985,
+   "out_tokens": 1289,
+   "must": 1,
+   "kept": 1,
+   "ms": 239690.438,
+   "prompt_tokens": 12782,
+   "error": "reply is not the schema's JSON: unexpected end of JSON input"
+  },
+  {
+   "case": "search-todo",
+   "category": "search results",
+   "set": "dev",
+   "strategy": "prune",
+   "budget": 4096,
+   "bytes": 38352,
+   "out_bytes": 3030,
+   "tokens": 11985,
+   "out_tokens": 947,
+   "must": 1,
+   "kept": 1,
+   "ms": 13.4
+  },
+  {
+   "case": "find-listing",
+   "category": "large terminal output",
+   "set": "dev",
+   "strategy": "model",
+   "budget": 4096,
+   "bytes": 68824,
+   "out_bytes": 68824,
+   "tokens": 21508,
+   "out_tokens": 21508,
+   "must": 1,
+   "kept": 1,
+   "ms": 67488.509,
+   "prompt_tokens": 26555
+  },
+  {
+   "case": "find-listing",
+   "category": "large terminal output",
+   "set": "dev",
+   "strategy": "prune",
+   "budget": 4096,
+   "bytes": 68824,
+   "out_bytes": 3664,
+   "tokens": 21508,
+   "out_tokens": 1145,
+   "must": 1,
+   "kept": 1,
+   "ms": 48.762
+  },
+  {
+   "case": "make-c-errors",
+   "category": "compiler",
+   "set": "heldout",
+   "strategy": "model",
+   "budget": 4096,
+   "bytes": 1402,
+   "out_bytes": 17,
+   "tokens": 439,
+   "out_tokens": 6,
+   "must": 4,
+   "kept": 0,
+   "missing": [
+    "main\\.c:6:20: error: implicit declaration of function .variance.",
+    "stats\\.c:11:63: error: expected .;. before",
+    "main\\.c:5:14: warning: format",
+    "not remade because of errors"
+   ],
+   "ms": 2775.112,
+   "prompt_tokens": 569
+  },
+  {
+   "case": "make-c-errors",
+   "category": "compiler",
+   "set": "heldout",
+   "strategy": "prune",
+   "budget": 4096,
+   "bytes": 1402,
+   "out_bytes": 1339,
+   "tokens": 439,
+   "out_tokens": 419,
+   "must": 4,
+   "kept": 4,
+   "ms": 0.212
+  },
+  {
+   "case": "go-test-race",
+   "category": "test failure",
+   "set": "heldout",
+   "strategy": "model",
+   "budget": 4096,
+   "bytes": 2289,
+   "out_bytes": 1835,
+   "tokens": 716,
+   "out_tokens": 574,
+   "must": 4,
+   "kept": 4,
+   "ms": 10187.149,
+   "prompt_tokens": 1114
+  },
+  {
+   "case": "go-test-race",
+   "category": "test failure",
+   "set": "heldout",
+   "strategy": "prune",
+   "budget": 4096,
+   "bytes": 2289,
+   "out_bytes": 2288,
+   "tokens": 716,
+   "out_tokens": 715,
+   "must": 4,
+   "kept": 4,
+   "ms": 0.533
+  },
+  {
+   "case": "go-testify-diff",
+   "category": "test failure",
+   "set": "heldout",
+   "strategy": "model",
+   "budget": 4096,
+   "bytes": 2291,
+   "out_bytes": 787,
+   "tokens": 716,
+   "out_tokens": 246,
+   "must": 5,
+   "kept": 5,
+   "ms": 5765.933,
+   "prompt_tokens": 1214
+  },
+  {
+   "case": "go-testify-diff",
+   "category": "test failure",
+   "set": "heldout",
+   "strategy": "prune",
+   "budget": 4096,
+   "bytes": 2291,
+   "out_bytes": 2266,
+   "tokens": 716,
+   "out_tokens": 709,
+   "must": 5,
+   "kept": 5,
+   "ms": 0.32
+  },
+  {
+   "case": "pip-install-mypy-ruff",
+   "category": "dependency resolution",
+   "set": "heldout",
+   "strategy": "model",
+   "budget": 4096,
+   "bytes": 1489,
+   "out_bytes": 1504,
+   "tokens": 466,
+   "out_tokens": 470,
+   "must": 2,
+   "kept": 2,
+   "ms": 7528.016,
+   "prompt_tokens": 785
+  },
+  {
+   "case": "pip-install-mypy-ruff",
+   "category": "dependency resolution",
+   "set": "heldout",
+   "strategy": "prune",
+   "budget": 4096,
+   "bytes": 1489,
+   "out_bytes": 1488,
+   "tokens": 466,
+   "out_tokens": 465,
+   "must": 2,
+   "kept": 2,
+   "ms": 0.376
+  },
+  {
+   "case": "mypy-errors",
+   "category": "linter",
+   "set": "heldout",
+   "strategy": "model",
+   "budget": 4096,
+   "bytes": 645,
+   "out_bytes": 16,
+   "tokens": 202,
+   "out_tokens": 5,
+   "must": 3,
+   "kept": 0,
+   "missing": [
+    "billing\\.py:9: error: Unsupported operand types",
+    "billing\\.py:13: error: Incompatible return value type",
+    "Found 5 errors in 1 file"
+   ],
+   "ms": 5046.265,
+   "prompt_tokens": 298
+  },
+  {
+   "case": "mypy-errors",
+   "category": "linter",
+   "set": "heldout",
+   "strategy": "prune",
+   "budget": 4096,
+   "bytes": 645,
+   "out_bytes": 644,
+   "tokens": 202,
+   "out_tokens": 202,
+   "must": 3,
+   "kept": 3,
+   "ms": 0.094
+  },
+  {
+   "case": "ruff-check",
+   "category": "linter",
+   "set": "heldout",
+   "strategy": "model",
+   "budget": 4096,
+   "bytes": 3788,
+   "out_bytes": 2951,
+   "tokens": 1184,
+   "out_tokens": 923,
+   "must": 3,
+   "kept": 2,
+   "missing": [
+    "Found 16 errors"
+   ],
+   "ms": 28674.67,
+   "prompt_tokens": 1839
+  },
+  {
+   "case": "ruff-check",
+   "category": "linter",
+   "set": "heldout",
+   "strategy": "prune",
+   "budget": 4096,
+   "bytes": 3788,
+   "out_bytes": 3785,
+   "tokens": 1184,
+   "out_tokens": 1183,
+   "must": 3,
+   "kept": 3,
+   "ms": 0.699
+  },
+  {
+   "case": "unittest-verbose",
+   "category": "test failure",
+   "set": "heldout",
+   "strategy": "model",
+   "budget": 4096,
+   "bytes": 3177,
+   "out_bytes": 17,
+   "tokens": 993,
+   "out_tokens": 6,
+   "must": 4,
+   "kept": 0,
+   "missing": [
+    "ERROR: test_no_discount",
+    "billing\\.py\", line 9, in invoice_total",
+    "TypeError: unsupported operand type",
+    "FAILED \\(errors=1\\)"
+   ],
+   "ms": 4633.195,
+   "prompt_tokens": 1209
+  },
+  {
+   "case": "unittest-verbose",
+   "category": "test failure",
+   "set": "heldout",
+   "strategy": "prune",
+   "budget": 4096,
+   "bytes": 3177,
+   "out_bytes": 3176,
+   "tokens": 993,
+   "out_tokens": 993,
+   "must": 4,
+   "kept": 4,
+   "ms": 0.401
+  },
+  {
+   "case": "python-log-flood",
+   "category": "large terminal output",
+   "set": "heldout",
+   "strategy": "model",
+   "budget": 4096,
+   "bytes": 38691,
+   "out_bytes": 35617,
+   "tokens": 12091,
+   "out_tokens": 11131,
+   "must": 3,
+   "kept": 3,
+   "ms": 69395.739,
+   "prompt_tokens": 26275
+  },
+  {
+   "case": "python-log-flood",
+   "category": "large terminal output",
+   "set": "heldout",
+   "strategy": "prune",
+   "budget": 4096,
+   "bytes": 38691,
+   "out_bytes": 3933,
+   "tokens": 12091,
+   "out_tokens": 1230,
+   "must": 3,
+   "kept": 3,
+   "ms": 25.674
+  },
+  {
+   "case": "npm-install-jest",
+   "category": "dependency resolution",
+   "set": "heldout",
+   "strategy": "model",
+   "budget": 4096,
+   "bytes": 560,
+   "out_bytes": 560,
+   "tokens": 175,
+   "out_tokens": 175,
+   "must": 2,
+   "kept": 2,
+   "ms": 6789.247,
+   "prompt_tokens": 249
+  },
+  {
+   "case": "npm-install-jest",
+   "category": "dependency resolution",
+   "set": "heldout",
+   "strategy": "prune",
+   "budget": 4096,
+   "bytes": 560,
+   "out_bytes": 559,
+   "tokens": 175,
+   "out_tokens": 175,
+   "must": 2,
+   "kept": 2,
+   "ms": 0.064
+  },
+  {
+   "case": "jest-failures",
+   "category": "test failure",
+   "set": "heldout",
+   "strategy": "model",
+   "budget": 4096,
+   "bytes": 2795,
+   "out_bytes": 17,
+   "tokens": 874,
+   "out_tokens": 6,
+   "must": 6,
+   "kept": 0,
+   "missing": [
+    "✕ percent coupon",
+    "Expected: 900",
+    "Received: -9000",
+    "price\\.test\\.js:42",
+    "Received: \"\\$12\\.3\"",
+    "Tests:\\s+2 failed, 40 passed"
+   ],
+   "ms": 7172.778,
+   "prompt_tokens": 1837
+  },
+  {
+   "case": "jest-failures",
+   "category": "test failure",
+   "set": "heldout",
+   "strategy": "prune",
+   "budget": 4096,
+   "bytes": 2795,
+   "out_bytes": 1912,
+   "tokens": 874,
+   "out_tokens": 598,
+   "must": 6,
+   "kept": 6,
+   "ms": 0.303
+  },
+  {
+   "case": "npm-install-missing",
+   "category": "dependency resolution",
+   "set": "heldout",
+   "strategy": "model",
+   "budget": 4096,
+   "bytes": 519,
+   "out_bytes": 16,
+   "tokens": 163,
+   "out_tokens": 5,
+   "must": 3,
+   "kept": 0,
+   "missing": [
+    "npm error code E404",
+    "404 Not Found - GET https://registry\\.npmjs\\.org/left-padd-not-a-real-package-xyz",
+    "exit status 1"
+   ],
+   "ms": 5100.018,
+   "prompt_tokens": 300
+  },
+  {
+   "case": "npm-install-missing",
+   "category": "dependency resolution",
+   "set": "heldout",
+   "strategy": "prune",
+   "budget": 4096,
+   "bytes": 519,
+   "out_bytes": 518,
+   "tokens": 163,
+   "out_tokens": 162,
+   "must": 3,
+   "kept": 3,
+   "ms": 0.132
+  },
+  {
+   "case": "tsc-project",
+   "category": "compiler",
+   "set": "heldout",
+   "strategy": "model",
+   "budget": 4096,
+   "bytes": 1557,
+   "out_bytes": 17,
+   "tokens": 487,
+   "out_tokens": 6,
+   "must": 4,
+   "kept": 0,
+   "missing": [
+    "src/app\\.ts\\(2,23\\): error TS2322",
+    "src/user\\.ts\\(2,69\\): error TS2345",
+    "src/user\\.ts\\(3,56\\): error TS2322",
+    "TS2339: Property .name. does not exist"
+   ],
+   "ms": 3582.884,
+   "prompt_tokens": 687
+  },
+  {
+   "case": "tsc-project",
+   "category": "compiler",
+   "set": "heldout",
+   "strategy": "prune",
+   "budget": 4096,
+   "bytes": 1557,
+   "out_bytes": 1556,
+   "tokens": 487,
+   "out_tokens": 487,
+   "must": 4,
+   "kept": 4,
+   "ms": 0.221
+  },
+  {
+   "case": "cargo-clippy",
+   "category": "linter",
+   "set": "heldout",
+   "strategy": "model",
+   "budget": 4096,
+   "bytes": 3774,
+   "out_bytes": 18,
+   "tokens": 1180,
+   "out_tokens": 6,
+   "must": 3,
+   "kept": 0,
+   "missing": [
+    "unneeded .return. statement",
+    "src/lib\\.rs:6:5",
+    "generated 8 warnings"
+   ],
+   "ms": 4809.853,
+   "prompt_tokens": 1707
+  },
+  {
+   "case": "cargo-clippy",
+   "category": "linter",
+   "set": "heldout",
+   "strategy": "prune",
+   "budget": 4096,
+   "bytes": 3774,
+   "out_bytes": 3773,
+   "tokens": 1180,
+   "out_tokens": 1180,
+   "must": 3,
+   "kept": 3,
+   "ms": 0.853
+  },
+  {
+   "case": "cargo-test-two-failures",
+   "category": "test failure",
+   "set": "heldout",
+   "strategy": "model",
+   "budget": 4096,
+   "bytes": 3144,
+   "out_bytes": 17,
+   "tokens": 983,
+   "out_tokens": 6,
+   "must": 6,
+   "kept": 0,
+   "missing": [
+    "test tests::by_zero \\.\\.\\. FAILED",
+    "panicked at src/lib\\.rs:2:16",
+    "attempt to divide by zero",
+    "panicked at src/lib\\.rs:9:32",
+    "left: 9",
+    "test result: FAILED"
+   ],
+   "ms": 2287.929,
+   "prompt_tokens": 1577
+  },
+  {
+   "case": "cargo-test-two-failures",
+   "category": "test failure",
+   "set": "heldout",
+   "strategy": "prune",
+   "budget": 4096,
+   "bytes": 3144,
+   "out_bytes": 3143,
+   "tokens": 983,
+   "out_tokens": 983,
+   "must": 6,
+   "kept": 6,
+   "ms": 0.5
+  },
+  {
+   "case": "gradle-test-failure",
+   "category": "test failure",
+   "set": "heldout",
+   "strategy": "model",
+   "budget": 4096,
+   "bytes": 2616,
+   "out_bytes": 1559,
+   "tokens": 818,
+   "out_tokens": 488,
+   "must": 5,
+   "kept": 4,
+   "missing": [
+    "2 tests completed, 1 failed"
+   ],
+   "ms": 4873.982,
+   "prompt_tokens": 919
+  },
+  {
+   "case": "gradle-test-failure",
+   "category": "test failure",
+   "set": "heldout",
+   "strategy": "prune",
+   "budget": 4096,
+   "bytes": 2616,
+   "out_bytes": 2614,
+   "tokens": 818,
+   "out_tokens": 817,
+   "must": 5,
+   "kept": 5,
+   "ms": 0.572
+  },
+  {
+   "case": "mvn-compile-error",
+   "category": "compiler",
+   "set": "heldout",
+   "strategy": "model",
+   "budget": 4096,
+   "bytes": 25123,
+   "out_bytes": 18,
+   "tokens": 7851,
+   "out_tokens": 6,
+   "must": 3,
+   "kept": 0,
+   "missing": [
+    "Report\\.java:\\[5,46\\] .;. expected",
+    "COMPILATION ERROR",
+    "BUILD FAILURE"
+   ],
+   "ms": 11441.883,
+   "prompt_tokens": 9184
+  },
+  {
+   "case": "mvn-compile-error",
+   "category": "compiler",
+   "set": "heldout",
+   "strategy": "prune",
+   "budget": 4096,
+   "bytes": 25123,
+   "out_bytes": 2366,
+   "tokens": 7851,
+   "out_tokens": 740,
+   "must": 3,
+   "kept": 3,
+   "ms": 11.153
+  },
+  {
+   "case": "search-node-modules",
+   "category": "search results",
+   "set": "heldout",
+   "strategy": "model",
+   "budget": 4096,
+   "bytes": 101041,
+   "out_bytes": 101041,
+   "tokens": 31576,
+   "out_tokens": 31576,
+   "must": 1,
+   "kept": 1,
+   "ms": 79057.564,
+   "prompt_tokens": 30067
+  },
+  {
+   "case": "search-node-modules",
+   "category": "search results",
+   "set": "heldout",
+   "strategy": "prune",
+   "budget": 4096,
+   "bytes": 101041,
+   "out_bytes": 3007,
+   "tokens": 31576,
+   "out_tokens": 940,
+   "must": 1,
+   "kept": 1,
+   "ms": 34.982
+  },
+  {
+   "case": "rg-python-stdlib",
+   "category": "search results",
+   "set": "heldout",
+   "strategy": "model",
+   "budget": 4096,
+   "bytes": 26380,
+   "out_bytes": 18,
+   "tokens": 8244,
+   "out_tokens": 6,
+   "must": 1,
+   "kept": 0,
+   "missing": [
+    "def __repr__"
+   ],
+   "ms": 21208.623,
+   "prompt_tokens": 10503
+  },
+  {
+   "case": "rg-python-stdlib",
+   "category": "search results",
+   "set": "heldout",
+   "strategy": "prune",
+   "budget": 4096,
+   "bytes": 26380,
+   "out_bytes": 2976,
+   "tokens": 8244,
+   "out_tokens": 930,
+   "must": 1,
+   "kept": 1,
+   "ms": 11.514
+  },
+  {
+   "case": "npm-ls-tree",
+   "category": "large terminal output",
+   "set": "heldout",
+   "strategy": "model",
+   "budget": 4096,
+   "bytes": 23106,
+   "out_bytes": 23106,
+   "tokens": 7221,
+   "out_tokens": 7221,
+   "must": 2,
+   "kept": 2,
+   "ms": 28528.898,
+   "prompt_tokens": 13853
+  },
+  {
+   "case": "npm-ls-tree",
+   "category": "large terminal output",
+   "set": "heldout",
+   "strategy": "prune",
+   "budget": 4096,
+   "bytes": 23106,
+   "out_bytes": 3732,
+   "tokens": 7221,
+   "out_tokens": 1167,
+   "must": 2,
+   "kept": 2,
+   "ms": 18.242
+  }
+ ],
+ "model": {
+  "note": "Qwen3-4B-Instruct-2507 Q4_K_M, llama.cpp b11146, CPU only, 8 threads, ctx 49152, beside the resident 35B",
+  "url": "http://127.0.0.1:8799"
+ }
+}

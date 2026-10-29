@@ -1,0 +1,67 @@
+==================
+WARNING: DATA RACE
+Read at 0x00c00011c168 by goroutine 12:
+  example.com/counter.(*Counter).Inc()
+      /work/gorace/counter.go:5 +0x7d
+  example.com/counter.TestConcurrentInc.func1()
+      /work/gorace/counter_test.go:13 +0x12
+
+Previous write at 0x00c00011c168 by goroutine 10:
+  example.com/counter.(*Counter).Inc()
+      /work/gorace/counter.go:5 +0x8f
+  example.com/counter.TestConcurrentInc.func1()
+      /work/gorace/counter_test.go:13 +0x12
+
+Goroutine 12 (running) created at:
+  example.com/counter.TestConcurrentInc()
+      /work/gorace/counter_test.go:13 +0x84
+  testing.tRunner()
+      /usr/local/go/src/testing/testing.go:2193 +0x21c
+  testing.(*T).Run.gowrap1()
+      /usr/local/go/src/testing/testing.go:2258 +0x38
+
+Goroutine 10 (finished) created at:
+  example.com/counter.TestConcurrentInc()
+      /work/gorace/counter_test.go:13 +0x84
+  testing.tRunner()
+      /usr/local/go/src/testing/testing.go:2193 +0x21c
+  testing.(*T).Run.gowrap1()
+      /usr/local/go/src/testing/testing.go:2258 +0x38
+==================
+==================
+WARNING: DATA RACE
+Write at 0x00c00011c168 by goroutine 12:
+  example.com/counter.(*Counter).Inc()
+      /work/gorace/counter.go:5 +0x8f
+  example.com/counter.TestConcurrentInc.func1()
+      /work/gorace/counter_test.go:13 +0x12
+
+Previous write at 0x00c00011c168 by goroutine 11:
+  example.com/counter.(*Counter).Inc()
+      /work/gorace/counter.go:5 +0x8f
+  example.com/counter.TestConcurrentInc.func1()
+      /work/gorace/counter_test.go:13 +0x12
+
+Goroutine 12 (running) created at:
+  example.com/counter.TestConcurrentInc()
+      /work/gorace/counter_test.go:13 +0x84
+  testing.tRunner()
+      /usr/local/go/src/testing/testing.go:2193 +0x21c
+  testing.(*T).Run.gowrap1()
+      /usr/local/go/src/testing/testing.go:2258 +0x38
+
+Goroutine 11 (finished) created at:
+  example.com/counter.TestConcurrentInc()
+      /work/gorace/counter_test.go:13 +0x84
+  testing.tRunner()
+      /usr/local/go/src/testing/testing.go:2193 +0x21c
+  testing.(*T).Run.gowrap1()
+      /usr/local/go/src/testing/testing.go:2258 +0x38
+==================
+--- FAIL: TestConcurrentInc (0.00s)
+    counter_test.go:17: N() = 49, want 50
+    testing.go:1865: race detected during execution of test
+FAIL
+FAIL	example.com/counter	0.008s
+FAIL
+exit status 1

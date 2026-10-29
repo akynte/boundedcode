@@ -1,0 +1,15 @@
+file:///work/nodecart/app.js:2
+function parse(text) { return JSON.parse(text).items.map(i => i.price.amount); }
+                                                                      ^
+
+TypeError: Cannot read properties of undefined (reading 'amount')
+    at file:///work/nodecart/app.js:2:71
+    at Array.map (<anonymous>)
+    at parse (file:///work/nodecart/app.js:2:54)
+    at load (file:///work/nodecart/app.js:3:26)
+    at Timeout._onTimeout (file:///work/nodecart/app.js:4:32)
+    at listOnTimeout (node:internal/timers:685:17)
+    at process.processTimers (node:internal/timers:618:7)
+
+Node.js v24.21.0
+exit status 1

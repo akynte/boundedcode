@@ -1,0 +1,30 @@
+cc -Wall -Wextra -O2   -c -o main.o main.c
+main.c: In function 'main':
+main.c:5:14: warning: format '%d' expects argument of type 'int', but argument 2 has type 'double' [-Wformat=]
+    5 |     printf("%d\n", mean(xs, 3));
+      |             ~^     ~~~~~~~~~~~
+      |              |     |
+      |              int   double
+      |             %f
+main.c:6:20: error: implicit declaration of function 'variance' [-Wimplicit-function-declaration]
+    6 |     printf("%f\n", variance(xs, 3));
+      |                    ^~~~~~~~
+main.c:6:14: warning: format '%f' expects argument of type 'double', but argument 2 has type 'int' [-Wformat=]
+    6 |     printf("%f\n", variance(xs, 3));
+      |             ~^     ~~~~~~~~~~~~~~~
+      |              |     |
+      |              |     int
+      |              double
+      |             %d
+make: *** [<builtin>: main.o] Error 1
+cc -Wall -Wextra -O2   -c -o stats.o stats.c
+stats.c: In function 'median':
+stats.c:11:63: error: expected ';' before '}' token
+   11 |     return n % 2 ? xs[n / 2] : (xs[n / 2 - 1] + xs[n / 2]) / 2
+      |                                                               ^
+      |                                                               ;
+   12 | }
+      | ~                                                              
+make: *** [<builtin>: stats.o] Error 1
+make: Target 'all' not remade because of errors.
+exit status 2

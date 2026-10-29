@@ -1,0 +1,83 @@
+✔ case 1 keeps the total (0.795833ms)
+✔ case 2 keeps the total (0.08966ms)
+✔ case 3 keeps the total (0.065603ms)
+✔ case 4 keeps the total (0.060082ms)
+✔ case 5 keeps the total (0.077491ms)
+✔ case 6 keeps the total (0.05384ms)
+✔ case 7 keeps the total (0.062533ms)
+✔ case 8 keeps the total (0.056608ms)
+✔ case 9 keeps the total (0.070796ms)
+✔ case 10 keeps the total (0.143502ms)
+✔ case 11 keeps the total (3.381612ms)
+✔ case 12 keeps the total (0.091909ms)
+✔ case 13 keeps the total (0.043327ms)
+✔ case 14 keeps the total (0.028908ms)
+✔ case 15 keeps the total (0.022831ms)
+✔ case 16 keeps the total (0.025148ms)
+✔ case 17 keeps the total (0.020983ms)
+✔ case 18 keeps the total (0.020455ms)
+✔ case 19 keeps the total (0.019931ms)
+✔ case 20 keeps the total (0.020043ms)
+✔ case 21 keeps the total (0.019971ms)
+✔ case 22 keeps the total (0.02086ms)
+✔ case 23 keeps the total (0.020495ms)
+✔ case 24 keeps the total (0.020148ms)
+✔ case 25 keeps the total (0.020245ms)
+✔ case 26 keeps the total (0.019964ms)
+✔ case 27 keeps the total (0.019544ms)
+✔ case 28 keeps the total (0.020216ms)
+✔ case 29 keeps the total (0.023493ms)
+✔ case 30 keeps the total (0.042942ms)
+✔ case 31 keeps the total (0.048014ms)
+✔ case 32 keeps the total (0.054102ms)
+✔ case 33 keeps the total (0.042111ms)
+✔ case 34 keeps the total (0.038792ms)
+✔ case 35 keeps the total (0.023927ms)
+✔ case 36 keeps the total (0.020599ms)
+✔ case 37 keeps the total (0.028927ms)
+✔ case 38 keeps the total (0.022542ms)
+✔ case 39 keeps the total (0.048996ms)
+✔ case 40 keeps the total (0.047924ms)
+✔ case 41 keeps the total (0.050383ms)
+✔ case 42 keeps the total (0.02804ms)
+✔ case 43 keeps the total (0.021683ms)
+✔ case 44 keeps the total (0.036525ms)
+✔ case 45 keeps the total (0.049955ms)
+✔ case 46 keeps the total (0.052971ms)
+✔ case 47 keeps the total (0.024907ms)
+✔ case 48 keeps the total (0.021379ms)
+✔ case 49 keeps the total (0.039503ms)
+✔ case 50 keeps the total (0.032873ms)
+✖ discount applies (0.606297ms)
+ℹ tests 51
+ℹ suites 0
+ℹ pass 50
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 53.866379
+
+✖ failing tests:
+
+test at cart.test.js:54:1
+✖ discount applies (0.606297ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  NaN !== 90
+  
+      at TestContext.<anonymous> (file:///work/nodecart/cart.test.js:54:41)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: NaN,
+    expected: 90,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+exit status 1

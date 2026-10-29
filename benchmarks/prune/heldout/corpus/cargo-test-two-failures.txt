@@ -1,0 +1,68 @@
+   Compiling rclip v0.1.0 (/work/rclip)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s
+     Running unittests src/lib.rs (target/debug/deps/rclip-d98ea11b2e5ece2a)
+
+running 3 tests
+test tests::ok_case ... ok
+test tests::by_zero ... FAILED
+test tests::keeps_total ... FAILED
+
+failures:
+
+---- tests::by_zero stdout ----
+
+thread 'tests::by_zero' (7645) panicked at src/lib.rs:2:16:
+attempt to divide by zero
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/b940084d7eb6a299eb4bfeb8e34901bc051e7ac4/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/b940084d7eb6a299eb4bfeb8e34901bc051e7ac4/library/core/src/panicking.rs:80:14
+   2: core::panicking::panic_const::panic_const_div_by_zero
+             at /rustc/b940084d7eb6a299eb4bfeb8e34901bc051e7ac4/library/core/src/panicking.rs:175:17
+   3: rclip::split
+             at ./src/lib.rs:2:16
+   4: rclip::tests::by_zero
+             at ./src/lib.rs:10:28
+   5: rclip::tests::by_zero::{closure#0}
+             at ./src/lib.rs:10:25
+   6: <rclip::tests::by_zero::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/b940084d7eb6a299eb4bfeb8e34901bc051e7ac4/library/core/src/ops/function.rs:250:5
+   7: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/b940084d7eb6a299eb4bfeb8e34901bc051e7ac4/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+---- tests::keeps_total stdout ----
+
+thread 'tests::keeps_total' (7646) panicked at src/lib.rs:9:32:
+assertion `left == right` failed
+  left: 9
+ right: 10
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/b940084d7eb6a299eb4bfeb8e34901bc051e7ac4/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/b940084d7eb6a299eb4bfeb8e34901bc051e7ac4/library/core/src/panicking.rs:80:14
+   2: core::panicking::assert_failed_inner
+             at /rustc/b940084d7eb6a299eb4bfeb8e34901bc051e7ac4/library/core/src/panicking.rs:452:17
+   3: core::panicking::assert_failed::<u32, u32>
+             at /rustc/b940084d7eb6a299eb4bfeb8e34901bc051e7ac4/library/core/src/panicking.rs:407:5
+   4: rclip::tests::keeps_total
+             at ./src/lib.rs:9:32
+   5: rclip::tests::keeps_total::{closure#0}
+             at ./src/lib.rs:9:29
+   6: <rclip::tests::keeps_total::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/b940084d7eb6a299eb4bfeb8e34901bc051e7ac4/library/core/src/ops/function.rs:250:5
+   7: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/b940084d7eb6a299eb4bfeb8e34901bc051e7ac4/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+
+failures:
+    tests::by_zero
+    tests::keeps_total
+
+test result: FAILED. 1 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+error: test failed, to rerun pass `--lib`
+exit status 101

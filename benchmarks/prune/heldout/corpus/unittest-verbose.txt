@@ -1,0 +1,60 @@
+test_discount (test_billing.TestInvoice.test_discount) ... ok
+test_no_discount (test_billing.TestInvoice.test_no_discount) ... ERROR
+test_keep_1 (test_billing.TestKeep.test_keep_1) ... ok
+test_keep_10 (test_billing.TestKeep.test_keep_10) ... ok
+test_keep_11 (test_billing.TestKeep.test_keep_11) ... ok
+test_keep_12 (test_billing.TestKeep.test_keep_12) ... ok
+test_keep_13 (test_billing.TestKeep.test_keep_13) ... ok
+test_keep_14 (test_billing.TestKeep.test_keep_14) ... ok
+test_keep_15 (test_billing.TestKeep.test_keep_15) ... ok
+test_keep_16 (test_billing.TestKeep.test_keep_16) ... ok
+test_keep_17 (test_billing.TestKeep.test_keep_17) ... ok
+test_keep_18 (test_billing.TestKeep.test_keep_18) ... ok
+test_keep_19 (test_billing.TestKeep.test_keep_19) ... ok
+test_keep_2 (test_billing.TestKeep.test_keep_2) ... ok
+test_keep_20 (test_billing.TestKeep.test_keep_20) ... ok
+test_keep_21 (test_billing.TestKeep.test_keep_21) ... ok
+test_keep_22 (test_billing.TestKeep.test_keep_22) ... ok
+test_keep_23 (test_billing.TestKeep.test_keep_23) ... ok
+test_keep_24 (test_billing.TestKeep.test_keep_24) ... ok
+test_keep_25 (test_billing.TestKeep.test_keep_25) ... ok
+test_keep_26 (test_billing.TestKeep.test_keep_26) ... ok
+test_keep_27 (test_billing.TestKeep.test_keep_27) ... ok
+test_keep_28 (test_billing.TestKeep.test_keep_28) ... ok
+test_keep_29 (test_billing.TestKeep.test_keep_29) ... ok
+test_keep_3 (test_billing.TestKeep.test_keep_3) ... ok
+test_keep_30 (test_billing.TestKeep.test_keep_30) ... ok
+test_keep_31 (test_billing.TestKeep.test_keep_31) ... ok
+test_keep_32 (test_billing.TestKeep.test_keep_32) ... ok
+test_keep_33 (test_billing.TestKeep.test_keep_33) ... ok
+test_keep_34 (test_billing.TestKeep.test_keep_34) ... ok
+test_keep_35 (test_billing.TestKeep.test_keep_35) ... ok
+test_keep_36 (test_billing.TestKeep.test_keep_36) ... ok
+test_keep_37 (test_billing.TestKeep.test_keep_37) ... ok
+test_keep_38 (test_billing.TestKeep.test_keep_38) ... ok
+test_keep_39 (test_billing.TestKeep.test_keep_39) ... ok
+test_keep_4 (test_billing.TestKeep.test_keep_4) ... ok
+test_keep_40 (test_billing.TestKeep.test_keep_40) ... ok
+test_keep_5 (test_billing.TestKeep.test_keep_5) ... ok
+test_keep_6 (test_billing.TestKeep.test_keep_6) ... ok
+test_keep_7 (test_billing.TestKeep.test_keep_7) ... ok
+test_keep_8 (test_billing.TestKeep.test_keep_8) ... ok
+test_keep_9 (test_billing.TestKeep.test_keep_9) ... ok
+
+======================================================================
+ERROR: test_no_discount (test_billing.TestInvoice.test_no_discount)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/work/pybilling/test_billing.py", line 94, in test_no_discount
+    self.assertEqual(invoice_total([{"qty": 1, "price": 10}], None), 10)
+                     ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/work/pybilling/billing.py", line 9, in invoice_total
+    return total * (1 - discount)
+                    ~~^~~~~~~~~~
+TypeError: unsupported operand type(s) for -: 'int' and 'NoneType'
+
+----------------------------------------------------------------------
+Ran 42 tests in 0.005s
+
+FAILED (errors=1)
+exit status 1

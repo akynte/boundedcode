@@ -1,0 +1,74 @@
+# What each corpus output must still show after pruning: the evidence a
+# developer needs to act on it (the failing test, the assertion, the error
+# and its location, the exception, the outcome). Patterns are regular
+# expressions matched line by line. Written from the outputs in corpus/
+# (generate.sh) before any pruning strategy was run on them.
+- id: go-test-verbose
+  category: test failure
+  must: ['--- FAIL: TestRoundHalfEven', 'round_test\.go:\d+: Round\(100\.5\) = 101, want 100', '^FAIL\s+example\.com/money', 'exit status 1']
+- id: go-build-errors
+  category: compiler
+  must: ['build\.go:6:3: invalid operation', 'build\.go:8:9: cannot use t', 'undefined: logf', 'build\.go:35:\d+: cannot use 42', 'exit status 1']
+- id: go-vet
+  category: linter
+  must: ['vet\.go:3:24: fmt\.Printf format %d has arg', 'vet\.go:3:55: unreachable code']
+- id: go-panic
+  category: stack trace
+  must: ['panic: runtime error: index out of range \[5\] with length 5', 'main\.go:10$', 'main\.go:14', 'exit status \d']
+- id: go-build-x
+  category: large terminal output
+  must: ['main\.go:6:14: undefined: undefinedName', 'exit status 1']
+- id: go-mod-download
+  category: dependency resolution
+  must: ['example\.com/does-not-exist@v0\.1\.0: reading .*404 Not Found', 'exit status 1']
+- id: pip-install
+  category: dependency resolution
+  must: ['Successfully installed .*pytest-8\.3\.3', 'exit status 0']
+- id: pip-install-error
+  category: dependency resolution
+  must: ['Could not find a version that satisfies the requirement requests==0\.0\.999', 'No matching distribution found for requests==0\.0\.999', 'exit status 1']
+- id: pytest-verbose
+  category: test failure
+  must: ['FAILED test_inventory\.py::test_reorder_point', 'assert 7 == 8', 'test_reorder_zero_safety\[5-2-10\]', '3 failed, 120 passed', 'test_inventory\.py:\d+']
+- id: python-traceback
+  category: stack trace
+  must: ['KeyError: .sku.', 'inventory\.py", line 13', 'run\.py", line \d+', 'DeprecationWarning: config key']
+- id: npm-install
+  category: dependency resolution
+  must: ['added \d+ packages', 'exit status 0']
+- id: tsc-errors
+  category: compiler
+  must: ['cart\.ts\(3,3\): error TS2322', 'cart\.ts\(7,19\): error TS2363', 'TS2304: Cannot find name .logger.']
+- id: eslint-output
+  category: linter
+  must: ['41:35\s+error\s+.undefinedThing. is not defined', '43:28\s+error\s+.x. is constant', '83 problems \(2 errors, 81 warnings\)']
+- id: node-test
+  category: test failure
+  must: ['discount applies', 'NaN !== 90', 'cart\.test\.js:54', 'fail 1']
+- id: node-stack
+  category: stack trace
+  must: ['TypeError: Cannot read properties of undefined \(reading .amount.\)', 'app\.js:2:71', 'at load .*app\.js:3']
+- id: cargo-build-deps
+  category: compiler
+  must: ['error\[E0308\]: mismatched types', 'src/lib\.rs:9:25', 'could not compile .rledger.']
+- id: cargo-test-backtrace
+  category: test failure
+  must: ['test tests::transfer_keeps_total \.\.\. FAILED', 'panicked at src/lib\.rs:15:9', 'assertion .left == right. failed', 'left: 90', 'right: 100', 'test result: FAILED']
+- id: mvn-test-downloads
+  category: test failure
+  must: ['expected: <100> but was: <90>', 'OrdersTest\.java:6', 'Tests run: 2, Failures: 1', 'BUILD FAILURE']
+- id: gradle-compile-errors
+  category: compiler
+  must: ['Orders\.java:4: error: cannot find symbol', 'Orders\.java:5: error: cannot find symbol', 'Orders\.java:6: error: cannot find symbol', 'Compilation failed']
+- id: java-exception
+  category: stack trace
+  must: ['Caused by: java\.lang\.IllegalStateException: no balance for account b', 'Main\.java:6', 'Main\.java:15']
+- id: search-func
+  category: search results
+  must: ['String\(\) string']
+- id: search-todo
+  category: search results
+  must: ['TODO']
+- id: find-listing
+  category: large terminal output
+  must: ['exit status 0']

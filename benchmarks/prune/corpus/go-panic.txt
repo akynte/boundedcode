@@ -1,0 +1,119 @@
+panic: runtime error: index out of range [5] with length 5
+
+goroutine 1 [running]:
+main.(*Ledger).At(...)
+	/work/gopanic/main.go:10
+main.walk(0x7f8a27b61c28?, 0x473000?)
+	/work/gopanic/main.go:14 +0x2d
+main.walk(0x1cc9d2c72a58?, 0x1e?)
+	/work/gopanic/main.go:16 +0x1b
+main.walk(0x7f8a27b61c28?, 0x436df7?)
+	/work/gopanic/main.go:16 +0x1b
+main.walk(0x1cc9d2c72b30?, 0x42263a?)
+	/work/gopanic/main.go:16 +0x1b
+main.walk(0x1c0000000000?, 0x420c9c?)
+	/work/gopanic/main.go:16 +0x1b
+main.walk(0x1cc9d2c72b28?, 0x422a65?)
+	/work/gopanic/main.go:16 +0x1b
+main.walk(0x42263a?, 0x7f8a27b61cc8?)
+	/work/gopanic/main.go:16 +0x1b
+main.walk(0x430965?, 0x593cc0?)
+	/work/gopanic/main.go:16 +0x1b
+main.walk(0x430a9c?, 0x593cc0?)
+	/work/gopanic/main.go:16 +0x1b
+main.walk(0x41b117?, 0x7f8a27b61c28?)
+	/work/gopanic/main.go:16 +0x1b
+main.walk(0x425d74?, 0x593cc0?)
+	/work/gopanic/main.go:16 +0x1b
+main.walk(0x7f8a6e7b6bc0?, 0x56861e?)
+	/work/gopanic/main.go:16 +0x1b
+main.walk(0xf00c9d2c72bf0?, 0x7f8a27b61c28?)
+	/work/gopanic/main.go:16 +0x1b
+main.walk(0x574260?, 0x1cc9d2ca80d0?)
+	/work/gopanic/main.go:16 +0x1b
+main.walk(0xc8?, 0x55d6c8?)
+	/work/gopanic/main.go:16 +0x1b
+main.walk(0x1cc9d2c72c60?, 0x477ffe?)
+	/work/gopanic/main.go:16 +0x1b
+main.walk(0x1?, 0x1cc9d2c72c80?)
+	/work/gopanic/main.go:16 +0x1b
+main.walk(0x45?, 0x1cc9d2c72ca0?)
+	/work/gopanic/main.go:16 +0x1b
+main.walk(0x1cc9d2ca80d0?, 0x1cc9d2c72d50?)
+	/work/gopanic/main.go:16 +0x1b
+main.walk(0x5533d8?, 0x1cc9d2ca00c0?)
+	/work/gopanic/main.go:16 +0x1b
+main.walk(0x477d8f?, 0x30?)
+	/work/gopanic/main.go:16 +0x1b
+main.walk(0x1?, 0x1cc9d2c72d28?)
+	/work/gopanic/main.go:16 +0x1b
+main.walk(0x1cc9d2c72d28?, 0x479b6f?)
+	/work/gopanic/main.go:16 +0x1b
+main.walk(0x592fe0?, 0x1cc9d2ca4018?)
+	/work/gopanic/main.go:16 +0x1b
+main.walk(0x485913?, 0x5533d8?)
+	/work/gopanic/main.go:16 +0x1b
+main.walk(0x7f8a6e7b6bc0?, 0x70?)
+	/work/gopanic/main.go:16 +0x1b
+main.walk(0x1cc9d2c72dc8?, 0x41d08a?)
+	/work/gopanic/main.go:16 +0x1b
+main.walk(0x41e513?, 0x574260?)
+	/work/gopanic/main.go:16 +0x1b
+main.walk(0x450b3f?, 0x1cc9d2c72de8?)
+	/work/gopanic/main.go:16 +0x1b
+main.walk(0x1cc9d2bdc1e0?, 0x49a49c?)
+	/work/gopanic/main.go:16 +0x1b
+main.walk(0x18?, 0x55f7f0?)
+	/work/gopanic/main.go:16 +0x1b
+main.main()
+	/work/gopanic/main.go:27 +0x139
+
+goroutine 19 [runnable]:
+main.main.func1()
+	/work/gopanic/main.go:24
+created by main.main in goroutine 1
+	/work/gopanic/main.go:24 +0x5c
+
+goroutine 20 [runnable]:
+main.main.func1()
+	/work/gopanic/main.go:24
+created by main.main in goroutine 1
+	/work/gopanic/main.go:24 +0x5c
+
+goroutine 21 [chan receive]:
+main.main.func1()
+	/work/gopanic/main.go:24 +0x49
+created by main.main in goroutine 1
+	/work/gopanic/main.go:24 +0x5c
+
+goroutine 22 [runnable]:
+main.main.func1()
+	/work/gopanic/main.go:24
+created by main.main in goroutine 1
+	/work/gopanic/main.go:24 +0x5c
+
+goroutine 23 [runnable]:
+main.main.func1()
+	/work/gopanic/main.go:24
+created by main.main in goroutine 1
+	/work/gopanic/main.go:24 +0x5c
+
+goroutine 24 [runnable]:
+main.main.func1()
+	/work/gopanic/main.go:24
+created by main.main in goroutine 1
+	/work/gopanic/main.go:24 +0x5c
+
+goroutine 25 [runnable]:
+main.main.func1()
+	/work/gopanic/main.go:24
+created by main.main in goroutine 1
+	/work/gopanic/main.go:24 +0x5c
+
+goroutine 26 [runnable]:
+main.main.func1()
+	/work/gopanic/main.go:24
+created by main.main in goroutine 1
+	/work/gopanic/main.go:24 +0x5c
+exit status 2
+exit status 1

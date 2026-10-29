@@ -1,0 +1,55 @@
+/work/jgradle/src/main/java/shop/Orders.java:4: error: cannot find symbol
+    public long total(List<Order> orders) { return orders.stream().mapToLong(Order::amount).sum(); }
+                           ^
+  symbol:   class Order
+  location: class Orders
+/work/jgradle/src/main/java/shop/Orders.java:6: error: cannot find symbol
+    public int count(List<Order> orders) { return orders.size; }
+                          ^
+  symbol:   class Order
+  location: class Orders
+/work/jgradle/src/main/java/shop/Orders.java:4: error: cannot find symbol
+    public long total(List<Order> orders) { return orders.stream().mapToLong(Order::amount).sum(); }
+                                                                             ^
+  symbol:   variable Order
+  location: class Orders
+/work/jgradle/src/main/java/shop/Orders.java:5: error: cannot find symbol
+    public String label(long cents) { return Money.format(cents); }
+                                             ^
+  symbol:   variable Money
+  location: class Orders
+4 errors
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':compileJava' (registered by plugin class 'org.gradle.api.plugins.JavaBasePlugin').
+> Compilation failed; see the compiler output below.
+  /work/jgradle/src/main/java/shop/Orders.java:4: error: cannot find symbol
+      public long total(List<Order> orders) { return orders.stream().mapToLong(Order::amount).sum(); }
+                             ^
+    symbol:   class Order
+    location: class Orders
+  /work/jgradle/src/main/java/shop/Orders.java:6: error: cannot find symbol
+      public int count(List<Order> orders) { return orders.size; }
+                            ^
+    symbol:   class Order
+    location: class Orders
+  /work/jgradle/src/main/java/shop/Orders.java:4: error: cannot find symbol
+      public long total(List<Order> orders) { return orders.stream().mapToLong(Order::amount).sum(); }
+                                                                               ^
+    symbol:   variable Order
+    location: class Orders
+  /work/jgradle/src/main/java/shop/Orders.java:5: error: cannot find symbol
+      public String label(long cents) { return Money.format(cents); }
+                                               ^
+    symbol:   variable Money
+    location: class Orders
+  4 errors
+
+* Try:
+> Check your code and dependencies to fix the compilation error(s)
+> Run with --scan to get full insights from a Build Scan (powered by Develocity).
+
+BUILD FAILED in 3s
+exit status 1

@@ -1,0 +1,310 @@
+/usr/local/go/src/net/interface_windows.go:70:			// TODO: use MIB_IF_ROW2.AccessType now that we no longer support
+/usr/local/go/src/net/lookup.go:168:	// TODO(bradfitz): optional interface impl override hook
+/usr/local/go/src/net/lookup.go:169:	// TODO(bradfitz): Timeout time.Duration?
+/usr/local/go/src/net/lookup.go:259:	// TODO(bradfitz): make this efficient, making the internal net package
+/usr/local/go/src/net/net_test.go:453:				// TODO: find a better way to wait
+/usr/local/go/src/net/mail/message.go:406:	// TODO(dsymonds): Is this really correct?
+/usr/local/go/src/net/mail/message.go:788:	// TODO(stapelberg): parse quoted-string within comment
+/usr/local/go/src/net/sock_stub.go:12:	// TODO: Implement this
+/usr/local/go/src/net/fd_fake.go:107:	// TODO Replace with runtime.AddCleanup.
+/usr/local/go/src/net/fd_fake.go:115:	// TODO Replace with runtime.AddCleanup.
+/usr/local/go/src/net/lookup_test.go:1024:		// TODO: plan9 implementation of the resolver uses the Dial function since
+/usr/local/go/src/net/fd_posix.go:43:	// TODO Replace with runtime.AddCleanup.
+/usr/local/go/src/net/fd_posix.go:48:	// TODO Replace with runtime.AddCleanup.
+/usr/local/go/src/net/netip/slow_test.go:54:		return Addr{}, fmt.Errorf("netaddr.ParseIP(%q): too many zone specifiers", s) // TODO: less specific?
+/usr/local/go/src/net/textproto/reader.go:20:// TODO: This should be a distinguishable error (ErrMessageTooLarge)
+/usr/local/go/src/net/sendfile_test.go:558:		// TODO(panjf2000): Windows has not yet implemented FileConn,
+/usr/local/go/src/net/tcpconn_keepalive_conf_windows_test.go:24:	// TODO(panjf2000): Unlike Unix-like OS's, old Windows (prior to Windows 10, version 1709)
+/usr/local/go/src/net/tcpsock_posix.go:137:	// TODO: try to understand what's really going on.
+/usr/local/go/src/net/net.go:620:// TODO(iant): We could consider changing this to os.ErrDeadlineExceeded
+/usr/local/go/src/net/http/internal/httpcommon/httpcommon.go:420:	// TODO(bradfitz): this is a copy of the logic in net/http. Unify somewhere?
+/usr/local/go/src/net/http/internal/sniff.go:188:	// TODO: do whatever the spec ends up doing.
+/usr/local/go/src/net/http/internal/chunked.go:208:	// TODO: care about exact syntax of chunk extensions? We're
+/usr/local/go/src/net/http/internal/http2/write.go:34:// TODO: decide whether to a) use this in the client code (which didn't
+/usr/local/go/src/net/http/internal/http2/write.go:209:	// TODO: this is a common one. It'd be nice to return true
+/usr/local/go/src/net/http/internal/http2/write.go:274:	// TODO: see writeResHeaders.staysWithinBuffer
+/usr/local/go/src/net/http/internal/http2/write.go:369:				// TODO: return an error? golang.org/issue/14048
+/usr/local/go/src/net/http/internal/http2/write.go:373:			// TODO: more of "8.1.2.2 Connection-Specific Header Fields"
+/usr/local/go/src/net/http/internal/http2/clientconn_test.go:298:		// TODO: This duplicates too much of the net/http RoundTrip flow.
+/usr/local/go/src/net/http/internal/http2/clientconn_test.go:539:			// TODO: We can simplify connection handling if we support
+/usr/local/go/src/net/http/internal/http2/transport.go:305:	// TODO(dneil): Clean up tests where cs.cc.cond is nil.
+/usr/local/go/src/net/http/internal/http2/transport.go:649:	// TODO: adjust this writer size to account for frame size +
+/usr/local/go/src/net/http/internal/http2/transport.go:950:	// TODO: do clients send GOAWAY too? maybe? Just Close:
+/usr/local/go/src/net/http/internal/http2/transport.go:1441:	// TODO: write h12Compare test showing whether
+/usr/local/go/src/net/http/internal/http2/transport.go:1721:				// TODO(bradfitz): this flush is for latency, not bandwidth.
+/usr/local/go/src/net/http/internal/http2/transport.go:1952:	// TODO: also do this if we've written the headers but not
+/usr/local/go/src/net/http/internal/http2/transport.go:2124:			// TODO(bradfitz): move first response byte earlier,
+/usr/local/go/src/net/http/internal/http2/transport.go:2268:			// TODO: care? unlike http/1, it won't mess up our framing, so it's
+/usr/local/go/src/net/http/internal/http2/transport.go:2272:		// TODO: care? unlike http/1, it won't mess up our framing, so it's
+/usr/local/go/src/net/http/internal/http2/transport.go:2319:		// TODO: ConnectionError might be overly harsh? Check.
+/usr/local/go/src/net/http/internal/http2/transport.go:2416:		// TODO(dneil): Acquiring this mutex can block indefinitely.
+/usr/local/go/src/net/http/internal/http2/transport.go:2454:		// TODO: be stricter here? only silently ignore things which
+/usr/local/go/src/net/http/internal/http2/transport.go:2557:	// TODO: check that any declared content-length matches, like
+/usr/local/go/src/net/http/internal/http2/transport.go:2620:		// TODO: deal with GOAWAY more. particularly the error code
+/usr/local/go/src/net/http/internal/http2/transport.go:2795:		// TODO: return error if server tries to RST_STREAM an idle stream
+/usr/local/go/src/net/http/internal/http2/transport.go:2899:	// TODO: map err to more interesting error codes, once the
+/usr/local/go/src/net/http/internal/http2/transport_test.go:296:	// TODO: Plumb the error causing the connection to be closed up to the user
+/usr/local/go/src/net/http/internal/http2/transport_test.go:501:// TODO: merge this with TestTransportBody to make TestTransportRequest? This
+/usr/local/go/src/net/http/internal/http2/transport_test.go:912:		// TODO: test 100-continue followed by immediate
+/usr/local/go/src/net/http/internal/http2/transport_test.go:3828:	// TODO: Figure out the correct behavior.
+/usr/local/go/src/net/http/internal/http2/transport_test.go:3980:	t.Skip("TODO: test fails because write errors don't cause the conn to close")
+/usr/local/go/src/net/http/internal/http2/transport_test.go:4199:		// TODO(dneil): Consider restructuring the request write to avoid reading
+/usr/local/go/src/net/http/internal/http2/databuffer.go:20:// TODO: Benchmark to determine if the pools are necessary. The GC may have
+/usr/local/go/src/net/http/internal/http2/client_conn_pool.go:17:// TODO: use singleflight for dialing and addConnCalls?
+/usr/local/go/src/net/http/internal/http2/client_conn_pool.go:21:	mu sync.Mutex // TODO: maybe switch to RWMutex
+/usr/local/go/src/net/http/internal/http2/client_conn_pool.go:22:	// TODO: add support for sharing conns based on cert names
+/usr/local/go/src/net/http/internal/http2/client_conn_pool.go:40:	// TODO(dneil): Dial a new connection when t.DisableKeepAlives is set?
+/usr/local/go/src/net/http/internal/http2/client_conn_pool.go:225:	// TODO: don't close a cc if it was just added to the pool
+/usr/local/go/src/net/http/internal/http2/server_test.go:668:// TODO: add a test with EndStream=true on the HEADERS but setting a
+/usr/local/go/src/net/http/internal/http2/server.go:5:// TODO: turn off the serve goroutine when idle, so
+/usr/local/go/src/net/http/internal/http2/server.go:17:// TODO (maybe): add a mechanism for Handlers to going into
+/usr/local/go/src/net/http/internal/http2/server.go:61:	defaultMaxStreams     = 250 // TODO: make this 100 as the GFE seems to?
+/usr/local/go/src/net/http/internal/http2/server.go:351:			// TODO: optionally enforce? Or enforce at the time we receive
+/usr/local/go/src/net/http/internal/http2/server.go:591:// TODO: remove this helper function once http2 can use build
+/usr/local/go/src/net/http/internal/http2/server.go:611:	// TODO(bradfitz): x/tools/cmd/bundle doesn't really support
+/usr/local/go/src/net/http/internal/http2/server.go:979:	timer := time.NewTimer(prefaceTimeout) // TODO: configurable on *Server?
+/usr/local/go/src/net/http/internal/http2/server.go:1213:			// reading data (see possible TODO at top of
+/usr/local/go/src/net/http/internal/http2/server.go:1324:// TODO: configurable?
+/usr/local/go/src/net/http/internal/http2/server.go:1371:			// TODO: could we also get into this state if
+/usr/local/go/src/net/http/internal/http2/server.go:1376:			// TODO: add CloseWrite to crypto/tls.Conn first
+/usr/local/go/src/net/http/internal/http2/server.go:1617:	// TODO: judging by RFC 7540, Section 6.5.3 each SETTINGS frame should be
+/usr/local/go/src/net/http/internal/http2/server.go:2018:				// TODO: send more details to the peer somehow. But http2 has
+/usr/local/go/src/net/http/internal/http2/server.go:2480:	// TODO: adjust buffer writing sizes based on server config, frame size updates from peer, etc
+/usr/local/go/src/net/http/internal/http2/server.go:2580:			// TODO(bradfitz): be faster here, like net/http? measure.
+/usr/local/go/src/net/http/internal/http2/server.go:2591:		// TODO: remove more Connection-specific header fields here, in addition
+/usr/local/go/src/net/http/internal/http2/server.go:2918:		// TODO: send a RST_STREAM
+/usr/local/go/src/net/http/internal/http2/server.go:3179:	// TODO: Dedup with http.Error?
+/usr/local/go/src/net/http/internal/http2/frame.go:299:	// TODO: let getReadBuf be configurable, and use a less memory-pinning
+/usr/local/go/src/net/http/internal/http2/frame.go:305:	maxWriteSize uint32 // zero means unlimited; TODO: implement
+/usr/local/go/src/net/http/internal/http2/frame.go:342:	// TODO: track which type of frame & with which flags was sent
+/usr/local/go/src/net/http/internal/http2/http2.go:218:// TODO: avoid alloc when code is neither 200 nor 404.
+/usr/local/go/src/net/http/internal/http2/http2.go:271:// TODO: pick a less arbitrary value? this is a bit under
+/usr/local/go/src/net/http/internal/http2/connframes_test.go:190:// TODO: rewrite those tests to use newer, more convenient test APIs.
+/usr/local/go/src/net/http/fcgi/child.go:242:			// TODO(eds): This blocks until the handler reads from the pipe.
+/usr/local/go/src/net/http/fcgi/child.go:312:	// TODO(bradfitz): also bound this copy in time. Or send
+/usr/local/go/src/net/http/transfer.go:331:			// TODO: could do better allocation-wise here, but trailers are rare,
+/usr/local/go/src/net/http/serve_test.go:986:		// TODO(panjf2000): sleep is not so robust, maybe find a better way to test this?
+/usr/local/go/src/net/http/serve_test.go:2391:	// TODO: maybe skip this search if no trailers were declared
+/usr/local/go/src/net/http/serve_test.go:2420:	// TODO: maybe skip this search if no trailers were declared
+/usr/local/go/src/net/http/serve_test.go:4998:// testing this tangentially and temporarily until another TODO was
+/usr/local/go/src/net/http/serve_test.go:6233:			// TODO(#59038): The HTTP/2 server empirically does not always reject new
+/usr/local/go/src/net/http/serve_test.go:6300:	// TODO(#59037): This timeout is hard-coded in closeIdleConnections.
+/usr/local/go/src/net/http/serve_test.go:7818:		// TODO: Read in this situation should return an error.
+/usr/local/go/src/net/http/clientserver_test.go:74:// of TODOs on what work needs to be done for our HTTP/3 implementation to
+/usr/local/go/src/net/http/clientserver_test.go:134:		// TODO(nsh): re-enable the tests once tree re-opens.
+/usr/local/go/src/net/http/clientserver_test.go:249:		// TODO: support testing HTTP/3 using fakenet.
+/usr/local/go/src/net/http/clientserver_test.go:700:		// TODO: Check that this is ErrContentLength, not just any error.
+/usr/local/go/src/net/http/clientserver_test.go:1734:		// TODO: also emit this log message for HTTP/2?
+/usr/local/go/src/net/http/request.go:669:	// TODO: validate r.Method too? At least it's less likely to
+/usr/local/go/src/net/http/request.go:792:	// TODO: Consider removing this check after verifying performance is okay.
+/usr/local/go/src/net/http/request.go:1154:		// TODO: Add a distinguishable error to net/textproto.
+/usr/local/go/src/net/http/request.go:1323:		// TODO(bradfitz): there are too many possible
+/usr/local/go/src/net/http/cgi/host.go:370:	// TODO: RFC 3875 isn't clear if only GET is supported, but it
+/usr/local/go/src/net/http/cgi/host.go:405:	// TODO: other transformations in spec or practice?
+/usr/local/go/src/net/http/http.go:115:// TODO(bradfitz): move common stuff here. The other files have accumulated
+/usr/local/go/src/net/http/transport.go:1837:	// TODO: actually support HTTP/3. Among other things:
+/usr/local/go/src/net/http/transport.go:2940:var errRequestCanceledConn = errors.New("net/http: request canceled while waiting for connection") // TODO: unify?
+/usr/local/go/src/net/http/transport_test.go:53:// TODO: test 5 pipelined requests with responses: 1) OK, 2) OK, Connection: Close
+/usr/local/go/src/net/http/transport_test.go:131:				// TODO(bcmills): What is the Sleep here doing, and why is this
+/usr/local/go/src/net/http/transport_test.go:1023:	// not what we want to test. TODO(bradfitz): use an io.Pipe
+/usr/local/go/src/net/http/transport_test.go:5407:		// TODO(meirf): issue 19761. Make these agnostic to h1/h2. (These are not h1 specific, but the
+/usr/local/go/src/net/http/routing_tree_test.go:41:// TODO: test host and method
+/usr/local/go/src/net/http/response_test.go:59:				"Connection": {"close"}, // TODO(rsc): Delete?
+/usr/local/go/src/net/http/response_test.go:485:				"Connection": {"close"}, // TODO(rsc): Delete?
+/usr/local/go/src/net/http/socks_bundle.go:456:		// TODO(mikio): handle IO deadlines and cancellation if
+/usr/local/go/src/net/http/server.go:1499:		// TODO: return an error if WriteHeader gets a return parameter
+/usr/local/go/src/net/http/server.go:1641:// TODO(bradfitz): short-circuit some of the buffering when the
+/usr/local/go/src/net/http/server.go:1804:// TODO(bcmills): This should arguably be a server configuration parameter,
+/usr/local/go/src/net/http/server.go:2261:	// TODO(bradfitz): let ServeHTTP handlers handle
+/usr/local/go/src/net/http/server.go:3781:	// TODO: Issue 26303: close HTTP/2 conns as soon as they become idle.
+/usr/local/go/src/net/http/pprof/pprof.go:308:		} else { // TODO: what's a good status code for canceled requests? 400?
+/usr/local/go/src/net/http/responsecontroller_test.go:289:			// TODO: Drop test for HTTP/2 when x/net is updated to support
+/usr/local/go/src/net/http/cookie_test.go:412:	// TODO(bradfitz): users have reported seeing this in the
+/usr/local/go/src/net/http/client_test.go:865:	// TODO(bradfitz): add tests for skipping hostname checks too?
+/usr/local/go/src/net/http/client_test.go:1958:				// TODO: Check that the body is valid when we do 307 and 308 support
+/usr/local/go/src/net/http/cookiejar/jar_test.go:138:	// TODO: Fix canonicalHost so that all of the following malformed
+/usr/local/go/src/net/http/cookiejar/jar.go:42:	// TODO: specify which of the caller and callee is responsible for IP
+/usr/local/go/src/net/http/httputil/dump.go:157:	// TODO: if the req.ContentLength is large, we allocate memory
+/usr/local/go/src/net/http/roundtrip_js.go:55:// TODO(go.dev/issue/60810): See if it's viable to test the Fetch API
+/usr/local/go/src/net/http/roundtrip_js.go:109:		// TODO(johanbrandhorst): Stream request body when possible.
+/usr/local/go/src/net/conf.go:202:		// TODO(bradfitz): for now we only permit use of the PreferGo
+/usr/local/go/src/net/dnsclient_unix.go:8:// TODO(rsc):
+/usr/local/go/src/net/iprawsock_posix.go:46:	// TODO(cw,rsc): consider using readv if we know the family
+/usr/local/go/src/net/resolverdialfunc_test.go:35:			// TODO: add test without HandleA* hooks specified at all, that Go
+/usr/local/go/src/net/resolverdialfunc_test.go:248:		// TODO: hook
+/usr/local/go/src/net/interface_bsdvar.go:21:	// TODO(mikio): Implement this like other platforms.
+/usr/local/go/src/net/udpsock_plan9.go:33:	// TODO: optimize. The equivalent code on posix is alloc-free.
+/usr/local/go/src/net/udpsock_plan9.go:76:	return c.writeTo(b, UDPAddrFromAddrPort(addr)) // TODO: optimize instead of allocating
+/usr/local/go/src/net/net_windows_test.go:396:	// TODO: need to test ipv6 netmask too, but netsh does not outputs it
+/usr/local/go/src/net/addrselect.go:133:	// TODO(bradfitz): implement? low priority for now.
+/usr/local/go/src/net/addrselect.go:141:	// TODO(bradfitz): implement? low priority for now.
+/usr/local/go/src/net/addrselect.go:171:	// TODO(bradfitz): implement? low priority for now.
+/usr/local/go/src/net/lookup_windows.go:98:	// TODO(bradfitz,brainman): use ctx more. See TODO below.
+/usr/local/go/src/net/lookup_windows.go:174:		// TODO(bradfitz,brainman): cancel the ongoing
+/usr/local/go/src/net/lookup_windows.go:191:	// TODO(bradfitz): finish ctx plumbing
+/usr/local/go/src/net/lookup_windows.go:260:	// TODO(bradfitz): finish ctx plumbing
+/usr/local/go/src/net/lookup_windows.go:291:	// TODO(bradfitz): finish ctx plumbing
+/usr/local/go/src/net/lookup_windows.go:322:	// TODO(bradfitz): finish ctx plumbing.
+/usr/local/go/src/net/lookup_windows.go:347:	// TODO(bradfitz): finish ctx plumbing.
+/usr/local/go/src/net/lookup_windows.go:371:	// TODO(bradfitz): finish ctx plumbing.
+/usr/local/go/src/net/lookup_windows.go:400:	// TODO(bradfitz): finish ctx plumbing.
+/usr/local/go/src/crypto/x509/root_windows.go:101:		// TODO(filippo): surface more error statuses.
+/usr/local/go/src/crypto/x509/root_windows.go:133:	// TODO(mkrautz): use the lChainIndex and lElementIndex fields
+/usr/local/go/src/crypto/x509/x509limbo_test.go:29:	"rfc5280::san::noncritical-with-empty-subject":    "TODO(#79741)",
+/usr/local/go/src/crypto/x509/x509limbo_test.go:30:	"webpki::san::san-critical-with-nonempty-subject": "TODO(#79741)",
+/usr/local/go/src/crypto/x509/x509limbo_test.go:31:	"rfc5280::nc::not-allowed-in-ee-noncritical":      "TODO(#79742)",
+/usr/local/go/src/crypto/x509/x509limbo_test.go:32:	"rfc5280::nc::not-allowed-in-ee-critical":         "TODO(#79742)",
+/usr/local/go/src/crypto/x509/x509limbo_test.go:33:	"rfc5280::eku::ee-eku-empty":                      "TODO(#79743)",
+/usr/local/go/src/crypto/x509/x509limbo_test.go:34:	"rfc5280::ca-empty-subject":                       "TODO(#79744)",
+/usr/local/go/src/crypto/x509/x509limbo_test.go:38:	"rfc5280::san::underscore-dns": "TODO(#75835)",
+/usr/local/go/src/crypto/x509/x509limbo_test.go:135:	"rfc5280::nc::permitted-self-issued": "TODO(#79746)",
+/usr/local/go/src/crypto/x509/parser.go:1379:	// TODO(#75835): This function omits a number of checks which we
+/usr/local/go/src/crypto/x509/parser.go:1386:	// I have left the checks we previously enabled, noted with "TODO(#75835)" so
+/usr/local/go/src/crypto/x509/parser.go:1389:	// TODO(#75835): this should only be true for constraints.
+/usr/local/go/src/crypto/x509/parser.go:1400:	// TODO(#75835): domains must have at least one label, cannot have
+/usr/local/go/src/crypto/x509/parser.go:1424:			// TODO(#75835): labels cannot be longer than 63 characters.
+/usr/local/go/src/crypto/x509/root_darwin.go:60:	// TODO(roland): we may want to allow passing in SCTs via VerifyOptions and
+/usr/local/go/src/crypto/x509/parser_test.go:270:		// TODO(#75835): these tests are for stricter name validation, which we
+/usr/local/go/src/crypto/x509/parser_test.go:283:		// TODO(#75835): these are the inverse of the tests above, they should be removed
+/usr/local/go/src/crypto/x509/parser_test.go:299:		{"period, constraint", ".", true, false}, // TODO(roland): not entirely clear if this is a valid constraint (require at least one label?)
+/usr/local/go/src/crypto/x509/parser_test.go:332:	// TODO(#75835): check that certificates we create with CreateCertificate that have malformed SAN values
+/usr/local/go/src/crypto/internal/boring/goboringcrypto.h:186:// TODO: EC_KEY_check_fips?
+/usr/local/go/src/crypto/internal/fips140/bigmod/nat_asm.go:20:// TODO(filippo): file cmd/compile performance issue.
+/usr/local/go/src/crypto/internal/fips140/edwards25519/field/fe_test.go:297:	// TODO: values close to 0, close to 2^255-19, between 2^255-19 and 2^255-1,
+/usr/local/go/src/crypto/internal/fips140/aes/gcm/gcm_s390x.go:220:// TODO(mundaym): could pass in hash subkey
+/usr/local/go/src/crypto/tls/bogo_shim_test.go:510:		// TODO: implement testingOnlyPeerSignatureAlgorithm on resumption.
+/usr/local/go/src/crypto/tls/bogo_shim_test.go:587:		"-loose-errors", // TODO(roland): this should be removed eventually
+/usr/local/go/src/crypto/tls/tls_test.go:1406:				// TODO: test changing parameters between original and resumed
+/usr/local/go/src/crypto/tls/tls_test.go:1834:// TODO: if it ends up exposed somewhere, use that instead.
+/usr/local/go/src/crypto/tls/conn.go:813:	// TODO(dmo): we use bytes.MinRead here because we used the buffer
+/usr/local/go/src/crypto/tls/bogo_config.json:28:        "TLS-ECH-Client-UnsolicitedInnerServerNameAck": "We don't allow sending empty SNI without skipping certificate verification, TODO: could add special flag to bogo to indicate 'empty sni'",
+/usr/local/go/src/crypto/tls/bogo_config.json:89:        "CheckLeafCurve": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:90:        "KeyUpdate-RequestACK": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:91:        "SupportedVersionSelection-TLS12": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:92:        "UnsolicitedServerNameAck-TLS-TLS1": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:93:        "TicketSessionIDLength-33-TLS-TLS1": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:94:        "UnsolicitedServerNameAck-TLS-TLS11": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:95:        "TicketSessionIDLength-33-TLS-TLS11": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:96:        "UnsolicitedServerNameAck-TLS-TLS12": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:97:        "TicketSessionIDLength-33-TLS-TLS12": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:98:        "UnsolicitedServerNameAck-TLS-TLS13": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:99:        "RenegotiationInfo-Forbidden-TLS13": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:100:        "EMS-Forbidden-TLS13": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:101:        "SendUnsolicitedOCSPOnCertificate-TLS13": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:102:        "SendUnsolicitedSCTOnCertificate-TLS13": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:103:        "SendUnknownExtensionOnCertificate-TLS13": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:104:        "Resume-Server-NoTickets-TLS1-TLS1-TLS": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:105:        "Resume-Server-NoTickets-TLS11-TLS11-TLS": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:106:        "Resume-Server-NoTickets-TLS12-TLS12-TLS": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:107:        "Resume-Server-NoPSKBinder": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:108:        "Resume-Server-PSKBinderFirstExtension": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:109:        "Resume-Server-PSKBinderFirstExtension-SecondBinder": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:110:        "Resume-Server-NoPSKBinder-SecondBinder": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:111:        "Resume-Server-OmitPSKsOnSecondClientHello": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:112:        "Renegotiate-Server-Forbidden": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:113:        "Renegotiate-Client-Forbidden-1": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:114:        "UnknownExtension-Client": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:115:        "UnknownUnencryptedExtension-Client-TLS13": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:116:        "UnofferedExtension-Client-TLS13": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:117:        "UnknownExtension-Client-TLS13": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:118:        "SendClientVersion-RSA": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:119:        "NoCommonCurves": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:120:        "PointFormat-EncryptedExtensions-TLS13": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:121:        "TLS13-SendNoKEMModesWithPSK-Server": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:122:        "TLS13-DuplicateTicketEarlyDataSupport": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:123:        "Basic-Client-NoTicket-TLS-Sync": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:124:        "Basic-Server-RSA-TLS-Sync": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:125:        "Basic-Client-NoTicket-TLS-Sync-SplitHandshakeRecords": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:126:        "Basic-Server-RSA-TLS-Sync-SplitHandshakeRecords": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:127:        "Basic-Client-NoTicket-TLS-Sync-PackHandshake": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:128:        "Basic-Server-RSA-TLS-Sync-PackHandshake": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:129:        "PartialSecondClientHelloAfterFirst": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:130:        "PartialServerHelloWithHelloRetryRequest": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:131:        "TrailingDataWithFinished-Server-TLS1": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:132:        "PartialClientKeyExchangeWithClientHello": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:133:        "TrailingDataWithFinished-Resume-Server-TLS1": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:134:        "TrailingDataWithFinished-Resume-Client-TLS11": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:135:        "TrailingDataWithFinished-Client-TLS1": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:136:        "TrailingDataWithFinished-Client-TLS11": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:137:        "TrailingDataWithFinished-Client-TLS12": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:138:        "TrailingDataWithFinished-Client-TLS13": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:139:        "PartialNewSessionTicketWithServerHelloDone": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:140:        "TrailingDataWithFinished-Server-TLS11": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:141:        "TrailingDataWithFinished-Server-TLS12": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:142:        "TrailingDataWithFinished-Resume-Server-TLS11": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:143:        "TrailingDataWithFinished-Resume-Client-TLS12": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:144:        "TrailingDataWithFinished-Resume-Server-TLS12": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:145:        "TrailingDataWithFinished-Resume-Client-TLS13": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:146:        "TrailingDataWithFinished-Resume-Client-TLS1": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:147:        "TrailingMessageData-ClientHello-TLS": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:148:        "TrailingMessageData-ServerHello-TLS": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:149:        "TrailingMessageData-ServerCertificate-TLS": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:150:        "TrailingMessageData-ServerHelloDone-TLS": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:151:        "TrailingMessageData-ServerKeyExchange-TLS": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:152:        "TrailingMessageData-CertificateRequest-TLS": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:153:        "TrailingMessageData-CertificateVerify-TLS": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:154:        "TrailingMessageData-ServerFinished-TLS": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:155:        "TrailingMessageData-ClientKeyExchange-TLS": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:156:        "TrailingMessageData-TLS13-ClientHello-TLS": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:157:        "TrailingMessageData-ClientFinished-TLS": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:158:        "TrailingMessageData-NewSessionTicket-TLS": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:159:        "TrailingMessageData-ClientCertificate-TLS": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:160:        "TrailingMessageData-TLS13-CertificateRequest-TLS": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:161:        "TrailingMessageData-TLS13-ServerCertificateVerify-TLS": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:162:        "TrailingMessageData-TLS13-EncryptedExtensions-TLS": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:163:        "TrailingMessageData-TLS13-ClientCertificate-TLS": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:164:        "TrailingMessageData-TLS13-ClientCertificateVerify-TLS": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:165:        "TrailingMessageData-TLS13-ServerCertificate-TLS": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:166:        "SkipEarlyData-TLS13": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:167:        "DuplicateKeyShares-TLS13": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:168:        "Server-TooLongSessionID-TLS13": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:169:        "Client-TooLongSessionID": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:170:        "Client-ShortSessionID": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:171:        "TLS12NoSessionID-TLS13": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:172:        "Server-TooLongSessionID-TLS12": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:173:        "EmptyEncryptedExtensions-TLS13": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:174:        "SkipEarlyData-SecondClientHelloEarlyData-TLS13": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:175:        "EncryptedExtensionsWithKeyShare-TLS13": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:176:        "HelloRetryRequest-DuplicateCurve-TLS13": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:177:        "HelloRetryRequest-DuplicateCookie-TLS13": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:178:        "HelloRetryRequest-Unknown-TLS13": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:179:        "SendPostHandshakeChangeCipherSpec-TLS13": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:180:        "EmptyExtensions-ClientHello-TLS1": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:181:        "OmitExtensions-ClientHello-TLS1": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:182:        "EmptyExtensions-ClientHello-TLS12": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:183:        "OmitExtensions-ClientHello-TLS12": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:184:        "EmptyExtensions-ClientHello-TLS11": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:185:        "OmitExtensions-ClientHello-TLS11": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:186:        "DuplicateCertCompressionExt-TLS12": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:187:        "DuplicateCertCompressionExt-TLS13": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:188:        "Client-RejectJDK11DowngradeRandom": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:189:        "CheckClientCertificateTypes": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:190:        "CheckECDSACurve-TLS12": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:191:        "ALPNClient-RejectUnknown-TLS-TLS1": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:192:        "ALPNClient-RejectUnknown-TLS-TLS11": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:193:        "ALPNClient-RejectUnknown-TLS-TLS12": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:194:        "ALPNClient-RejectUnknown-TLS-TLS13": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:195:        "ClientHelloPadding": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:196:        "TLS13-ExpectTicketEarlyDataSupport": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:197:        "TLS13-EarlyData-TooMuchData-Client-TLS-Sync": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:198:        "TLS13-EarlyData-TooMuchData-Client-TLS-Sync-SplitHandshakeRecords": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:199:        "TLS13-EarlyData-TooMuchData-Client-TLS-Sync-PackHandshake": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:200:        "WrongMessageType-TLS13-EndOfEarlyData-TLS": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:201:        "TrailingMessageData-TLS13-EndOfEarlyData-TLS": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:202:        "SendHelloRetryRequest-2-TLS13": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:203:        "EarlyData-SkipEndOfEarlyData-TLS13": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:204:        "EarlyData-Server-BadFinished-TLS13": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:205:        "EarlyData-UnexpectedHandshake-Server-TLS13": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:206:        "EarlyData-CipherMismatch-Client-TLS13": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:208:        "Resume-Server-UnofferedCipher-TLS13": "TODO: first pass, this should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:209:        "GarbageCertificate-Server-TLS13": "TODO: 2025/06 BoGo update, should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:210:        "WrongMessageType-TLS13-ClientCertificate-TLS": "TODO: 2025/06  BoGo update, should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:211:        "KeyUpdate-Requested": "TODO: 2025/06  BoGo update, should be fixed",
+/usr/local/go/src/crypto/tls/bogo_config.json:212:        "AppDataBeforeTLS13KeyChange-*": "TODO: 2025/06  BoGo update, should be fixed"
+/usr/local/go/src/crypto/tls/cipher_suites.go:152:var cipherSuites = []*cipherSuite{ // TODO: replace with a map, since the order doesn't matter.
+/usr/local/go/src/crypto/tls/cipher_suites.go:214:var cipherSuitesTLS13 = []*cipherSuiteTLS13{ // TODO: replace with a map.
+/usr/local/go/src/crypto/tls/link_test.go:67:		// TODO: add only_server like func main() { tls.Server(nil, nil) }
+/usr/local/go/src/crypto/tls/quic.go:409:	// TODO(roland): we should merge this check with the similar one in setReadTrafficSecret.
+/usr/local/go/src/crypto/sha3/sha3_test.go:405:// TODO(filippo): move this to crypto/internal/cryptotest.
+/usr/local/go/src/crypto/sha3/sha3_test.go:429:// TODO(filippo): move this to crypto/internal/cryptotest.
+exit status 0

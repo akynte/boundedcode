@@ -1,0 +1,106 @@
+    Checking rclip v0.1.0 (/work/rclip)
+warning: this function could have a `#[must_use]` attribute
+ --> src/lib.rs:1:8
+  |
+1 | pub fn total(xs: &Vec<i64>) -> i64 {
+  |        ^^^^^
+  |
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#must_use_candidate
+  = note: `-W clippy::must-use-candidate` implied by `-W clippy::pedantic`
+  = help: to override `-W clippy::pedantic` add `#[allow(clippy::must_use_candidate)]`
+help: add the attribute
+  |
+1 + #[must_use]
+2 | pub fn total(xs: &Vec<i64>) -> i64 {
+  |
+
+warning: unneeded `return` statement
+ --> src/lib.rs:6:5
+  |
+6 |     return t;
+  |     ^^^^^^^^
+  |
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#needless_return
+  = note: `#[warn(clippy::needless_return)]` on by default
+help: remove `return`
+  |
+6 -     return t;
+6 +     t
+  |
+
+warning: writing `&Vec` instead of `&[_]` involves a new object where a slice will do
+ --> src/lib.rs:1:18
+  |
+1 | pub fn total(xs: &Vec<i64>) -> i64 {
+  |                  ^^^^^^^^^
+  |
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#ptr_arg
+  = note: `#[warn(clippy::ptr_arg)]` on by default
+help: change this to
+  |
+1 - pub fn total(xs: &Vec<i64>) -> i64 {
+1 + pub fn total(xs: &[i64]) -> i64 {
+  |
+
+warning: the loop variable `i` is only used to index `xs`
+ --> src/lib.rs:3:14
+  |
+3 |     for i in 0..xs.len() {
+  |              ^^^^^^^^^^^
+  |
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#needless_range_loop
+  = note: `#[warn(clippy::needless_range_loop)]` on by default
+help: consider using an iterator
+  |
+3 -     for i in 0..xs.len() {
+3 +     for <item> in &xs {
+  |
+
+warning: manual implementation of an assign operation
+ --> src/lib.rs:4:9
+  |
+4 |         t = t + xs[i];
+  |         ^^^^^^^^^^^^^ help: replace it with: `t += xs[i]`
+  |
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#assign_op_pattern
+  = note: `#[warn(clippy::assign_op_pattern)]` on by default
+
+warning: this function could have a `#[must_use]` attribute
+  --> src/lib.rs:9:8
+   |
+ 9 | pub fn first_even(xs: &[i64]) -> Option<i64> {
+   |        ^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#must_use_candidate
+help: add the attribute
+   |
+ 9 + #[must_use]
+10 | pub fn first_even(xs: &[i64]) -> Option<i64> {
+   |
+
+warning: you are using an explicit closure for copying elements
+  --> src/lib.rs:10:5
+   |
+10 |     xs.iter().filter(|x| *x % 2 == 0).next().map(|x| *x)
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider calling the dedicated `copied` method: `xs.iter().filter(|x| *x % 2 == 0).next().copied()`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#map_clone
+   = note: `#[warn(clippy::map_clone)]` on by default
+
+warning: called `filter(..).next()` on an `Iterator`
+  --> src/lib.rs:10:5
+   |
+10 |     xs.iter().filter(|x| *x % 2 == 0).next().map(|x| *x)
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#filter_next
+   = note: `#[warn(clippy::filter_next)]` on by default
+help: use `.find(..)` instead
+   |
+10 -     xs.iter().filter(|x| *x % 2 == 0).next().map(|x| *x)
+10 +     xs.iter().find(|x| *x % 2 == 0).map(|x| *x)
+   |
+
+warning: `rclip` (lib) generated 8 warnings (run `cargo clippy --fix --lib -p rclip -- -W clippy::pedantic` to apply 6 suggestions)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.07s
+exit status 0

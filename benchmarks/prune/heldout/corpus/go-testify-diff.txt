@@ -1,0 +1,81 @@
+=== RUN   TestKeep1
+--- PASS: TestKeep1 (0.00s)
+=== RUN   TestKeep2
+--- PASS: TestKeep2 (0.00s)
+=== RUN   TestKeep3
+--- PASS: TestKeep3 (0.00s)
+=== RUN   TestKeep4
+--- PASS: TestKeep4 (0.00s)
+=== RUN   TestKeep5
+--- PASS: TestKeep5 (0.00s)
+=== RUN   TestKeep6
+--- PASS: TestKeep6 (0.00s)
+=== RUN   TestKeep7
+--- PASS: TestKeep7 (0.00s)
+=== RUN   TestKeep8
+--- PASS: TestKeep8 (0.00s)
+=== RUN   TestKeep9
+--- PASS: TestKeep9 (0.00s)
+=== RUN   TestKeep10
+--- PASS: TestKeep10 (0.00s)
+=== RUN   TestKeep11
+--- PASS: TestKeep11 (0.00s)
+=== RUN   TestKeep12
+--- PASS: TestKeep12 (0.00s)
+=== RUN   TestKeep13
+--- PASS: TestKeep13 (0.00s)
+=== RUN   TestKeep14
+--- PASS: TestKeep14 (0.00s)
+=== RUN   TestKeep15
+--- PASS: TestKeep15 (0.00s)
+=== RUN   TestKeep16
+--- PASS: TestKeep16 (0.00s)
+=== RUN   TestKeep17
+--- PASS: TestKeep17 (0.00s)
+=== RUN   TestKeep18
+--- PASS: TestKeep18 (0.00s)
+=== RUN   TestKeep19
+--- PASS: TestKeep19 (0.00s)
+=== RUN   TestKeep20
+--- PASS: TestKeep20 (0.00s)
+=== RUN   TestKeep21
+--- PASS: TestKeep21 (0.00s)
+=== RUN   TestKeep22
+--- PASS: TestKeep22 (0.00s)
+=== RUN   TestKeep23
+--- PASS: TestKeep23 (0.00s)
+=== RUN   TestKeep24
+--- PASS: TestKeep24 (0.00s)
+=== RUN   TestKeep25
+--- PASS: TestKeep25 (0.00s)
+=== RUN   TestKeep26
+--- PASS: TestKeep26 (0.00s)
+=== RUN   TestKeep27
+--- PASS: TestKeep27 (0.00s)
+=== RUN   TestKeep28
+--- PASS: TestKeep28 (0.00s)
+=== RUN   TestKeep29
+--- PASS: TestKeep29 (0.00s)
+=== RUN   TestKeep30
+--- PASS: TestKeep30 (0.00s)
+=== RUN   TestNormalize
+    orders_test.go:41: 
+        	Error Trace:	/work/gotestify/orders_test.go:41
+        	Error:      	Not equal: 
+        	            	expected: orders.Order{ID:"o-1", Items:[]string{"a", "b"}, Total:300, Status:"new"}
+        	            	actual  : orders.Order{ID:"o-1", Items:[]string{"a", "b"}, Total:300, Status:"open"}
+        	            	
+        	            	Diff:
+        	            	--- Expected
+        	            	+++ Actual
+        	            	@@ -7,3 +7,3 @@
+        	            	  Total: (int) 300,
+        	            	- Status: (string) (len=3) "new"
+        	            	+ Status: (string) (len=4) "open"
+        	            	 }
+        	Test:       	TestNormalize
+--- FAIL: TestNormalize (0.00s)
+FAIL
+FAIL	example.com/orders	0.002s
+FAIL
+exit status 1

@@ -1,0 +1,87 @@
+id: session-noisy-tests
+language: python
+category: session
+# A noisy test suite: 160 tests that print progress lines and warnings, one
+# planted defect. The verbose run is far larger than a tool result's cap,
+# and the failure is reported among hundreds of passing lines. Then a fix,
+# a second run, and a question about the last run's outcome.
+fixture: polyglot
+repos: [py-inventory]
+setup:
+  - repo: py-inventory
+    file: inventory.py
+    old: "return sum(qty * prices[sku] for sku, qty in self._items.items() if sku in prices)"
+    new: "return sum(qty + prices[sku] for sku, qty in self._items.items() if sku in prices)"
+  - repo: py-inventory
+    file: tests/test_records.py
+    new: |
+      import unittest
+      import warnings
+
+      from inventory import Inventory
+
+
+      def _check(case):
+          inv = Inventory()
+          for i in range(5):
+              print(f"case {case}: loading record {i} of 5 from fixtures/records-{case}.json")
+          warnings.warn(f"record schema v1 is deprecated (case {case})", DeprecationWarning)
+          inv.add(f"sku-{case}", case + 1)
+          return inv.quantity(f"sku-{case}")
+
+
+      class RecordTest(unittest.TestCase):
+          pass
+
+
+      for _n in range(160):
+          setattr(RecordTest, f"test_record_{_n:03d}", lambda self, n=_n: self.assertEqual(_check(n), n + 1))
+
+
+      class ValueTest(unittest.TestCase):
+          def test_total_value(self):
+              inv = Inventory()
+              inv.add("a", 3)
+              inv.add("b", 2)
+              print("computing the stock value of 2 SKUs")
+              self.assertEqual(inv.total_value({"a": 100, "b": 250, "c": 7}), 800)
+request: >-
+  In the inventory project, run the whole test suite verbosely with
+  `python3 -W always -m unittest -v` and tell me which tests fail and why. Do not
+  change anything yet.
+expect:
+  - "test_total_value|total_value"
+turns:
+  - request: Fix the cause in the production code (not the tests) and run the same command again.
+  - request: >-
+      How many tests ran in that last run, and did any fail? Quote the summary
+      line the runner printed.
+    expect:
+      - "16[45]"
+      - "OK|no failures|all (?:tests )?pass|none failed|0 fail"
+hidden:
+  - repo: py-inventory
+    path: tests/test_hidden_value.py
+    content: |
+      import unittest
+
+      from inventory import Inventory
+
+
+      class HiddenValue(unittest.TestCase):
+          def test_value(self):
+              inv = Inventory()
+              inv.add("x", 4)
+              inv.add("y", 1)
+              self.assertEqual(inv.total_value({"x": 25, "y": 3}), 103)
+
+          def test_skips_unpriced(self):
+              inv = Inventory()
+              inv.add("x", 4)
+              self.assertEqual(inv.total_value({}), 0)
+checks:
+  - repo: py-inventory
+    run: [python3, -m, unittest, -q]
+  - repo: py-inventory
+    run: [sh, -c, "git diff --exit-code HEAD -- tests/test_records.py tests/test_inventory.py"]
+timeout: 25m

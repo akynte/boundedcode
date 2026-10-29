@@ -1,0 +1,81 @@
+FAIL ./price.test.js
+  ✓ keeps 1 (1 ms)
+  ✓ keeps 2
+  ✓ keeps 3
+  ✓ keeps 4
+  ✓ keeps 5
+  ✓ keeps 6
+  ✓ keeps 7 (1 ms)
+  ✓ keeps 8
+  ✓ keeps 9
+  ✓ keeps 10
+  ✓ keeps 11
+  ✓ keeps 12
+  ✓ keeps 13 (1 ms)
+  ✓ keeps 14
+  ✓ keeps 15
+  ✓ keeps 16
+  ✓ keeps 17
+  ✓ keeps 18
+  ✓ keeps 19
+  ✓ keeps 20
+  ✓ keeps 21
+  ✓ keeps 22
+  ✓ keeps 23
+  ✓ keeps 24 (1 ms)
+  ✓ keeps 25
+  ✓ keeps 26
+  ✓ keeps 27
+  ✓ keeps 28
+  ✓ keeps 29
+  ✓ keeps 30
+  ✓ keeps 31
+  ✓ keeps 32
+  ✓ keeps 33
+  ✓ keeps 34
+  ✓ keeps 35
+  ✓ keeps 36
+  ✓ keeps 37
+  ✓ keeps 38
+  ✓ keeps 39
+  ✓ keeps 40
+  ✕ percent coupon (1 ms)
+  ✕ format
+
+  ● percent coupon
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: 900
+    Received: -9000
+
+    [0m [90m 40 |[39m test([32m'keeps 39'[39m[33m,[39m () [33m=>[39m { expect([35m39[39m)[33m.[39mtoBe([35m39[39m)[33m;[39m })[33m;[39m
+     [90m 41 |[39m test([32m'keeps 40'[39m[33m,[39m () [33m=>[39m { expect([35m40[39m)[33m.[39mtoBe([35m40[39m)[33m;[39m })[33m;[39m
+    [31m[1m>[22m[39m[90m 42 |[39m test([32m'percent coupon'[39m[33m,[39m () [33m=>[39m { expect(applyCoupon([35m1000[39m[33m,[39m { type[33m:[39m [32m'percent'[39m[33m,[39m value[33m:[39m [35m10[39m }))[33m.[39mtoBe([35m900[39m)[33m;[39m })[33m;[39m
+     [90m    |[39m                                                                                          [31m[1m^[22m[39m
+     [90m 43 |[39m test([32m'format'[39m[33m,[39m () [33m=>[39m { expect(format([35m1234[39m))[33m.[39mtoEqual([32m'$12.34'[39m)[33m;[39m })[33m;[39m
+     [90m 44 |[39m[0m
+
+      at Object.toBe (price.test.js:42:90)
+
+  ● format
+
+    expect(received).toEqual(expected) // deep equality
+
+    Expected: "$12.34"
+    Received: "$12.3"
+
+    [0m [90m 41 |[39m test([32m'keeps 40'[39m[33m,[39m () [33m=>[39m { expect([35m40[39m)[33m.[39mtoBe([35m40[39m)[33m;[39m })[33m;[39m
+     [90m 42 |[39m test([32m'percent coupon'[39m[33m,[39m () [33m=>[39m { expect(applyCoupon([35m1000[39m[33m,[39m { type[33m:[39m [32m'percent'[39m[33m,[39m value[33m:[39m [35m10[39m }))[33m.[39mtoBe([35m900[39m)[33m;[39m })[33m;[39m
+    [31m[1m>[22m[39m[90m 43 |[39m test([32m'format'[39m[33m,[39m () [33m=>[39m { expect(format([35m1234[39m))[33m.[39mtoEqual([32m'$12.34'[39m)[33m;[39m })[33m;[39m
+     [90m    |[39m                                             [31m[1m^[22m[39m
+     [90m 44 |[39m[0m
+
+      at Object.toEqual (price.test.js:43:45)
+
+Test Suites: 1 failed, 1 total
+Tests:       2 failed, 40 passed, 42 total
+Snapshots:   0 total
+Time:        0.202 s
+Ran all test suites.
+exit status 1

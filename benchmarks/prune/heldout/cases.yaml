@@ -1,0 +1,60 @@
+# Held out: written from the raw outputs in corpus/ (generate.sh) and
+# frozen before internal/prune was run on any of them. Patterns are
+# regular expressions matched line by line.
+- id: make-c-errors
+  category: compiler
+  must: ['main\.c:6:20: error: implicit declaration of function .variance.', 'stats\.c:11:63: error: expected .;. before', 'main\.c:5:14: warning: format', 'not remade because of errors']
+- id: go-test-race
+  category: test failure
+  must: ['WARNING: DATA RACE', 'counter\.go:5', 'counter_test\.go:13', 'race detected during execution of test|--- FAIL: TestConcurrentInc']
+- id: go-testify-diff
+  category: test failure
+  must: ['--- FAIL: TestNormalize', 'Error Trace:.*orders_test\.go:41', 'expected: orders\.Order', 'actual\s*: orders\.Order', 'Status: \(string\) \(len=4\) "open"']
+- id: pip-install-mypy-ruff
+  category: dependency resolution
+  must: ['Successfully installed .*mypy-1\.13\.0', 'exit status 0']
+- id: mypy-errors
+  category: linter
+  must: ['billing\.py:9: error: Unsupported operand types', 'billing\.py:13: error: Incompatible return value type', 'Found 5 errors in 1 file']
+- id: ruff-check
+  category: linter
+  must: ['billing\.py:17:5: F841', 'billing\.py:7:9: E741', 'Found 16 errors']
+- id: unittest-verbose
+  category: test failure
+  must: ['ERROR: test_no_discount', 'billing\.py", line 9, in invoice_total', 'TypeError: unsupported operand type', 'FAILED \(errors=1\)']
+- id: python-log-flood
+  category: large terminal output
+  must: ['fatal: queue .billing. does not exist', 'upstream returned 503', 'exit status 1']
+- id: npm-install-jest
+  category: dependency resolution
+  must: ['added 267 packages', 'exit status 0']
+- id: jest-failures
+  category: test failure
+  must: ['✕ percent coupon', 'Expected: 900', 'Received: -9000', 'price\.test\.js:42', 'Received: "\$12\.3"', 'Tests:\s+2 failed, 40 passed']
+- id: npm-install-missing
+  category: dependency resolution
+  must: ['npm error code E404', '404 Not Found - GET https://registry\.npmjs\.org/left-padd-not-a-real-package-xyz', 'exit status 1']
+- id: tsc-project
+  category: compiler
+  must: ['src/app\.ts\(2,23\): error TS2322', 'src/user\.ts\(2,69\): error TS2345', 'src/user\.ts\(3,56\): error TS2322', 'TS2339: Property .name. does not exist']
+- id: cargo-clippy
+  category: linter
+  must: ['unneeded .return. statement', 'src/lib\.rs:6:5', 'generated 8 warnings']
+- id: cargo-test-two-failures
+  category: test failure
+  must: ['test tests::by_zero \.\.\. FAILED', 'panicked at src/lib\.rs:2:16', 'attempt to divide by zero', 'panicked at src/lib\.rs:9:32', 'left: 9', 'test result: FAILED']
+- id: gradle-test-failure
+  category: test failure
+  must: ['StockTest > takeUnknownSkuIsRejected\(\) FAILED', 'but was: <java\.lang\.NullPointerException>', 'Stock\.java:7', 'StockTest\.java:7', '2 tests completed, 1 failed']
+- id: mvn-compile-error
+  category: compiler
+  must: ['Report\.java:\[5,46\] .;. expected', 'COMPILATION ERROR', 'BUILD FAILURE']
+- id: search-node-modules
+  category: search results
+  must: ['node_modules/jest-\S+:\d+:']
+- id: rg-python-stdlib
+  category: search results
+  must: ['def __repr__']
+- id: npm-ls-tree
+  category: large terminal output
+  must: ['nodejest@1\.0\.0', 'exit status 0']

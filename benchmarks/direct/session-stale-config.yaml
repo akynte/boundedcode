@@ -1,0 +1,70 @@
+id: session-stale-config
+language: go
+category: session
+# What the conversation saw goes stale: the user edits the file the first
+# answer was about between messages. Questions about other code grow the
+# history in between, so the first read is set aside or summarised. The
+# later answer and the test must follow the file as it is now.
+fixture: payment-platform
+repos: [payment-service]
+request: >-
+  In payment-service, what is the default listen address in the config
+  package, and which environment variable sets the database DSN?
+expect:
+  - ":8080"
+  - "PAYMENT_DB_DSN"
+turns:
+  - request: >-
+      Which Kafka topic does payment-service publish to, and where is it
+      defined?
+    expect:
+      - "payments\\.charged"
+  - request: >-
+      How does the HTTP handler in internal/api validate a charge request?
+      Name the checks it makes.
+  - request: >-
+      I have just changed internal/config/config.go myself. What is the
+      default listen address now, and which environment variable sets the
+      database DSN now?
+    edits:
+      - repo: payment-service
+        file: internal/config/config.go
+        old: "c.ListenAddr = \":8080\""
+        new: "c.ListenAddr = \":9090\""
+      - repo: payment-service
+        file: internal/config/config.go
+        old: "DatabaseDSN:  os.Getenv(\"PAYMENT_DB_DSN\"),"
+        new: "DatabaseDSN:  os.Getenv(\"PAYMENTS_DATABASE_URL\"),"
+      - repo: payment-service
+        file: internal/config/config.go
+        old: "return c, errors.New(\"PAYMENT_DB_DSN is required\")"
+        new: "return c, errors.New(\"PAYMENTS_DATABASE_URL is required\")"
+    expect:
+      - ":9090"
+      - "PAYMENTS_DATABASE_URL"
+  - request: >-
+      Add a test in internal/config/config_test.go that checks the default
+      listen address and that Load fails when the DSN variable is unset, and
+      run it.
+hidden:
+  - repo: payment-service
+    path: internal/config/hidden_config_test.go
+    content: |
+      package config
+
+      import "testing"
+
+      func TestHiddenDefaults(t *testing.T) {
+      	t.Setenv("PAYMENTS_DATABASE_URL", "postgres://x")
+      	t.Setenv("LISTEN_ADDR", "")
+      	c, err := Load()
+      	if err != nil || c.ListenAddr != ":9090" {
+      		t.Fatalf("%+v %v", c, err)
+      	}
+      }
+checks:
+  - repo: payment-service
+    run: [go, test, ./internal/config/]
+  - repo: payment-service
+    run: [sh, -c, "grep -q ':9090' internal/config/config_test.go && grep -q 'PAYMENTS_DATABASE_URL' internal/config/config_test.go"]
+timeout: 25m
