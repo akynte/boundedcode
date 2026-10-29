@@ -1,0 +1,492 @@
+{
+  "started": "2026-10-29T16:38:19.638255514Z",
+  "runtime": "0.5.0-dev (build 11146, commit 7fe450e19)",
+  "machine": {
+    "time": "2026-10-29T16:38:19.63825906Z",
+    "os": "linux",
+    "arch": "amd64",
+    "cpu_model": "13th Gen Intel(R) Core(TM) i7-13620H",
+    "logical_cpus": 16,
+    "mem_total_mib": 62741,
+    "mem_available_mib": 49473,
+    "swap_used_mib": 8190,
+    "gpus": [
+      {
+        "index": 0,
+        "name": "NVIDIA GeForce RTX 4060 Laptop GPU",
+        "compute_cap": "8.9",
+        "driver": "595.99.02",
+        "mem_total_mib": 8188,
+        "mem_used_mib": 77,
+        "util_pct": 0,
+        "temp_c": 43,
+        "power_w": 4.24,
+        "power_limit_w": 115,
+        "sm_clock_mhz": 915,
+        "throttle": "0x0000000000000001"
+      }
+    ],
+    "accelerator": {
+      "kind": "cuda",
+      "name": "NVIDIA GeForce RTX 4060 Laptop GPU",
+      "memory_mib": 8188
+    }
+  },
+  "profiles": [
+    {
+      "profile": "qwen3.5-4b",
+      "file": "Qwen3.5-4B-Q4_K_M.gguf",
+      "fit": {
+        "profile": "qwen3.5-4b",
+        "fit": "gpu",
+        "need_mib": 5737,
+        "detail": "needs about 5.6 GB; fits in 8.0 GB of GPU memory"
+      },
+      "declared": {
+        "ToolCalling": "native",
+        "StructuredOutput": "json_schema",
+        "Thinking": "toggle",
+        "ContextMax": 262144,
+        "Tokenizer": "qwen35",
+        "Speculative": [
+          "ngram",
+          "draft"
+        ],
+        "Limitations": null
+      },
+      "weights": {
+        "architecture": "qwen35",
+        "name": "Qwen3.5-4B",
+        "tokenizer": "qwen35",
+        "context_length": 262144,
+        "blocks": 32,
+        "mtp_layers": 0,
+        "tensors": 426
+      },
+      "load_seconds": 2.506015728,
+      "server_rss_mib": 3320,
+      "vram_used_mib": 5039,
+      "checks": [
+        {
+          "name": "tool_call",
+          "pass": true,
+          "detail": "read_file {\"path\":\"go.mod\"}",
+          "seconds": 0.970717215
+        },
+        {
+          "name": "tool_result",
+          "pass": true,
+          "detail": "This module declares Go version **1.23.4** in its go.mod file.",
+          "seconds": 0.873830477
+        },
+        {
+          "name": "code_arguments",
+          "pass": true,
+          "detail": "old \"\\treturn \\\"negative\\\"\" new \"\\treturn \\\"below zero\\\"\" (want old within the file, e.g. \"\\t\\treturn \\\"negative\\\"\")",
+          "seconds": 1.34856702
+        },
+        {
+          "name": "structured",
+          "pass": false,
+          "detail": "does not parse: {\n  \"file\": \"store/db.go\",\n  \"line\": 42,\n  \"severity\": \"high\",\n  \"summary\": \"SQL Injection vulnerability detected via string concatenation in query construction. User input is directly concatenated into an SQL statement without any sanitization or parameterization, allowing an attack…",
+          "seconds": 21.553571481
+        },
+        {
+          "name": "thinking_default",
+          "pass": true,
+          "detail": "reasoning 11031 chars, answer \"\"",
+          "seconds": 42.113990322
+        },
+        {
+          "name": "thinking_off",
+          "pass": true,
+          "detail": "reasoning 0 chars, answer \"When `xs` has length 1, `len(xs)-1` equals 0, so the function returns early with…\"",
+          "seconds": 0.552701359
+        },
+        {
+          "name": "long_context",
+          "pass": true,
+          "detail": "37207 tokens; answer \"K7Q9-ZX31\"",
+          "seconds": 14.568731264
+        }
+      ],
+      "thinking": "toggle",
+      "decode_tps": 72.577739297345,
+      "prompt_tps": 2596.4473744353177
+    },
+    {
+      "profile": "qwen3.5-9b",
+      "file": "Qwen3.5-9B-Q4_K_M.gguf",
+      "fit": {
+        "profile": "qwen3.5-9b",
+        "fit": "split",
+        "need_mib": 8541,
+        "detail": "needs about 8.3 GB, more than the 8.0 GB GPU; layers split with system RAM (slow)"
+      },
+      "declared": {
+        "ToolCalling": "native",
+        "StructuredOutput": "json_schema",
+        "Thinking": "toggle",
+        "ContextMax": 262144,
+        "Tokenizer": "qwen35",
+        "Speculative": [
+          "ngram",
+          "draft"
+        ],
+        "Limitations": null
+      },
+      "weights": {
+        "architecture": "qwen35",
+        "name": "Qwen3.5-9B",
+        "tokenizer": "qwen35",
+        "context_length": 262144,
+        "blocks": 32,
+        "mtp_layers": 0,
+        "tensors": 427
+      },
+      "load_seconds": 4.509336536,
+      "server_rss_mib": 4129,
+      "vram_used_mib": 6653,
+      "checks": [
+        {
+          "name": "tool_call",
+          "pass": true,
+          "detail": "read_file {\"path\":\"go.mod\"}",
+          "seconds": 2.391724666
+        },
+        {
+          "name": "tool_result",
+          "pass": true,
+          "detail": "This module declares Go version **1.23.4** in its `go.mod` file.",
+          "seconds": 2.415260182
+        },
+        {
+          "name": "code_arguments",
+          "pass": true,
+          "detail": "old \"\\treturn \\\"negative\\\"\" new \"\\treturn \\\"below zero\\\"\" (want old within the file, e.g. \"\\t\\treturn \\\"negative\\\"\")",
+          "seconds": 3.774740324
+        },
+        {
+          "name": "structured",
+          "pass": true,
+          "detail": "{\n  \"file\": \"store/db.go\",\n  \"line\": 42,\n  \"severity\": \"high\",\n  \"summary\": \"SQL Injection vulnerability due to string concatenation in query building. User input is directly interpolated into the SQL statement without parameterization, allowing attackers to manipulate the query logic. This can lead…",
+          "seconds": 5.292947846
+        },
+        {
+          "name": "thinking_default",
+          "pass": true,
+          "detail": "reasoning 2295 chars, answer \"The function returns early because `len(xs) - 1` evaluates to 0 when `xs` has le…\"",
+          "seconds": 25.088364529
+        },
+        {
+          "name": "thinking_off",
+          "pass": true,
+          "detail": "reasoning 0 chars, answer \"When `xs` has length 1, the caller passes `0` to the function, which triggers th…\"",
+          "seconds": 1.292528214
+        },
+        {
+          "name": "long_context",
+          "pass": true,
+          "detail": "37207 tokens; answer \"K7Q9-ZX31\"",
+          "seconds": 28.02981594
+        }
+      ],
+      "thinking": "toggle",
+      "decode_tps": 28.88794332797264,
+      "prompt_tps": 1355.9970625591088
+    },
+    {
+      "profile": "qwen3.6-35b-a3b",
+      "file": "Qwen3.6-35B-A3B-UD-Q4_K_M.gguf",
+      "fit": {
+        "profile": "qwen3.6-35b-a3b",
+        "fit": "offload",
+        "need_mib": 23533,
+        "detail": "needs about 23.0 GB: attention on the 8.0 GB GPU, experts in system RAM"
+      },
+      "declared": {
+        "ToolCalling": "native",
+        "StructuredOutput": "json_schema",
+        "Thinking": "toggle",
+        "ContextMax": 262144,
+        "Tokenizer": "qwen35",
+        "Speculative": [
+          "ngram",
+          "draft"
+        ],
+        "Limitations": [
+          "Hybrid attention with recurrent layers: a cached prompt prefix is reused only up to a context checkpoint.",
+          "This file has no multi-token prediction layers; MTP needs the -MTP build of the weights (profile qwen3.6-35b-a3b-mtp).",
+          "Thinks by default: a request with a small max_tokens can end inside the thinking, with no answer, unless it sets enable_thinking false."
+        ]
+      },
+      "weights": {
+        "architecture": "qwen35moe",
+        "name": "Qwen3.6-35B-A3B",
+        "tokenizer": "qwen35",
+        "context_length": 262144,
+        "blocks": 40,
+        "experts": 256,
+        "mtp_layers": 0,
+        "tensors": 733
+      },
+      "load_seconds": 7.013133871,
+      "server_rss_mib": 20680,
+      "vram_used_mib": 7139,
+      "checks": [
+        {
+          "name": "tool_call",
+          "pass": true,
+          "detail": "read_file {\"path\":\"go.mod\"}",
+          "seconds": 5.188186323
+        },
+        {
+          "name": "tool_result",
+          "pass": true,
+          "detail": "The module declares **Go 1.23.4** in go.mod.",
+          "seconds": 1.079204467
+        },
+        {
+          "name": "code_arguments",
+          "pass": true,
+          "detail": "old \"func Label(n int) string {\\n\\tif n \u003c 0 {\\n\\t\\treturn \\\"negative\\\"\\n\\t}\\n\\treturn fmt.Sprintf(\\\"%d \\\\\\\"units\\\\\\\"\\\", n)\\n}\" new \"func Label(n int) string {\\n\\tif n \u003c 0 {\\n\\t\\treturn \\\"below zero\\\"\\n\\t}\\n\\treturn fmt.Sprintf(\\\"%d \\\\\\\"units\\\\\\\"\\\", n)\\n}\" (want old within the file, e.g. \"\\t\\treturn …",
+          "seconds": 5.021112295
+        },
+        {
+          "name": "structured",
+          "pass": true,
+          "detail": "{\n  \"file\": \"store/db.go\",\n  \"line\": 42,\n  \"severity\": \"high\",\n  \"summary\": \"SQL Injection vulnerability due to string concatenation in query building\"\n}",
+          "seconds": 1.768095904
+        },
+        {
+          "name": "thinking_default",
+          "pass": true,
+          "detail": "reasoning 1494 chars, answer \"The function immediately returns early because `len(xs) - 1` evaluates to 0, tri…\"",
+          "seconds": 11.370967038
+        },
+        {
+          "name": "thinking_off",
+          "pass": true,
+          "detail": "reasoning 0 chars, answer \"The function receives an index of 0, which triggers the early return condition, …\"",
+          "seconds": 0.848079138
+        },
+        {
+          "name": "long_context",
+          "pass": true,
+          "detail": "37207 tokens; answer \"K7Q9-ZX31\"",
+          "seconds": 49.432237241
+        }
+      ],
+      "thinking": "toggle",
+      "decode_tps": 39.96667249709889,
+      "prompt_tps": 758.2174132748713
+    },
+    {
+      "profile": "qwen3.6-35b-a3b-mtp",
+      "file": "Qwen3.6-35B-A3B-UD-Q4_K_M.gguf",
+      "fit": {
+        "profile": "qwen3.6-35b-a3b-mtp",
+        "fit": "offload",
+        "need_mib": 24037,
+        "detail": "needs about 23.5 GB: attention on the 8.0 GB GPU, experts in system RAM"
+      },
+      "declared": {
+        "ToolCalling": "native",
+        "StructuredOutput": "json_schema",
+        "Thinking": "toggle",
+        "ContextMax": 262144,
+        "Tokenizer": "qwen35",
+        "Speculative": [
+          "ngram",
+          "draft",
+          "mtp"
+        ],
+        "Limitations": [
+          "Hybrid attention with recurrent layers: a cached prompt prefix is reused only up to a context checkpoint.",
+          "Thinks by default: a request with a small max_tokens can end inside the thinking, with no answer, unless it sets enable_thinking false."
+        ]
+      },
+      "weights": {
+        "architecture": "qwen35moe",
+        "name": "Qwen3.6-35B-A3B",
+        "tokenizer": "qwen35",
+        "context_length": 262144,
+        "blocks": 41,
+        "experts": 256,
+        "mtp_layers": 1,
+        "tensors": 753
+      },
+      "load_seconds": 0,
+      "checks": null,
+      "error": "load: llama-server exited: out of memory (reduce ctx_size or gpu layers, or raise n_cpu_moe): exit status 1\n--- log tail ---\n0.01.118.930 W common_fit_params: failed to fit params to free device memory: n_gpu_layers already set by user to 999, abort\n0.01.383.989 W llama_model_loader: tensor overrides to CPU are used with mmap enabled - consider using --load-mode none for better performance\n0.10.071.597 I cmn          init: llama threadpool init, n_threads = 8\n0.10.188.037 I common_speculative_init_result: creating MTP draft context against the target model '/home/ali/.local/share/boundedcode/models/mtp/Qwen3.6-35B-A3B-UD-Q4_K_M.gguf'\n0.10.205.982 E ggml_backend_cuda_buffer_type_alloc_buffer: allocating 672.06 MiB on device 0: cudaMalloc failed: out of memory\n0.10.205.988 E ggml_gallocr_reserve_n_impl: failed to allocate CUDA0 buffer of size 704708736\n0.10.205.989 E graph_reserve: failed to allocate compute buffers\n0.10.208.325 E llama_init_from_model: failed to initialize the context: failed to allocate compute pp buffers\n0.10.208.328 E common_speculative_init_result: failed to create MTP context\n0.10.208.332 E srv    load_model: failed to create MTP context\n0.10.208.336 I srv    operator(): operator(): cleaning up before exit...\n0.10.209.324 E srv  llama_server: exiting due to model loading error"
+    },
+    {
+      "profile": "qwen3-coder-next",
+      "file": "Qwen3-Coder-Next-UD-IQ3_XXS.gguf",
+      "fit": {
+        "profile": "qwen3-coder-next",
+        "fit": "offload",
+        "need_mib": 31415,
+        "detail": "needs about 30.7 GB: attention on the 8.0 GB GPU, experts in system RAM"
+      },
+      "declared": {
+        "ToolCalling": "native",
+        "StructuredOutput": "json_schema",
+        "Thinking": "none",
+        "ContextMax": 262144,
+        "Tokenizer": "qwen2",
+        "Speculative": [
+          "ngram",
+          "draft"
+        ],
+        "Limitations": [
+          "A 3-bit quant (IQ3_XXS), the largest that fits 64 GB of RAM beside a desktop session; below the model's published quality."
+        ]
+      },
+      "weights": {
+        "architecture": "qwen3next",
+        "name": "Qwen3-Coder-Next",
+        "tokenizer": "qwen2",
+        "context_length": 262144,
+        "blocks": 48,
+        "experts": 512,
+        "mtp_layers": 0,
+        "tensors": 843
+      },
+      "load_seconds": 14.511259091,
+      "server_rss_mib": 26200,
+      "vram_used_mib": 7569,
+      "checks": [
+        {
+          "name": "tool_call",
+          "pass": true,
+          "detail": "read_file {\"path\":\"go.mod\"}",
+          "seconds": 6.568959374
+        },
+        {
+          "name": "tool_result",
+          "pass": true,
+          "detail": "The Go module declares Go version **1.23.4** in `go.mod`.",
+          "seconds": 1.662500658
+        },
+        {
+          "name": "code_arguments",
+          "pass": true,
+          "detail": "old \"\\tif n \u003c 0 {\\n\\t\\treturn \\\"negative\\\"\\n\\t}\" new \"\\tif n \u003c 0 {\\n\\t\\treturn \\\"below zero\\\"\\n\\t}\" (want old within the file, e.g. \"\\t\\treturn \\\"negative\\\"\")",
+          "seconds": 4.123220806
+        },
+        {
+          "name": "structured",
+          "pass": true,
+          "detail": "{\"file\": \"store/db.go\", \"line\": 42, \"severity\": \"high\", \"summary\": \"SQL injection vulnerability via string concatenation of user input in query construction\"}",
+          "seconds": 2.611969218
+        },
+        {
+          "name": "thinking_default",
+          "pass": true,
+          "detail": "reasoning 0 chars, answer \"For `xs` of length 1, `len(xs)-1` equals 0, so the function returns early when `…\"",
+          "seconds": 2.659028219
+        },
+        {
+          "name": "thinking_off",
+          "pass": true,
+          "detail": "reasoning 0 chars, answer \"For `xs` of length 1, `len(xs)-1` equals 0, so the function returns early when `…\"",
+          "seconds": 1.864254534
+        },
+        {
+          "name": "long_context",
+          "pass": true,
+          "detail": "37647 tokens; answer \"K7Q9-ZX31\"",
+          "seconds": 62.952181258
+        }
+      ],
+      "thinking": "none",
+      "decode_tps": 26.314830842591597,
+      "prompt_tps": 601.4951725327078
+    },
+    {
+      "profile": "laguna-xs-2.1",
+      "file": "Laguna-XS-2.1-Q4_K_M.gguf",
+      "fit": {
+        "profile": "laguna-xs-2.1",
+        "fit": "offload",
+        "need_mib": 22804,
+        "detail": "needs about 22.3 GB: attention on the 8.0 GB GPU, experts in system RAM"
+      },
+      "declared": {
+        "ToolCalling": "native",
+        "StructuredOutput": "json_schema",
+        "Thinking": "toggle",
+        "ContextMax": 262144,
+        "Tokenizer": "laguna",
+        "Speculative": [
+          "ngram"
+        ],
+        "Limitations": [
+          "Its license (OpenMDW-1.1) is under review.",
+          "Trained at 8K and extended by RoPE scaling to 262144 tokens."
+        ]
+      },
+      "weights": {
+        "architecture": "laguna",
+        "name": "2afce91e7cdb129f891d65a18f54d4a63f8e3215",
+        "tokenizer": "laguna",
+        "context_length": 262144,
+        "blocks": 40,
+        "experts": 256,
+        "mtp_layers": 0,
+        "tensors": 678
+      },
+      "load_seconds": 9.509438163,
+      "server_rss_mib": 19301,
+      "vram_used_mib": 7513,
+      "checks": [
+        {
+          "name": "tool_call",
+          "pass": true,
+          "detail": "read_file {\"path\":\"go.mod\"}",
+          "seconds": 2.51828615
+        },
+        {
+          "name": "tool_result",
+          "pass": true,
+          "detail": "The module declares Go version **1.23.4** in its `go.mod` file.",
+          "seconds": 0.938893368
+        },
+        {
+          "name": "code_arguments",
+          "pass": true,
+          "detail": "old \"if n \u003c 0 {\\n\\t\\treturn \\\"negative\\\"\\n\\t}\" new \"if n \u003c 0 {\\n\\t\\treturn \\\"below zero\\\"\\n\\t}\" (want old within the file, e.g. \"\\t\\treturn \\\"negative\\\"\")",
+          "seconds": 3.146109598
+        },
+        {
+          "name": "structured",
+          "pass": true,
+          "detail": "{\n  \"file\": \"store/db.go\",\n  \"line\": 42,\n  \"severity\": \"high\",\n  \"summary\": \"SQL injection vulnerability due to string concatenation of user input in SQL query construction\"\n}",
+          "seconds": 1.665879578
+        },
+        {
+          "name": "thinking_default",
+          "pass": true,
+          "detail": "reasoning 3139 chars, answer \"When `xs` has length 1, `len(xs)-1` is 0, so the function returns early without …\"",
+          "seconds": 15.786338999
+        },
+        {
+          "name": "thinking_off",
+          "pass": true,
+          "detail": "reasoning 0 chars, answer \"When `xs` has length 1, the function is called with `n = 0` (since `len(xs)-1 = …\"",
+          "seconds": 1.161689718
+        },
+        {
+          "name": "long_context",
+          "pass": true,
+          "detail": "37240 tokens; answer \"K7Q9-ZX31\"",
+          "seconds": 47.758747775
+        }
+      ],
+      "thinking": "toggle",
+      "decode_tps": 50.02936036776092,
+      "prompt_tps": 783.9155892637948
+    }
+  ]
+}

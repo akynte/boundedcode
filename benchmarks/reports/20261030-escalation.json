@@ -1,0 +1,3289 @@
+{
+  "started": "2026-10-29T20:59:17.085238787Z",
+  "runs": 135,
+  "rules_agreement": 135,
+  "summaries": [
+    {
+      "policy": "rules",
+      "runs": 135,
+      "runs_needing_help": 16,
+      "needing_help_with_actionable_escalation": 16,
+      "escalations": 129,
+      "escalations_on_passed_runs": 104,
+      "passed_runs": 118,
+      "passed_runs_escalated": 85,
+      "not_actionable": 0,
+      "by_code": {
+        "Z1": 25,
+        "Z2": 7,
+        "Z3": 97
+      },
+      "precision": 0.1937984496124031
+    },
+    {
+      "policy": "adaptive",
+      "runs": 135,
+      "runs_needing_help": 16,
+      "needing_help_with_actionable_escalation": 16,
+      "escalations": 114,
+      "escalations_on_passed_runs": 91,
+      "passed_runs": 118,
+      "passed_runs_escalated": 86,
+      "not_actionable": 0,
+      "by_code": {
+        "Z1": 11,
+        "Z2": 6,
+        "Z3": 97
+      },
+      "precision": 0.20175438596491227
+    }
+  ],
+  "per_run": [
+    {
+      "task": "api-contract-description",
+      "report": "20261027-tasks-baseline-r1.json",
+      "passed": true,
+      "recorded": [
+        "Z1",
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/internal/api/handler.go, payment-service/internal/api/handler_test.go, payment-service/internal/store/store.go, payment-service/migrations/001_create_payments.sql, shared-protos/proto/payment.proto"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 0,
+            "code": "Z1",
+            "actionable": true,
+            "reason": "architectural risk: touches payment; changes span 2 repositories"
+          },
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/internal/api/handler.go, payment-service/internal/api/handler_test.go, payment-service/internal/store/store.go, payment-service/migrations/001_create_payments.sql, shared-protos/proto/payment.proto"
+          }
+        ]
+      }
+    },
+    {
+      "task": "cross-service-idempotency",
+      "report": "20261027-tasks-baseline-r1.json",
+      "passed": false,
+      "recorded": [
+        "Z1",
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z1",
+            "actionable": true,
+            "reason": "architectural risk, and an attempt failed: touches idempotency, idempotent, ledger, payment; changes span 2 repositories"
+          },
+          {
+            "attempt": 2,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/consumer/consumer_test.go, ledger-service/internal/ledger/ledger.go, payment-service/internal/api/handler.go, payment-service/internal/api/handler_test.go, payment-service/internal/store/store.go"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 0,
+            "code": "Z1",
+            "actionable": true,
+            "reason": "architectural risk: touches idempotency, idempotent, ledger, payment; changes span 2 repositories"
+          },
+          {
+            "attempt": 2,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/consumer/consumer_test.go, ledger-service/internal/ledger/ledger.go, payment-service/internal/api/handler.go, payment-service/internal/api/handler_test.go, payment-service/internal/store/store.go"
+          }
+        ]
+      }
+    },
+    {
+      "task": "docker-hardening",
+      "report": "20261027-tasks-baseline-r1.json",
+      "passed": true,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/Dockerfile, payment-service/test_dockerfile.sh"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/Dockerfile, payment-service/test_dockerfile.sh"
+          }
+        ]
+      }
+    },
+    {
+      "task": "event-field-rename",
+      "report": "20261027-tasks-baseline-r1.json",
+      "passed": true,
+      "recorded": [
+        "Z1",
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/consumer/consumer.go, ledger-service/internal/consumer/consumer_test.go, payment-service/internal/events/kafka.go"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 0,
+            "code": "Z1",
+            "actionable": true,
+            "reason": "architectural risk: touches payment; changes span 2 repositories"
+          },
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/consumer/consumer.go, ledger-service/internal/consumer/consumer_test.go, payment-service/internal/events/kafka.go"
+          }
+        ]
+      }
+    },
+    {
+      "task": "go-bugfix-ledger-balance",
+      "report": "20261027-tasks-baseline-r1.json",
+      "passed": true,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/consumer/consumer.go, ledger-service/internal/consumer/consumer_test.go"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/consumer/consumer.go, ledger-service/internal/consumer/consumer_test.go"
+          }
+        ]
+      }
+    },
+    {
+      "task": "go-debug-ledger-balance-query",
+      "report": "20261027-tasks-baseline-r1.json",
+      "passed": false,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/ledger/ledger.go, ledger-service/internal/ledger/ledger_test.go"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/ledger/ledger.go, ledger-service/internal/ledger/ledger_test.go"
+          }
+        ]
+      }
+    },
+    {
+      "task": "go-feature-currency-validation",
+      "report": "20261027-tasks-baseline-r1.json",
+      "passed": true,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/internal/api/handler.go, payment-service/internal/api/handler_test.go"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/internal/api/handler.go, payment-service/internal/api/handler_test.go"
+          }
+        ]
+      }
+    },
+    {
+      "task": "go-iface-add-method",
+      "report": "20261027-tasks-baseline-r1.json",
+      "passed": true,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: billing-service/internal/payment/memory.go, billing-service/internal/payment/postgres.go, billing-service/internal/payment/repository.go, billing-service/internal/payment/service.go, billing-service/internal/payment/service_test.go"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: billing-service/internal/payment/memory.go, billing-service/internal/payment/postgres.go, billing-service/internal/payment/repository.go, billing-service/internal/payment/service.go, billing-service/internal/payment/service_test.go"
+          }
+        ]
+      }
+    },
+    {
+      "task": "go-refactor-validate",
+      "report": "20261027-tasks-baseline-r1.json",
+      "passed": true,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/internal/api/handler.go, payment-service/internal/api/handler_test.go"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/internal/api/handler.go, payment-service/internal/api/handler_test.go"
+          }
+        ]
+      }
+    },
+    {
+      "task": "java-bugfix-paid-total",
+      "report": "20261027-tasks-baseline-r1.json",
+      "passed": true,
+      "recorded": null,
+      "fired": {
+        "adaptive": null,
+        "rules": null
+      }
+    },
+    {
+      "task": "k8s-health-and-resources",
+      "report": "20261027-tasks-baseline-r1.json",
+      "passed": true,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/deploy/helm/payment-service/values.yaml, payment-service/internal/api/handler.go, payment-service/internal/api/handler_test.go"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/deploy/helm/payment-service/values.yaml, payment-service/internal/api/handler.go, payment-service/internal/api/handler_test.go"
+          }
+        ]
+      }
+    },
+    {
+      "task": "multi-feature-discount",
+      "report": "20261027-tasks-baseline-r1.json",
+      "passed": true,
+      "recorded": null,
+      "fired": {
+        "adaptive": null,
+        "rules": null
+      }
+    },
+    {
+      "task": "py-bugfix-inventory",
+      "report": "20261027-tasks-baseline-r1.json",
+      "passed": true,
+      "recorded": null,
+      "fired": {
+        "adaptive": null,
+        "rules": null
+      }
+    },
+    {
+      "task": "rust-bugfix-transfer",
+      "report": "20261027-tasks-baseline-r1.json",
+      "passed": true,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: rust-ledger/src/lib.rs, rust-ledger/tests/ledger.rs"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: rust-ledger/src/lib.rs, rust-ledger/tests/ledger.rs"
+          }
+        ]
+      }
+    },
+    {
+      "task": "sql-migration-idempotency-key",
+      "report": "20261027-tasks-baseline-r1.json",
+      "passed": true,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/migrations/002_add_idempotency_key.sql, payment-service/migrations/migrations_test.go"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/migrations/002_add_idempotency_key.sql, payment-service/migrations/migrations_test.go"
+          }
+        ]
+      }
+    },
+    {
+      "task": "terraform-topics",
+      "report": "20261027-tasks-baseline-r1.json",
+      "passed": true,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: infrastructure/terraform/kafka.tf"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: infrastructure/terraform/kafka.tf"
+          }
+        ]
+      }
+    },
+    {
+      "task": "ts-bugfix-cart-discount",
+      "report": "20261027-tasks-baseline-r1.json",
+      "passed": true,
+      "recorded": [
+        "Z2",
+        "Z2"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 2,
+            "code": "Z2",
+            "actionable": true,
+            "reason": "the same verification failure repeated across attempts"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 2,
+            "code": "Z2",
+            "actionable": true,
+            "reason": "the same verification failure repeated across attempts"
+          },
+          {
+            "attempt": 3,
+            "code": "Z2",
+            "actionable": true,
+            "reason": "the same verification failure repeated across attempts"
+          }
+        ]
+      }
+    },
+    {
+      "task": "ts-retry-5xx",
+      "report": "20261027-tasks-baseline-r1.json",
+      "passed": true,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: gateway/src/payments.test.mjs, gateway/src/payments.ts"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: gateway/src/payments.test.mjs, gateway/src/payments.ts"
+          }
+        ]
+      }
+    },
+    {
+      "task": "api-contract-description",
+      "report": "20261027-tasks-baseline-r2.json",
+      "passed": true,
+      "recorded": [
+        "Z1",
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/internal/api/handler.go, payment-service/internal/api/handler_test.go, payment-service/internal/store/store.go, shared-protos/proto/payment.proto"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 0,
+            "code": "Z1",
+            "actionable": true,
+            "reason": "architectural risk: touches payment; changes span 2 repositories"
+          },
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/internal/api/handler.go, payment-service/internal/api/handler_test.go, payment-service/internal/store/store.go, shared-protos/proto/payment.proto"
+          }
+        ]
+      }
+    },
+    {
+      "task": "cross-service-idempotency",
+      "report": "20261027-tasks-baseline-r2.json",
+      "passed": false,
+      "recorded": [
+        "Z1",
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z1",
+            "actionable": true,
+            "reason": "architectural risk, and an attempt failed: touches idempotency, idempotent, ledger, payment; changes span 2 repositories"
+          },
+          {
+            "attempt": 2,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/consumer/consumer_test.go, ledger-service/internal/ledger/ledger.go, payment-service/internal/api/handler.go, payment-service/internal/api/handler_test.go, payment-service/internal/store/store.go"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 0,
+            "code": "Z1",
+            "actionable": true,
+            "reason": "architectural risk: touches idempotency, idempotent, ledger, payment; changes span 2 repositories"
+          },
+          {
+            "attempt": 2,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/consumer/consumer_test.go, ledger-service/internal/ledger/ledger.go, payment-service/internal/api/handler.go, payment-service/internal/api/handler_test.go, payment-service/internal/store/store.go"
+          }
+        ]
+      }
+    },
+    {
+      "task": "docker-hardening",
+      "report": "20261027-tasks-baseline-r2.json",
+      "passed": true,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/Dockerfile, payment-service/docker_test.go"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/Dockerfile, payment-service/docker_test.go"
+          }
+        ]
+      }
+    },
+    {
+      "task": "event-field-rename",
+      "report": "20261027-tasks-baseline-r2.json",
+      "passed": true,
+      "recorded": [
+        "Z1",
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/consumer/consumer.go, ledger-service/internal/consumer/consumer_test.go, payment-service/internal/events/kafka.go"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 0,
+            "code": "Z1",
+            "actionable": true,
+            "reason": "architectural risk: touches payment; changes span 2 repositories"
+          },
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/consumer/consumer.go, ledger-service/internal/consumer/consumer_test.go, payment-service/internal/events/kafka.go"
+          }
+        ]
+      }
+    },
+    {
+      "task": "go-bugfix-ledger-balance",
+      "report": "20261027-tasks-baseline-r2.json",
+      "passed": true,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/consumer/consumer.go"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/consumer/consumer.go"
+          }
+        ]
+      }
+    },
+    {
+      "task": "go-debug-ledger-balance-query",
+      "report": "20261027-tasks-baseline-r2.json",
+      "passed": true,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/ledger/ledger.go"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/ledger/ledger.go"
+          }
+        ]
+      }
+    },
+    {
+      "task": "go-feature-currency-validation",
+      "report": "20261027-tasks-baseline-r2.json",
+      "passed": true,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/internal/api/handler.go, payment-service/internal/api/handler_test.go"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/internal/api/handler.go, payment-service/internal/api/handler_test.go"
+          }
+        ]
+      }
+    },
+    {
+      "task": "go-iface-add-method",
+      "report": "20261027-tasks-baseline-r2.json",
+      "passed": true,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: billing-service/internal/payment/memory.go, billing-service/internal/payment/postgres.go, billing-service/internal/payment/repository.go, billing-service/internal/payment/service.go, billing-service/internal/payment/service_test.go"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: billing-service/internal/payment/memory.go, billing-service/internal/payment/postgres.go, billing-service/internal/payment/repository.go, billing-service/internal/payment/service.go, billing-service/internal/payment/service_test.go"
+          }
+        ]
+      }
+    },
+    {
+      "task": "go-refactor-validate",
+      "report": "20261027-tasks-baseline-r2.json",
+      "passed": true,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/internal/api/handler.go, payment-service/internal/api/handler_test.go"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/internal/api/handler.go, payment-service/internal/api/handler_test.go"
+          }
+        ]
+      }
+    },
+    {
+      "task": "java-bugfix-paid-total",
+      "report": "20261027-tasks-baseline-r2.json",
+      "passed": true,
+      "recorded": null,
+      "fired": {
+        "adaptive": null,
+        "rules": null
+      }
+    },
+    {
+      "task": "k8s-health-and-resources",
+      "report": "20261027-tasks-baseline-r2.json",
+      "passed": true,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/deploy/helm/payment-service/values.yaml, payment-service/internal/api/handler.go, payment-service/internal/api/handler_test.go"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/deploy/helm/payment-service/values.yaml, payment-service/internal/api/handler.go, payment-service/internal/api/handler_test.go"
+          }
+        ]
+      }
+    },
+    {
+      "task": "multi-feature-discount",
+      "report": "20261027-tasks-baseline-r2.json",
+      "passed": true,
+      "recorded": null,
+      "fired": {
+        "adaptive": null,
+        "rules": null
+      }
+    },
+    {
+      "task": "py-bugfix-inventory",
+      "report": "20261027-tasks-baseline-r2.json",
+      "passed": true,
+      "recorded": null,
+      "fired": {
+        "adaptive": null,
+        "rules": null
+      }
+    },
+    {
+      "task": "rust-bugfix-transfer",
+      "report": "20261027-tasks-baseline-r2.json",
+      "passed": true,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: rust-ledger/src/lib.rs, rust-ledger/tests/ledger.rs"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: rust-ledger/src/lib.rs, rust-ledger/tests/ledger.rs"
+          }
+        ]
+      }
+    },
+    {
+      "task": "sql-migration-idempotency-key",
+      "report": "20261027-tasks-baseline-r2.json",
+      "passed": true,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/internal/store/migration_test.go, payment-service/migrations/002_add_idempotency_key.sql"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/internal/store/migration_test.go, payment-service/migrations/002_add_idempotency_key.sql"
+          }
+        ]
+      }
+    },
+    {
+      "task": "terraform-topics",
+      "report": "20261027-tasks-baseline-r2.json",
+      "passed": true,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: infrastructure/terraform/kafka.test.sh, infrastructure/terraform/kafka.tf"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: infrastructure/terraform/kafka.test.sh, infrastructure/terraform/kafka.tf"
+          }
+        ]
+      }
+    },
+    {
+      "task": "ts-bugfix-cart-discount",
+      "report": "20261027-tasks-baseline-r2.json",
+      "passed": true,
+      "recorded": [
+        "Z2",
+        "Z2"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 2,
+            "code": "Z2",
+            "actionable": true,
+            "reason": "the same verification failure repeated across attempts"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 2,
+            "code": "Z2",
+            "actionable": true,
+            "reason": "the same verification failure repeated across attempts"
+          },
+          {
+            "attempt": 3,
+            "code": "Z2",
+            "actionable": true,
+            "reason": "the same verification failure repeated across attempts"
+          }
+        ]
+      }
+    },
+    {
+      "task": "ts-retry-5xx",
+      "report": "20261027-tasks-baseline-r2.json",
+      "passed": true,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: gateway/src/payments.test.ts, gateway/src/payments.ts"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: gateway/src/payments.test.ts, gateway/src/payments.ts"
+          }
+        ]
+      }
+    },
+    {
+      "task": "api-contract-description",
+      "report": "20261027-tasks-baseline-r3.json",
+      "passed": true,
+      "recorded": [
+        "Z1",
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/internal/api/handler.go, payment-service/internal/api/handler_test.go, payment-service/internal/store/store.go, payment-service/migrations/001_create_payments.sql, shared-protos/proto/payment.proto"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 0,
+            "code": "Z1",
+            "actionable": true,
+            "reason": "architectural risk: touches payment; changes span 2 repositories"
+          },
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/internal/api/handler.go, payment-service/internal/api/handler_test.go, payment-service/internal/store/store.go, payment-service/migrations/001_create_payments.sql, shared-protos/proto/payment.proto"
+          }
+        ]
+      }
+    },
+    {
+      "task": "cross-service-idempotency",
+      "report": "20261027-tasks-baseline-r3.json",
+      "passed": false,
+      "recorded": [
+        "Z1",
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z1",
+            "actionable": true,
+            "reason": "architectural risk, and an attempt failed: touches idempotency, idempotent, ledger, payment; changes span 2 repositories"
+          },
+          {
+            "attempt": 2,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/consumer/consumer.go, ledger-service/internal/consumer/consumer_test.go, payment-service/internal/api/handler.go, payment-service/internal/api/handler_test.go, payment-service/internal/store/store.go"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 0,
+            "code": "Z1",
+            "actionable": true,
+            "reason": "architectural risk: touches idempotency, idempotent, ledger, payment; changes span 2 repositories"
+          },
+          {
+            "attempt": 2,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/consumer/consumer.go, ledger-service/internal/consumer/consumer_test.go, payment-service/internal/api/handler.go, payment-service/internal/api/handler_test.go, payment-service/internal/store/store.go"
+          }
+        ]
+      }
+    },
+    {
+      "task": "docker-hardening",
+      "report": "20261027-tasks-baseline-r3.json",
+      "passed": true,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/Dockerfile, payment-service/test_dockerfile_hardening.sh"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/Dockerfile, payment-service/test_dockerfile_hardening.sh"
+          }
+        ]
+      }
+    },
+    {
+      "task": "event-field-rename",
+      "report": "20261027-tasks-baseline-r3.json",
+      "passed": true,
+      "recorded": [
+        "Z1",
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/consumer/consumer.go, ledger-service/internal/consumer/consumer_test.go, payment-service/internal/events/kafka.go"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 0,
+            "code": "Z1",
+            "actionable": true,
+            "reason": "architectural risk: touches payment; changes span 2 repositories"
+          },
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/consumer/consumer.go, ledger-service/internal/consumer/consumer_test.go, payment-service/internal/events/kafka.go"
+          }
+        ]
+      }
+    },
+    {
+      "task": "go-bugfix-ledger-balance",
+      "report": "20261027-tasks-baseline-r3.json",
+      "passed": true,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/consumer/consumer.go"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/consumer/consumer.go"
+          }
+        ]
+      }
+    },
+    {
+      "task": "go-debug-ledger-balance-query",
+      "report": "20261027-tasks-baseline-r3.json",
+      "passed": false,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/ledger/ledger.go, ledger-service/internal/ledger/ledger_test.go"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/ledger/ledger.go, ledger-service/internal/ledger/ledger_test.go"
+          }
+        ]
+      }
+    },
+    {
+      "task": "go-feature-currency-validation",
+      "report": "20261027-tasks-baseline-r3.json",
+      "passed": true,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/internal/api/handler.go, payment-service/internal/api/handler_test.go"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/internal/api/handler.go, payment-service/internal/api/handler_test.go"
+          }
+        ]
+      }
+    },
+    {
+      "task": "go-iface-add-method",
+      "report": "20261027-tasks-baseline-r3.json",
+      "passed": true,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: billing-service/internal/payment/memory.go, billing-service/internal/payment/postgres.go, billing-service/internal/payment/repository.go, billing-service/internal/payment/service.go, billing-service/internal/payment/service_test.go"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: billing-service/internal/payment/memory.go, billing-service/internal/payment/postgres.go, billing-service/internal/payment/repository.go, billing-service/internal/payment/service.go, billing-service/internal/payment/service_test.go"
+          }
+        ]
+      }
+    },
+    {
+      "task": "go-refactor-validate",
+      "report": "20261027-tasks-baseline-r3.json",
+      "passed": true,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/internal/api/handler.go, payment-service/internal/api/handler_test.go"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/internal/api/handler.go, payment-service/internal/api/handler_test.go"
+          }
+        ]
+      }
+    },
+    {
+      "task": "java-bugfix-paid-total",
+      "report": "20261027-tasks-baseline-r3.json",
+      "passed": true,
+      "recorded": null,
+      "fired": {
+        "adaptive": null,
+        "rules": null
+      }
+    },
+    {
+      "task": "k8s-health-and-resources",
+      "report": "20261027-tasks-baseline-r3.json",
+      "passed": true,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/deploy/helm/payment-service/values.yaml, payment-service/internal/api/handler.go, payment-service/internal/api/handler_test.go"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/deploy/helm/payment-service/values.yaml, payment-service/internal/api/handler.go, payment-service/internal/api/handler_test.go"
+          }
+        ]
+      }
+    },
+    {
+      "task": "multi-feature-discount",
+      "report": "20261027-tasks-baseline-r3.json",
+      "passed": true,
+      "recorded": null,
+      "fired": {
+        "adaptive": null,
+        "rules": null
+      }
+    },
+    {
+      "task": "py-bugfix-inventory",
+      "report": "20261027-tasks-baseline-r3.json",
+      "passed": true,
+      "recorded": null,
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z2",
+            "actionable": true,
+            "reason": "the attempt changed nothing"
+          }
+        ],
+        "rules": null
+      }
+    },
+    {
+      "task": "rust-bugfix-transfer",
+      "report": "20261027-tasks-baseline-r3.json",
+      "passed": true,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: rust-ledger/src/lib.rs, rust-ledger/tests/ledger.rs"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: rust-ledger/src/lib.rs, rust-ledger/tests/ledger.rs"
+          }
+        ]
+      }
+    },
+    {
+      "task": "sql-migration-idempotency-key",
+      "report": "20261027-tasks-baseline-r3.json",
+      "passed": true,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/migrations/002_add_idempotency_key.sql, payment-service/migrations/migrations_test.go"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/migrations/002_add_idempotency_key.sql, payment-service/migrations/migrations_test.go"
+          }
+        ]
+      }
+    },
+    {
+      "task": "terraform-topics",
+      "report": "20261027-tasks-baseline-r3.json",
+      "passed": true,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: infrastructure/terraform/kafka.tf"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: infrastructure/terraform/kafka.tf"
+          }
+        ]
+      }
+    },
+    {
+      "task": "ts-bugfix-cart-discount",
+      "report": "20261027-tasks-baseline-r3.json",
+      "passed": true,
+      "recorded": [
+        "Z2"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 2,
+            "code": "Z2",
+            "actionable": true,
+            "reason": "the same verification failure repeated across attempts"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 2,
+            "code": "Z2",
+            "actionable": true,
+            "reason": "the same verification failure repeated across attempts"
+          }
+        ]
+      }
+    },
+    {
+      "task": "ts-retry-5xx",
+      "report": "20261027-tasks-baseline-r3.json",
+      "passed": true,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: gateway/src/payments.test.ts, gateway/src/payments.ts"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: gateway/src/payments.test.ts, gateway/src/payments.ts"
+          }
+        ]
+      }
+    },
+    {
+      "task": "go-large-iface-method",
+      "report": "20261028-tasks-fixcheck-large.json",
+      "passed": true,
+      "recorded": null,
+      "fired": {
+        "adaptive": null,
+        "rules": null
+      }
+    },
+    {
+      "task": "cross-service-idempotency",
+      "report": "20261028-tasks-fixcheck.json",
+      "passed": false,
+      "recorded": [
+        "Z1",
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z1",
+            "actionable": true,
+            "reason": "architectural risk, and an attempt failed: touches idempotency, idempotent, ledger, payment; changes span 2 repositories"
+          },
+          {
+            "attempt": 2,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/consumer/consumer_test.go, ledger-service/internal/ledger/ledger.go, payment-service/internal/api/handler.go, payment-service/internal/api/handler_test.go, payment-service/internal/store/store.go"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 0,
+            "code": "Z1",
+            "actionable": true,
+            "reason": "architectural risk: touches idempotency, idempotent, ledger, payment; changes span 2 repositories"
+          },
+          {
+            "attempt": 2,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/consumer/consumer_test.go, ledger-service/internal/ledger/ledger.go, payment-service/internal/api/handler.go, payment-service/internal/api/handler_test.go, payment-service/internal/store/store.go"
+          }
+        ]
+      }
+    },
+    {
+      "task": "go-large-iface-method",
+      "report": "20261028-tasks-fixcheck.json",
+      "passed": false,
+      "recorded": [
+        "Z2",
+        "Z2",
+        "Z2",
+        "Z2",
+        "Z2"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 2,
+            "code": "Z2",
+            "actionable": true,
+            "reason": "2 strategies rejected"
+          },
+          {
+            "attempt": 3,
+            "code": "Z2",
+            "actionable": true,
+            "reason": "3 consecutive failed verification attempts"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 2,
+            "code": "Z2",
+            "actionable": true,
+            "reason": "2 strategies rejected"
+          },
+          {
+            "attempt": 3,
+            "code": "Z2",
+            "actionable": true,
+            "reason": "3 consecutive failed verification attempts"
+          }
+        ]
+      }
+    },
+    {
+      "task": "java-bugfix-paid-total",
+      "report": "20261028-tasks-fixcheck.json",
+      "passed": true,
+      "recorded": null,
+      "fired": {
+        "adaptive": null,
+        "rules": null
+      }
+    },
+    {
+      "task": "multi-feature-discount",
+      "report": "20261028-tasks-fixcheck.json",
+      "passed": true,
+      "recorded": null,
+      "fired": {
+        "adaptive": null,
+        "rules": null
+      }
+    },
+    {
+      "task": "py-bugfix-inventory",
+      "report": "20261028-tasks-fixcheck.json",
+      "passed": true,
+      "recorded": null,
+      "fired": {
+        "adaptive": null,
+        "rules": null
+      }
+    },
+    {
+      "task": "ts-bugfix-cart-discount",
+      "report": "20261028-tasks-fixcheck.json",
+      "passed": true,
+      "recorded": null,
+      "fired": {
+        "adaptive": null,
+        "rules": null
+      }
+    },
+    {
+      "task": "api-contract-description",
+      "report": "20261028-tasks-reasoning-auto.json",
+      "passed": true,
+      "recorded": [
+        "Z1",
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/internal/api/handler.go, payment-service/internal/api/handler_test.go, payment-service/internal/store/store.go, payment-service/migrations/001_create_payments.sql, shared-protos/proto/payment.proto"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 0,
+            "code": "Z1",
+            "actionable": true,
+            "reason": "architectural risk: touches payment; changes span 2 repositories"
+          },
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/internal/api/handler.go, payment-service/internal/api/handler_test.go, payment-service/internal/store/store.go, payment-service/migrations/001_create_payments.sql, shared-protos/proto/payment.proto"
+          }
+        ]
+      }
+    },
+    {
+      "task": "cross-service-idempotency",
+      "report": "20261028-tasks-reasoning-auto.json",
+      "passed": true,
+      "recorded": [
+        "Z1",
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z1",
+            "actionable": true,
+            "reason": "architectural risk, and an attempt failed: touches idempotency, idempotent, ledger, payment; changes span 2 repositories"
+          },
+          {
+            "attempt": 2,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/consumer/consumer.go, ledger-service/internal/consumer/consumer_test.go, ledger-service/internal/ledger/ledger.go, payment-service/internal/api/handler.go, payment-service/internal/api/handler_test.go"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 0,
+            "code": "Z1",
+            "actionable": true,
+            "reason": "architectural risk: touches idempotency, idempotent, ledger, payment; changes span 2 repositories"
+          },
+          {
+            "attempt": 2,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/consumer/consumer.go, ledger-service/internal/consumer/consumer_test.go, ledger-service/internal/ledger/ledger.go, payment-service/internal/api/handler.go, payment-service/internal/api/handler_test.go"
+          }
+        ]
+      }
+    },
+    {
+      "task": "docker-hardening",
+      "report": "20261028-tasks-reasoning-auto.json",
+      "passed": true,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/Dockerfile, payment-service/test_dockerfile.sh"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/Dockerfile, payment-service/test_dockerfile.sh"
+          }
+        ]
+      }
+    },
+    {
+      "task": "event-field-rename",
+      "report": "20261028-tasks-reasoning-auto.json",
+      "passed": true,
+      "recorded": [
+        "Z1",
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/consumer/consumer.go, ledger-service/internal/consumer/consumer_test.go, payment-service/internal/events/kafka.go, payment-service/internal/events/kafka_test.go"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 0,
+            "code": "Z1",
+            "actionable": true,
+            "reason": "architectural risk: touches payment; changes span 2 repositories"
+          },
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/consumer/consumer.go, ledger-service/internal/consumer/consumer_test.go, payment-service/internal/events/kafka.go, payment-service/internal/events/kafka_test.go"
+          }
+        ]
+      }
+    },
+    {
+      "task": "go-bugfix-ledger-balance",
+      "report": "20261028-tasks-reasoning-auto.json",
+      "passed": true,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/consumer/consumer.go"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/consumer/consumer.go"
+          }
+        ]
+      }
+    },
+    {
+      "task": "go-debug-ledger-balance-query",
+      "report": "20261028-tasks-reasoning-auto.json",
+      "passed": false,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/ledger/ledger.go, ledger-service/internal/ledger/ledger_test.go"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/ledger/ledger.go, ledger-service/internal/ledger/ledger_test.go"
+          }
+        ]
+      }
+    },
+    {
+      "task": "go-feature-currency-validation",
+      "report": "20261028-tasks-reasoning-auto.json",
+      "passed": true,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/internal/api/handler.go, payment-service/internal/api/handler_test.go"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/internal/api/handler.go, payment-service/internal/api/handler_test.go"
+          }
+        ]
+      }
+    },
+    {
+      "task": "go-iface-add-method",
+      "report": "20261028-tasks-reasoning-auto.json",
+      "passed": true,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: billing-service/internal/payment/memory.go, billing-service/internal/payment/postgres.go, billing-service/internal/payment/repository.go, billing-service/internal/payment/service.go, billing-service/internal/payment/service_test.go"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: billing-service/internal/payment/memory.go, billing-service/internal/payment/postgres.go, billing-service/internal/payment/repository.go, billing-service/internal/payment/service.go, billing-service/internal/payment/service_test.go"
+          }
+        ]
+      }
+    },
+    {
+      "task": "go-large-iface-method",
+      "report": "20261028-tasks-reasoning-auto.json",
+      "passed": true,
+      "recorded": null,
+      "fired": {
+        "adaptive": null,
+        "rules": null
+      }
+    },
+    {
+      "task": "go-refactor-validate",
+      "report": "20261028-tasks-reasoning-auto.json",
+      "passed": true,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/internal/api/handler.go, payment-service/internal/api/handler_test.go"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/internal/api/handler.go, payment-service/internal/api/handler_test.go"
+          }
+        ]
+      }
+    },
+    {
+      "task": "java-bugfix-paid-total",
+      "report": "20261028-tasks-reasoning-auto.json",
+      "passed": true,
+      "recorded": null,
+      "fired": {
+        "adaptive": null,
+        "rules": null
+      }
+    },
+    {
+      "task": "k8s-health-and-resources",
+      "report": "20261028-tasks-reasoning-auto.json",
+      "passed": true,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/deploy/helm/payment-service/values.yaml, payment-service/internal/api/handler.go, payment-service/internal/api/handler_test.go"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/deploy/helm/payment-service/values.yaml, payment-service/internal/api/handler.go, payment-service/internal/api/handler_test.go"
+          }
+        ]
+      }
+    },
+    {
+      "task": "multi-feature-discount",
+      "report": "20261028-tasks-reasoning-auto.json",
+      "passed": true,
+      "recorded": null,
+      "fired": {
+        "adaptive": null,
+        "rules": null
+      }
+    },
+    {
+      "task": "py-bugfix-inventory",
+      "report": "20261028-tasks-reasoning-auto.json",
+      "passed": true,
+      "recorded": null,
+      "fired": {
+        "adaptive": null,
+        "rules": null
+      }
+    },
+    {
+      "task": "rust-bugfix-transfer",
+      "report": "20261028-tasks-reasoning-auto.json",
+      "passed": true,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: rust-ledger/src/lib.rs, rust-ledger/tests/ledger.rs"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: rust-ledger/src/lib.rs, rust-ledger/tests/ledger.rs"
+          }
+        ]
+      }
+    },
+    {
+      "task": "sql-migration-idempotency-key",
+      "report": "20261028-tasks-reasoning-auto.json",
+      "passed": true,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/migrations/002_add_idempotency_key.sql, payment-service/migrations/migrations_test.go"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/migrations/002_add_idempotency_key.sql, payment-service/migrations/migrations_test.go"
+          }
+        ]
+      }
+    },
+    {
+      "task": "terraform-topics",
+      "report": "20261028-tasks-reasoning-auto.json",
+      "passed": true,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: infrastructure/terraform/kafka.tf, infrastructure/terraform/test_kafka.sh"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: infrastructure/terraform/kafka.tf, infrastructure/terraform/test_kafka.sh"
+          }
+        ]
+      }
+    },
+    {
+      "task": "ts-bugfix-cart-discount",
+      "report": "20261028-tasks-reasoning-auto.json",
+      "passed": true,
+      "recorded": null,
+      "fired": {
+        "adaptive": null,
+        "rules": null
+      }
+    },
+    {
+      "task": "ts-retry-5xx",
+      "report": "20261028-tasks-reasoning-auto.json",
+      "passed": true,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: gateway/src/payments.test.js, gateway/src/payments.ts"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: gateway/src/payments.test.js, gateway/src/payments.ts"
+          }
+        ]
+      }
+    },
+    {
+      "task": "api-contract-description",
+      "report": "20261028-tasks-reasoning-drop.json",
+      "passed": true,
+      "recorded": [
+        "Z1",
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/internal/api/handler.go, payment-service/internal/api/handler_test.go, payment-service/internal/store/store.go, shared-protos/proto/payment.proto"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 0,
+            "code": "Z1",
+            "actionable": true,
+            "reason": "architectural risk: touches payment; changes span 2 repositories"
+          },
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/internal/api/handler.go, payment-service/internal/api/handler_test.go, payment-service/internal/store/store.go, shared-protos/proto/payment.proto"
+          }
+        ]
+      }
+    },
+    {
+      "task": "cross-service-idempotency",
+      "report": "20261028-tasks-reasoning-drop.json",
+      "passed": true,
+      "recorded": [
+        "Z1",
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z1",
+            "actionable": true,
+            "reason": "architectural risk, and an attempt failed: touches idempotency, idempotent, ledger, payment; changes span 2 repositories"
+          },
+          {
+            "attempt": 2,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/consumer/consumer_test.go, ledger-service/internal/ledger/ledger.go, payment-service/internal/api/handler.go, payment-service/internal/api/handler_test.go, payment-service/internal/store/store.go"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 0,
+            "code": "Z1",
+            "actionable": true,
+            "reason": "architectural risk: touches idempotency, idempotent, ledger, payment; changes span 2 repositories"
+          },
+          {
+            "attempt": 2,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/consumer/consumer_test.go, ledger-service/internal/ledger/ledger.go, payment-service/internal/api/handler.go, payment-service/internal/api/handler_test.go, payment-service/internal/store/store.go"
+          }
+        ]
+      }
+    },
+    {
+      "task": "docker-hardening",
+      "report": "20261028-tasks-reasoning-drop.json",
+      "passed": true,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/Dockerfile, payment-service/test_dockerfile.sh"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/Dockerfile, payment-service/test_dockerfile.sh"
+          }
+        ]
+      }
+    },
+    {
+      "task": "event-field-rename",
+      "report": "20261028-tasks-reasoning-drop.json",
+      "passed": true,
+      "recorded": [
+        "Z1",
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/consumer/consumer.go, ledger-service/internal/consumer/consumer_test.go, payment-service/internal/events/kafka.go, payment-service/internal/events/kafka_test.go"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 0,
+            "code": "Z1",
+            "actionable": true,
+            "reason": "architectural risk: touches payment; changes span 2 repositories"
+          },
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/consumer/consumer.go, ledger-service/internal/consumer/consumer_test.go, payment-service/internal/events/kafka.go, payment-service/internal/events/kafka_test.go"
+          }
+        ]
+      }
+    },
+    {
+      "task": "go-bugfix-ledger-balance",
+      "report": "20261028-tasks-reasoning-drop.json",
+      "passed": true,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/consumer/consumer.go"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/consumer/consumer.go"
+          }
+        ]
+      }
+    },
+    {
+      "task": "go-debug-ledger-balance-query",
+      "report": "20261028-tasks-reasoning-drop.json",
+      "passed": true,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/ledger/ledger.go"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/ledger/ledger.go"
+          }
+        ]
+      }
+    },
+    {
+      "task": "go-feature-currency-validation",
+      "report": "20261028-tasks-reasoning-drop.json",
+      "passed": true,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/internal/api/handler.go, payment-service/internal/api/handler_test.go"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/internal/api/handler.go, payment-service/internal/api/handler_test.go"
+          }
+        ]
+      }
+    },
+    {
+      "task": "go-iface-add-method",
+      "report": "20261028-tasks-reasoning-drop.json",
+      "passed": true,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: billing-service/internal/payment/memory.go, billing-service/internal/payment/postgres.go, billing-service/internal/payment/repository.go, billing-service/internal/payment/service.go, billing-service/internal/payment/service_test.go"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: billing-service/internal/payment/memory.go, billing-service/internal/payment/postgres.go, billing-service/internal/payment/repository.go, billing-service/internal/payment/service.go, billing-service/internal/payment/service_test.go"
+          }
+        ]
+      }
+    },
+    {
+      "task": "go-large-iface-method",
+      "report": "20261028-tasks-reasoning-drop.json",
+      "passed": true,
+      "recorded": null,
+      "fired": {
+        "adaptive": null,
+        "rules": null
+      }
+    },
+    {
+      "task": "go-refactor-validate",
+      "report": "20261028-tasks-reasoning-drop.json",
+      "passed": true,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/internal/api/handler.go, payment-service/internal/api/handler_test.go"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/internal/api/handler.go, payment-service/internal/api/handler_test.go"
+          }
+        ]
+      }
+    },
+    {
+      "task": "java-bugfix-paid-total",
+      "report": "20261028-tasks-reasoning-drop.json",
+      "passed": true,
+      "recorded": null,
+      "fired": {
+        "adaptive": null,
+        "rules": null
+      }
+    },
+    {
+      "task": "k8s-health-and-resources",
+      "report": "20261028-tasks-reasoning-drop.json",
+      "passed": true,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/deploy/helm/payment-service/values.yaml, payment-service/internal/api/handler.go, payment-service/internal/api/handler_test.go"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/deploy/helm/payment-service/values.yaml, payment-service/internal/api/handler.go, payment-service/internal/api/handler_test.go"
+          }
+        ]
+      }
+    },
+    {
+      "task": "multi-feature-discount",
+      "report": "20261028-tasks-reasoning-drop.json",
+      "passed": true,
+      "recorded": null,
+      "fired": {
+        "adaptive": null,
+        "rules": null
+      }
+    },
+    {
+      "task": "py-bugfix-inventory",
+      "report": "20261028-tasks-reasoning-drop.json",
+      "passed": true,
+      "recorded": null,
+      "fired": {
+        "adaptive": null,
+        "rules": null
+      }
+    },
+    {
+      "task": "rust-bugfix-transfer",
+      "report": "20261028-tasks-reasoning-drop.json",
+      "passed": true,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: rust-ledger/src/lib.rs, rust-ledger/tests/ledger.rs"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: rust-ledger/src/lib.rs, rust-ledger/tests/ledger.rs"
+          }
+        ]
+      }
+    },
+    {
+      "task": "sql-migration-idempotency-key",
+      "report": "20261028-tasks-reasoning-drop.json",
+      "passed": true,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/migrations/002_add_idempotency_key.sql, payment-service/migrations/migration_test.go"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/migrations/002_add_idempotency_key.sql, payment-service/migrations/migration_test.go"
+          }
+        ]
+      }
+    },
+    {
+      "task": "terraform-topics",
+      "report": "20261028-tasks-reasoning-drop.json",
+      "passed": true,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: infrastructure/terraform/kafka.tf"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: infrastructure/terraform/kafka.tf"
+          }
+        ]
+      }
+    },
+    {
+      "task": "ts-bugfix-cart-discount",
+      "report": "20261028-tasks-reasoning-drop.json",
+      "passed": true,
+      "recorded": null,
+      "fired": {
+        "adaptive": null,
+        "rules": null
+      }
+    },
+    {
+      "task": "ts-retry-5xx",
+      "report": "20261028-tasks-reasoning-drop.json",
+      "passed": true,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: gateway/src/payments.test.js, gateway/src/payments.ts"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: gateway/src/payments.test.js, gateway/src/payments.ts"
+          }
+        ]
+      }
+    },
+    {
+      "task": "cross-service-idempotency",
+      "report": "20261028-tasks-verify2.json",
+      "passed": true,
+      "recorded": [
+        "Z1",
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z1",
+            "actionable": true,
+            "reason": "architectural risk, and an attempt failed: touches idempotency, idempotent, ledger, payment; changes span 2 repositories"
+          },
+          {
+            "attempt": 2,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/consumer/consumer.go, ledger-service/internal/consumer/consumer_test.go, ledger-service/internal/ledger/ledger.go, ledger-service/internal/ledger/ledger_test.go, payment-service/internal/api/handler.go"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 0,
+            "code": "Z1",
+            "actionable": true,
+            "reason": "architectural risk: touches idempotency, idempotent, ledger, payment; changes span 2 repositories"
+          },
+          {
+            "attempt": 2,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/consumer/consumer.go, ledger-service/internal/consumer/consumer_test.go, ledger-service/internal/ledger/ledger.go, ledger-service/internal/ledger/ledger_test.go, payment-service/internal/api/handler.go"
+          }
+        ]
+      }
+    },
+    {
+      "task": "go-bugfix-ledger-balance",
+      "report": "20261028-tasks-verify2.json",
+      "passed": true,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/consumer/consumer.go"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/consumer/consumer.go"
+          }
+        ]
+      }
+    },
+    {
+      "task": "java-bugfix-paid-total",
+      "report": "20261028-tasks-verify2.json",
+      "passed": true,
+      "recorded": null,
+      "fired": {
+        "adaptive": null,
+        "rules": null
+      }
+    },
+    {
+      "task": "multi-feature-discount",
+      "report": "20261028-tasks-verify2.json",
+      "passed": true,
+      "recorded": null,
+      "fired": {
+        "adaptive": null,
+        "rules": null
+      }
+    },
+    {
+      "task": "py-bugfix-inventory",
+      "report": "20261028-tasks-verify2.json",
+      "passed": true,
+      "recorded": null,
+      "fired": {
+        "adaptive": null,
+        "rules": null
+      }
+    },
+    {
+      "task": "ts-bugfix-cart-discount",
+      "report": "20261028-tasks-verify2.json",
+      "passed": true,
+      "recorded": null,
+      "fired": {
+        "adaptive": null,
+        "rules": null
+      }
+    },
+    {
+      "task": "go-debug-ledger-balance-query",
+      "report": "20261029-recheck-tasks-auto-r1.json",
+      "passed": true,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/ledger/ledger.go"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/ledger/ledger.go"
+          }
+        ]
+      }
+    },
+    {
+      "task": "go-debug-ledger-balance-query",
+      "report": "20261029-recheck-tasks-auto-r2.json",
+      "passed": false,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/ledger/ledger.go, ledger-service/internal/ledger/ledger_test.go"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/ledger/ledger.go, ledger-service/internal/ledger/ledger_test.go"
+          }
+        ]
+      }
+    },
+    {
+      "task": "go-debug-ledger-balance-query",
+      "report": "20261029-recheck-tasks-auto-r3.json",
+      "passed": false,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/ledger/ledger.go, ledger-service/internal/ledger/ledger_test.go"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/ledger/ledger.go, ledger-service/internal/ledger/ledger_test.go"
+          }
+        ]
+      }
+    },
+    {
+      "task": "go-debug-ledger-balance-query",
+      "report": "20261029-recheck-tasks-drop-r1.json",
+      "passed": false,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/ledger/ledger.go, ledger-service/internal/ledger/ledger_test.go"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/ledger/ledger.go, ledger-service/internal/ledger/ledger_test.go"
+          }
+        ]
+      }
+    },
+    {
+      "task": "go-debug-ledger-balance-query",
+      "report": "20261029-recheck-tasks-drop-r2.json",
+      "passed": true,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/ledger/ledger.go"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/ledger/ledger.go"
+          }
+        ]
+      }
+    },
+    {
+      "task": "go-debug-ledger-balance-query",
+      "report": "20261029-recheck-tasks-drop-r3.json",
+      "passed": false,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/ledger/ledger.go, ledger-service/internal/ledger/ledger_test.go"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/ledger/ledger.go, ledger-service/internal/ledger/ledger_test.go"
+          }
+        ]
+      }
+    },
+    {
+      "task": "cross-service-idempotency",
+      "report": "20261029-recheck-tasks-p8-after-cross-service-r1.json",
+      "passed": false,
+      "recorded": [
+        "Z1",
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/consumer/consumer_test.go, ledger-service/internal/ledger/ledger.go, payment-service/internal/api/handler.go, payment-service/internal/api/handler_test.go, payment-service/internal/store/store.go"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 0,
+            "code": "Z1",
+            "actionable": true,
+            "reason": "architectural risk: touches idempotency, idempotent, ledger, payment; changes span 2 repositories"
+          },
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/consumer/consumer_test.go, ledger-service/internal/ledger/ledger.go, payment-service/internal/api/handler.go, payment-service/internal/api/handler_test.go, payment-service/internal/store/store.go"
+          }
+        ]
+      }
+    },
+    {
+      "task": "cross-service-idempotency",
+      "report": "20261029-recheck-tasks-p8-after-cross-service-r2.json",
+      "passed": true,
+      "recorded": [
+        "Z1",
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z1",
+            "actionable": true,
+            "reason": "architectural risk, and an attempt failed: touches idempotency, idempotent, ledger, payment; changes span 2 repositories"
+          },
+          {
+            "attempt": 2,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/consumer/consumer.go, ledger-service/internal/consumer/consumer_test.go, ledger-service/internal/ledger/ledger.go, payment-service/internal/api/handler.go, payment-service/internal/api/handler_test.go"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 0,
+            "code": "Z1",
+            "actionable": true,
+            "reason": "architectural risk: touches idempotency, idempotent, ledger, payment; changes span 2 repositories"
+          },
+          {
+            "attempt": 2,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/consumer/consumer.go, ledger-service/internal/consumer/consumer_test.go, ledger-service/internal/ledger/ledger.go, payment-service/internal/api/handler.go, payment-service/internal/api/handler_test.go"
+          }
+        ]
+      }
+    },
+    {
+      "task": "api-contract-description",
+      "report": "20261029-recheck-tasks-p8-api-contract.json",
+      "passed": true,
+      "recorded": [
+        "Z1",
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/internal/api/handler.go, payment-service/internal/api/handler_test.go, payment-service/internal/store/store.go, payment-service/migrations/001_create_payments.sql, shared-protos/proto/payment.proto"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 0,
+            "code": "Z1",
+            "actionable": true,
+            "reason": "architectural risk: touches payment; changes span 2 repositories"
+          },
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/internal/api/handler.go, payment-service/internal/api/handler_test.go, payment-service/internal/store/store.go, payment-service/migrations/001_create_payments.sql, shared-protos/proto/payment.proto"
+          }
+        ]
+      }
+    },
+    {
+      "task": "cross-service-idempotency",
+      "report": "20261029-recheck-tasks-p8-before-cross-service-r1.json",
+      "passed": true,
+      "recorded": [
+        "Z1",
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z1",
+            "actionable": true,
+            "reason": "architectural risk, and an attempt failed: touches idempotency, idempotent, ledger, payment; changes span 2 repositories"
+          },
+          {
+            "attempt": 2,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/consumer/consumer_test.go, ledger-service/internal/ledger/ledger.go, payment-service/internal/api/handler.go, payment-service/internal/api/handler_test.go, payment-service/internal/store/store.go"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 0,
+            "code": "Z1",
+            "actionable": true,
+            "reason": "architectural risk: touches idempotency, idempotent, ledger, payment; changes span 2 repositories"
+          },
+          {
+            "attempt": 2,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/consumer/consumer_test.go, ledger-service/internal/ledger/ledger.go, payment-service/internal/api/handler.go, payment-service/internal/api/handler_test.go, payment-service/internal/store/store.go"
+          }
+        ]
+      }
+    },
+    {
+      "task": "cross-service-idempotency",
+      "report": "20261029-recheck-tasks-p8-before-cross-service-r2.json",
+      "passed": false,
+      "recorded": [
+        "Z1",
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z1",
+            "actionable": true,
+            "reason": "architectural risk, and an attempt failed: touches idempotency, idempotent, ledger, payment; changes span 2 repositories"
+          },
+          {
+            "attempt": 2,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/consumer/consumer_test.go, ledger-service/internal/ledger/ledger.go, ledger-service/internal/ledger/ledger_test.go, payment-service/internal/api/handler.go, payment-service/internal/api/handler_test.go"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 0,
+            "code": "Z1",
+            "actionable": true,
+            "reason": "architectural risk: touches idempotency, idempotent, ledger, payment; changes span 2 repositories"
+          },
+          {
+            "attempt": 2,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/consumer/consumer_test.go, ledger-service/internal/ledger/ledger.go, ledger-service/internal/ledger/ledger_test.go, payment-service/internal/api/handler.go, payment-service/internal/api/handler_test.go"
+          }
+        ]
+      }
+    },
+    {
+      "task": "api-contract-description",
+      "report": "20261029-tasks-p8.json",
+      "passed": false,
+      "recorded": [
+        "Z1"
+      ],
+      "fired": {
+        "adaptive": null,
+        "rules": [
+          {
+            "attempt": 0,
+            "code": "Z1",
+            "actionable": true,
+            "reason": "architectural risk: touches payment; changes span 2 repositories"
+          }
+        ]
+      }
+    },
+    {
+      "task": "cross-service-idempotency",
+      "report": "20261029-tasks-p8.json",
+      "passed": false,
+      "recorded": [
+        "Z1",
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z1",
+            "actionable": true,
+            "reason": "architectural risk, and an attempt failed: touches idempotency, idempotent, ledger, payment; changes span 2 repositories"
+          },
+          {
+            "attempt": 2,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/consumer/consumer_test.go, ledger-service/internal/ledger/ledger.go, payment-service/internal/api/handler.go, payment-service/internal/api/handler_test.go, payment-service/internal/store/store.go"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 0,
+            "code": "Z1",
+            "actionable": true,
+            "reason": "architectural risk: touches idempotency, idempotent, ledger, payment; changes span 2 repositories"
+          },
+          {
+            "attempt": 2,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/consumer/consumer_test.go, ledger-service/internal/ledger/ledger.go, payment-service/internal/api/handler.go, payment-service/internal/api/handler_test.go, payment-service/internal/store/store.go"
+          }
+        ]
+      }
+    },
+    {
+      "task": "docker-hardening",
+      "report": "20261029-tasks-p8.json",
+      "passed": true,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/Dockerfile, payment-service/tests/dockerfile_hardening_test.sh"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/Dockerfile, payment-service/tests/dockerfile_hardening_test.sh"
+          }
+        ]
+      }
+    },
+    {
+      "task": "event-field-rename",
+      "report": "20261029-tasks-p8.json",
+      "passed": true,
+      "recorded": [
+        "Z1",
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/consumer/consumer.go, ledger-service/internal/consumer/consumer_test.go, payment-service/internal/events/kafka.go, payment-service/internal/events/kafka_test.go"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 0,
+            "code": "Z1",
+            "actionable": true,
+            "reason": "architectural risk: touches payment; changes span 2 repositories"
+          },
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/consumer/consumer.go, ledger-service/internal/consumer/consumer_test.go, payment-service/internal/events/kafka.go, payment-service/internal/events/kafka_test.go"
+          }
+        ]
+      }
+    },
+    {
+      "task": "go-bugfix-ledger-balance",
+      "report": "20261029-tasks-p8.json",
+      "passed": true,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/consumer/consumer.go, ledger-service/internal/consumer/consumer_test.go"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/consumer/consumer.go, ledger-service/internal/consumer/consumer_test.go"
+          }
+        ]
+      }
+    },
+    {
+      "task": "go-debug-ledger-balance-query",
+      "report": "20261029-tasks-p8.json",
+      "passed": false,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/ledger/ledger.go, ledger-service/internal/ledger/ledger_test.go"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: ledger-service/internal/ledger/ledger.go, ledger-service/internal/ledger/ledger_test.go"
+          }
+        ]
+      }
+    },
+    {
+      "task": "go-feature-currency-validation",
+      "report": "20261029-tasks-p8.json",
+      "passed": true,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/internal/api/handler.go, payment-service/internal/api/handler_test.go"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/internal/api/handler.go, payment-service/internal/api/handler_test.go"
+          }
+        ]
+      }
+    },
+    {
+      "task": "go-iface-add-method",
+      "report": "20261029-tasks-p8.json",
+      "passed": true,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: billing-service/internal/payment/memory.go, billing-service/internal/payment/postgres.go, billing-service/internal/payment/repository.go, billing-service/internal/payment/service.go, billing-service/internal/payment/service_test.go"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: billing-service/internal/payment/memory.go, billing-service/internal/payment/postgres.go, billing-service/internal/payment/repository.go, billing-service/internal/payment/service.go, billing-service/internal/payment/service_test.go"
+          }
+        ]
+      }
+    },
+    {
+      "task": "go-large-iface-method",
+      "report": "20261029-tasks-p8.json",
+      "passed": true,
+      "recorded": null,
+      "fired": {
+        "adaptive": null,
+        "rules": null
+      }
+    },
+    {
+      "task": "go-refactor-validate",
+      "report": "20261029-tasks-p8.json",
+      "passed": true,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/internal/api/handler.go, payment-service/internal/api/handler_test.go"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/internal/api/handler.go, payment-service/internal/api/handler_test.go"
+          }
+        ]
+      }
+    },
+    {
+      "task": "java-bugfix-paid-total",
+      "report": "20261029-tasks-p8.json",
+      "passed": true,
+      "recorded": null,
+      "fired": {
+        "adaptive": null,
+        "rules": null
+      }
+    },
+    {
+      "task": "k8s-health-and-resources",
+      "report": "20261029-tasks-p8.json",
+      "passed": true,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/deploy/helm/payment-service/values.yaml, payment-service/internal/api/handler.go, payment-service/internal/api/handler_test.go"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/deploy/helm/payment-service/values.yaml, payment-service/internal/api/handler.go, payment-service/internal/api/handler_test.go"
+          }
+        ]
+      }
+    },
+    {
+      "task": "multi-feature-discount",
+      "report": "20261029-tasks-p8.json",
+      "passed": true,
+      "recorded": null,
+      "fired": {
+        "adaptive": null,
+        "rules": null
+      }
+    },
+    {
+      "task": "py-bugfix-inventory",
+      "report": "20261029-tasks-p8.json",
+      "passed": true,
+      "recorded": null,
+      "fired": {
+        "adaptive": null,
+        "rules": null
+      }
+    },
+    {
+      "task": "rust-bugfix-transfer",
+      "report": "20261029-tasks-p8.json",
+      "passed": true,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: rust-ledger/src/lib.rs, rust-ledger/tests/ledger.rs"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: rust-ledger/src/lib.rs, rust-ledger/tests/ledger.rs"
+          }
+        ]
+      }
+    },
+    {
+      "task": "sql-migration-idempotency-key",
+      "report": "20261029-tasks-p8.json",
+      "passed": true,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/migrations/002_add_idempotency_key.sql, payment-service/migrations/migration_test.go"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: payment-service/migrations/002_add_idempotency_key.sql, payment-service/migrations/migration_test.go"
+          }
+        ]
+      }
+    },
+    {
+      "task": "terraform-topics",
+      "report": "20261029-tasks-p8.json",
+      "passed": true,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: infrastructure/terraform/kafka.tf"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: infrastructure/terraform/kafka.tf"
+          }
+        ]
+      }
+    },
+    {
+      "task": "ts-bugfix-cart-discount",
+      "report": "20261029-tasks-p8.json",
+      "passed": true,
+      "recorded": null,
+      "fired": {
+        "adaptive": null,
+        "rules": null
+      }
+    },
+    {
+      "task": "ts-retry-5xx",
+      "report": "20261029-tasks-p8.json",
+      "passed": true,
+      "recorded": [
+        "Z3"
+      ],
+      "fired": {
+        "adaptive": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: gateway/src/payments.test.js, gateway/src/payments.ts"
+          }
+        ],
+        "rules": [
+          {
+            "attempt": 1,
+            "code": "Z3",
+            "actionable": true,
+            "reason": "high-risk change before merge: gateway/src/payments.test.js, gateway/src/payments.ts"
+          }
+        ]
+      }
+    }
+  ]
+}

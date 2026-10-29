@@ -1,0 +1,123 @@
+{
+  "started": "2026-10-29T19:54:04.940768592Z",
+  "runtime": "0.5.0-dev (build 11146, commit 7fe450e19)",
+  "machine": {
+    "time": "2026-10-29T19:54:04.940768867Z",
+    "os": "linux",
+    "arch": "amd64",
+    "cpu_model": "13th Gen Intel(R) Core(TM) i7-13620H",
+    "logical_cpus": 16,
+    "mem_total_mib": 62741,
+    "mem_available_mib": 49593,
+    "swap_used_mib": 8191,
+    "gpus": [
+      {
+        "index": 0,
+        "name": "NVIDIA GeForce RTX 4060 Laptop GPU",
+        "compute_cap": "8.9",
+        "driver": "595.99.02",
+        "mem_total_mib": 8188,
+        "mem_used_mib": 77,
+        "util_pct": 0,
+        "temp_c": 49,
+        "power_w": 4.48,
+        "power_limit_w": 115,
+        "sm_clock_mhz": 210,
+        "throttle": "0x0000000000000001"
+      }
+    ],
+    "accelerator": {
+      "kind": "cuda",
+      "name": "NVIDIA GeForce RTX 4060 Laptop GPU",
+      "memory_mib": 8188
+    }
+  },
+  "profiles": [
+    {
+      "profile": "qwen3.6-35b-a3b-mtp",
+      "file": "Qwen3.6-35B-A3B-UD-Q4_K_M.gguf",
+      "fit": {
+        "profile": "qwen3.6-35b-a3b-mtp",
+        "fit": "offload",
+        "need_mib": 24037,
+        "detail": "needs about 23.5 GB: attention on the 8.0 GB GPU, experts in system RAM"
+      },
+      "declared": {
+        "ToolCalling": "native",
+        "StructuredOutput": "json_schema",
+        "Thinking": "toggle",
+        "ContextMax": 262144,
+        "Tokenizer": "qwen35",
+        "Speculative": [
+          "ngram",
+          "draft",
+          "mtp"
+        ],
+        "Limitations": [
+          "Hybrid attention with recurrent layers: a cached prompt prefix is reused only up to a context checkpoint.",
+          "Thinks by default: a request with a small max_tokens can end inside the thinking, with no answer, unless it sets enable_thinking false."
+        ]
+      },
+      "weights": {
+        "architecture": "qwen35moe",
+        "name": "Qwen3.6-35B-A3B",
+        "tokenizer": "qwen35",
+        "context_length": 262144,
+        "blocks": 41,
+        "experts": 256,
+        "mtp_layers": 1,
+        "tensors": 753
+      },
+      "load_seconds": 10.506183234,
+      "server_rss_mib": 23308,
+      "vram_used_mib": 7431,
+      "checks": [
+        {
+          "name": "tool_call",
+          "pass": true,
+          "detail": "read_file {\"path\":\"go.mod\"}",
+          "seconds": 3.348977303
+        },
+        {
+          "name": "tool_result",
+          "pass": true,
+          "detail": "The module declares **Go 1.23.4** in go.mod.",
+          "seconds": 1.018441405
+        },
+        {
+          "name": "code_arguments",
+          "pass": true,
+          "detail": "old \"package ledger\\n\\nfunc Label(n int) string {\\n\\tif n \u003c 0 {\\n\\t\\treturn \\\"negative\\\"\\n\\t}\\n\\treturn fmt.Sprintf(\\\"%d \\\\\\\"units\\\\\\\"\\\", n)\\n}\" new \"package ledger\\n\\nfunc Label(n int) string {\\n\\tif n \u003c 0 {\\n\\t\\treturn \\\"below zero\\\"\\n\\t}\\n\\treturn fmt.Sprintf(\\\"%d \\\\\\\"units\\\\\\\"\\\", n)\\n}\" (want ol…",
+          "seconds": 3.066144024
+        },
+        {
+          "name": "structured",
+          "pass": true,
+          "detail": "{\n  \"file\": \"store/db.go\",\n  \"line\": 42,\n  \"severity\": \"high\",\n  \"summary\": \"SQL Injection vulnerability due to string concatenation in query building\"\n}",
+          "seconds": 1.664501457
+        },
+        {
+          "name": "thinking_default",
+          "pass": true,
+          "detail": "reasoning 4811 chars, answer \"The function immediately triggers its early return because `len(xs) - 1` evaluat…\"",
+          "seconds": 24.415509855
+        },
+        {
+          "name": "thinking_off",
+          "pass": true,
+          "detail": "reasoning 0 chars, answer \"The function receives an argument of 0, causing it to return early immediately.\"",
+          "seconds": 0.65376954
+        },
+        {
+          "name": "long_context",
+          "pass": true,
+          "detail": "37207 tokens; answer \"K7Q9-ZX31\"",
+          "seconds": 52.781394119
+        }
+      ],
+      "thinking": "toggle",
+      "decode_tps": 52.55250613627792,
+      "prompt_tps": 708.2126013609895
+    }
+  ]
+}
