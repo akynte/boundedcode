@@ -15,6 +15,7 @@ import (
 	"github.com/akynte/boundedcode/internal/contextplan"
 	"github.com/akynte/boundedcode/internal/frontier"
 	"github.com/akynte/boundedcode/internal/gitops"
+	"github.com/akynte/boundedcode/internal/policy"
 	"github.com/akynte/boundedcode/internal/store"
 	"github.com/akynte/boundedcode/internal/task"
 )
@@ -29,6 +30,18 @@ func (r *Runner) escalate(ctx context.Context, t *task.Task, wts []task.Worktree
 		r.recordEscalation(ctx, t.ID, tr, "none", "declined", "", 0, "", "frontier disabled")
 		return ""
 	}
+	// A repository can refuse external models (policy.DataPolicyFile),
+	// read from the user's checkout, not from the agent's worktree.
+	var sources []string
+	for _, w := range wts {
+		sources = append(sources, w.RepoPath)
+	}
+	if denied, why := policy.ExternalDenied(sources...); denied {
+		r.recordEscalation(ctx, t.ID, tr, r.Frontier.Name(), "blocked", "", 0, "", "data policy")
+		r.Rec.Emit(ctx, t.ID, "frontier.blocked", map[string]any{"code": tr.Code, "error": why})
+		r.say("escalation %s not sent: %s; continuing locally", tr.Code, why)
+		return ""
+	}
 	strategies, _ := r.Ledger.Strategies(ctx, t.ID)
 	pack, err := contextplan.Build(ctx, contextplan.Inputs{Task: t, Worktrees: wts, WorkDir: r.WorkDir(t.ID), Strategies: strategies,
 		Verification: r.latestVerification(ctx, t.ID, wts), Intel: r.Intel, Mode: mode,
@@ -39,13 +52,37 @@ func (r *Runner) escalate(ctx context.Context, t *task.Task, wts []task.Worktree
 		return ""
 	}
 	home, _ := os.UserHomeDir()
-	packet := frontier.BuildPacket(tr, pack, frontier.DefaultQuestion(tr), r.packetPaths(t, wts), home)
+	data := r.Cfg.Frontier.Data
+	var packet string
+	var gate func(string) error
+	if data == frontier.DataAbstract {
+		var roots []string
+		for _, w := range wts {
+			roots = append(roots, w.Path)
+		}
+		src, err := frontier.CollectSourceLines(ctx, roots, 2<<20)
+		if err != nil {
+			// Without the source lines the packet cannot be checked: fail closed.
+			r.recordEscalation(ctx, t.ID, tr, r.Frontier.Name(), "blocked", "", 0, "", "data policy")
+			r.say("escalation %s not sent: the abstract packet cannot be checked (%v)", tr.Code, err)
+			return ""
+		}
+		packet = frontier.BuildAbstractPacket(tr, pack, frontier.DefaultQuestion(tr), r.packetPaths(t, wts), home, src)
+		gate = func(p string) error { return frontier.CheckAbstract(p, src) }
+	} else {
+		data = frontier.DataFull
+		packet = frontier.BuildPacket(tr, pack, frontier.DefaultQuestion(tr), r.packetPaths(t, wts), home)
+	}
 	dir := filepath.Join(r.Paths.TaskDir(t.ID), "frontier")
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return ""
 	}
 	n := r.escalationCount(ctx, t.ID) + 1
-	if err := checkPacket(packet, home); err != nil {
+	err = checkPacket(packet, home)
+	if err == nil && gate != nil {
+		err = gate(packet)
+	}
+	if err != nil {
 		// Fail closed, but visibly: keep the refused packet on this host for
 		// diagnosis and record the escalation as blocked. It is kept outside
 		// dir, which the frontier provider's container mounts.
@@ -82,7 +119,7 @@ func (r *Runner) escalate(ctx context.Context, t *task.Task, wts []task.Worktree
 		model = "(provider default)"
 	}
 	_, _ = r.DB.ExecContext(ctx, `UPDATE escalations SET model = ?, diff_before = ? WHERE id = ?`, model, diffHash(ctx, wts), id)
-	r.say("escalating %s to %s (%d-token packet): %s", tr.Code, r.Frontier.Name(), tokens, trunc(tr.Reason, 160))
+	r.say("escalating %s to %s (%d-token %s packet): %s", tr.Code, r.Frontier.Name(), tokens, data, trunc(tr.Reason, 160))
 	answer, err := r.Frontier.Ask(ctx, packet, dir)
 	if errors.Is(err, frontier.ErrPending) {
 		r.say("packet written to %s; answer with `frontier answer %s FILE`, then `task resume %s`", packetPath, t.ID, t.ID)

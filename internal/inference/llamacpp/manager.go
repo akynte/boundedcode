@@ -99,6 +99,11 @@ func (m *Manager) Ensure(ctx context.Context, p model.Profile) (inference.Endpoi
 		}
 		return ep, fmt.Errorf("model file for %s: %w", p.Name, err)
 	}
+	if d := p.ResolveDraft(m.ModelsDir); d != "" {
+		if _, err := os.Stat(d); err != nil {
+			return ep, fmt.Errorf("draft model for %s (server.speculative.draft_file): %w", p.Name, err)
+		}
+	}
 	args := m.ServerArgs(p, modelPath)
 	hash := ArgsHash(m.Binary, append(slices.Clone(args), ServerEnv(p)...))
 
@@ -129,7 +134,14 @@ func (m *Manager) Ensure(ctx context.Context, p model.Profile) (inference.Endpoi
 }
 
 // ServerArgs is BuildArgs plus the manager's runtime settings (idle sleep).
+// A draft model's file resolves against the models directory like the
+// model's own.
 func (m *Manager) ServerArgs(p model.Profile, modelPath string) []string {
+	if d := p.ResolveDraft(m.ModelsDir); d != "" {
+		sp := *p.Server.Speculative
+		sp.DraftFile = d
+		p.Server.Speculative = &sp
+	}
 	return WithIdleSleep(BuildArgs(p, modelPath, m.Host, m.Port), m.IdleSleep)
 }
 

@@ -6,6 +6,13 @@ name: devstral-small-2
 display_name: Devstral Small 2 24B (Q4_K_M GGUF)
 description: Coding specialist for a 24 GB GPU or a 32 GB Mac; dense, so slow when it does not fit the GPU.
 status: experimental
+capabilities:
+  tool_calling: native
+  structured_output: json_schema
+  thinking: none
+  speculative: [ngram]
+  limitations:
+    - "Needs llama.cpp support from PR #17945; loading on the pinned runtime is unverified."
 file: Devstral-Small-2-24B-Instruct-2512-Q4_K_M.gguf
 source:
   repo: unsloth/Devstral-Small-2-24B-Instruct-2512-GGUF

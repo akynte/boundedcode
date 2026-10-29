@@ -5,6 +5,17 @@ name: qwen3.6-35b-a3b
 display_name: Qwen3.6-35B-A3B (UD-Q4_K_M GGUF)
 description: The default and the only validated model (8 GB GPU, 64 GB RAM, experts in system RAM); also suits a 24 GB+ GPU.
 status: validated
+capabilities:
+  tool_calling: native
+  structured_output: json_schema
+  thinking: toggle
+  context_max: 262144
+  tokenizer: qwen35
+  speculative: [ngram, draft]
+  limitations:
+    - "Hybrid attention with recurrent layers: a cached prompt prefix is reused only up to a context checkpoint."
+    - "This file has no multi-token prediction layers; MTP needs the -MTP build of the weights (profile qwen3.6-35b-a3b-mtp)."
+    - "Thinks by default: a request with a small max_tokens can end inside the thinking, with no answer, unless it sets enable_thinking false."
 file: Qwen3.6-35B-A3B-UD-Q4_K_M.gguf
 source:
   repo: unsloth/Qwen3.6-35B-A3B-GGUF

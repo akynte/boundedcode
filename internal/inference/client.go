@@ -76,6 +76,10 @@ type Timings struct {
 	PredictedN         int     `json:"predicted_n"`
 	PredictedMS        float64 `json:"predicted_ms"`
 	PredictedPerSecond float64 `json:"predicted_per_second"`
+	// DraftN and DraftNAccepted are the tokens speculative decoding drafted
+	// and the model accepted (absent without it).
+	DraftN         int `json:"draft_n,omitempty"`
+	DraftNAccepted int `json:"draft_n_accepted,omitempty"`
 }
 
 // ChatResponse is the parsed response.

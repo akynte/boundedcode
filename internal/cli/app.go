@@ -36,6 +36,9 @@ type App struct {
 	// prompt; confirmFn likewise replaces confirm (the terminal UI sets both).
 	approve   func(ctx context.Context, tr frontier.Trigger, packetPath string, tokens int) bool
 	confirmFn func(prompt string) bool
+	// speculative, when set (bench --speculative), replaces the served
+	// profile's speculative decoding for this invocation.
+	speculative *model.Speculative
 }
 
 func (a *App) configFile() string { return filepath.Join(a.Paths.Config, "config.yaml") }

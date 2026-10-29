@@ -5,6 +5,10 @@ name: qwen3.8-27b
 display_name: Qwen3.8-27B (UD-Q4_K_M GGUF)
 description: For a 24 GB+ GPU or a 32-64 GB Mac; vendor coding scores above the default (not measured here); dense, so slow when it does not fit the GPU.
 status: experimental
+capabilities:
+  tool_calling: native
+  structured_output: json_schema
+  speculative: [ngram]
 file: Qwen3.8-27B-UD-Q4_K_M.gguf
 source:
   repo: unsloth/Qwen3.8-27B-GGUF

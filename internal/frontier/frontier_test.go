@@ -94,3 +94,36 @@ func TestCodexContainerIsNamedAndRemovedOnCancel(t *testing.T) {
 		t.Fatalf("name=%q cancel=%v waitdelay=%v", name, cmd.Cancel != nil, cmd.WaitDelay)
 	}
 }
+
+func TestEvaluateAdaptive(t *testing.T) {
+	cfg := config.Defaults().Escalation
+	risky := "add idempotency to payments"
+	cases := []struct {
+		name string
+		s    Signals
+		want string
+	}{
+		{"risk waits for a failure", Signals{Text: risky, ChangedRepos: 2, RemainingAttempts: 5}, ""},
+		{"risk with unresolved requirements", Signals{Text: risky, ChangedRepos: 2, Ambiguities: 1, RemainingAttempts: 5}, "Z1"},
+		{"risk after a failure", Signals{Text: risky, ChangedRepos: 2, ConsecutiveFailures: 1, Signature: "a", RemainingAttempts: 4}, "Z1"},
+		{"no attempt left to use the advice", Signals{Text: risky, ChangedRepos: 2, ConsecutiveFailures: 3, Signature: "a", RemainingAttempts: 0}, ""},
+		{"an attempt that changed nothing", Signals{Text: "x", ConsecutiveFailures: 1, NoChanges: true, Signature: "no-changes", RemainingAttempts: 3}, "Z2"},
+		{"same failure once", Signals{Text: "x", ConsecutiveFailures: 2, RepeatedFailure: true, Signature: "a", RemainingAttempts: 3}, "Z2"},
+		{"same failure not again", Signals{Text: "x", ConsecutiveFailures: 3, RepeatedFailure: true, Signature: "a", Escalated: []string{"a"}, RemainingAttempts: 2}, ""},
+		{"a new failure escalates", Signals{Text: "x", ConsecutiveFailures: 3, Signature: "b", Escalated: []string{"a"}, RemainingAttempts: 2}, "Z2"},
+		{"unknown budget can act", Signals{Text: "x", ConsecutiveFailures: 3, Signature: "a", RemainingAttempts: -1}, "Z2"},
+		{"pre-merge review is the rules'", Signals{Text: "x", PreMerge: true, ChangedFiles: []string{"svc/internal/auth/token.go"}}, "Z3"},
+		{"budget spent", Signals{Text: "x", ConsecutiveFailures: 5, Signature: "a", EscalationsUsed: 2, MaxEscalations: 2, RemainingAttempts: 1}, ""},
+		{"user overrides budget", Signals{UserRequested: true, EscalationsUsed: 2, MaxEscalations: 2}, "Z4"},
+	}
+	for _, c := range cases {
+		if got := codes(EvaluatePolicy(PolicyAdaptive, cfg, c.s)); got != c.want {
+			t.Errorf("%s: got %q want %q", c.name, got, c.want)
+		}
+	}
+	// The rules are what Evaluate returns.
+	s := Signals{Text: risky, ChangedRepos: 2}
+	if codes(EvaluatePolicy(PolicyRules, cfg, s)) != codes(Evaluate(cfg, s)) || codes(EvaluatePolicy("", cfg, s)) != "Z1" {
+		t.Error("rules policy differs from Evaluate")
+	}
+}

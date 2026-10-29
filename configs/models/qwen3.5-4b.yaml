@@ -6,6 +6,15 @@ name: qwen3.5-4b
 display_name: Qwen3.5-4B (Q4_K_M GGUF)
 description: Smallest option; runs on a CPU-only machine with 8 GB of RAM. Expect weak results on hard tasks.
 status: experimental
+capabilities:
+  tool_calling: native
+  structured_output: json_schema
+  thinking: toggle
+  context_max: 262144
+  tokenizer: qwen35
+  speculative: [ngram, draft]
+  limitations:
+    - "An answer constrained to a JSON schema can run on inside a string field until the token limit (bench models, 2026-10-29: 1,500 tokens)."
 file: Qwen3.5-4B-Q4_K_M.gguf
 source:
   repo: unsloth/Qwen3.5-4B-GGUF

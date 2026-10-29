@@ -324,10 +324,14 @@ func (r *Runner) Run(ctx context.Context, taskID string, opt RunOptions) (*task.
 		return r.Ledger.Save(context.WithoutCancel(ctx), t)
 	}
 
-	// Z1 (and Z4) are evaluated once before implementation starts.
-	if t.AttemptCount == 0 {
-		trs := frontier.Evaluate(r.Cfg.Escalation, frontier.Signals{Text: t.OriginalRequest + "\n" + t.Goal, ChangedRepos: len(wts),
-			UserRequested: userFrontier, EscalationsUsed: t.Budget.UsedEscalations, MaxEscalations: t.Budget.MaxEscalations})
+	// Z1 (and Z4) are evaluated once before implementation starts: here
+	// under the rules, after the contract under the adaptive policy (it
+	// uses the contract's unresolved ambiguities).
+	policy := r.Cfg.Escalation.Policy
+	escalateFirst := func(ambiguities int) {
+		trs := frontier.EvaluatePolicy(policy, r.Cfg.Escalation, frontier.Signals{Text: t.OriginalRequest + "\n" + t.Goal, ChangedRepos: len(wts),
+			UserRequested: userFrontier, EscalationsUsed: t.Budget.UsedEscalations, MaxEscalations: t.Budget.MaxEscalations,
+			Ambiguities: ambiguities, RemainingAttempts: remainingAttempts(t)})
 		for _, tr := range trs {
 			if tr.Code == frontier.Z1 || tr.Code == frontier.Z4 {
 				if a := r.escalate(ctx, t, wts, tr, mode); a != "" {
@@ -338,6 +342,9 @@ func (r *Runner) Run(ctx context.Context, taskID string, opt RunOptions) (*task.
 				break
 			}
 		}
+	}
+	if t.AttemptCount == 0 && policy != frontier.PolicyAdaptive {
+		escalateFirst(0)
 	}
 
 	interrupted := func(reason string) (*task.Task, error) {
@@ -367,6 +374,10 @@ func (r *Runner) Run(ctx context.Context, taskID string, opt RunOptions) (*task.
 		return t, r.block(t, save, "SPEC_AMBIGUOUS: the request is materially ambiguous; clarify with `task run "+t.ID+" --clarify \"...\"`:\n- "+questions)
 	}
 	contractText := contractPackText(contract, len(contract.MaterialOrNone()) > 0)
+	if t.AttemptCount == 0 && policy == frontier.PolicyAdaptive {
+		escalateFirst(len(contract.MaterialOrNone()))
+	}
+	var escalatedSigs []string // failure signatures escalated (Z2), for the adaptive policy
 	for {
 		if ctx.Err() != nil {
 			return interrupted("before attempt")
@@ -629,7 +640,7 @@ func (r *Runner) Run(ctx context.Context, taskID string, opt RunOptions) (*task.
 			// review happens even on the last attempt; advice that cannot be
 			// applied then blocks the task instead of being dropped.
 			if !reviewedZ3 {
-				trs := frontier.Evaluate(r.Cfg.Escalation, frontier.Signals{Text: t.OriginalRequest, ChangedFiles: changedFiles,
+				trs := frontier.EvaluatePolicy(policy, r.Cfg.Escalation, frontier.Signals{Text: t.OriginalRequest, ChangedFiles: changedFiles,
 					ChangedRepos: len(changedRepos), PreMerge: true, EscalationsUsed: t.Budget.UsedEscalations,
 					MaxEscalations: t.Budget.MaxEscalations, AlreadyReviewedZ1: reviewedZ1, UserRequested: userFrontier,
 					UnupdatedCounterparts: outside})
@@ -757,15 +768,20 @@ func (r *Runner) Run(ctx context.Context, taskID string, opt RunOptions) (*task.
 			return t, err
 		}
 		strategies, _ = r.Ledger.Strategies(ctx, t.ID)
-		trs := frontier.Evaluate(r.Cfg.Escalation, frontier.Signals{Text: t.OriginalRequest, ChangedFiles: changedFiles,
+		trs := frontier.EvaluatePolicy(policy, r.Cfg.Escalation, frontier.Signals{Text: t.OriginalRequest, ChangedFiles: changedFiles,
 			ChangedRepos: len(changedRepos), ConsecutiveFailures: consecutive, RejectedStrategies: countRejected(strategies),
 			RepeatedFailure: repeated, Stuck: res.Stuck || res.Status == "stuck", EscalationsUsed: t.Budget.UsedEscalations,
-			MaxEscalations: t.Budget.MaxEscalations, AlreadyReviewedZ1: reviewedZ1, UserRequested: userFrontier})
+			MaxEscalations: t.Budget.MaxEscalations, AlreadyReviewedZ1: reviewedZ1, UserRequested: userFrontier,
+			Signature: sig, Escalated: escalatedSigs, NoChanges: sig == "no-changes", Ambiguities: len(contract.MaterialOrNone()),
+			RemainingAttempts: remainingAttempts(t)})
 		advice = ""
 		if tr, ok := find(trs, frontier.Z2, frontier.Z1, frontier.Z4); ok {
 			userFrontier = false
 			if tr.Code == frontier.Z1 {
 				reviewedZ1 = true
+			}
+			if tr.Code == frontier.Z2 {
+				escalatedSigs = append(escalatedSigs, sig)
 			}
 			advice = r.escalate(ctx, t, wts, tr, contextplan.ModeRetry)
 		}
@@ -1101,6 +1117,15 @@ func dependencyMounts(wts []task.Worktree) ([]agent.DependencyMount, []string, e
 		scratch = append(scratch, deps.Scratch...)
 	}
 	return out, scratch, nil
+}
+
+// remainingAttempts is the attempts the task's budget allows after the
+// current one (-1: no limit).
+func remainingAttempts(t *task.Task) int {
+	if t.Budget.MaxAttempts <= 0 {
+		return -1
+	}
+	return max(t.Budget.MaxAttempts-t.AttemptCount, 0)
 }
 
 func countRejected(st []task.Strategy) int {

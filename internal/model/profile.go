@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 
@@ -31,6 +32,10 @@ type Profile struct {
 	Status string `yaml:"status"`
 	// Description is one line for model choices in set-up.
 	Description string `yaml:"description"`
+	// Capabilities is what the model is declared to do with BoundedCode's
+	// requests. `bench models` measures them on this machine; routing
+	// trusts the measurement, never a leaderboard score.
+	Capabilities Capabilities `yaml:"capabilities"`
 	// Origin is where the profile was loaded from (not serialized).
 	Origin string `yaml:"-"`
 }
@@ -68,6 +73,69 @@ type Architecture struct {
 	// model's config (full-attention layers × KV heads × head size × 2 ×
 	// bytes per element × tokens); an estimate, not a measurement.
 	KVMiB int `yaml:"kv_mib"`
+}
+
+// Capabilities are a profile's declared capabilities, from the model card,
+// the weights' metadata and the runtime's support. Empty means unknown.
+type Capabilities struct {
+	// ToolCalling is "native" (the chat template formats tool calls and
+	// the server parses them) or "none".
+	ToolCalling string `yaml:"tool_calling"`
+	// StructuredOutput is "json_schema" (answers can be constrained to a
+	// schema) or "none".
+	StructuredOutput string `yaml:"structured_output"`
+	// Thinking is "toggle" (the template honours enable_thinking per
+	// request), "always" (it reasons and cannot be told not to) or "none".
+	Thinking string `yaml:"thinking"`
+	// ContextMax is the trained context length in tokens.
+	ContextMax int `yaml:"context_max"`
+	// Tokenizer is the weights' tokenizer family (GGUF
+	// tokenizer.ggml.pre). A draft model must share the target's.
+	Tokenizer string `yaml:"tokenizer"`
+	// Speculative lists the speculative decoding methods these weights
+	// allow: "ngram" (any model), "draft" (a smaller model with the same
+	// tokenizer) and "mtp" (the weights carry multi-token prediction
+	// layers). Allowed is not faster: `bench spec` measures.
+	Speculative []string `yaml:"speculative"`
+	// Limitations are known compatibility problems, one sentence each.
+	Limitations []string `yaml:"limitations"`
+}
+
+// Speculative configures speculative decoding (llama-server --spec-*).
+// Off unless Type is set.
+type Speculative struct {
+	// Type is a llama-server --spec-type: ngram-mod, ngram-simple,
+	// ngram-map-k, ngram-cache, draft-simple or draft-mtp.
+	Type string `yaml:"type"`
+	// DraftFile is the draft model's GGUF for draft-simple; relative paths
+	// resolve like File.
+	DraftFile string `yaml:"draft_file,omitempty"`
+	// DraftGPULayers offloads the draft model's layers (-ngld; 0 = the
+	// runtime default).
+	DraftGPULayers int `yaml:"draft_gpu_layers,omitempty"`
+	// NMax and NMin bound the tokens drafted per step (0 = the runtime
+	// default: 3 and 0).
+	NMax int `yaml:"n_max,omitempty"`
+	NMin int `yaml:"n_min,omitempty"`
+	// PMin is the least draft probability to keep drafting (greedy).
+	PMin float64 `yaml:"p_min,omitempty"`
+}
+
+// SpecTypes are the llama-server --spec-type values a profile may use.
+var SpecTypes = []string{"ngram-mod", "ngram-simple", "ngram-map-k", "ngram-map-k4v", "ngram-cache", "draft-simple", "draft-mtp"}
+
+// SpecMethod is the capability a --spec-type needs: "ngram", "draft" or
+// "mtp".
+func SpecMethod(specType string) string {
+	switch {
+	case strings.HasPrefix(specType, "ngram"):
+		return "ngram"
+	case specType == "draft-mtp":
+		return "mtp"
+	case strings.HasPrefix(specType, "draft"):
+		return "draft"
+	}
+	return ""
 }
 
 // ServerFlags are inference-server settings. Field names are runtime-neutral;
@@ -120,6 +188,8 @@ type ServerFlags struct {
 	// operations (the experts kept in system RAM) are run on the GPU
 	// (GGML_OP_OFFLOAD_MIN_BATCH of the CUDA backend; 0 = its default).
 	OpOffloadMinBatch int `yaml:"op_offload_min_batch,omitempty"`
+	// Speculative enables speculative decoding; nil leaves it off.
+	Speculative *Speculative `yaml:"speculative,omitempty"`
 	// ExtraArgs are appended verbatim; prefer typed fields.
 	ExtraArgs []string `yaml:"extra_args"`
 }
@@ -185,6 +255,25 @@ func (p Profile) Validate() error {
 	if p.Source.SizeBytes < 0 {
 		errs = append(errs, errors.New("source.size_bytes: negative"))
 	}
+	errs = append(errs, p.Capabilities.validate()...)
+	if sp := p.Server.Speculative; sp != nil {
+		switch {
+		case !slices.Contains(SpecTypes, sp.Type):
+			errs = append(errs, fmt.Errorf("server.speculative.type: %q is not one of %s", sp.Type, strings.Join(SpecTypes, ", ")))
+		case sp.Type == "draft-simple" && sp.DraftFile == "":
+			errs = append(errs, errors.New("server.speculative.draft_file: required for draft-simple"))
+		case sp.Type != "draft-simple" && sp.DraftFile != "":
+			errs = append(errs, fmt.Errorf("server.speculative.draft_file: only draft-simple uses a draft model (type %s)", sp.Type))
+		case len(p.Capabilities.Speculative) > 0 && !slices.Contains(p.Capabilities.Speculative, SpecMethod(sp.Type)):
+			errs = append(errs, fmt.Errorf("server.speculative.type %s needs %q, which capabilities.speculative does not list", sp.Type, SpecMethod(sp.Type)))
+		}
+		if sp.NMax < 0 || sp.NMin < 0 || sp.NMax > 0 && sp.NMin > sp.NMax || sp.PMin < 0 || sp.PMin > 1 {
+			errs = append(errs, errors.New("server.speculative: n_max and n_min must be >= 0 with n_min <= n_max, p_min in [0,1]"))
+		}
+		if sp.DraftFile != "" && !strings.HasSuffix(strings.ToLower(sp.DraftFile), ".gguf") {
+			errs = append(errs, fmt.Errorf("server.speculative.draft_file %q: only GGUF is supported", sp.DraftFile))
+		}
+	}
 	if p.Sampling.Temperature < 0 || p.Sampling.TopP < 0 || p.Sampling.TopP > 1 {
 		errs = append(errs, errors.New("sampling: temperature must be >= 0 and top_p in [0,1]"))
 	}
@@ -192,6 +281,35 @@ func (p Profile) Validate() error {
 		return fmt.Errorf("model profile %q: %w", p.Name, err)
 	}
 	return nil
+}
+
+func (c Capabilities) validate() []error {
+	var errs []error
+	check := func(field, v string, ok ...string) {
+		if v != "" && !slices.Contains(ok, v) {
+			errs = append(errs, fmt.Errorf("capabilities.%s: %q is not %s", field, v, strings.Join(ok, "|")))
+		}
+	}
+	check("tool_calling", c.ToolCalling, "native", "none")
+	check("structured_output", c.StructuredOutput, "json_schema", "none")
+	check("thinking", c.Thinking, "toggle", "always", "none")
+	for _, m := range c.Speculative {
+		check("speculative", m, "ngram", "draft", "mtp")
+	}
+	if c.ContextMax < 0 {
+		errs = append(errs, errors.New("capabilities.context_max: negative"))
+	}
+	return errs
+}
+
+// ResolveDraft returns the speculative draft model's GGUF path, resolved
+// like ResolveFile ("" without one).
+func (p Profile) ResolveDraft(modelsDir string) string {
+	sp := p.Server.Speculative
+	if sp == nil || sp.DraftFile == "" {
+		return ""
+	}
+	return Profile{File: sp.DraftFile}.ResolveFile(modelsDir)
 }
 
 // ResolveFile returns the absolute GGUF path: absolute files as-is, else the
@@ -329,6 +447,14 @@ func inheritCatalog(p *Profile, prev Profile) {
 	if p.Architecture.KVMiB == 0 {
 		p.Architecture.KVMiB = prev.Architecture.KVMiB
 	}
+	if p.Capabilities.zero() {
+		p.Capabilities = prev.Capabilities
+	}
+}
+
+func (c Capabilities) zero() bool {
+	return c.ToolCalling == "" && c.StructuredOutput == "" && c.Thinking == "" && c.ContextMax == 0 && c.Tokenizer == "" &&
+		len(c.Speculative) == 0 && len(c.Limitations) == 0
 }
 
 // Get returns the named profile.

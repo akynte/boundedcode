@@ -23,6 +23,8 @@ import (
 	"github.com/akynte/boundedcode/internal/gitops"
 	"github.com/akynte/boundedcode/internal/inference"
 	"github.com/akynte/boundedcode/internal/orchestrator"
+	"github.com/akynte/boundedcode/internal/policy"
+	"github.com/akynte/boundedcode/internal/routing"
 	"github.com/akynte/boundedcode/internal/telemetry"
 )
 
@@ -43,6 +45,9 @@ type directEndpoint struct {
 	// tokens with the local server's tokenizer (nil for a cloud provider).
 	pin      map[string]any
 	tokenize func(context.Context, string) (int, error)
+	// thinking is the local model's thinking capability
+	// (model.Capabilities.Thinking); "" for a cloud provider.
+	thinking string
 }
 
 func (a *App) directEndpoint(ctx context.Context, modelOverride string) (*directEndpoint, error) {
@@ -79,7 +84,7 @@ func (a *App) directEndpoint(ctx context.Context, modelOverride string) (*direct
 			return nil, err
 		}
 	}
-	return &directEndpoint{provider: inference.ProviderLocal, model: ep.Model, ctxSize: p.Server.CtxSize,
+	return &directEndpoint{provider: inference.ProviderLocal, model: ep.Model, ctxSize: p.Server.CtxSize, thinking: p.Capabilities.Thinking,
 		pin: modelPin(p), tokenize: inference.NewClient(ep.BaseURL, timeout).Tokenize,
 		newGateway: func(id string) *inference.Gateway {
 			return &inference.Gateway{Model: ep.Model, Upstream: inference.LocalUpstream(inference.NewClient(ep.BaseURL, timeout), a.Config.Inference.ReasoningHistory, nil),
@@ -113,6 +118,11 @@ func (a *App) directRunner(ctx context.Context, dir, sessionID, modelOverride, a
 	if err != nil {
 		return nil, err
 	}
+	if ep.provider != inference.ProviderLocal {
+		if denied, why := policy.ExternalDenied(root); denied {
+			return nil, fmt.Errorf("%s: the %s provider is a model outside this machine; `%s provider use local` uses the local model", why, ep.provider, buildinfo.Command())
+		}
+	}
 	var sess *direct.Session
 	if sessionID == "" {
 		if sess, err = direct.NewSession(a.sessionsDir(), root, ep.provider, ep.model); err != nil {
@@ -128,7 +138,7 @@ func (a *App) directRunner(ctx context.Context, dir, sessionID, modelOverride, a
 		}
 	}
 	rec := telemetry.New(a.st.DB, a.Log)
-	r := &direct.Runner{Gateway: ep.newGateway(sess.ID), Session: sess, Opts: a.directOptions(root, cwd, approval, ep.ctxSize)}
+	r := &direct.Runner{Gateway: ep.newGateway(sess.ID), Session: sess, Opts: a.directOptions(root, cwd, approval, ep)}
 	if nav, _ := a.serenaNavigator(ctx, a.Paths); nav != nil {
 		r.Nav = nav
 	}
@@ -157,11 +167,12 @@ func (a *App) directRunner(ctx context.Context, dir, sessionID, modelOverride, a
 // directory dir, from the configuration: the project's and the user's
 // instruction files, skills, agents, commands, hooks, MCP servers and
 // checkpoints.
-func (a *App) directOptions(root, dir, approval string, ctxSize int) direct.Options {
+func (a *App) directOptions(root, dir, approval string, ep *directEndpoint) direct.Options {
 	dc := a.Config.Direct
 	opts := direct.Options{
 		Root: root, Dir: dir, Approval: approval, MaxTurns: dc.MaxTurns,
-		CommandTimeout: dc.CommandTimeout.D(), ContextTokens: ctxSize,
+		CommandTimeout: dc.CommandTimeout.D(), ContextTokens: ep.ctxSize,
+		Routing: dc.Routing, RoutingThinking: routingRoles(dc.RoutingThinking), ModelThinking: ep.thinking,
 		WorkingSetTokens: dc.WorkingSetTokens, MaxToolOutput: dc.MaxToolOutput, ObservationBytes: dc.ObservationBytes, ParallelTools: dc.ParallelTools, MCPToolSearch: dc.MCPToolSearch, NoPrune: !dc.PruneOn(), Compaction: dc.Compaction, NoChecks: !dc.ChecksOn(), NoSeedPack: !dc.SeedPackOn(), Retrieval: dc.Retrieval, NoHistoryNotes: !dc.HistoryNotesOn(), NoStream: !dc.StreamOn(),
 		MaxOutputTokens: a.Config.Agent.MaxOutputTokens, Instructions: dc.Instructions,
 		UserInstructions: a.userInstructionsFile(),
@@ -573,7 +584,7 @@ func (a *App) runChat(ctx context.Context, o chatOptions) error {
 		return err
 	}
 	if d.Confidence == "low" && (mode == "" || mode == "auto") {
-		d = direct.RouteWithModel(ctx, r.Gateway, prompt, a.riskRules(), caps)
+		d = direct.RouteWithModel(ctx, r.Gateway, prompt, a.riskRules(), caps, a.classifyThinking(r.Opts.ModelThinking))
 		if d.Mode == direct.ModeVerify {
 			if !o.jsonEvents {
 				fmt.Fprintf(a.Err, "· mode: verify (%s)\n", d.Reason)
@@ -722,4 +733,23 @@ func humanInt(n int) string {
 		return fmt.Sprintf("%.1fk", float64(n)/1e3)
 	}
 	return fmt.Sprint(n)
+}
+
+// routingRoles is direct.routing_thinking keyed by role.
+func routingRoles(m map[string]string) map[routing.Role]string {
+	if len(m) == 0 {
+		return nil
+	}
+	out := make(map[routing.Role]string, len(m))
+	for k, v := range m {
+		out[routing.Role(k)] = v
+	}
+	return out
+}
+
+// classifyThinking is routing's thinking for the router's classification
+// call on a model with the given thinking capability.
+func (a *App) classifyThinking(modelThinking string) string {
+	dc := a.Config.Direct
+	return routing.Thinking(dc.Routing, routing.RoleClassify, routingRoles(dc.RoutingThinking), modelThinking)
 }

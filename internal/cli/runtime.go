@@ -2,9 +2,12 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -53,7 +56,51 @@ func (a *App) profile(name string) (model.Profile, error) {
 	if name == "" {
 		name = a.Config.DefaultModel
 	}
-	return a.Models.Get(name)
+	p, err := a.Models.Get(name)
+	if err == nil && a.speculative != nil {
+		p.Server.Speculative = a.speculative
+		if a.speculative.Type == "" {
+			p.Server.Speculative = nil
+		}
+	}
+	return p, err
+}
+
+// parseSpeculative reads a --speculative value: "off", or a --spec-type
+// with comma-separated settings: draft=FILE, n_max=N, n_min=N, ngl=N
+// (e.g. "draft-simple,draft=Qwen3.5-0.8B-Q8_0.gguf,n_max=8").
+func parseSpeculative(v string) (*model.Speculative, error) {
+	if v == "" {
+		return nil, nil
+	}
+	if v == "off" {
+		return &model.Speculative{}, nil
+	}
+	parts := strings.Split(v, ",")
+	sp := &model.Speculative{Type: parts[0]}
+	if !slices.Contains(model.SpecTypes, sp.Type) {
+		return nil, fmt.Errorf("--speculative: %q is not off or one of %s", sp.Type, strings.Join(model.SpecTypes, ", "))
+	}
+	for _, kv := range parts[1:] {
+		k, val, _ := strings.Cut(kv, "=")
+		n, nerr := strconv.Atoi(val)
+		switch {
+		case k == "draft":
+			sp.DraftFile = val
+		case k == "n_max" && nerr == nil:
+			sp.NMax = n
+		case k == "n_min" && nerr == nil:
+			sp.NMin = n
+		case k == "ngl" && nerr == nil:
+			sp.DraftGPULayers = n
+		default:
+			return nil, fmt.Errorf("--speculative: %q is not draft=FILE, n_max=N, n_min=N or ngl=N", kv)
+		}
+	}
+	if (sp.Type == "draft-simple") != (sp.DraftFile != "") {
+		return nil, errors.New("--speculative: draft-simple needs draft=FILE, and only draft-simple takes one")
+	}
+	return sp, nil
 }
 
 func newRuntimeCmd(app *App) *cobra.Command {
@@ -144,6 +191,7 @@ func newRuntimeCmd(app *App) *cobra.Command {
 func newModelCmd(app *App) *cobra.Command {
 	cmd := &cobra.Command{Use: "model", Short: "Choose, download and inspect local models"}
 	cmd.AddCommand(newModelCatalogCmds(app)...)
+	cmd.AddCommand(newModelRouteCmd(app))
 	cmd.AddCommand(&cobra.Command{
 		Use:   "list",
 		Short: "List model profiles and whether their weights are present",
@@ -182,10 +230,11 @@ func newModelCmd(app *App) *cobra.Command {
 			c := app.Config.Inference
 			argv := app.llamaManager().ServerArgs(p, p.ResolveFile(app.modelsDir()))
 			if app.jsonOut {
-				return app.printJSON(map[string]any{"profile": p, "server_args": argv})
+				return app.printJSON(map[string]any{"profile": p, "server_args": argv, "fit": model.FitFor(p, app.hardware(context.Background()))})
 			}
 			app.printf("%s (%s) from %s\nsource: %s/%s license=%s\nargs: %s %s\n", p.Name, p.DisplayName, p.Origin,
 				p.Source.Repo, p.Source.File, p.Source.License, c.ServerBinary, strings.Join(argv, " "))
+			app.printf("%s\n", describeCapabilities(p, model.FitFor(p, app.hardware(context.Background()))))
 			return nil
 		},
 	})
@@ -297,4 +346,38 @@ func (a *App) serverBinary() string {
 		return ""
 	}
 	return a.Config.Inference.ServerBinary
+}
+
+// describeCapabilities is a profile's declared capabilities and memory fit
+// as `model show` prints them.
+func describeCapabilities(p model.Profile, fit model.Fit) string {
+	c := p.Capabilities
+	v := func(s string) string {
+		if s == "" {
+			return "unknown"
+		}
+		return s
+	}
+	ctxMax := "unknown"
+	if c.ContextMax > 0 {
+		ctxMax = fmt.Sprintf("%d tokens (served: %d)", c.ContextMax, p.Server.CtxSize)
+	}
+	spec := "unknown"
+	if len(c.Speculative) > 0 {
+		spec = strings.Join(c.Speculative, ", ")
+	}
+	if sp := p.Server.Speculative; sp != nil && sp.Type != "" {
+		spec += " (on: " + sp.Type + ")"
+	}
+	lines := []string{
+		"declared capabilities (bench models measures them):",
+		"  tool calling: " + v(c.ToolCalling) + "; structured output: " + v(c.StructuredOutput) + "; thinking: " + v(c.Thinking),
+		"  context: " + ctxMax + "; tokenizer: " + v(c.Tokenizer) + "; speculative decoding: " + spec,
+		fmt.Sprintf("memory: %s (%s)", fit.Level, fit.Detail),
+		"status: " + v(p.Status) + "; revision: " + v(p.Source.Revision),
+	}
+	for _, l := range c.Limitations {
+		lines = append(lines, "limitation: "+l)
+	}
+	return strings.Join(lines, "\n")
 }

@@ -6,6 +6,7 @@ package frontier
 import (
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/akynte/boundedcode/internal/config"
@@ -47,6 +48,100 @@ type Signals struct {
 	// change whose other side lives in a repository the task did not change
 	// (e.g. "topic payments.charged consumed by ledger-service").
 	UnupdatedCounterparts []string
+
+	// The adaptive policy's signals (PolicyAdaptive); the rules ignore them.
+	// Signature is the latest failure's; Escalated lists the failure
+	// signatures already escalated in the task. NoChanges: the attempt
+	// changed nothing. Ambiguities are the contract's unresolved ones.
+	// RemainingAttempts is the attempts the budget still allows after this
+	// one (-1: unknown).
+	Signature         string
+	Escalated         []string
+	NoChanges         bool
+	Ambiguities       int
+	RemainingAttempts int
+}
+
+// Escalation policies (escalation.policy).
+const (
+	PolicyRules    = "rules"    // the default: fixed thresholds and keyword triggers
+	PolicyAdaptive = "adaptive" // experimental: progress, ambiguity and budget aware
+)
+
+// EvaluatePolicy evaluates s under the named policy ("" = rules).
+func EvaluatePolicy(policy string, cfg config.EscalationConfig, s Signals) []Trigger {
+	if policy == PolicyAdaptive {
+		return evaluateAdaptive(cfg, s)
+	}
+	return Evaluate(cfg, s)
+}
+
+// evaluateAdaptive is the rules with four changes, each from a signal the
+// rules do not use:
+//
+//   - Advice needs an attempt to act on: Z1 and Z2 do not fire once the
+//     budget allows no further attempt.
+//   - Lack of progress: the same failure is escalated once (Z2 does not
+//     repeat for a signature already escalated), and an attempt that
+//     changed nothing escalates at once.
+//   - Ambiguous requirements: architectural risk (Z1) is escalated before
+//     implementing only when the contract has unresolved ambiguities;
+//     otherwise it waits for the first failed attempt, since most risky
+//     tasks pass locally.
+//   - Z3 (pre-merge review) and Z4 (the user's request) are the rules'.
+//
+// User controls are unchanged: frontier.enabled, require_approval and the
+// task's escalation budget apply to every trigger it returns.
+func evaluateAdaptive(cfg config.EscalationConfig, s Signals) []Trigger {
+	var out []Trigger
+	if s.UserRequested {
+		out = append(out, Trigger{Z4, "user requested frontier review"})
+	}
+	if s.MaxEscalations > 0 && s.EscalationsUsed >= s.MaxEscalations {
+		return out
+	}
+	canAct := s.RemainingAttempts != 0
+	failed := s.ConsecutiveFailures > 0
+	if why := architecturalRisk(cfg, s); why != "" && !s.AlreadyReviewedZ1 && canAct {
+		switch {
+		case !failed && s.Ambiguities > 0:
+			out = append(out, Trigger{Z1, "architectural risk with unresolved requirements: " + why})
+		case failed:
+			out = append(out, Trigger{Z1, "architectural risk, and an attempt failed: " + why})
+		}
+	}
+	if failed && canAct && (s.Signature == "" || !slices.Contains(s.Escalated, s.Signature)) {
+		switch {
+		case s.Stuck:
+			out = append(out, Trigger{Z2, "agent stuck (runtime loop detector)"})
+		case s.NoChanges:
+			out = append(out, Trigger{Z2, "the attempt changed nothing"})
+		case s.RepeatedFailure:
+			out = append(out, Trigger{Z2, "the same verification failure repeated across attempts"})
+		case s.ConsecutiveFailures >= cfg.FailedAttempts:
+			out = append(out, Trigger{Z2, fmt.Sprintf("%d consecutive failed verification attempts", s.ConsecutiveFailures)})
+		case s.RejectedStrategies >= cfg.RejectedStrategies && s.ConsecutiveFailures >= 2:
+			out = append(out, Trigger{Z2, fmt.Sprintf("%d strategies rejected", s.RejectedStrategies)})
+		}
+	}
+	for _, t := range Evaluate(cfg, Signals{Text: s.Text, ChangedFiles: s.ChangedFiles, ChangedRepos: s.ChangedRepos, PreMerge: s.PreMerge,
+		AlreadyReviewedZ1: true, AlreadyReviewedZ3: s.AlreadyReviewedZ3, UnupdatedCounterparts: s.UnupdatedCounterparts}) {
+		if t.Code == Z3 {
+			out = append(out, t)
+		}
+	}
+	return out
+}
+
+// architecturalRisk is the rules' Z1 condition, as its reason ("" when it
+// does not hold).
+func architecturalRisk(cfg config.EscalationConfig, s Signals) string {
+	for _, t := range Evaluate(cfg, Signals{Text: s.Text, ChangedFiles: s.ChangedFiles, ChangedRepos: s.ChangedRepos}) {
+		if t.Code == Z1 {
+			return strings.TrimPrefix(t.Reason, "architectural risk: ")
+		}
+	}
+	return ""
 }
 
 var contractPaths = []string{"*.proto", "*openapi*.yaml", "*openapi*.json", "*swagger*", "*.sql", "*/migrations/*", "*.avsc", "*schema*.graphql"}

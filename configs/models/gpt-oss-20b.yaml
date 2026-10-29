@@ -6,6 +6,14 @@ name: gpt-oss-20b
 display_name: gpt-oss-20b (MXFP4 GGUF)
 description: For a 12-16 GB GPU or a 32 GB machine; OpenAI's open-weight model.
 status: experimental
+capabilities:
+  tool_calling: native
+  structured_output: json_schema
+  thinking: always
+  context_max: 131072
+  speculative: [ngram]
+  limitations:
+    - "Reasoning cannot be turned off: enable_thinking is ignored (its effort is a request setting)."
 file: gpt-oss-20b-MXFP4.gguf
 source:
   repo: ggml-org/gpt-oss-20b-GGUF

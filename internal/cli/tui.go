@@ -202,8 +202,9 @@ func (b *tuiBackend) Route(ctx context.Context, dir, text string) (direct.Decisi
 	// open, otherwise a fresh endpoint.
 	b.mu.Lock()
 	var gw *inference.Gateway
+	thinking := ""
 	for _, r := range b.runners {
-		gw = r.Gateway
+		gw, thinking = r.Gateway, r.Opts.ModelThinking
 		break
 	}
 	b.mu.Unlock()
@@ -212,11 +213,11 @@ func (b *tuiBackend) Route(ctx context.Context, dir, text string) (direct.Decisi
 		if err != nil {
 			return direct.Route(text, rules, caps), nil //nolint:nilerr // the rules' choice stands
 		}
-		gw = ep.newGateway("route")
+		gw, thinking = ep.newGateway("route"), ep.thinking
 	}
 	rctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	return direct.RouteWithModel(rctx, gw, text, rules, caps), nil
+	return direct.RouteWithModel(rctx, gw, text, rules, caps, a.classifyThinking(thinking)), nil
 }
 
 // Sessions implements tui.Backend.

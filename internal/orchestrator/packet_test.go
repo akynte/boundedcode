@@ -14,7 +14,7 @@ import (
 // escalateOnce runs a task whose two attempts fail verification, so the
 // policy escalates (Z2) once. HOME is the test's root directory, which also
 // holds the repository and the runner's state; request receives it.
-func escalateOnce(t *testing.T, request func(home string) string) (*fakeFrontier, *Runner, string) {
+func escalateOnce(t *testing.T, request func(home string) string, prepare ...func(r *Runner, root string)) (*fakeFrontier, *Runner, string) {
 	t.Helper()
 	_, w, s, root := setup(t)
 	t.Cleanup(func() { s.Close() })
@@ -32,6 +32,9 @@ func escalateOnce(t *testing.T, request func(home string) string) (*fakeFrontier
 	tk.Budget.MaxAttempts = 2
 	if err := r.Ledger.Save(ctx, tk); err != nil {
 		t.Fatal(err)
+	}
+	for _, f := range prepare {
+		f(r, root)
 	}
 	if _, err := r.Run(ctx, tk.ID, RunOptions{}); err != nil {
 		t.Fatal(err)
@@ -90,5 +93,53 @@ func TestBlockedEscalationIsRecorded(t *testing.T) {
 	// container; a refused packet must not be readable there.
 	if filepath.Base(filepath.Dir(path)) == "frontier" {
 		t.Fatalf("blocked packet %s is in the directory the frontier container mounts", path)
+	}
+}
+
+// TestDataPolicyBlocksEscalation: a repository whose data policy denies
+// external models gets no escalation, and the refusal is recorded.
+func TestDataPolicyBlocksEscalation(t *testing.T) {
+	fr, r, _ := escalateOnce(t, func(string) string { return "Fix the unbalanced ledger posting in HandlePaymentCharged" },
+		func(_ *Runner, root string) {
+			dir := filepath.Join(root, "repos", "ledger-service", ".boundedcode")
+			if err := os.MkdirAll(dir, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(dir, "data-policy.yaml"), []byte("external_models: deny\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		})
+	if len(fr.asked) != 0 {
+		t.Fatal("a repository that denies external models was escalated")
+	}
+	var status, outcome string
+	if err := r.DB.QueryRow(`SELECT status, outcome FROM escalations`).Scan(&status, &outcome); err != nil {
+		t.Fatal(err)
+	}
+	if status != "blocked" || outcome != "data policy" {
+		t.Fatalf("escalation = %s %s", status, outcome)
+	}
+}
+
+// TestAbstractPacketSent: with frontier.data abstract the packet carries
+// the failure but none of the repository's source lines.
+func TestAbstractPacketSent(t *testing.T) {
+	fr, _, root := escalateOnce(t, func(string) string { return "Fix the unbalanced ledger posting in HandlePaymentCharged" },
+		func(r *Runner, _ string) { r.Cfg.Frontier.Data = "abstract" })
+	if len(fr.asked) != 1 {
+		t.Fatalf("expected one escalation, got %d", len(fr.asked))
+	}
+	p := fr.asked[0]
+	src, err := os.ReadFile(filepath.Join(root, "repos", consumerFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, l := range strings.Split(string(src), "\n") {
+		if l = strings.TrimSpace(l); len(l) >= 16 && strings.Contains(p, l) {
+			t.Errorf("abstract packet repeats %q", l)
+		}
+	}
+	if !strings.Contains(p, "content withheld") && !strings.Contains(p, "withheld") {
+		t.Errorf("no outline of the change:\n%s", p)
 	}
 }

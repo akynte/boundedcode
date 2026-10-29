@@ -145,6 +145,13 @@ type DirectConfig struct {
 	// mcp_call: auto (default: when they would take more than a tenth of
 	// the working set), on or off.
 	MCPToolSearch string `yaml:"mcp_tool_search,omitempty"`
+	// Routing chooses the local model's thinking per model call from the
+	// call's role: "adaptive", or "off" (the default: every call as the
+	// model's default). Experimental. RoutingThinking overrides the
+	// adaptive choice per role (classify, plan, explore, edit, debug,
+	// answer: on or off).
+	Routing         string            `yaml:"routing,omitempty"`
+	RoutingThinking map[string]string `yaml:"routing_thinking,omitempty"`
 	// Compaction is how the history is summarised when setting results
 	// aside is not enough: "structured" (the default: the session state,
 	// the session's record plus the model's notes) or "legacy" (a free-text
@@ -477,8 +484,14 @@ type FrontierConfig struct {
 	// RequireApproval asks the user before sending any packet.
 	RequireApproval bool `yaml:"require_approval"`
 	// MaxPacketTokens caps the escalation packet size.
-	MaxPacketTokens int      `yaml:"max_packet_tokens"`
-	Timeout         Duration `yaml:"timeout"`
+	MaxPacketTokens int `yaml:"max_packet_tokens"`
+	// Data is what a packet may carry: "full" (the default: code, the
+	// diff and contracts, sanitized and redacted) or "abstract" (the
+	// problem without the source; see frontier.DataAbstract). A
+	// repository's .boundedcode/data-policy.yaml can refuse external models
+	// altogether.
+	Data    string   `yaml:"data,omitempty"`
+	Timeout Duration `yaml:"timeout"`
 	// Contain runs the frontier CLI inside a container so its own agent
 	// cannot read the host filesystem (only the packet is visible).
 	Contain bool `yaml:"contain"`
@@ -505,6 +518,10 @@ type Budgets struct {
 
 // EscalationConfig holds the Z1-Z4 policy thresholds.
 type EscalationConfig struct {
+	// Policy is "rules" (the default) or "adaptive" (experimental: it
+	// uses progress, ambiguity and the remaining budget; see
+	// frontier.EvaluatePolicy).
+	Policy string `yaml:"policy,omitempty"`
 	// Z2: escalate after this many consecutive failed verification attempts...
 	FailedAttempts int `yaml:"failed_attempts"`
 	// ...or this many rejected, materially different strategies.
@@ -700,6 +717,26 @@ func (c Config) Validate() error {
 	case "", "auto", "on", "off":
 	default:
 		errs = append(errs, fmt.Errorf("direct.mcp_tool_search: %q is not auto, on or off", c.Direct.MCPToolSearch))
+	}
+	switch c.Frontier.Data {
+	case "", "full", "abstract":
+	default:
+		errs = append(errs, fmt.Errorf("frontier.data: %q is not full or abstract", c.Frontier.Data))
+	}
+	switch c.Escalation.Policy {
+	case "", "rules", "adaptive":
+	default:
+		errs = append(errs, fmt.Errorf("escalation.policy: %q is not rules or adaptive", c.Escalation.Policy))
+	}
+	switch c.Direct.Routing {
+	case "", "off", "adaptive":
+	default:
+		errs = append(errs, fmt.Errorf("direct.routing: %q is not off or adaptive", c.Direct.Routing))
+	}
+	for role, v := range c.Direct.RoutingThinking {
+		if !slices.Contains([]string{"classify", "plan", "explore", "edit", "debug", "answer"}, role) || (v != "on" && v != "off" && (v != "skip" || role != "classify")) {
+			errs = append(errs, fmt.Errorf("direct.routing_thinking: %s: %s (roles: classify, plan, explore, edit, debug, answer; values: on, off; classify also skip)", role, v))
+		}
 	}
 	if c.Direct.ParallelTools < 0 || c.Direct.ParallelTools > 16 {
 		errs = append(errs, fmt.Errorf("direct.parallel_tools: %d is not between 0 and 16", c.Direct.ParallelTools))

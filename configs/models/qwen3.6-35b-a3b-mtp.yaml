@@ -1,0 +1,72 @@
+# Qwen3.6-35B-A3B with its multi-token prediction layer (the -MTP build of
+# the same quantization), for speculative decoding by MTP. Weights are NOT
+# redistributed by this project; download them from the source below and
+# review the model license there.
+name: qwen3.6-35b-a3b-mtp
+display_name: Qwen3.6-35B-A3B with MTP (UD-Q4_K_M GGUF)
+description: The default model with its multi-token prediction layer, for speculative decoding; experimental (see docs/benchmarks/adaptive-2026-10.md).
+status: experimental
+capabilities:
+  tool_calling: native
+  structured_output: json_schema
+  thinking: toggle
+  context_max: 262144
+  tokenizer: qwen35
+  speculative: [ngram, draft, mtp]
+  limitations:
+    - "Hybrid attention with recurrent layers: a cached prompt prefix is reused only up to a context checkpoint."
+    - "Thinks by default: a request with a small max_tokens can end inside the thinking, with no answer, unless it sets enable_thinking false."
+file: mtp/Qwen3.6-35B-A3B-UD-Q4_K_M.gguf
+source:
+  repo: unsloth/Qwen3.6-35B-A3B-MTP-GGUF
+  file: Qwen3.6-35B-A3B-UD-Q4_K_M.gguf
+  revision: 5bc3e238d916f48a861bac2f8a1990a0e9b7e98d
+  base_model: Qwen/Qwen3.6-35B-A3B
+  license: apache-2.0
+  license_url: https://huggingface.co/Qwen/Qwen3.6-35B-A3B
+  size_bytes: 22663387424
+  sha256: 0b21525e972670ed59e1812e170b27c26355381f0656ecc4e25617ece7dac58b
+architecture:
+  moe: true
+  total_params_b: 35
+  active_params_b: 3
+  # 10 of 40 layers use full attention; about 1.33 GiB of q8_0 KV cache at
+  # 128K (estimate; consistent with the measured 1.1 GB VRAM headroom).
+  kv_mib: 1400
+# Server flags measured on the reference machine (RTX 4060 Laptop 8 GB, 64 GB
+# DDR5) with llama.cpp v0.5.0 -- see benchmarks/reports/20261003T152755Z-infra-*
+# (sweep) and 20261003T161953Z-infra-* (idle, cold-load finalists):
+#   128K ctx, ubatch 2048, n_cpu_moe 35: ~39 t/s decode @2K, ~30 @58K, ~24 @116K;
+#   ~580-780 t/s prompt processing; 1.1 GB VRAM headroom; stable over 10 min.
+# Other machines: run `boundedcode bench infra --apply`.
+server:
+  ctx_size: 131072
+  gpu_layers: 999
+  # Three more expert layers in system RAM than the default: the MTP draft
+  # context (its KV cache, 256 MiB at 128K, and compute buffers) does not fit
+  # beside n_cpu_moe 35 or 36 on an 8 GB GPU (20261029-models, -spec-*).
+  n_cpu_moe: 38
+  flash_attn: "on"
+  cache_type_k: q8_0
+  cache_type_v: q8_0
+  batch_size: 2048
+  ubatch_size: 2048
+  threads: 8
+  parallel: 1
+  jinja: true
+  # Cap thinking per response; see model.ServerFlags.ReasoningBudget.
+  reasoning_budget: 4096
+  reasoning_budget_message: "\n\nI have reasoned enough. I will now act on my best plan.\n"
+  # Prompt steps below 256 tokens compute the experts in system RAM on the
+  # CPU instead of copying them to the GPU (about 0.7 s per step with
+  # n_cpu_moe 35): 57-124 new tokens take 0.43-0.82 s instead of
+  # 0.80-1.15 s, and the same from about 170 tokens up
+  # (docs/benchmarks/inference-2026-10.md).
+  op_offload_min_batch: 256
+  speculative:
+    type: draft-mtp
+sampling:
+  temperature: 0.6
+  top_p: 0.95
+  top_k: 20
+  min_p: 0.0

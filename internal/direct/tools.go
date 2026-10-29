@@ -345,6 +345,7 @@ func (r *Runner) finishTool(ctx context.Context, c *toolCall) string {
 				}
 				if diag := r.checkFile(ctx, abs, rel, before); diag != "" {
 					out += "\n" + diag
+					r.turnFailed = true
 				}
 				r.phase(PhaseChecks, tc)
 			}
@@ -361,7 +362,11 @@ func (r *Runner) finishTool(ctx context.Context, c *toolCall) string {
 	if res := r.runHooks(ctx, HookPostTool, HookInput{Tool: t.Name, Args: args, Result: r.clip(out), Error: errString(err)}); res.Extra != "" {
 		out += "\n\n[hook] " + res.Extra
 	}
+	if err == nil && t.Mutates && t.Name != "bash" {
+		r.turnEdited = true
+	}
 	if err != nil {
+		r.turnFailed = true
 		c.code = capability.CodeFailed
 		var ce *capability.Error
 		switch {

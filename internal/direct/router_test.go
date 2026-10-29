@@ -70,17 +70,17 @@ func TestRiskyPath(t *testing.T) {
 func TestRouteWithModelOnlyWhenUnsure(t *testing.T) {
 	up := &scripted{replies: []reply{{text: `{"mode":"code","reason":"wants a flag added"}`}}}
 	r, _, _ := newRunner(t, up, ApprovalAuto)
-	d := RouteWithModel(context.Background(), r.Gateway, "fix the typo", RiskRules{}, Capabilities{BoundedAvailable: true})
+	d := RouteWithModel(context.Background(), r.Gateway, "fix the typo", RiskRules{}, Capabilities{BoundedAvailable: true}, "")
 	if d.Mode != ModeCode || len(up.requests) != 0 {
 		t.Fatalf("sure request consulted the model: %+v %d", d, len(up.requests))
 	}
-	d = RouteWithModel(context.Background(), r.Gateway, "how do I add a flag?", RiskRules{}, Capabilities{BoundedAvailable: true})
+	d = RouteWithModel(context.Background(), r.Gateway, "how do I add a flag?", RiskRules{}, Capabilities{BoundedAvailable: true}, "")
 	if d.Mode != ModeCode || d.Reason != "wants a flag added" || len(up.requests) != 1 {
 		t.Fatalf("model route: %+v", d)
 	}
 	// A bad answer keeps the rules' choice.
 	up.replies = []reply{{text: "sure thing"}}
-	if d = RouteWithModel(context.Background(), r.Gateway, "how do I add a flag?", RiskRules{}, Capabilities{BoundedAvailable: true}); d.Mode != ModeChat {
+	if d = RouteWithModel(context.Background(), r.Gateway, "how do I add a flag?", RiskRules{}, Capabilities{BoundedAvailable: true}, ""); d.Mode != ModeChat {
 		t.Fatalf("bad answer: %+v", d)
 	}
 }

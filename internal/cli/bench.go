@@ -24,13 +24,14 @@ import (
 	"github.com/akynte/boundedcode/internal/orchestrator"
 	"github.com/akynte/boundedcode/internal/repointel/cbm"
 	"github.com/akynte/boundedcode/internal/repointel/serena"
+	"github.com/akynte/boundedcode/internal/routing"
 	"github.com/akynte/boundedcode/internal/store"
 )
 
 func newBenchCmd(app *App) *cobra.Command {
 	cmd := &cobra.Command{Use: "bench", Short: "Run reproducible benchmarks"}
 	cmd.AddCommand(newBenchVerifyCmd(app))
-	cmd.AddCommand(newBenchInfraCmd(app), newBenchTasksCmd(app), newBenchDirectCmd(app), newBenchIntelCmd(app), newBenchLeaseCmd(app), newBenchTrailCmd(app), newBenchCompareCmd(app), newBenchRetrievalCmd(app), newBenchStructuredCmd(app), newBenchPruneCmd(app), newBenchMCPSearchCmd(app))
+	cmd.AddCommand(newBenchInfraCmd(app), newBenchTasksCmd(app), newBenchDirectCmd(app), newBenchIntelCmd(app), newBenchLeaseCmd(app), newBenchTrailCmd(app), newBenchCompareCmd(app), newBenchRetrievalCmd(app), newBenchStructuredCmd(app), newBenchPruneCmd(app), newBenchMCPSearchCmd(app), newBenchModelsCmd(app), newBenchSpecCmd(app), newBenchRouterCmd(app), newBenchEscalationCmd(app), newBenchPacketsCmd(app))
 	return cmd
 }
 
@@ -166,6 +167,7 @@ func newBenchTasksCmd(app *App) *cobra.Command {
 		baseline           bool
 		only               []string
 		rf                 runFlags
+		speculative        string
 	)
 	cmd := &cobra.Command{
 		Use:   "tasks",
@@ -190,6 +192,9 @@ func newBenchTasksCmd(app *App) *cobra.Command {
 			}
 			if len(tasks) == 0 {
 				return fmt.Errorf("no tasks selected")
+			}
+			if app.speculative, err = parseSpeculative(speculative); err != nil {
+				return err
 			}
 			p, err := app.profile(rf.model)
 			if err != nil {
@@ -266,6 +271,7 @@ func newBenchTasksCmd(app *App) *cobra.Command {
 	f.StringVar(&screenGold, "screen-gold", "", "validate tasks instead of running them: acceptance must fail on base and pass with DIR/<id>.patch applied")
 	f.StringVar(&reasoningHistory, "reasoning-history", "", "auto, keep or drop for this run (inference.reasoning_history)")
 	addRunFlags(cmd, &rf)
+	cmd.Flags().StringVar(&speculative, "speculative", "", "speculative decoding for this run: off, or TYPE[,draft=FILE][,n_max=N][,ngl=N] (server.speculative)")
 	return cmd
 }
 
@@ -283,6 +289,8 @@ func newBenchDirectCmd(app *App) *cobra.Command {
 		compaction, pruneMode    string
 		observationBytes         int
 		parallelTools            int
+		routingPolicy            string
+		speculative              string
 	)
 	cmd := &cobra.Command{
 		Use:   "direct",
@@ -340,6 +348,11 @@ aside and recalled, summaries, broken edits caught by the check, and time.`,
 			if reasoningHistory != "" {
 				app.Config.Inference.ReasoningHistory = reasoningHistory
 			}
+			sp, err := parseSpeculative(speculative)
+			if err != nil {
+				return err
+			}
+			app.speculative = sp
 			ep, err := app.directEndpoint(ctx, modelName)
 			if err != nil {
 				return err
@@ -369,6 +382,9 @@ aside and recalled, summaries, broken edits caught by the check, and time.`,
 			if parallelTools > 0 {
 				app.Config.Direct.ParallelTools = parallelTools
 			}
+			if routingPolicy != "" {
+				app.Config.Direct.Routing = routingPolicy
+			}
 			if err := app.Config.Validate(); err != nil {
 				return err
 			}
@@ -392,7 +408,7 @@ aside and recalled, summaries, broken edits caught by the check, and time.`,
 			dr := &benchmark.DirectRunner{FixturesDir: fixtures, WorkRoot: work, Rules: app.riskRules(), Timeout: timeout,
 				Tokenize: ep.tokenize, Model: ep.pin, TaskDirs: dirs,
 				Settings: map[string]any{"approval": approval, "working_set_tokens": dc.WorkingSetTokens, "max_tool_output": dc.MaxToolOutput, "checks": dc.ChecksOn(), "seed_pack": dc.SeedPackOn(), "retrieval": dc.Retrieval, "history_notes": dc.HistoryNotesOn(), "context_tokens": ep.ctxSize, "provider": ep.provider,
-					"compaction": compactionSetting(dc.Compaction), "prune": dc.PruneOn(), "observation_bytes": dc.ObservationBytes, "parallel_tools": parallelSetting(dc.ParallelTools),
+					"compaction": compactionSetting(dc.Compaction), "prune": dc.PruneOn(), "observation_bytes": dc.ObservationBytes, "parallel_tools": parallelSetting(dc.ParallelTools), "routing": routingSetting(dc.Routing), "speculative": speculativeSetting(app, modelName),
 					"reasoning_history": reasoningSetting(app.Config.Inference.ReasoningHistory), "reasoning_round_trip": ep.newGateway("probe").Capabilities(ctx).ReasoningRoundTrip},
 				Progress: func(s string) { fmt.Fprintf(app.Err, "%s %s\n", time.Now().Format("15:04:05"), s) },
 				NewRunner: func(ctx context.Context, root, stateDir string) (*direct.Runner, func(), error) {
@@ -400,7 +416,7 @@ aside and recalled, summaries, broken edits caught by the check, and time.`,
 					if err != nil {
 						return nil, nil, err
 					}
-					opts := app.directOptions(root, root, approval, ep.ctxSize)
+					opts := app.directOptions(root, root, approval, ep)
 					// A benchmark is the project and the model alone: no
 					// personal instructions, notes, commands, hooks or servers.
 					opts.UserInstructions, opts.MemoryFile, opts.UserDir = "", "", ""
@@ -450,7 +466,35 @@ aside and recalled, summaries, broken edits caught by the check, and time.`,
 	f.StringVar(&pruneMode, "prune", "", "on or off for this run (direct.prune)")
 	f.IntVar(&observationBytes, "observation-bytes", 0, "budget command output is pruned to, in bytes (direct.observation_bytes)")
 	f.IntVar(&parallelTools, "parallel-tools", 0, "calls of one reply that change nothing run this many at once; 1 runs them in turn (direct.parallel_tools)")
+	f.StringVar(&routingPolicy, "routing", "", "off or adaptive for this run (direct.routing)")
+	f.StringVar(&speculative, "speculative", "", "speculative decoding for this run: off, or TYPE[,draft=FILE][,n_max=N][,ngl=N] (server.speculative)")
 	return cmd
+}
+
+// routingSetting is direct.routing as a report shows it.
+func routingSetting(v string) string {
+	if v == "" {
+		return routing.PolicyOff
+	}
+	return v
+}
+
+// speculativeSetting is the served profile's speculative decoding as a
+// report shows it ("off" without).
+func speculativeSetting(app *App, modelName string) string {
+	p, err := app.profile(modelName)
+	if err != nil || p.Server.Speculative == nil || p.Server.Speculative.Type == "" {
+		return "off"
+	}
+	sp := p.Server.Speculative
+	out := sp.Type
+	if sp.DraftFile != "" {
+		out += ",draft=" + sp.DraftFile
+	}
+	if sp.NMax > 0 {
+		out += fmt.Sprintf(",n_max=%d", sp.NMax)
+	}
+	return out
 }
 
 // compactionSetting is direct.compaction as a report shows it.
@@ -993,7 +1037,7 @@ and tool calls, prompt tokens and what the server processed of them.`,
 			b := &benchmark.MCPSearchBench{Arms: arms, Runs: runs, Model: ep.model,
 				Progress: func(s string) { fmt.Fprintf(app.Err, "%s %s\n", time.Now().Format("15:04:05"), s) },
 				NewRunner: func(ctx context.Context, root string, servers []direct.MCPServer, search string) (*direct.Runner, func(), error) {
-					opts := app.directOptions(root, root, direct.ApprovalAuto, ep.ctxSize)
+					opts := app.directOptions(root, root, direct.ApprovalAuto, ep)
 					opts.UserInstructions, opts.MemoryFile, opts.UserDir = "", "", ""
 					opts.Hooks, opts.MCP, opts.MCPToolSearch = nil, servers, search
 					opts.SkillDirs, opts.AgentDirs = nil, nil

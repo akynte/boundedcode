@@ -9,7 +9,9 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/akynte/boundedcode/internal/inference"
 	"github.com/akynte/boundedcode/internal/policy"
+	"github.com/akynte/boundedcode/internal/routing"
 )
 
 // Modes a message can be handled in. The router picks one automatically;
@@ -196,10 +198,11 @@ type Completer interface {
 
 // RouteWithModel applies the rules and, when they are unsure, asks the
 // model for a one-word classification. A failed or odd answer keeps the
-// rules' choice.
-func RouteWithModel(ctx context.Context, c Completer, request string, rules RiskRules, caps Capabilities) Decision {
+// rules' choice. think is routing's thinking for the call ("on", "off",
+// "" for the model's default, or "skip": no call, the rules decide).
+func RouteWithModel(ctx context.Context, c Completer, request string, rules RiskRules, caps Capabilities, think string) Decision {
 	d := route(request, rules)
-	if d.Confidence == "high" || c == nil {
+	if d.Confidence == "high" || c == nil || think == routing.ThinkSkip {
 		return applyCaps(d, caps)
 	}
 	body := map[string]any{
@@ -210,6 +213,10 @@ func RouteWithModel(ctx context.Context, c Completer, request string, rules Risk
 		"max_tokens":  80,
 		"temperature": 0,
 	}
+	if think != "" {
+		body["chat_template_kwargs"] = map[string]any{"enable_thinking": think == routing.ThinkOn}
+	}
+	ctx = inference.WithRoute(ctx, string(routing.RoleClassify), think)
 	status, resp, err := c.Forward(ctx, "/v1/chat/completions", body)
 	if err != nil || status != http.StatusOK {
 		return applyCaps(d, caps)

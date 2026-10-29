@@ -31,6 +31,7 @@ import (
 	"github.com/akynte/boundedcode/internal/contextplan"
 	"github.com/akynte/boundedcode/internal/inference"
 	"github.com/akynte/boundedcode/internal/repointel"
+	"github.com/akynte/boundedcode/internal/routing"
 )
 
 // Approval modes (config direct.approval).
@@ -199,6 +200,14 @@ type Options struct {
 	// mcp_call: "auto" (the default: when they would take more than a
 	// tenth of the working set), "on" or "off".
 	MCPToolSearch string
+	// Routing chooses the model's thinking per call from the call's role
+	// (routing.PolicyAdaptive), or leaves every call to the model's default
+	// ("" or routing.PolicyOff). Experimental. RoutingThinking overrides the
+	// policy's choice per role; ModelThinking is the model's thinking
+	// capability (model.Capabilities.Thinking): only "toggle" is routed.
+	Routing         string
+	RoutingThinking map[routing.Role]string
+	ModelThinking   string
 	// MaxToolOutput caps one tool result in bytes (0 = a default by
 	// provider).
 	MaxToolOutput int
@@ -339,6 +348,12 @@ type Runner struct {
 	// a message.
 	lastFail string
 	failures int
+	// turnCalls, turnEdited and turnFailed are what the message has done
+	// so far, from which routing gives the next model call its role:
+	// model calls made, a file changed, and a failure among the last
+	// reply's results.
+	turnCalls              int
+	turnEdited, turnFailed bool
 	// deferred are the MCP tools found through mcp_search instead of
 	// listed (mcpsearch.go).
 	deferred []Tool
@@ -497,6 +512,7 @@ func (r *Runner) Send(ctx context.Context, text string) (string, error) {
 	}()
 	nudged, emptyNudged := false, false
 	r.lastFail, r.failures = "", 0
+	r.turnCalls, r.turnEdited, r.turnFailed = 0, false, false
 	for turn := 0; turn < r.maxTurns(); turn++ {
 		if err := ctx.Err(); err != nil {
 			return final, ErrInterrupted
@@ -508,6 +524,8 @@ func (r *Runner) Send(ctx context.Context, text string) (string, error) {
 			return final, err
 		}
 		msg, err := r.complete(ctx, tools)
+		r.turnCalls++
+		r.turnFailed = false // set again by this reply's results
 		if err != nil {
 			if ctx.Err() != nil {
 				return final, ErrInterrupted
@@ -655,11 +673,22 @@ func (r *Runner) Usage() Usage {
 	return Usage{Processed: p, Generated: g, Cached: c}
 }
 
+// Role is the role routing gives the message's next model call.
+func (r *Runner) Role() routing.Role {
+	return routing.RoleOf(routing.TurnState{Change: r.Opts.Mode != ModeChat, Calls: r.turnCalls, Edited: r.turnEdited, Failed: r.turnFailed})
+}
+
 // complete makes one model call with the current history.
 func (r *Runner) complete(ctx context.Context, tools []Tool) (Message, error) {
 	body := map[string]any{
 		"messages": r.wireMessages(),
 	}
+	role := r.Role()
+	think := routing.Thinking(r.Opts.Routing, role, r.Opts.RoutingThinking, r.Opts.ModelThinking)
+	if think != "" {
+		body["chat_template_kwargs"] = map[string]any{"enable_thinking": think == routing.ThinkOn}
+	}
+	ctx = inference.WithRoute(ctx, string(role), think)
 	r.seen, r.setAside = len(r.Session.Messages), nil
 	if len(tools) > 0 {
 		body["tools"] = toolSchemas(tools)

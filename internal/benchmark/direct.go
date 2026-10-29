@@ -19,6 +19,7 @@ import (
 	"github.com/akynte/boundedcode/internal/direct"
 	"github.com/akynte/boundedcode/internal/gitops"
 	"github.com/akynte/boundedcode/internal/inference"
+	"github.com/akynte/boundedcode/internal/routing"
 )
 
 // The direct-mode suite measures the everyday agent: each task is one
@@ -283,6 +284,14 @@ type DirectSummary struct {
 	PeakHarnessRSSMiB float64 `json:"peak_harness_rss_mib"`
 	PeakServerRSSMiB  float64 `json:"peak_model_server_rss_mib,omitempty"`
 	PeakGPUMemMiB     float64 `json:"peak_gpu_mem_used_mib,omitempty"`
+	// Decode speed over the run (tokens generated over the server's decode
+	// time), speculative decoding's drafted and accepted tokens, and the
+	// model calls by routing role.
+	DecodeTokens  int                  `json:"decode_tokens,omitempty"`
+	DecodeSeconds float64              `json:"decode_seconds,omitempty"`
+	Drafted       int                  `json:"drafted_tokens,omitempty"`
+	Accepted      int                  `json:"accepted_tokens,omitempty"`
+	Roles         map[string]RoleCalls `json:"roles,omitempty"`
 }
 
 func (d *DirectRunner) progress(format string, args ...any) {
@@ -866,6 +875,18 @@ func summarizeDirect(category string, rs []DirectResult) DirectSummary {
 		tool += r.ToolSeconds
 		harness += r.HarnessSeconds
 		reasoning += float64(r.CallStats.ReasoningTokens)
+		if r.CallStats.DecodeSeconds > 0 {
+			s.DecodeTokens += r.CallStats.GeneratedTokens
+			s.DecodeSeconds += r.CallStats.DecodeSeconds
+		}
+		s.Drafted += r.CallStats.Drafted
+		s.Accepted += r.CallStats.Accepted
+		for role, rc := range r.CallStats.Roles {
+			if s.Roles == nil {
+				s.Roles = map[string]RoleCalls{}
+			}
+			s.Roles[role] = s.Roles[role].Add(rc)
+		}
 		if r.CallStats.TTFTMedianMS > 0 {
 			ttfts = append(ttfts, r.CallStats.TTFTMedianMS)
 		}
@@ -986,6 +1007,23 @@ func WriteDirectMarkdown(w io.Writer, r *DirectReport) error {
 	}
 	if s.Batches > 0 {
 		fmt.Fprintf(w, "Calls run together: %d replies, %d calls, %.3f s together against %.3f s one after another.\n\n", s.Batches, s.BatchCalls, s.BatchWallSeconds, s.BatchSumSeconds)
+	}
+	if s.DecodeSeconds > 0 {
+		fmt.Fprintf(w, "Decode: %.1f tokens/s over the run (%d tokens in %.0f s of the server's decode time).", float64(s.DecodeTokens)/s.DecodeSeconds, s.DecodeTokens, s.DecodeSeconds)
+		if s.Drafted > 0 {
+			fmt.Fprintf(w, " Speculative decoding: %d tokens drafted, %d accepted (%.0f%%).", s.Drafted, s.Accepted, 100*float64(s.Accepted)/float64(s.Drafted))
+		}
+		fmt.Fprint(w, "\n\n")
+	}
+	if len(s.Roles) > 0 {
+		fmt.Fprint(w, "Model calls by role: ")
+		var parts []string
+		for _, role := range routing.Roles {
+			if rc, ok := s.Roles[string(role)]; ok {
+				parts = append(parts, fmt.Sprintf("%s %d (%d without thinking, %d generated tokens, %.0f s)", role, rc.Calls, rc.NoThink, rc.Generated, rc.Seconds))
+			}
+		}
+		fmt.Fprint(w, strings.Join(parts, "; ")+".\n\n")
 	}
 	if s.MeanAgentSeconds > 0 {
 		fmt.Fprintf(w, "Where the agent's time went, per task: %.1f s in model calls, %.1f s in tools (with the checks after edits), %.2f s in the harness itself; time to first token %.0f ms (median). %.0f reasoning tokens per task. %d prompt-cache invalidations (%d after the history was rewritten), %d prompt tokens recomputed; %.0f prompt tokens evaluated by the server per task, in %.1f s. Cost of a passed task: %.0f processed tokens and %.0f s; of a failed one: %.0f and %.0f s. Peak memory: harness %.0f MiB, model server %.0f MiB, GPU %.0f MiB.\n\n",

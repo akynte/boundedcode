@@ -6,6 +6,15 @@ name: qwen3-coder-next
 display_name: Qwen3-Coder-Next (UD-IQ3_XXS GGUF)
 description: Larger coding MoE in a 3-bit quant; the same 10/11 as the default in the model evaluation at about half the throughput.
 status: experimental
+capabilities:
+  tool_calling: native
+  structured_output: json_schema
+  thinking: none
+  context_max: 262144
+  tokenizer: qwen2
+  speculative: [ngram, draft]
+  limitations:
+    - "A 3-bit quant (IQ3_XXS), the largest that fits 64 GB of RAM beside a desktop session; below the model's published quality."
 file: Qwen3-Coder-Next-UD-IQ3_XXS.gguf
 source:
   repo: unsloth/Qwen3-Coder-Next-GGUF

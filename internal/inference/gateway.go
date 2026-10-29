@@ -85,6 +85,25 @@ type CallStat struct {
 	Changed  int `json:"changed"`
 	// Retried counts re-sent requests: a stream cut off before its end.
 	Retried int `json:"retried,omitempty"`
+	// Drafted and Accepted are the tokens speculative decoding drafted and
+	// the model kept (llama.cpp timings; 0 without it).
+	Drafted  int `json:"drafted_tokens,omitempty"`
+	Accepted int `json:"accepted_tokens,omitempty"`
+	// Role and Thinking are what routing chose for the call (WithRoute);
+	// empty when routing is off.
+	Role     string `json:"role,omitempty"`
+	Thinking string `json:"thinking,omitempty"`
+}
+
+type routeKey struct{}
+
+type routeTag struct{ role, thinking string }
+
+// WithRoute tags the model calls made with ctx with the role routing gave
+// them and the thinking it chose ("on", "off" or "" for the model's
+// default), for the call log.
+func WithRoute(ctx context.Context, role, thinking string) context.Context {
+	return context.WithValue(ctx, routeKey{}, routeTag{role, thinking})
 }
 
 // CallLog returns the calls so far (KeepLog only).
@@ -227,6 +246,7 @@ func (g *Gateway) account(ctx context.Context, status int, resp []byte, cs CallS
 	if parsed.Timings != nil {
 		cs.PrefillMS, cs.DecodeMS = parsed.Timings.PromptMS, parsed.Timings.PredictedMS
 		cs.Evaluated = parsed.Timings.PromptN
+		cs.Drafted, cs.Accepted = parsed.Timings.DraftN, parsed.Timings.DraftNAccepted
 	}
 	if c := parsed.Usage.Completion; c != nil && c.Reasoning > 0 {
 		cs.Reasoning, cs.ReasoningSource = c.Reasoning, "provider"
@@ -289,6 +309,9 @@ func (g *Gateway) Provider() string {
 }
 
 func (g *Gateway) record(ctx context.Context, cs CallStat) {
+	if t, ok := ctx.Value(routeKey{}).(routeTag); ok && cs.Role == "" {
+		cs.Role, cs.Thinking = t.role, t.thinking
+	}
 	if g.KeepLog {
 		g.mu.Lock()
 		g.log = append(g.log, cs)

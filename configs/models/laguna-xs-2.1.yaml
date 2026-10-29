@@ -6,6 +6,16 @@ name: laguna-xs-2.1
 display_name: Laguna XS 2.1 (Q4_K_M GGUF)
 description: Benchmark candidate; its license (OpenMDW-1.1) is under review, so set-up does not offer it.
 status: review
+capabilities:
+  tool_calling: native
+  structured_output: json_schema
+  thinking: toggle
+  context_max: 262144
+  tokenizer: laguna
+  speculative: [ngram]
+  limitations:
+    - "Its license (OpenMDW-1.1) is under review."
+    - "Trained at 8K and extended by RoPE scaling to 262144 tokens."
 file: Laguna-XS-2.1-Q4_K_M.gguf
 source:
   repo: poolside/Laguna-XS-2.1-GGUF

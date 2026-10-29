@@ -118,3 +118,25 @@ func TestBuiltinOffloadThreshold(t *testing.T) {
 		t.Fatalf("env %q", env)
 	}
 }
+
+func TestSpeculativeArgs(t *testing.T) {
+	p := model.Profile{Name: "m", File: "m.gguf"}
+	if j := strings.Join(BuildArgs(p, "/m", "127.0.0.1", 1), " "); strings.Contains(j, "--spec-") {
+		t.Fatalf("speculative flags without a setting: %q", j)
+	}
+	p.Server.Speculative = &model.Speculative{Type: "draft-simple", DraftFile: "draft.gguf", DraftGPULayers: 99, NMax: 8}
+	m := &Manager{ModelsDir: "/models", Host: "127.0.0.1", Port: 1}
+	j := strings.Join(m.ServerArgs(p, "/models/m.gguf"), " ")
+	for _, want := range []string{"--spec-type draft-simple", "--spec-draft-model /models/draft.gguf", "--spec-draft-ngl 99", "--spec-draft-n-max 8"} {
+		if !strings.Contains(j, want) {
+			t.Errorf("missing %q in %q", want, j)
+		}
+	}
+	if p.Server.Speculative.DraftFile != "draft.gguf" {
+		t.Error("ServerArgs changed the caller's profile")
+	}
+	p.Server.Speculative = &model.Speculative{Type: "ngram-mod"}
+	if j := strings.Join(BuildArgs(p, "/m", "127.0.0.1", 1), " "); !strings.Contains(j, "--spec-type ngram-mod") || strings.Contains(j, "--spec-draft-model") {
+		t.Fatalf("ngram args: %q", j)
+	}
+}

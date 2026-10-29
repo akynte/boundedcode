@@ -78,6 +78,18 @@ func BuildArgs(p model.Profile, modelPath, host string, port int) []string {
 			args = append(args, "--reasoning-budget-message", s.ReasoningBudgetMessage)
 		}
 	}
+	if sp := s.Speculative; sp != nil && sp.Type != "" {
+		args = append(args, "--spec-type", sp.Type)
+		if sp.DraftFile != "" {
+			args = append(args, "--spec-draft-model", sp.DraftFile)
+		}
+		addInt("--spec-draft-ngl", sp.DraftGPULayers)
+		addInt("--spec-draft-n-max", sp.NMax)
+		addInt("--spec-draft-n-min", sp.NMin)
+		if sp.PMin > 0 {
+			args = append(args, "--spec-draft-p-min", ftoa(sp.PMin))
+		}
+	}
 	// Sampling defaults are set server-side so every client (including the
 	// agent runtime) gets the profile's recommended values.
 	smp := p.Sampling

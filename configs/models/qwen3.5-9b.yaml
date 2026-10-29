@@ -6,6 +6,13 @@ name: qwen3.5-9b
 display_name: Qwen3.5-9B (Q4_K_M GGUF)
 description: For a 6-8 GB GPU or a 16 GB Mac; the same family as the default model.
 status: experimental
+capabilities:
+  tool_calling: native
+  structured_output: json_schema
+  thinking: toggle
+  context_max: 262144
+  tokenizer: qwen35
+  speculative: [ngram, draft]
 file: Qwen3.5-9B-Q4_K_M.gguf
 source:
   repo: unsloth/Qwen3.5-9B-GGUF

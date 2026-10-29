@@ -40,6 +40,29 @@ type CallSummary struct {
 	Failed          int `json:"failed_calls,omitempty"`
 	PromptTokens    int `json:"prompt_tokens,omitempty"` // all calls' prompts, cached included (bounded reports)
 	PeakCall        int `json:"peak_call"`               // index of the largest prompt
+	// GeneratedTokens is the calls' output, for decode speed with
+	// DecodeSeconds. Drafted and Accepted are speculative decoding's
+	// drafted and kept tokens.
+	GeneratedTokens int `json:"generated_tokens,omitempty"`
+	Drafted         int `json:"drafted_tokens,omitempty"`
+	Accepted        int `json:"accepted_tokens,omitempty"`
+	// Roles are the calls by routing role (inference.WithRoute).
+	Roles map[string]RoleCalls `json:"roles,omitempty"`
+}
+
+// RoleCalls are the model calls of one routing role.
+type RoleCalls struct {
+	Calls     int     `json:"calls"`
+	NoThink   int     `json:"no_thinking,omitempty"` // calls routed with thinking off
+	Generated int     `json:"generated_tokens"`
+	Reasoning int     `json:"reasoning_tokens,omitempty"`
+	Seconds   float64 `json:"seconds"`
+}
+
+// Add adds b's calls to r's.
+func (r RoleCalls) Add(b RoleCalls) RoleCalls {
+	return RoleCalls{Calls: r.Calls + b.Calls, NoThink: r.NoThink + b.NoThink, Generated: r.Generated + b.Generated,
+		Reasoning: r.Reasoning + b.Reasoning, Seconds: r.Seconds + b.Seconds}
 }
 
 // invalidationSlack: the end of the previous prompt (the generation
@@ -75,6 +98,19 @@ func summarizeCalls(log []inference.CallStat, rewrites map[int]bool) CallSummary
 		s.PrefillSeconds += c.PrefillMS / 1000
 		s.DecodeSeconds += c.DecodeMS / 1000
 		s.EvaluatedTokens += c.Evaluated
+		s.GeneratedTokens += c.Completion
+		s.Drafted += c.Drafted
+		s.Accepted += c.Accepted
+		if c.Role != "" {
+			if s.Roles == nil {
+				s.Roles = map[string]RoleCalls{}
+			}
+			rc := RoleCalls{Calls: 1, Generated: c.Completion, Reasoning: c.Reasoning, Seconds: c.TotalMS / 1000}
+			if c.Thinking == "off" {
+				rc.NoThink = 1
+			}
+			s.Roles[c.Role] = s.Roles[c.Role].Add(rc)
+		}
 		if c.Status != "ok" {
 			s.Failed++
 		}
