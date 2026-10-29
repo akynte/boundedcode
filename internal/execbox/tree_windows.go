@@ -4,6 +4,7 @@ package execbox
 
 import (
 	"os/exec"
+	"sync/atomic"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
@@ -17,7 +18,9 @@ import (
 // the assignment are ended by taskkill's tree walk instead.
 type tree struct {
 	job windows.Handle
-	pid int
+	// pid is set once the command starts and read by the cancel, which
+	// exec runs on its own goroutine.
+	pid atomic.Int64
 }
 
 func newTree(c *exec.Cmd) *tree {
@@ -41,11 +44,12 @@ func newTree(c *exec.Cmd) *tree {
 }
 
 func (t *tree) started(c *exec.Cmd) {
-	t.pid = c.Process.Pid
+	pid := c.Process.Pid
+	t.pid.Store(int64(pid))
 	if t.job == 0 {
 		return
 	}
-	h, err := windows.OpenProcess(windows.PROCESS_SET_QUOTA|windows.PROCESS_TERMINATE, false, uint32(t.pid))
+	h, err := windows.OpenProcess(windows.PROCESS_SET_QUOTA|windows.PROCESS_TERMINATE, false, uint32(pid))
 	if err != nil {
 		return
 	}
@@ -57,8 +61,8 @@ func (t *tree) kill() {
 	if t.job != 0 {
 		_ = windows.TerminateJobObject(t.job, 1)
 	}
-	if t.pid > 0 {
-		proctree.KillTree(t.pid)
+	if pid := int(t.pid.Load()); pid > 0 {
+		proctree.KillTree(pid)
 	}
 }
 

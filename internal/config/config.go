@@ -137,6 +137,14 @@ type DirectConfig struct {
 	// ObservationBytes is the size such output is pruned to (0 = 8 KiB
 	// for a local model, 24 KiB for a cloud provider).
 	ObservationBytes int `yaml:"observation_bytes,omitempty"`
+	// ParallelTools is how many calls of one model reply that change
+	// nothing (reads, searches, fetches) may run at once (0 = 4; 1 runs
+	// every call in turn).
+	ParallelTools int `yaml:"parallel_tools,omitempty"`
+	// MCPToolSearch defers MCP tool definitions behind mcp_search and
+	// mcp_call: auto (default: when they would take more than a tenth of
+	// the working set), on or off.
+	MCPToolSearch string `yaml:"mcp_tool_search,omitempty"`
 	// Compaction is how the history is summarised when setting results
 	// aside is not enough: "structured" (the default: the session state,
 	// the session's record plus the model's notes) or "legacy" (a free-text
@@ -687,6 +695,14 @@ func (c Config) Validate() error {
 	case "", "structured", "legacy":
 	default:
 		errs = append(errs, fmt.Errorf("direct.compaction: %q is not structured|legacy", c.Direct.Compaction))
+	}
+	switch c.Direct.MCPToolSearch {
+	case "", "auto", "on", "off":
+	default:
+		errs = append(errs, fmt.Errorf("direct.mcp_tool_search: %q is not auto, on or off", c.Direct.MCPToolSearch))
+	}
+	if c.Direct.ParallelTools < 0 || c.Direct.ParallelTools > 16 {
+		errs = append(errs, fmt.Errorf("direct.parallel_tools: %d is not between 0 and 16", c.Direct.ParallelTools))
 	}
 	if c.Direct.ObservationBytes < 0 {
 		errs = append(errs, fmt.Errorf("direct.observation_bytes: %d is negative", c.Direct.ObservationBytes))

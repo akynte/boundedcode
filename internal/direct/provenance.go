@@ -74,6 +74,8 @@ func (r *Runner) resultProvenance(call ToolCall, args map[string]any) *Provenanc
 		return untrusted(SourceWeb, "search: "+str(args, "query"))
 	case strings.HasPrefix(name, "mcp__"):
 		return untrusted(SourceMCP, strings.TrimPrefix(name, "mcp__"))
+	case name == "mcp_call":
+		return untrusted(SourceMCP, strings.TrimPrefix(str(args, "tool"), "mcp__"))
 	case name == "task":
 		return untrusted(SourceSubagent, str(args, "subagent_type"))
 	case name == "skill":

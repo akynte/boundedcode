@@ -39,12 +39,14 @@ func (r *Runner) findings(t *Tool, args map[string]any) []policy.Finding {
 	switch t.Name {
 	case "bash":
 		return policy.ClassifyCommand(str(args, "command"), r.commandContext())
-	case "write", "edit", "multi_edit", "notebook_edit":
-		abs, _, err := r.resolve(str(args, "path"))
-		if err != nil {
-			return nil
+	case "write", "edit", "multi_edit", "notebook_edit", "replace_symbol":
+		var out []policy.Finding
+		for _, p := range toolPaths(t, args) {
+			if abs, _, err := r.resolve(p); err == nil {
+				out = append(out, policy.ClassifyPath(r.rootRel(abs))...)
+			}
 		}
-		return policy.ClassifyPath(r.rootRel(abs))
+		return out
 	case "save_memory":
 		return []policy.Finding{{Category: policy.CatInstructions, Subject: "memory",
 			Reason: "it adds to your instruction file, which every future session reads"}}

@@ -95,6 +95,7 @@ type directRun struct {
 
 type directActivity struct {
 	summary string
+	callID  string
 	err     string
 	denied  bool
 	running bool
@@ -1455,10 +1456,12 @@ func (v *chatView) transcript(m *Model, w int) []string {
 func (r *directRun) apply(e direct.Event) {
 	switch e.Kind {
 	case direct.EventToolStart:
-		r.activity = append(r.activity, directActivity{summary: e.Summary, running: true})
+		r.activity = append(r.activity, directActivity{summary: e.Summary, callID: e.CallID, running: true})
 	case direct.EventToolEnd:
+		// Calls that ran together end in call order, not start order
+		// reversed: match the call.
 		for i := len(r.activity) - 1; i >= 0; i-- {
-			if r.activity[i].running {
+			if r.activity[i].running && (e.CallID == "" || r.activity[i].callID == e.CallID) {
 				r.activity[i].running = false
 				r.activity[i].err = e.Err
 				break

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/akynte/boundedcode/internal/agent"
+	"github.com/akynte/boundedcode/internal/capability"
 	"github.com/akynte/boundedcode/internal/config"
 	"github.com/akynte/boundedcode/internal/verify"
 )
@@ -82,27 +83,25 @@ func (g *governor) observe(e agent.Event, generated int) {
 			Path    string `json:"path"`
 		}
 		_ = json.Unmarshal([]byte(raw.Action), &act)
-		switch e.Tool {
-		case "file_editor":
-			if act.Command == "view" {
-				g.inspected[act.Path]++
-				return
-			}
-			if act.Command == "create" || act.Command == "str_replace" || act.Command == "insert" {
-				if g.edits == 0 {
-					g.mark(generated, "first edit")
-				}
-				g.edits++
-				if act.Command == "create" && verify.IsTestFile(act.Path) {
-					g.mark(generated, "created test file "+act.Path)
-				}
-			}
-		case "terminal":
+		// The action's effect, from the same catalog that describes both
+		// modes' tools (internal/capability).
+		switch eff := capability.BoundedAction(e.Tool, act.Command); {
+		case eff.Has(capability.Exec):
 			g.commands++
 			g.lastCmd = act.Command
+		case eff == capability.Read:
+			g.inspected[act.Path]++
+		case eff.Has(capability.Write):
+			if g.edits == 0 {
+				g.mark(generated, "first edit")
+			}
+			g.edits++
+			if act.Command == "create" && verify.IsTestFile(act.Path) {
+				g.mark(generated, "created test file "+act.Path)
+			}
 		}
 	case "ObservationEvent":
-		if e.Tool != "terminal" || !testCmdRE.MatchString(g.lastCmd) {
+		if !capability.BoundedAction(e.Tool, "").Has(capability.Exec) || !testCmdRE.MatchString(g.lastCmd) {
 			return
 		}
 		m := exitCodeRE.FindAllStringSubmatch(raw.Text, -1)

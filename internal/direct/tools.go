@@ -18,6 +18,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/akynte/boundedcode/internal/capability"
+	"github.com/akynte/boundedcode/internal/fileedit"
 	"github.com/akynte/boundedcode/internal/policy"
 )
 
@@ -40,6 +42,9 @@ type Tool struct {
 	// Precheck applies deterministic policy before anyone is asked; an
 	// error refuses the call.
 	Precheck func(r *Runner, args map[string]any) error
+	// Paths lists the project files a call reads or changes, for a tool
+	// that can name several (default: its "path" argument).
+	Paths func(args map[string]any) []string
 }
 
 const (
@@ -90,14 +95,33 @@ func (r *Runner) buildTools() []Tool {
 		ts = append(ts, taskTool())
 	}
 	ts = append(ts, findSymbolTool(), findReferencesTool())
-	if r.Nav != nil { // implementations need a language server
+	if r.Nav != nil { // implementations and exact ranges need a language server
 		ts = append(ts, findImplementationsTool())
+		if !r.Opts.ReadOnly {
+			ts = append(ts, replaceSymbolTool())
+		}
 	}
-	ts = append(ts, r.mcpTools()...)
+	mcp := r.mcpTools()
+	r.deferred = nil
+	if len(r.only) > 0 {
+		var kept []Tool
+		for _, t := range mcp {
+			if toolAllowed(r.only, t.Name) {
+				kept = append(kept, t)
+			}
+		}
+		mcp = kept
+	}
+	if r.deferMCP(mcp) {
+		r.deferred = mcp
+		ts = append(ts, mcpSearchTool(), mcpCallTool())
+	} else {
+		ts = append(ts, mcp...)
+	}
 	if len(r.only) > 0 {
 		var kept []Tool
 		for _, t := range ts {
-			if toolAllowed(r.only, t.Name) {
+			if toolAllowed(r.only, t.Name) || t.Name == "mcp_search" || t.Name == "mcp_call" {
 				kept = append(kept, t)
 			}
 		}
@@ -156,123 +180,242 @@ func (r *Runner) findTool(name string) *Tool {
 			return &r.tools[i]
 		}
 	}
-	return nil
+	// A deferred MCP tool called by its own name (after mcp_search).
+	return r.deferredTool(name)
+}
+
+// toolCall is one model tool call on its way through runTool's stages:
+// prepare (policy, approval, hooks: in call order), execute (the tool
+// itself: the only stage that may run alongside other calls) and finish
+// (checks, hooks, the result for the model: in call order again).
+type toolCall struct {
+	call    ToolCall
+	t       *Tool
+	args    map[string]any
+	summary string
+	// done: the call was refused or handed off; result is the answer.
+	done   bool
+	result string
+	code   capability.Code
+	// before is a Go file's content before the change, for the check.
+	before  []byte
+	out     string
+	err     error
+	elapsed time.Duration
 }
 
 // runTool executes one model tool call with policy and approval applied
 // and returns the text result for the model.
 func (r *Runner) runTool(ctx context.Context, call ToolCall) string {
-	t := r.findTool(call.Function.Name)
-	if t == nil {
-		r.emit(Event{Kind: EventDenied, Tool: call.Function.Name, CallID: call.ID, Err: "unknown tool"})
-		return "error: unknown tool " + call.Function.Name
+	c := r.prepareTool(ctx, call)
+	if c.done {
+		return c.result
 	}
-	args := map[string]any{}
-	if a := strings.TrimSpace(call.Function.Arguments); a != "" {
-		if err := json.Unmarshal([]byte(a), &args); err != nil {
-			r.emit(Event{Kind: EventDenied, Tool: t.Name, CallID: call.ID, Err: "malformed arguments"})
-			return "error: arguments are not a JSON object: " + err.Error()
+	r.execTool(ctx, c)
+	return r.finishTool(ctx, c)
+}
+
+// refuse ends a call before it runs.
+func (r *Runner) refuse(c *toolCall, code capability.Code, why, result string) *toolCall {
+	name := c.call.Function.Name
+	if c.t != nil {
+		name = c.t.Name
+	}
+	r.emit(Event{Kind: EventDenied, Tool: name, CallID: c.call.ID, Summary: c.summary, Err: why, Code: code})
+	c.done, c.code, c.result = true, code, result
+	return c
+}
+
+// prepareTool applies policy, rules, hooks and approval to a call, in
+// that order, and announces it. A refused call comes back done.
+func (r *Runner) prepareTool(ctx context.Context, call ToolCall) *toolCall {
+	c := &toolCall{call: call, args: map[string]any{}}
+	name, rawArgs := call.Function.Name, call.Function.Arguments
+	if name == "mcp_call" && len(r.deferred) > 0 {
+		// The tool it names runs in its place, through every check below.
+		var err error
+		if name, rawArgs, err = r.unwrapMCPCall(call); err != nil {
+			return r.refuse(c, capability.CodeBadArgs, err.Error(), "error: "+err.Error())
 		}
 	}
-	summary := t.Summary(args)
+	t := r.findTool(name)
+	if t == nil {
+		return r.refuse(c, capability.CodeUnknownTool, "unknown tool", "error: unknown tool "+name)
+	}
+	c.t = t
+	if a := strings.TrimSpace(rawArgs); a != "" {
+		if err := json.Unmarshal([]byte(a), &c.args); err != nil {
+			return r.refuse(c, capability.CodeBadArgs, "malformed arguments", "error: arguments are not a JSON object: "+err.Error())
+		}
+	}
+	args := c.args
+	c.summary = t.Summary(args)
 	if t.Precheck != nil {
 		if err := t.Precheck(r, args); err != nil {
-			r.emit(Event{Kind: EventDenied, Tool: t.Name, CallID: call.ID, Summary: summary, Err: err.Error()})
-			return "error: " + err.Error()
+			return r.refuse(c, capability.CodePolicy, err.Error(), "error: "+err.Error())
 		}
 	}
-	spec := t.Name + "(" + permissionArg(t, args) + ")"
-	if why, denied := r.Opts.Permissions.Denied(spec); denied {
-		r.emit(Event{Kind: EventDenied, Tool: t.Name, CallID: call.ID, Summary: summary, Err: why})
-		return "error: " + why
+	for _, spec := range permissionSpecs(t, args) {
+		if why, denied := r.Opts.Permissions.Denied(spec); denied {
+			return r.refuse(c, capability.CodeRule, why, "error: "+why)
+		}
 	}
 	if t.Mutates && r.plan && (t.Name != "bash" || !isSafeCommand(str(args, "command"))) {
-		r.emit(Event{Kind: EventDenied, Tool: t.Name, CallID: call.ID, Summary: summary, Err: "plan mode"})
-		return "Plan mode is on: no files are changed and no commands other than read-only ones run until the plan is approved. Finish the plan and call exit_plan_mode."
+		return r.refuse(c, capability.CodePlanMode, "plan mode", "Plan mode is on: no files are changed and no commands other than read-only ones run until the plan is approved. Finish the plan and call exit_plan_mode.")
 	}
 	if t.Mutates {
-		rel := ""
+		var rels []string
 		if t.Name != "bash" {
-			abs, _, err := r.resolve(str(args, "path"))
-			if err == nil {
-				rel = r.rootRel(abs)
+			for _, p := range toolPaths(t, args) {
+				if abs, _, err := r.resolve(p); err == nil {
+					rels = append(rels, r.rootRel(abs))
+				}
 			}
-		} else if isSafeCommand(str(args, "command")) || r.Opts.Mode != ModeChat && (r.Opts.VerifyDeserved == "" || r.directOK) {
+			if len(rels) == 0 {
+				rels = []string{""}
+			}
+		} else if !isSafeCommand(str(args, "command")) && (r.Opts.Mode == ModeChat || r.Opts.VerifyDeserved != "" && !r.directOK) {
 			// A safe command is not a change; an unsafe one is, in chat
 			// mode or in a turn that deserved verification.
-			goto hooks
+			rels = []string{""}
 		}
-		if ok, refusal := r.mutating(ctx, t.Name, rel); !ok {
-			if r.handoff == nil {
-				r.emit(Event{Kind: EventDenied, Tool: t.Name, CallID: call.ID, Summary: summary, Err: refusal})
-				return "error: " + refusal
+		for _, rel := range rels {
+			if ok, refusal := r.mutating(ctx, t.Name, rel); !ok {
+				if r.handoff == nil {
+					return r.refuse(c, capability.CodePolicy, refusal, "error: "+refusal)
+				}
+				return r.refuse(c, capability.CodeHandoff, "handed off to verification", "This change is being handed off to a verified task; stop here.")
 			}
-			r.emit(Event{Kind: EventDenied, Tool: t.Name, CallID: call.ID, Summary: summary, Err: "handed off to verification"})
-			return "This change is being handed off to a verified task; stop here."
 		}
 	}
-hooks:
 	if res := r.runHooks(ctx, HookPreTool, HookInput{Tool: t.Name, Args: args}); res.Block {
-		r.emit(Event{Kind: EventDenied, Tool: t.Name, CallID: call.ID, Summary: summary, Err: "blocked by a hook: " + res.Reason})
-		return "error: blocked by a hook: " + res.Reason
+		return r.refuse(c, capability.CodeHook, "blocked by a hook: "+res.Reason, "error: blocked by a hook: "+res.Reason)
 	}
-	ok, approved, refusal := r.guard(ctx, t.Name, summary, r.findings(t, args))
+	ok, approved, refusal := r.guard(ctx, t.Name, c.summary, r.findings(t, args))
 	if !ok {
-		r.emit(Event{Kind: EventDenied, Tool: t.Name, CallID: call.ID, Summary: summary, Err: refusal})
-		return "error: " + refusal
+		return r.refuse(c, capability.CodePolicy, refusal, "error: "+refusal)
 	}
-	if t.Consent != nil && !approved && !r.Opts.Permissions.Allowed(spec) {
+	if t.Consent != nil && !approved && !r.allowedAll(t, args) {
 		if detail, needed := t.Consent(r, args); needed {
-			if r.Approve == nil || !r.Approve(ctx, ApprovalRequest{Tool: t.Name, Summary: summary, Detail: detail}) {
-				r.emit(Event{Kind: EventDenied, Tool: t.Name, CallID: call.ID, Summary: summary, Err: "not approved"})
-				return "The user did not approve this action. Ask what they would like instead, or try a different approach; do not retry the same action."
+			if r.Approve == nil || !r.Approve(ctx, ApprovalRequest{Tool: t.Name, Summary: c.summary, Detail: detail}) {
+				return r.refuse(c, capability.CodeNotApproved, "not approved", "The user did not approve this action. Ask what they would like instead, or try a different approach; do not retry the same action.")
 			}
 		}
 	}
-	var before []byte // a Go file's content before the change, for the check
 	if t.Mutates && t.Name != "bash" {
-		if abs, _, err := r.resolve(str(args, "path")); err == nil {
-			r.checkpoint(abs)
-			if strings.HasSuffix(abs, ".go") {
-				before, _ = os.ReadFile(abs)
+		for i, p := range toolPaths(t, args) {
+			if abs, _, err := r.resolve(p); err == nil {
+				r.checkpoint(abs)
+				if i == 0 && strings.HasSuffix(abs, ".go") {
+					c.before, _ = os.ReadFile(abs)
+				}
 			}
 		}
 	}
-	r.emit(Event{Kind: EventToolStart, Tool: t.Name, CallID: call.ID, Summary: summary, Args: args})
+	r.emit(Event{Kind: EventToolStart, Tool: t.Name, CallID: call.ID, Summary: c.summary, Args: args})
+	return c
+}
+
+// execTool runs the tool. It touches no runner state the other stages
+// keep, so concurrent calls (capability.Descriptor.Concurrent) can run at
+// once.
+func (r *Runner) execTool(ctx context.Context, c *toolCall) {
 	start := time.Now()
-	out, err := t.Run(ctx, r, args)
+	c.out, c.err = c.t.Run(ctx, r, c.args)
+	c.elapsed = time.Since(start)
+}
+
+// finishTool checks what a change did, runs the post-tool hooks and fits
+// the result for the model.
+func (r *Runner) finishTool(ctx context.Context, c *toolCall) string {
+	t, args, out, err := c.t, c.args, c.out, c.err
+	t0 := time.Now()
 	if err == nil && t.Mutates && t.Name != "bash" {
-		if abs, rel, rerr := r.resolve(str(args, "path")); rerr == nil {
+		for i, p := range toolPaths(t, args) {
+			abs, rel, rerr := r.resolve(p)
+			if rerr != nil {
+				continue
+			}
 			r.noteWritten(abs)
 			if !r.Opts.NoChecks {
-				t0 := time.Now()
+				tc := time.Now()
+				var before []byte
+				if i == 0 {
+					before = c.before
+				}
 				if diag := r.checkFile(ctx, abs, rel, before); diag != "" {
 					out += "\n" + diag
 				}
-				r.phase(PhaseChecks, t0)
+				r.phase(PhaseChecks, tc)
 			}
 			if !r.Opts.NoHistoryNotes {
-				t0 := time.Now()
+				th := time.Now()
 				if note := r.coChangeNote(r.rootRel(abs)); note != "" {
 					out += "\n" + note
 				}
-				r.phase(PhaseHistoryNotes, t0)
+				r.phase(PhaseHistoryNotes, th)
 			}
 		}
 	}
-	el := time.Since(start) // the tool, its check and history note
+	el := c.elapsed + time.Since(t0) // the tool, its checks and history notes
 	if res := r.runHooks(ctx, HookPostTool, HookInput{Tool: t.Name, Args: args, Result: r.clip(out), Error: errString(err)}); res.Extra != "" {
 		out += "\n\n[hook] " + res.Extra
 	}
 	if err != nil {
-		r.emit(Event{Kind: EventToolEnd, Tool: t.Name, CallID: call.ID, Summary: summary, Err: err.Error(), Elapsed: el, Output: out})
+		c.code = capability.CodeFailed
+		var ce *capability.Error
+		switch {
+		case errors.As(err, &ce):
+			c.code = ce.Code
+		case ctx.Err() != nil:
+			c.code = capability.CodeCanceled
+		}
+		r.emit(Event{Kind: EventToolEnd, Tool: t.Name, CallID: c.call.ID, Summary: c.summary, Err: err.Error(), Code: c.code, Elapsed: el, Output: out})
 		if out == "" {
 			return "error: " + err.Error()
 		}
-		return r.observe(t.Name, call.ID, out) + "\nerror: " + err.Error()
+		return r.observe(t.Name, c.call.ID, out) + "\nerror: " + err.Error()
 	}
-	r.emit(Event{Kind: EventToolEnd, Tool: t.Name, CallID: call.ID, Summary: summary, Output: out, Elapsed: el})
-	return r.observe(t.Name, call.ID, out)
+	r.emit(Event{Kind: EventToolEnd, Tool: t.Name, CallID: c.call.ID, Summary: c.summary, Output: out, Elapsed: el})
+	return r.observe(t.Name, c.call.ID, out)
+}
+
+// toolPaths are the project files a call names: Tool.Paths, or its
+// "path" argument.
+func toolPaths(t *Tool, args map[string]any) []string {
+	if t.Paths != nil {
+		return t.Paths(args)
+	}
+	if p := str(args, "path"); p != "" {
+		return []string{p}
+	}
+	return nil
+}
+
+// permissionSpecs are what permission rules match for a call:
+// tool(argument), once per file for a call that names several.
+func permissionSpecs(t *Tool, args map[string]any) []string {
+	if t.Paths != nil {
+		var out []string
+		for _, p := range t.Paths(args) {
+			out = append(out, t.Name+"("+p+")")
+		}
+		if len(out) > 0 {
+			return out
+		}
+	}
+	return []string{t.Name + "(" + permissionArg(t, args) + ")"}
+}
+
+// allowedAll: an allow rule matches every file (or the one argument) of
+// the call.
+func (r *Runner) allowedAll(t *Tool, args map[string]any) bool {
+	for _, spec := range permissionSpecs(t, args) {
+		if !r.Opts.Permissions.Allowed(spec) {
+			return false
+		}
+	}
+	return true
 }
 
 // clipOutput applies the package-wide cap; runTool applies the runner's
@@ -531,14 +674,16 @@ func writeTool() Tool {
 			}
 			content := str(a, "content")
 			existed := false
+			expect := ""
 			if _, err := os.Stat(abs); err == nil {
 				existed = true
+				// Overwriting a file the model has seen is refused when
+				// it changed since: the new content was written from the
+				// old one.
+				expect = r.seenBlob(r.rootRel(abs))
 			}
-			if err := os.MkdirAll(filepath.Dir(abs), 0o755); err != nil {
-				return "", err
-			}
-			if err := os.WriteFile(abs, []byte(content), 0o644); err != nil {
-				return "", err
+			if _, err := fileedit.Apply([]fileedit.Change{{Path: abs, Content: &content, Expect: expect}}); err != nil {
+				return "", r.editError(err, rel)
 			}
 			verb := "created"
 			if existed {
@@ -578,41 +723,18 @@ func editTool() Tool {
 			if oldS == "" {
 				return "", errors.New("old_string is empty; use write to create a file")
 			}
-			b, err := os.ReadFile(abs)
+			// An exact match, or one ignoring indentation (tabs vs
+			// spaces, a re-indented block) re-indented the way the file
+			// is (internal/fileedit).
+			ps, err := fileedit.Prepare([]fileedit.Change{{Path: abs, Edits: []fileedit.Edit{{Old: oldS, New: newS, All: boolean(a, "replace_all")}}}})
 			if err != nil {
+				return "", r.editError(err, rel)
+			}
+			note := r.changedSinceSeen(abs, ps[0].Before)
+			if err := fileedit.Commit(ps); err != nil {
 				return "", err
 			}
-			src := string(b)
-			n := strings.Count(src, oldS)
-			var out string
-			switch {
-			case n == 0:
-				// Tolerate indentation differences (tabs vs spaces, a
-				// re-indented block): match line by line ignoring leading
-				// and trailing whitespace, and re-indent the replacement
-				// the way the file is indented.
-				var ferr error
-				out, ferr = fuzzyReplace(src, oldS, newS)
-				if ferr != nil {
-					return "", fmt.Errorf("%w in %s; read the file and copy the text exactly (indentation is matched loosely, other characters must be identical)", ferr, rel)
-				}
-				n = 1
-			case n > 1 && !boolean(a, "replace_all"):
-				return "", fmt.Errorf("old_string occurs %d times in %s; include more context or set replace_all", n, rel)
-			case boolean(a, "replace_all"):
-				out = strings.ReplaceAll(src, oldS, newS)
-			default:
-				out = strings.Replace(src, oldS, newS, 1)
-			}
-			st, _ := os.Stat(abs)
-			mode := fs.FileMode(0o644)
-			if st != nil {
-				mode = st.Mode().Perm()
-			}
-			if err := os.WriteFile(abs, []byte(out), mode); err != nil {
-				return "", err
-			}
-			return fmt.Sprintf("edited %s (%d replacement(s))", rel, max(n, 1)), nil
+			return fmt.Sprintf("edited %s (%d replacement(s))", rel, max(ps[0].Replacements, 1)) + note, nil
 		},
 	}
 }
@@ -891,7 +1013,13 @@ func (r *Runner) rgGrep(ctx context.Context, rg, abs, pattern, glob string, igno
 	if glob != "" {
 		args = append(args, "--glob", glob)
 	}
-	args = append(args, "-e", pattern, abs)
+	// The same directories as the built-in search, and files in path
+	// order: ripgrep's parallel search otherwise answers in a different
+	// order each time, and the session record with it.
+	for _, d := range sortedSkippedDirs() {
+		args = append(args, "--glob", "!"+d+"/")
+	}
+	args = append(args, "--sort", "path", "-e", pattern, abs)
 	c := exec.CommandContext(ctx, rg, args...)
 	c.Dir = r.cwd()
 	out, err := c.Output()
@@ -1133,6 +1261,18 @@ func clipLine(l string) string {
 
 var skippedDirs = map[string]bool{".git": true, "node_modules": true, ".venv": true, "venv": true, "__pycache__": true, "target": true, "dist": true, "build": true, ".next": true, ".cache": true, "vendor": true, ".idea": true, ".vscode": false}
 
+// sortedSkippedDirs lists the skipped directories in a fixed order.
+func sortedSkippedDirs() []string {
+	var out []string
+	for d, skip := range skippedDirs {
+		if skip {
+			out = append(out, d)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
 // walk visits regular files under dir (a file visits itself), skipping
 // build and dependency directories, with paths relative to the root.
 func (r *Runner) walk(dir string, fn func(file, rel string, d fs.DirEntry) error) error {
@@ -1326,97 +1466,6 @@ func lsTool() Tool {
 			return strings.TrimRight(b.String(), "\n"), nil
 		},
 	}
-}
-
-var errNotFound = errors.New("old_string not found")
-
-// fuzzyReplace replaces old with new in src when old matches a unique run
-// of lines ignoring leading and trailing whitespace. The replacement's
-// lines are re-indented from old's indentation to the file's.
-func fuzzyReplace(src, old, new string) (string, error) {
-	oldLines := strings.Split(strings.TrimRight(old, "\n"), "\n")
-	if len(oldLines) == 0 || strings.TrimSpace(old) == "" {
-		return "", errNotFound
-	}
-	srcLines := strings.Split(src, "\n")
-	trim := strings.TrimSpace
-	start := -1
-	for i := 0; i+len(oldLines) <= len(srcLines); i++ {
-		ok := true
-		for j, ol := range oldLines {
-			if trim(srcLines[i+j]) != trim(ol) {
-				ok = false
-				break
-			}
-		}
-		if ok {
-			if start >= 0 {
-				return "", errors.New("old_string matches more than once ignoring indentation")
-			}
-			start = i
-		}
-	}
-	if start < 0 {
-		return "", errNotFound
-	}
-	// Indentation mapping: old's first line indent -> the file's.
-	fileIndent := leadingWS(srcLines[start])
-	oldIndent := leadingWS(oldLines[0])
-	unit := indentUnit(oldLines, srcLines[start:start+len(oldLines)])
-	var repl []string
-	for _, nl := range strings.Split(strings.TrimRight(new, "\n"), "\n") {
-		if strings.TrimSpace(nl) == "" {
-			repl = append(repl, "")
-			continue
-		}
-		ws := leadingWS(nl)
-		body := nl[len(ws):]
-		var extra string
-		if strings.HasPrefix(ws, oldIndent) {
-			extra = ws[len(oldIndent):]
-		} else {
-			extra = strings.TrimLeft(ws, " \t") // shallower than old's first line: keep the file's indent
-		}
-		if strings.HasPrefix(fileIndent, "\t") || (fileIndent == "" && strings.Contains(strings.Join(srcLines[start:start+len(oldLines)], ""), "\t")) {
-			if unit > 0 && !strings.Contains(extra, "\t") {
-				extra = strings.Repeat("\t", len(extra)/unit)
-			}
-		} else if unit > 0 && strings.Contains(extra, "\t") && !strings.Contains(fileIndent, "\t") {
-			extra = strings.Repeat(" ", strings.Count(extra, "\t")*unit)
-		}
-		repl = append(repl, fileIndent+extra+body)
-	}
-	out := append(append(append([]string{}, srcLines[:start]...), repl...), srcLines[start+len(oldLines):]...)
-	return strings.Join(out, "\n"), nil
-}
-
-func leadingWS(s string) string { return s[:len(s)-len(strings.TrimLeft(s, " \t"))] }
-
-// indentUnit guesses how many spaces one indentation level is in old (or,
-// when the file indents with spaces and old with tabs, in the file): the
-// smallest positive difference between consecutive lines' indentation.
-func indentUnit(oldLines, fileLines []string) int {
-	best := 0
-	for _, ls := range [][]string{oldLines, fileLines} {
-		for i := 1; i < len(ls); i++ {
-			a, b := leadingWS(ls[i-1]), leadingWS(ls[i])
-			if strings.Contains(a+b, "\t") || strings.TrimSpace(ls[i]) == "" || strings.TrimSpace(ls[i-1]) == "" {
-				continue
-			}
-			if d := len(b) - len(a); d < 0 {
-				d = -d
-				if d > 0 && (best == 0 || d < best) {
-					best = d
-				}
-			} else if d > 0 && (best == 0 || d < best) {
-				best = d
-			}
-		}
-		if best > 0 {
-			return best
-		}
-	}
-	return 4
 }
 
 // rootRel is abs relative to the project root (slash-separated).

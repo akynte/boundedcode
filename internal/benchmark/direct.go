@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/akynte/boundedcode/internal/capability"
 	"github.com/akynte/boundedcode/internal/config"
 	"github.com/akynte/boundedcode/internal/direct"
 	"github.com/akynte/boundedcode/internal/gitops"
@@ -114,6 +115,15 @@ type DirectResult struct {
 	// FreshnessNotes counts notes that files or the checkout changed
 	// since the conversation saw them.
 	FreshnessNotes int `json:"freshness_notes,omitempty"`
+	// Batches counts replies whose calls ran together, with the calls in
+	// them and their time together and one after another.
+	Batches          int     `json:"batches,omitempty"`
+	BatchCalls       int     `json:"batch_calls,omitempty"`
+	BatchWallSeconds float64 `json:"batch_wall_seconds,omitempty"`
+	BatchSumSeconds  float64 `json:"batch_sum_seconds,omitempty"`
+	// Outcomes counts each tool's calls by outcome (internal/capability
+	// codes), refusals included.
+	Outcomes capability.Tally `json:"outcomes"`
 	// CheckNotes counts notes about code that compiles but is probably
 	// wrong (a pointer to a range loop's copy).
 	CheckNotes int `json:"check_notes,omitempty"`
@@ -231,6 +241,10 @@ type DirectSummary struct {
 	PrunedBytes              int     `json:"pruned_original_bytes,omitempty"`
 	PrunedShownBytes         int     `json:"pruned_shown_bytes,omitempty"`
 	FreshnessNotes           int     `json:"freshness_notes,omitempty"`
+	Batches                  int     `json:"batches,omitempty"`
+	BatchCalls               int     `json:"batch_calls,omitempty"`
+	BatchWallSeconds         float64 `json:"batch_wall_seconds,omitempty"`
+	BatchSumSeconds          float64 `json:"batch_sum_seconds,omitempty"`
 	ChecksCaught             int     `json:"checks_caught"`
 	CheckNotes               int     `json:"check_notes"`
 	GuardRefusals            int     `json:"guard_refusals,omitempty"`
@@ -470,6 +484,7 @@ func (d *DirectRunner) runOne(ctx context.Context, model string, spec TaskSpec) 
 				res.Recalls++
 			}
 		case direct.EventToolEnd:
+			res.Outcomes.Add(e.Tool, e.Code)
 			res.ResultBytes += len(e.Output)
 			tt := res.ToolTimes[e.Tool]
 			tt.Calls++
@@ -500,6 +515,18 @@ func (d *DirectRunner) runOne(ctx context.Context, model string, spec TaskSpec) 
 			}
 		case direct.EventDenied:
 			res.Denied++
+			res.Outcomes.Add(e.Tool, e.Code)
+		case direct.EventBatch:
+			res.Batches++
+			if n, ok := e.Args["calls"].(int); ok {
+				res.BatchCalls += n
+			}
+			if us, ok := e.Args["wall_us"].(int64); ok {
+				res.BatchWallSeconds += float64(us) / 1e6
+			}
+			if us, ok := e.Args["sum_us"].(int64); ok {
+				res.BatchSumSeconds += float64(us) / 1e6
+			}
 		case direct.EventCompact:
 			rewrites[len(r.Gateway.CallLog())] = true
 			switch {
@@ -891,6 +918,10 @@ func summarizeDirect(category string, rs []DirectResult) DirectSummary {
 		s.PrunedBytes += r.PrunedBytes
 		s.PrunedShownBytes += r.PrunedShownBytes
 		s.FreshnessNotes += r.FreshnessNotes
+		s.Batches += r.Batches
+		s.BatchCalls += r.BatchCalls
+		s.BatchWallSeconds += r.BatchWallSeconds
+		s.BatchSumSeconds += r.BatchSumSeconds
 		s.ChecksCaught += r.ChecksCaught
 		s.CheckNotes += r.CheckNotes
 		s.GuardRefusals += r.GuardRefusals
@@ -952,6 +983,9 @@ func WriteDirectMarkdown(w io.Writer, r *DirectReport) error {
 	if s.Compactions > 0 || s.Pruned > 0 || s.FreshnessNotes > 0 {
 		fmt.Fprintf(w, "Summaries: %d, %.1f s writing them, %d prompt tokens evaluated for them and %d by the first call after each. Command outputs pruned: %d, %d KB → %d KB. Freshness notes: %d.\n\n",
 			s.Compactions, s.CompactionSeconds, s.CompactionEvaluated, s.AfterCompactionEvaluated, s.Pruned, s.PrunedBytes/1024, s.PrunedShownBytes/1024, s.FreshnessNotes)
+	}
+	if s.Batches > 0 {
+		fmt.Fprintf(w, "Calls run together: %d replies, %d calls, %.3f s together against %.3f s one after another.\n\n", s.Batches, s.BatchCalls, s.BatchWallSeconds, s.BatchSumSeconds)
 	}
 	if s.MeanAgentSeconds > 0 {
 		fmt.Fprintf(w, "Where the agent's time went, per task: %.1f s in model calls, %.1f s in tools (with the checks after edits), %.2f s in the harness itself; time to first token %.0f ms (median). %.0f reasoning tokens per task. %d prompt-cache invalidations (%d after the history was rewritten), %d prompt tokens recomputed; %.0f prompt tokens evaluated by the server per task, in %.1f s. Cost of a passed task: %.0f processed tokens and %.0f s; of a failed one: %.0f and %.0f s. Peak memory: harness %.0f MiB, model server %.0f MiB, GPU %.0f MiB.\n\n",

@@ -10,7 +10,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/akynte/boundedcode/internal/fileedit"
 	"github.com/akynte/boundedcode/internal/repointel"
+	"github.com/akynte/boundedcode/internal/retrieve"
 )
 
 // ---- multi_edit
@@ -18,26 +20,35 @@ import (
 func multiEditTool() Tool {
 	return Tool{
 		Name:        "multi_edit",
-		Description: "Apply several edits to one file atomically, in order; each edit is like edit (old_string must occur once unless replace_all). Nothing is written if any edit fails.",
+		Description: "Apply several edits atomically, in order; each edit is like edit (old_string must occur once unless replace_all). Edits may change several files: give each edit its own path, or one path for all. Nothing is written if any edit fails.",
 		Schema: schema(map[string]any{
-			"path": prop("string", "File path, relative to the project root"),
+			"path": prop("string", "File path, relative to the project root, for edits that do not give their own"),
 			"edits": map[string]any{"type": "array", "description": "The edits, applied in order", "items": map[string]any{"type": "object", "properties": map[string]any{
+				"path":       prop("string", "This edit's file (default: path)"),
 				"old_string": prop("string", "Exact text to replace"), "new_string": prop("string", "Replacement"), "replace_all": prop("boolean", "Replace every occurrence")}, "required": []string{"old_string", "new_string"}}},
-		}, "path", "edits"),
+		}, "edits"),
 		Mutates: true,
+		Paths:   multiEditPaths,
 		Summary: func(a map[string]any) string {
 			n := 0
 			if es, ok := a["edits"].([]any); ok {
 				n = len(es)
 			}
+			if ps := multiEditPaths(a); len(ps) > 1 {
+				return fmt.Sprintf("multi_edit %s (%d edits, %d files)", strings.Join(ps, ", "), n, len(ps))
+			}
 			return fmt.Sprintf("multi_edit %s (%d edits)", str(a, "path"), n)
 		},
 		Consent: mutationConsent(func(a map[string]any) string {
 			var b strings.Builder
-			b.WriteString("Edit " + str(a, "path") + ":\n")
+			last := ""
 			if es, ok := a["edits"].([]any); ok {
 				for _, e := range es {
 					if m, ok := e.(map[string]any); ok {
+						if p := editPath(a, m); p != last {
+							b.WriteString("Edit " + p + ":\n")
+							last = p
+						}
 						b.WriteString("\n" + unifiedSnippet(str(m, "old_string"), str(m, "new_string")))
 					}
 				}
@@ -45,55 +56,80 @@ func multiEditTool() Tool {
 			return b.String()
 		}),
 		Run: func(ctx context.Context, r *Runner, a map[string]any) (string, error) {
-			abs, rel, err := r.resolve(str(a, "path"))
-			if err != nil {
-				return "", err
-			}
-			if err := r.checkReadable(abs); err != nil {
-				return "", err
-			}
 			es, _ := a["edits"].([]any)
 			if len(es) == 0 {
 				return "", errors.New("edits is empty")
 			}
-			b, err := os.ReadFile(abs)
-			if err != nil {
-				return "", err
-			}
-			src := string(b)
+			var changes []fileedit.Change
+			var rels []string
+			seen := map[string]bool{}
+			befores := map[string]bool{}
 			for i, e := range es {
 				m, _ := e.(map[string]any)
+				p := editPath(a, m)
+				if p == "" {
+					return "", fmt.Errorf("edit %d: no path (give the edit a path, or path for all edits)", i+1)
+				}
+				abs, rel, err := r.resolve(p)
+				if err != nil {
+					return "", err
+				}
+				if err := r.checkReadable(abs); err != nil {
+					return "", err
+				}
 				oldS, newS := str(m, "old_string"), str(m, "new_string")
 				if oldS == "" {
 					return "", fmt.Errorf("edit %d: old_string is empty", i+1)
 				}
-				n := strings.Count(src, oldS)
-				switch {
-				case n == 0:
-					out, ferr := fuzzyReplace(src, oldS, newS)
-					if ferr != nil {
-						return "", fmt.Errorf("edit %d: %w in %s (nothing was written)", i+1, ferr, rel)
-					}
-					src = out
-				case n > 1 && !boolean(m, "replace_all"):
-					return "", fmt.Errorf("edit %d: old_string occurs %d times in %s (nothing was written)", i+1, n, rel)
-				case boolean(m, "replace_all"):
-					src = strings.ReplaceAll(src, oldS, newS)
-				default:
-					src = strings.Replace(src, oldS, newS, 1)
+				changes = append(changes, fileedit.Change{Path: abs, Edits: []fileedit.Edit{{Old: oldS, New: newS, All: boolean(m, "replace_all")}}})
+				if !seen[abs] {
+					seen[abs] = true
+					rels = append(rels, rel)
 				}
 			}
-			st, _ := os.Stat(abs)
-			mode := os.FileMode(0o644)
-			if st != nil {
-				mode = st.Mode().Perm()
+			ps, err := fileedit.Prepare(changes)
+			if err != nil {
+				return "", r.multiEditError(err)
 			}
-			if err := os.WriteFile(abs, []byte(src), mode); err != nil {
+			var notes string
+			for _, p := range ps {
+				if !befores[p.Path] {
+					befores[p.Path] = true
+					notes += r.changedSinceSeen(p.Path, p.Before)
+				}
+			}
+			if err := fileedit.Commit(ps); err != nil {
 				return "", err
 			}
-			return fmt.Sprintf("applied %d edit(s) to %s", len(es), rel), nil
+			return fmt.Sprintf("applied %d edit(s) to %s", len(es), strings.Join(rels, ", ")) + notes, nil
 		},
 	}
+}
+
+// editPath is a multi_edit edit's file: its own path, or the call's.
+func editPath(a, edit map[string]any) string {
+	if p := str(edit, "path"); p != "" {
+		return p
+	}
+	return str(a, "path")
+}
+
+// multiEditPaths lists a multi_edit call's files in order, once each.
+func multiEditPaths(a map[string]any) []string {
+	var out []string
+	seen := map[string]bool{}
+	es, _ := a["edits"].([]any)
+	for _, e := range es {
+		m, _ := e.(map[string]any)
+		if p := editPath(a, m); p != "" && !seen[p] {
+			seen[p] = true
+			out = append(out, p)
+		}
+	}
+	if len(out) == 0 && str(a, "path") != "" {
+		out = []string{str(a, "path")}
+	}
+	return out
 }
 
 // ---- read_many
@@ -429,6 +465,81 @@ func findImplementationsTool() Tool {
 				return "", err
 			}
 			return formatSymbols(syms), nil
+		},
+	}
+}
+
+// replaceSymbolTool replaces a definition by the range a language server
+// gives for it. It is offered only with a language server (Opts.Nav):
+// the definition patterns used elsewhere know where a symbol starts, not
+// exactly where it ends, and a replacement must not reach into the next
+// one. Languages without a server keep edit and multi_edit.
+func replaceSymbolTool() Tool {
+	return Tool{
+		Name:        "replace_symbol",
+		Description: "Replace a symbol's whole definition (function, method, type, class) with new source. The language server locates it, so no old text has to be copied. Get the name path from find_symbol. Use edit for a change inside a definition.",
+		Schema: schema(map[string]any{
+			"path":       prop("string", "The file that defines the symbol"),
+			"name_path":  prop("string", "The symbol's name path, as find_symbol gives it (Type/Method)"),
+			"new_source": prop("string", "The complete new definition, including its signature"),
+		}, "path", "name_path", "new_source"),
+		Mutates: true,
+		Summary: func(a map[string]any) string { return "replace " + str(a, "name_path") + " in " + str(a, "path") },
+		Consent: mutationConsent(func(a map[string]any) string {
+			src := str(a, "new_source")
+			if len(src) > 1500 {
+				src = src[:1500] + "\n…"
+			}
+			return "Replace " + str(a, "name_path") + " in " + str(a, "path") + " with:\n\n" + src
+		}),
+		Run: func(ctx context.Context, r *Runner, a map[string]any) (string, error) {
+			abs, rel, err := r.resolve(str(a, "path"))
+			if err != nil {
+				return "", err
+			}
+			if err := r.checkReadable(abs); err != nil {
+				return "", err
+			}
+			name, src := str(a, "name_path"), str(a, "new_source")
+			if strings.TrimSpace(src) == "" {
+				return "", errors.New("new_source is empty")
+			}
+			syms, err := r.Nav.FindSymbol(ctx, r.Opts.Root, name, repointel.FindOptions{Within: r.rootRel(abs)})
+			if err != nil {
+				return "", err
+			}
+			var match []repointel.Symbol
+			for _, s := range syms {
+				if s.File == r.rootRel(abs) && (s.NamePath == name || strings.HasSuffix(s.NamePath, "/"+name)) {
+					match = append(match, s)
+				}
+			}
+			switch {
+			case len(match) == 0:
+				return "", fmt.Errorf("the language server finds no symbol %s in %s; check the name path with find_symbol, or use edit", name, rel)
+			case len(match) > 1:
+				return "", fmt.Errorf("%s names %d symbols in %s; give the full name path:\n%s", name, len(match), rel, formatSymbols(match))
+			}
+			sym := match[0]
+			b, err := os.ReadFile(abs)
+			if err != nil {
+				return "", err
+			}
+			lines := strings.SplitAfter(string(b), "\n")
+			if sym.StartLine < 1 || sym.EndLine < sym.StartLine || sym.EndLine > len(lines) {
+				return "", fmt.Errorf("the language server gave lines %d-%d for %s, outside %s (%d lines); use edit", sym.StartLine, sym.EndLine, name, rel, len(lines))
+			}
+			if lines[sym.EndLine-1] != strings.TrimRight(lines[sym.EndLine-1], "\n") && !strings.HasSuffix(src, "\n") {
+				src += "\n"
+			}
+			out := strings.Join(lines[:sym.StartLine-1], "") + src + strings.Join(lines[sym.EndLine:], "")
+			// Expect the content just read: the file must not change
+			// between the language server's answer and the write.
+			if _, err := fileedit.Apply([]fileedit.Change{{Path: abs, Content: &out, Expect: retrieve.BlobID(b)}}); err != nil {
+				return "", r.editError(err, rel)
+			}
+			newEnd := sym.StartLine + strings.Count(strings.TrimSuffix(src, "\n"), "\n")
+			return fmt.Sprintf("replaced %s in %s (lines %d-%d, now %d-%d)", sym.NamePath, rel, sym.StartLine, sym.EndLine, sym.StartLine, newEnd) + r.changedSinceSeen(abs, b), nil
 		},
 	}
 }

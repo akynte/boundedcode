@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/akynte/boundedcode/internal/execbox"
 	"io"
 	"os"
 	"path/filepath"
@@ -18,7 +17,9 @@ import (
 	"golang.org/x/term"
 
 	"github.com/akynte/boundedcode/internal/buildinfo"
+	"github.com/akynte/boundedcode/internal/capability"
 	"github.com/akynte/boundedcode/internal/direct"
+	"github.com/akynte/boundedcode/internal/execbox"
 	"github.com/akynte/boundedcode/internal/gitops"
 	"github.com/akynte/boundedcode/internal/inference"
 	"github.com/akynte/boundedcode/internal/orchestrator"
@@ -161,7 +162,7 @@ func (a *App) directOptions(root, dir, approval string, ctxSize int) direct.Opti
 	opts := direct.Options{
 		Root: root, Dir: dir, Approval: approval, MaxTurns: dc.MaxTurns,
 		CommandTimeout: dc.CommandTimeout.D(), ContextTokens: ctxSize,
-		WorkingSetTokens: dc.WorkingSetTokens, MaxToolOutput: dc.MaxToolOutput, ObservationBytes: dc.ObservationBytes, NoPrune: !dc.PruneOn(), Compaction: dc.Compaction, NoChecks: !dc.ChecksOn(), NoSeedPack: !dc.SeedPackOn(), Retrieval: dc.Retrieval, NoHistoryNotes: !dc.HistoryNotesOn(), NoStream: !dc.StreamOn(),
+		WorkingSetTokens: dc.WorkingSetTokens, MaxToolOutput: dc.MaxToolOutput, ObservationBytes: dc.ObservationBytes, ParallelTools: dc.ParallelTools, MCPToolSearch: dc.MCPToolSearch, NoPrune: !dc.PruneOn(), Compaction: dc.Compaction, NoChecks: !dc.ChecksOn(), NoSeedPack: !dc.SeedPackOn(), Retrieval: dc.Retrieval, NoHistoryNotes: !dc.HistoryNotesOn(), NoStream: !dc.StreamOn(),
 		MaxOutputTokens: a.Config.Agent.MaxOutputTokens, Instructions: dc.Instructions,
 		UserInstructions: a.userInstructionsFile(),
 		Web:              direct.WebOptions{AllowHosts: dc.Web.AllowHosts, SearchURL: dc.Web.SearchURL},
@@ -377,16 +378,30 @@ Examples:
 			return nil
 		},
 	}, &cobra.Command{
-		Use: "tools", Short: "List the tools direct mode offers here (built-in, skills, agents, MCP)", Args: cobra.NoArgs,
+		Use: "tools", Short: "List the tools direct mode offers here (built-in, skills, agents, MCP) and bounded mode's, with what each does", Args: cobra.NoArgs,
+		Long: "Lists each tool with its effects (read, write, exec, network, interact, delegate, state) and whether calls of it may run together " +
+			"with the other such calls of one model reply (direct.parallel_tools), then bounded mode's tools and where their effects are enforced.",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			root, err := projectRoot(f.dir)
 			if err != nil {
 				return err
 			}
-			r := &direct.Runner{Session: &direct.Session{}, Opts: direct.Options{Root: root, MemoryFile: app.userInstructionsFile(), MCP: app.mcpServers(root)}}
+			r := &direct.Runner{Session: &direct.Session{}, Opts: direct.Options{Root: root, MemoryFile: app.userInstructionsFile(), MCP: app.mcpServers(root), MCPToolSearch: app.Config.Direct.MCPToolSearch}}
 			r.Asker = func(context.Context, string, []string) (string, error) { return "", nil }
-			for _, t := range r.Tools() {
-				app.printf("%-24s %s\n", t.Name, oneLineText(t.Description, 100))
+			defer r.Close()
+			if app.jsonOut {
+				return app.printJSON(map[string]any{"direct": r.Capabilities(), "deferred_mcp": r.DeferredTools(), "bounded": capability.BoundedTools})
+			}
+			caps := r.Capabilities()
+			for i, t := range r.Tools() {
+				together := ""
+				if caps[i].Concurrent {
+					together = "together"
+				}
+				app.printf("%-24s %-24s %-9s %s\n", t.Name, caps[i].Effects, together, oneLineText(t.Description, 80))
+			}
+			if d := r.DeferredTools(); len(d) > 0 {
+				app.printf("\n%d MCP tools are found with mcp_search and run with mcp_call (direct.mcp_tool_search):\n  %s\n", len(d), strings.Join(d, ", "))
 			}
 			if sk := r.Skills(); len(sk) > 0 {
 				app.printf("\nskills:\n")
@@ -409,7 +424,10 @@ Examples:
 			for _, l := range r.MCPStatus() {
 				app.printf("mcp %s\n", l)
 			}
-			r.Close()
+			app.printf("\nbounded mode (OpenHands tools, in the task's container):\n")
+			for _, d := range capability.BoundedTools {
+				app.printf("  %-22s %-24s %s\n", d.Name, d.Effects, d.Enforced)
+			}
 			return nil
 		},
 	})

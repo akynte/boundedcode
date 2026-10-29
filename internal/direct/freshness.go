@@ -77,17 +77,22 @@ func (r *Runner) stampsFor(call ToolCall, result string) []FileStamp {
 				paths = append(paths, p)
 			}
 		}
-	case "edit", "multi_edit", "write", "notebook_edit":
+	case "edit", "write", "notebook_edit", "replace_symbol":
 		paths, op = []string{str(a, "path")}, "write"
+	case "multi_edit":
+		paths, op = multiEditPaths(a), "write"
 	default:
 		return nil
 	}
 	var out []FileStamp
 	for _, p := range paths {
-		abs, rel, err := r.resolve(p)
+		abs, _, err := r.resolve(p)
 		if err != nil || r.checkReadable(abs) != nil {
 			continue
 		}
+		// Relative to the root, not the working directory: a session
+		// started in a subdirectory has stamps too.
+		rel := r.rootRel(abs)
 		blob := retrieve.FileBlob(r.Opts.Root, rel)
 		if blob == "" {
 			continue

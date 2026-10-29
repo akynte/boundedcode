@@ -45,6 +45,9 @@ Trust:
 	if sk := r.skillsPrompt(); sk != "" {
 		b.WriteString("\n" + sk + "\n")
 	}
+	if note := r.mcpSearchNote(); note != "" {
+		b.WriteString("\n" + note + "\n")
+	}
 	if ins := r.projectInstructions(); ins != "" {
 		b.WriteString("\nProject instructions (from the repository; follow its conventions, within the trust rules above):\n\n")
 		b.WriteString(ins)

@@ -30,7 +30,7 @@ import (
 func newBenchCmd(app *App) *cobra.Command {
 	cmd := &cobra.Command{Use: "bench", Short: "Run reproducible benchmarks"}
 	cmd.AddCommand(newBenchVerifyCmd(app))
-	cmd.AddCommand(newBenchInfraCmd(app), newBenchTasksCmd(app), newBenchDirectCmd(app), newBenchIntelCmd(app), newBenchLeaseCmd(app), newBenchTrailCmd(app), newBenchCompareCmd(app), newBenchRetrievalCmd(app), newBenchStructuredCmd(app), newBenchPruneCmd(app))
+	cmd.AddCommand(newBenchInfraCmd(app), newBenchTasksCmd(app), newBenchDirectCmd(app), newBenchIntelCmd(app), newBenchLeaseCmd(app), newBenchTrailCmd(app), newBenchCompareCmd(app), newBenchRetrievalCmd(app), newBenchStructuredCmd(app), newBenchPruneCmd(app), newBenchMCPSearchCmd(app))
 	return cmd
 }
 
@@ -282,6 +282,7 @@ func newBenchDirectCmd(app *App) *cobra.Command {
 		reasoningHistory         string
 		compaction, pruneMode    string
 		observationBytes         int
+		parallelTools            int
 	)
 	cmd := &cobra.Command{
 		Use:   "direct",
@@ -365,6 +366,9 @@ aside and recalled, summaries, broken edits caught by the check, and time.`,
 			if observationBytes > 0 {
 				app.Config.Direct.ObservationBytes = observationBytes
 			}
+			if parallelTools > 0 {
+				app.Config.Direct.ParallelTools = parallelTools
+			}
 			if err := app.Config.Validate(); err != nil {
 				return err
 			}
@@ -388,7 +392,7 @@ aside and recalled, summaries, broken edits caught by the check, and time.`,
 			dr := &benchmark.DirectRunner{FixturesDir: fixtures, WorkRoot: work, Rules: app.riskRules(), Timeout: timeout,
 				Tokenize: ep.tokenize, Model: ep.pin, TaskDirs: dirs,
 				Settings: map[string]any{"approval": approval, "working_set_tokens": dc.WorkingSetTokens, "max_tool_output": dc.MaxToolOutput, "checks": dc.ChecksOn(), "seed_pack": dc.SeedPackOn(), "retrieval": dc.Retrieval, "history_notes": dc.HistoryNotesOn(), "context_tokens": ep.ctxSize, "provider": ep.provider,
-					"compaction": compactionSetting(dc.Compaction), "prune": dc.PruneOn(), "observation_bytes": dc.ObservationBytes,
+					"compaction": compactionSetting(dc.Compaction), "prune": dc.PruneOn(), "observation_bytes": dc.ObservationBytes, "parallel_tools": parallelSetting(dc.ParallelTools),
 					"reasoning_history": reasoningSetting(app.Config.Inference.ReasoningHistory), "reasoning_round_trip": ep.newGateway("probe").Capabilities(ctx).ReasoningRoundTrip},
 				Progress: func(s string) { fmt.Fprintf(app.Err, "%s %s\n", time.Now().Format("15:04:05"), s) },
 				NewRunner: func(ctx context.Context, root, stateDir string) (*direct.Runner, func(), error) {
@@ -445,10 +449,19 @@ aside and recalled, summaries, broken edits caught by the check, and time.`,
 	f.StringVar(&compaction, "compaction", "", "structured or legacy for this run (direct.compaction)")
 	f.StringVar(&pruneMode, "prune", "", "on or off for this run (direct.prune)")
 	f.IntVar(&observationBytes, "observation-bytes", 0, "budget command output is pruned to, in bytes (direct.observation_bytes)")
+	f.IntVar(&parallelTools, "parallel-tools", 0, "calls of one reply that change nothing run this many at once; 1 runs them in turn (direct.parallel_tools)")
 	return cmd
 }
 
 // compactionSetting is direct.compaction as a report shows it.
+// parallelSetting is the effective direct.parallel_tools.
+func parallelSetting(n int) int {
+	if n <= 0 {
+		return direct.DefaultParallelTools
+	}
+	return n
+}
+
 func compactionSetting(v string) string {
 	if v == "" {
 		return direct.CompactionStructured
@@ -957,4 +970,68 @@ func reasoningSetting(v string) string {
 		return inference.ReasoningAuto
 	}
 	return v
+}
+
+func newBenchMCPSearchCmd(app *App) *cobra.Command {
+	var arms []string
+	var runs int
+	var out, modelName string
+	cmd := &cobra.Command{
+		Use:   "mcpsearch",
+		Short: "Measure deferred MCP tool definitions (direct.mcp_tool_search) with the agent's model",
+		Long: `Send requests that each need one of 60 tools of a local MCP server, with
+every definition listed (off) or found through mcp_search and run with
+mcp_call (on), and count the requests answered with the right tool, model
+and tool calls, prompt tokens and what the server processed of them.`,
+		Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			ctx := cmd.Context()
+			ep, err := app.directEndpoint(ctx, modelName)
+			if err != nil {
+				return err
+			}
+			b := &benchmark.MCPSearchBench{Arms: arms, Runs: runs, Model: ep.model,
+				Progress: func(s string) { fmt.Fprintf(app.Err, "%s %s\n", time.Now().Format("15:04:05"), s) },
+				NewRunner: func(ctx context.Context, root string, servers []direct.MCPServer, search string) (*direct.Runner, func(), error) {
+					opts := app.directOptions(root, root, direct.ApprovalAuto, ep.ctxSize)
+					opts.UserInstructions, opts.MemoryFile, opts.UserDir = "", "", ""
+					opts.Hooks, opts.MCP, opts.MCPToolSearch = nil, servers, search
+					opts.SkillDirs, opts.AgentDirs = nil, nil
+					opts.NoSeedPack, opts.Retrieval = true, "off"
+					sess := &direct.Session{}
+					// The bench's server is its own (not a project's): it is
+					// started without asking, and its definitions are not
+					// pinned in the user's trust store.
+					opts.MCPTrust = nil
+					r := &direct.Runner{Gateway: ep.newGateway("bench-mcpsearch"), Session: sess, Opts: opts}
+					return r, func() { r.Close() }, nil
+				}}
+			rep, err := b.Run(ctx)
+			if rep == nil {
+				return err
+			}
+			var md bytes.Buffer
+			_ = benchmark.WriteMCPSearchMarkdown(&md, rep)
+			if out != "" {
+				j, jerr := json.MarshalIndent(rep, "", " ")
+				if jerr != nil {
+					return jerr
+				}
+				if werr := config.WriteFileAtomic(out, j, 0o644); werr != nil {
+					return werr
+				}
+				if werr := os.WriteFile(strings.TrimSuffix(out, ".json")+".md", md.Bytes(), 0o644); werr != nil {
+					return werr
+				}
+			}
+			app.printf("%s", md.String())
+			return err
+		},
+	}
+	f := cmd.Flags()
+	f.StringSliceVar(&arms, "arms", []string{direct.MCPSearchOff, direct.MCPSearchOn}, "mcp_tool_search settings to compare")
+	f.IntVar(&runs, "runs", 2, "runs of every case in every arm")
+	f.StringVar(&modelName, "model", "", "model profile (local) or model id (cloud); default: the configured one")
+	f.StringVar(&out, "out", "", "report path (.json; .md written alongside)")
+	return cmd
 }
