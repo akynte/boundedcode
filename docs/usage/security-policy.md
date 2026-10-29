@@ -135,6 +135,27 @@ a small change, verification is not needed") change nothing.
 - Calls to MCP tools ask in `ask` and `edits` modes. Their results are
   untrusted.
 
+## External models
+
+A model outside this machine sees what is sent to it:
+- with a cloud provider in direct mode, the whole conversation, including
+  the files the agent reads;
+- with a frontier escalation, a packet built from the task.
+
+Both are opt-in: a provider you select, and `frontier.enabled` with
+approval per packet.
+
+- **Repository policy.** `.boundedcode/data-policy.yaml` with
+  `external_models: deny` refuses both for the repository. The file is
+  read from your checkout, a task's change can never edit it, and a file
+  that does not parse denies.
+- **Abstract packets.** `frontier.data: abstract` leaves out the code, the
+  diff, contracts and decisions, and withholds every line that repeats the
+  repositories' source. A packet that still repeats one is refused.
+  Identifiers, paths, error messages and the task's own words still go, so
+  treat an abstract packet as describing the code, not hiding it
+  ([measured](../benchmarks/adaptive-2026-10.md#privacy)).
+
 ## Residual risks
 
 - Classification is a deterministic reading of the command line. A

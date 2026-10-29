@@ -197,6 +197,78 @@ used on real work.
   verification counts) extends `ecosystem.IsTest` (what history notes
   count).
 
+### Adaptive execution: model capabilities, speculative decoding, routing, escalation, data policy
+
+Measured in the [adaptive execution benchmark](docs/benchmarks/adaptive-2026-10.md).
+Everything new is off or opt-in.
+
+- **Model profiles describe capabilities**: tool calling, structured
+  output, thinking control, trained context, tokenizer family, the
+  speculative decoding methods the weights allow, and known limitations.
+  - A user override keeps the built-in ones.
+  - `bcode model show` prints them with the memory fit.
+  - `bcode bench models` checks them against the GGUF header and probes
+    each model with BoundedCode's own requests: a tool call and its
+    result, code in tool arguments, a JSON schema, thinking off, a fact in
+    a 32K prompt, speed, load time and memory.
+  - On this machine every probed model passed, except Qwen3.5-4B under a
+    JSON schema (it writes on inside a string). Laguna turns thinking off
+    per request, and the MTP build needs `n_cpu_moe 38`.
+- **Speculative decoding** (`server.speculative`, off; `bench direct` and
+  `bench tasks --speculative`).
+  - A new experimental profile, `qwen3.6-35b-a3b-mtp`, serves the default
+    model with its multi-token prediction layer. Against the same profile
+    without speculation:
+    - a direct-suite task took 33.3 s instead of 38.7 s (−14%);
+    - decode went from 36.6 to 51.9 tokens/s (+42%), with 80% of drafts
+      accepted;
+    - 49 of 52 tasks passed, against 48;
+    - it takes 3.2 GiB more server memory.
+  - n-gram speculation makes a file rewrite 2.4× faster on its own but is
+    slower in the agent loop (23% accepted). A 0.8B draft model is slower
+    even on its own.
+  - `bench spec` measures each method's decode speed, prompt time,
+    acceptance, memory and changed answers.
+  - The gateway records drafted and accepted tokens per call.
+- **Routing** (`internal/routing`, experimental).
+  - `direct.routing: adaptive` chooses thinking per model call from its
+    role (plan, explore, edit, debug, answer). Measured: it moved tokens
+    from exploring and answering to editing and debugging, with no gain,
+    so it stays off.
+  - The router's model fallback never answered with a thinking model: in
+    80 tokens it only thought, and each unsure request waited 2.3 s for
+    the rules' choice. Under adaptive routing the call is skipped.
+  - `bcode model route` compares the local models measured on this
+    machine, with Wilson intervals, measured load times and a dwell
+    against switching. It reports which model it would use for questions
+    and for changes, and never switches the server.
+  - The gateway records each call's role and thinking, and `bench direct`
+    reports calls and tokens by role, and decode speed.
+- **Escalation** (`escalation.policy: adaptive`, experimental).
+  - No escalation once no attempt is left to apply it.
+  - A failure is escalated once.
+  - An attempt that changed nothing escalates at once.
+  - Architectural review waits for a failed attempt unless the contract
+    has unresolved ambiguities.
+  - `bench escalation` replays both policies on recorded runs. On 135, it
+    made 114 escalations against 129, covering the same 16 runs that
+    needed help.
+- **Data handling.**
+  - `frontier.data: abstract` sends the problem without the source: the
+    task, the failures and the strategies tried, with every line that
+    repeats a repository line withheld. A packet that still repeats one is
+    refused.
+  - `.boundedcode/data-policy.yaml` with `external_models: deny` blocks
+    escalation for a repository, and a cloud provider in direct mode. It is
+    read from the user's checkout and is a protected path; a file that
+    does not parse denies.
+  - `bench packets` rebuilds packets from recorded runs: 0 source lines in
+    abstract packets against 670 in full ones, and 53% fewer tokens, but
+    17.6 source identifiers still named per packet. Abstraction is not
+    proof of non-disclosure.
+- **Benchmark helpers:** `bench router` (the router's classification) and
+  a GGUF header reader (`model.ReadGGUFMeta`).
+
 ### Tool capabilities: one vocabulary for both modes, concurrent reads, safer edits
 
 - **What tools do, described once for both modes**

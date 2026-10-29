@@ -68,6 +68,35 @@ built-in profile later (such as `reasoning_budget` or
 prompt-cache and offload keys are in
 [Inference protocol](inference.md#llamacpp-server-settings).
 
+A profile also declares its `capabilities`: `tool_calling` (`native`,
+`none`), `structured_output` (`json_schema`, `none`), `thinking` (`toggle`:
+it can be turned off per request; `always`; `none`), `context_max` (the
+trained context), `tokenizer` (the GGUF tokenizer family, which a draft
+model must share), `speculative` (the methods the weights allow: `ngram`,
+`draft`, `mtp`) and `limitations`. A user override without them keeps the
+built-in ones. They are declarations: `bcode bench models` checks them
+against the weights and measures what the model does with BoundedCode's
+requests, and `bcode model show NAME` prints them with the memory fit.
+
+`server.speculative` turns on speculative decoding (off by default):
+
+```yaml
+server:
+  speculative:
+    type: ngram-mod        # or ngram-simple, ngram-map-k, draft-simple, draft-mtp
+    draft_file: Qwen3.5-0.8B-Q8_0.gguf   # draft-simple only; resolved like file
+    draft_gpu_layers: 99   # optional
+    n_max: 8               # optional: tokens drafted per step
+```
+
+A type the profile's `capabilities.speculative` does not allow is refused.
+Whether it is faster depends on the model and the machine:
+`bcode bench spec` measures it ([results](../benchmarks/adaptive-2026-10.md#speculative-decoding)).
+
+`bcode model route` shows which measured local model the experimental model
+routing would choose for chat and code requests on this machine, and why;
+it never switches the server itself.
+
 ### Model provider
 
 `bcode provider use NAME [--model ID] [...]` sets these keys, and
@@ -189,6 +218,8 @@ Further keys under `direct` (see the [tool coverage](../design/tool-coverage.md)
 | `observation_bytes` | `0` (8 KiB local, 24 KiB cloud) | The size such output is pruned to. |
 | `compaction` | `structured` | How the history is summarised when setting results aside is not enough. `structured`: the session state, the record built from the session (the user's requests and constraints verbatim, files read and changed with their blobs, symbols, test and build runs, the checkout) plus the model's notes (status, findings, decisions, pending, questions, next step), asked for by continuing the conversation so the prompt cache serves it. `legacy`: a free-text summary of a transcript, as before. |
 | `parallel_tools` | `0` (4) | How many calls of one model reply that change nothing (reads, searches, symbol lookups, fetches) run at once. `1` runs every call in turn. Edits, commands and every other call always run alone, in order ([capabilities](../architecture/capabilities.md#direct-modes-tool-pipeline)). |
+| `routing` | `off` | `adaptive` (experimental): the local model's thinking is chosen per model call from the call's role. No model call for the router's classification (the rules decide); thinking off for answering a question and for choosing what to read; the model's own for planning, editing and debugging. Only for a model whose profile says `thinking: toggle`. Approval, the guard and verification do not depend on it ([measured](../benchmarks/adaptive-2026-10.md#routing)). |
+| `routing_thinking` | empty | Overrides `routing`'s choice per role: `classify`, `plan`, `explore`, `edit`, `debug`, `answer`, each `on` or `off` (`classify` also `skip`). |
 | `mcp_tool_search` | `auto` | `auto`: when the MCP servers' tool definitions would take more than a tenth of the working set, they are not listed; the model finds them with `mcp_search` and runs them with `mcp_call`, under the same trust pins, rules and approval. `on` always, `off` never. `bcode bench mcpsearch` measures both with your model ([benchmark](../benchmarks/orchestration-2026-10.md#mcp-tool-search)). |
 | `seed_pack` | `true` | Before the first model call of a message, look up the names it mentions (identifiers, paths, quoted errors) in the project and send the places found with the message, definitions first, so the model starts at the right file instead of searching. A session's first message also carries a project map: the projects in the top four directory levels in any language, with their build and test commands, package manager and any missing tool; the CI configuration; top-level directories with source-file counts; top-level files. |
 | `retrieval` | `adaptive` | How that lookup works. `adaptive`: strategies chosen from the message and the evidence collected so far (stack traces, compiler and test-runner output, failing tests, paths, module names, symbols, routes, environment variables, named commits, and path words as a fallback), ranked by reliability, with provenance, in any language ([Retrieval](retrieval.md)). `basic`: the earlier lookup, a grep of the names the message mentions. |
@@ -241,6 +272,20 @@ Optional LSP navigation; see [serena.md](serena.md).
 | `max_packet_tokens` | `24000` | Escalation packet cap; must be >= 1. |
 | `timeout` | `15m` | |
 | `contain` | `true` | Run the frontier CLI in a container that sees only the packet. |
+| `data` | `full` | What a packet may carry. `full`: the context pack, with code, the diff and contracts (host paths rewritten, secrets redacted). `abstract`: the task, the verification failures and the strategies tried, with every line that repeats the repositories' source withheld, and the change as files and line counts; a packet that still repeats a source line is refused. Identifiers, paths and error messages remain, so `abstract` is not proof that the source cannot be inferred ([measured](../benchmarks/adaptive-2026-10.md#privacy)). |
+
+A repository can refuse external models altogether with
+`.boundedcode/data-policy.yaml`:
+
+```yaml
+external_models: deny   # allow (the default) or deny
+```
+
+It is read from your checkout, never from an agent's worktree, and a task's
+change can never edit it (`.boundedcode/` is a protected path). With `deny`,
+no escalation packet is built for a task that includes the repository, and
+direct mode refuses a cloud provider in it. A file that does not parse
+denies.
 
 ### `sandbox`
 
@@ -268,6 +313,7 @@ When a budget runs out, the task is parked as blocked. Work is never thrown away
 
 | Key | Default | Notes |
 |---|---|---|
+| `policy` | `rules` | `rules`, or `adaptive` (experimental): no escalation once no attempt is left to apply the advice; the same failure is escalated once; an attempt that changed nothing escalates at once; architectural risk (Z1) waits for a failed attempt unless the contract has unresolved ambiguities. Z3, Z4, the budget and approval are unchanged ([replayed](../benchmarks/adaptive-2026-10.md#escalation)). |
 | `failed_attempts` | `3` | Z2: consecutive failed verification attempts before escalating; >= 1. |
 | `rejected_strategies` | `2` | Z2: rejected, materially different strategies before escalating; >= 1. |
 | `architectural_risk` | idempotency, outbox, ledger, payment, auth, … | Z1 keywords matched against task text, paths and symbols. |
