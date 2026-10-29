@@ -129,7 +129,7 @@ func codeMask(src []byte, hashComments, rust bool) []bool {
 				return nil
 			}
 			i += end + 6
-		case c == '"' || c == '`' || c == '\'' && !(rust && lifetime(src, i)):
+		case c == '"' || c == '`' || c == '\'' && (!rust || !lifetime(src, i)):
 			j := i + 1
 			for j < len(src) && src[j] != c {
 				if src[j] == '\\' {

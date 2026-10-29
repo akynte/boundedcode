@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -83,7 +84,9 @@ func TestLocalReasoningRoundTrip(t *testing.T) {
 	}
 	// A caller that keeps its own reasoning (direct mode) sends it as is.
 	own := map[string]any{"role": "assistant", "content": "done", "reasoning_content": "mine"}
-	g.Forward(ctx, "/v1/chat/completions", agentRequest(own))
+	if _, _, err := g.Forward(ctx, "/v1/chat/completions", agentRequest(own)); err != nil {
+		t.Fatal(err)
+	}
 	if got := lastChat(t, rc)[2].(map[string]any)["reasoning_content"]; got != "mine" {
 		t.Fatalf("own reasoning = %v", got)
 	}
@@ -139,11 +142,15 @@ func TestLocalReasoningSurvivesResume(t *testing.T) {
 	})
 	path := filepath.Join(t.TempDir(), "local-replay.jsonl")
 	u := LocalUpstream(NewClient(srv.URL, 0), "", &FileReplay{Path: path})
-	u.Complete(context.Background(), agentRequest())
+	if _, _, err := u.Complete(context.Background(), agentRequest()); err != nil {
+		t.Fatal(err)
+	}
 	again := LocalUpstream(NewClient(srv.URL, 0), "", &FileReplay{Path: path})
 	turn := map[string]any{"role": "assistant", "content": "", "tool_calls": []any{map[string]any{"id": "call_9", "type": "function",
 		"function": map[string]any{"name": "terminal", "arguments": `{"command":"ls"}`}}}}
-	again.Complete(context.Background(), agentRequest(turn))
+	if _, _, err := again.Complete(context.Background(), agentRequest(turn)); err != nil {
+		t.Fatal(err)
+	}
 	if got := lastChat(t, rc)[2].(map[string]any)["reasoning_content"]; got != "kept" {
 		t.Fatalf("after resume: %v", got)
 	}
@@ -225,7 +232,7 @@ func TestMalformedAnswers(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { io.WriteString(w, c.body) }))
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _, _ = io.WriteString(w, c.body) }))
 			t.Cleanup(srv.Close)
 			g := &Gateway{Client: NewClient(srv.URL, 0), Model: "m"}
 			status, resp, _ := g.Forward(context.Background(), "/v1/chat/completions", map[string]any{"messages": []any{}})
@@ -261,7 +268,9 @@ func TestLocalServerErrorIsSampledAgain(t *testing.T) {
 		t.Fatalf("idempotency keys %q %q", rc.requests[1].Header.Get("Idempotency-Key"), rc.requests[2].Header.Get("Idempotency-Key"))
 	}
 	cloud := &OpenAIUpstream{Client: NewClient(srv.URL, 0), Name: ProviderOpenAI, Path: "/v1/chat/completions", Cloud: true}
-	cloud.Complete(context.Background(), agentRequest())
+	if _, _, err := cloud.Complete(context.Background(), agentRequest()); err != nil {
+		t.Fatal(err)
+	}
 	if k := rc.last(t, "/v1/chat/completions").Header.Get("Idempotency-Key"); k != "" {
 		t.Fatalf("cloud request has an idempotency key %q", k)
 	}
@@ -292,7 +301,7 @@ func TestClosedKeepAliveConnectionIsRetried(t *testing.T) {
 					if err != nil {
 						return
 					}
-					io.Copy(io.Discard, req.Body)
+					_, _ = io.Copy(io.Discard, req.Body)
 					if first && served == 1 {
 						return // closes the reused connection without answering
 					}
@@ -342,7 +351,7 @@ func TestContextOverflowNormalized(t *testing.T) {
 // purpose is compared with its own kind.
 func TestHistoryChangeAttribution(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		io.WriteString(w, `{"choices":[{"index":0,"message":{"role":"assistant","content":"ok"}}],"usage":{"prompt_tokens":4,"completion_tokens":1},"timings":{"cache_n":1,"prompt_n":3}}`)
+		_, _ = io.WriteString(w, `{"choices":[{"index":0,"message":{"role":"assistant","content":"ok"}}],"usage":{"prompt_tokens":4,"completion_tokens":1},"timings":{"cache_n":1,"prompt_n":3}}`)
 	}))
 	t.Cleanup(srv.Close)
 	g := &Gateway{Client: NewClient(srv.URL, 0), Model: "m", KeepLog: true}
@@ -352,7 +361,9 @@ func TestHistoryChangeAttribution(t *testing.T) {
 		for _, m := range ms {
 			arr = append(arr, m)
 		}
-		g.ForwardFor(context.Background(), purpose, "/v1/chat/completions", map[string]any{"messages": arr})
+		if _, _, err := g.ForwardFor(context.Background(), purpose, "/v1/chat/completions", map[string]any{"messages": arr}); err != nil {
+			t.Fatal(err)
+		}
 	}
 	s, u, a, tr := msg("system", "s"), msg("user", "u"), msg("assistant", "a"), msg("tool", "big result")
 	send("", s, u)
@@ -379,7 +390,9 @@ func TestStructuredOutputPerProvider(t *testing.T) {
 	}
 	t.Run("llama.cpp", func(t *testing.T) {
 		rc, srv := localServer(t, "", func(int, recorded) (int, string, http.Header) { return 200, chatAnswer("", "c"), nil })
-		LocalUpstream(NewClient(srv.URL, 0), "", nil).Complete(context.Background(), withFormat())
+		if _, _, err := LocalUpstream(NewClient(srv.URL, 0), "", nil).Complete(context.Background(), withFormat()); err != nil {
+			t.Fatal(err)
+		}
 		rf, _ := rc.last(t, "/v1/chat/completions").Body["response_format"].(map[string]any)
 		if rf["type"] != "json_schema" || rf["json_schema"].(map[string]any)["schema"] == nil {
 			t.Fatalf("response_format %v", rf)
@@ -463,11 +476,13 @@ func TestPromptProgressRelayed(t *testing.T) {
 					http.NotFound(w, r)
 					return
 				}
-				io.WriteString(w, `{"chat_template":"x","chat_template_caps":{"supports_tool_calls":true}}`)
+				_, _ = io.WriteString(w, `{"chat_template":"x","chat_template_caps":{"supports_tool_calls":true}}`)
 				return
 			}
 			var b map[string]any
-			json.NewDecoder(r.Body).Decode(&b)
+			if err := json.NewDecoder(r.Body).Decode(&b); err != nil {
+				t.Error(err)
+			}
 			asked = b["return_progress"] == true
 			w.Header().Set("Content-Type", "text/event-stream")
 			fmt.Fprint(w, "data: {\"choices\":[],\"prompt_progress\":{\"total\":900,\"cache\":800,\"processed\":50,\"time_ms\":40}}\n\n")
@@ -475,12 +490,15 @@ func TestPromptProgressRelayed(t *testing.T) {
 		}))
 		g := &Gateway{Client: NewClient(srv.URL, 0), Model: "m", KeepLog: true}
 		var progress []PromptProgress
-		g.Stream(context.Background(), "/v1/chat/completions", map[string]any{"messages": []any{}}, func(d Delta) {
+		_, _, err := g.Stream(context.Background(), "/v1/chat/completions", map[string]any{"messages": []any{}}, func(d Delta) {
 			if d.Progress != nil {
 				progress = append(progress, *d.Progress)
 			}
 		})
 		srv.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
 		if asked != llama || len(progress) != 1 || progress[0].Processed != 50 {
 			t.Fatalf("llama %v: asked %v progress %+v", llama, asked, progress)
 		}
@@ -493,7 +511,7 @@ func TestPromptProgressRelayed(t *testing.T) {
 // Anthropic and Gemini streams that end without their stop reason are
 // cut off, not complete.
 func TestCloudStreamsCutOff(t *testing.T) {
-	if _, err := foldGemini(strings.NewReader("data: {\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"Hi\"}]}}]}\n\n"), nil); err != ErrStreamInterrupted {
+	if _, err := foldGemini(strings.NewReader("data: {\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"Hi\"}]}}]}\n\n"), nil); !errors.Is(err, ErrStreamInterrupted) {
 		t.Fatalf("gemini: %v", err)
 	}
 	var a anthropicFold
@@ -506,7 +524,7 @@ func TestCloudStreamsCutOff(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if _, err := a.message(); err != ErrStreamInterrupted {
+	if _, err := a.message(); !errors.Is(err, ErrStreamInterrupted) {
 		t.Fatalf("anthropic: %v", err)
 	}
 }

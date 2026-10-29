@@ -109,6 +109,7 @@ func commitTree(ctx context.Context, dir string, files map[string]string) (strin
 // Run runs every case.
 func (b *VerifyBench) Run(ctx context.Context) (*VerifyReport, error) {
 	rep := &VerifyReport{Started: time.Now().UTC(), Sandbox: b.Engine.Sandbox.Name()}
+cases:
 	for _, c := range VerifyCases() {
 		if len(b.Only) > 0 && !hasPrefixAny(c.ID, b.Only) {
 			continue
@@ -121,8 +122,12 @@ func (b *VerifyBench) Run(ctx context.Context) (*VerifyReport, error) {
 		if b.Progress != nil {
 			b.Progress(fmt.Sprintf("  old=%s new=%s required=%s strong=%v truth=%v (%s) %s", r.Old, r.New, r.Required, r.Strong, r.TruthAgrees, r.Mutation, r.Error))
 		}
-		if ctx.Err() != nil {
-			break
+		// A cancelled run stops after the case in hand; the cases it ran
+		// are still a report, so it is returned without an error.
+		select {
+		case <-ctx.Done():
+			break cases
+		default:
 		}
 	}
 	rep.Variants = summarise(rep.Results)

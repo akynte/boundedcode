@@ -70,7 +70,7 @@ func TestLanguageConfigValidation(t *testing.T) {
 		if err := yaml.Unmarshal([]byte(src), &cfg); err != nil {
 			t.Fatal(err)
 		}
-		if err := cfg.Validate(); err == nil || !(strings.Contains(err.Error(), "languages") || strings.Contains(err.Error(), "build_systems")) {
+		if err := cfg.Validate(); err == nil || (!strings.Contains(err.Error(), "languages") && !strings.Contains(err.Error(), "build_systems")) {
 			t.Errorf("%s: %v", src, err)
 		}
 	}

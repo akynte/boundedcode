@@ -211,7 +211,8 @@ func (b *Box) pick() {
 		}
 		b.report = b.backend.report(b)
 		if b.report.Level != LevelStrong {
-			b.report.Missing = append(missing, unsupported()...)
+			missing = append(missing, unsupported()...)
+			b.report.Missing = missing
 			b.report.ByConfig = b.cfg.Network == NetHost || b.cfg.Backend != "" && b.cfg.Backend != "bwrap"
 		}
 	})
@@ -277,7 +278,8 @@ func (b *Box) Command(ctx context.Context, s Spec) (*Cmd, error) {
 	}
 	c := exec.CommandContext(ctx, argv[0], argv[1:]...)
 	c.Dir = s.Dir
-	c.Env = append(env, extra...)
+	env = append(env, extra...)
+	c.Env = env
 	c.WaitDelay = 2 * time.Second
 	t := newTree(c)
 	return &Cmd{Cmd: c, cleanup: cleanup, tree: t}, nil

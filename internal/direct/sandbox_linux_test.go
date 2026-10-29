@@ -160,6 +160,9 @@ func TestSandboxProcessLifetimes(t *testing.T) {
 		{text: "done"},
 	}}
 	r, _, _, _ := sandboxRunner(t, up, execbox.Config{})
+	if r.Opts.Sandbox.Report().Level != execbox.LevelStrong {
+		t.Skip("bwrap not available")
+	}
 	start := time.Now()
 	if _, err := r.Send(context.Background(), "go"); err != nil {
 		t.Fatal(err)
@@ -192,6 +195,9 @@ func TestSandboxOrdinaryWork(t *testing.T) {
 		{text: "done"},
 	}}
 	r, _, _, evs := sandboxRunner(t, up, execbox.Config{Registries: true})
+	if r.Opts.Sandbox.Report().Level != execbox.LevelStrong {
+		t.Skip("bwrap not available")
+	}
 	if _, err := exec.LookPath("go"); err != nil {
 		t.Skip("go")
 	}

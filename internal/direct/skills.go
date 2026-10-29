@@ -399,7 +399,7 @@ func (r *Runner) injectShell(ctx context.Context, body string, byModel bool) (st
 			firstErr = fmt.Errorf("command %q in the template: %s", cmd, refusal)
 			return m
 		}
-		if byModel && !approved && r.Opts.Approval != ApprovalAuto && !(r.Opts.Approval == ApprovalEdits && isSafeCommand(cmd)) &&
+		if byModel && !approved && r.Opts.Approval != ApprovalAuto && (r.Opts.Approval != ApprovalEdits || !isSafeCommand(cmd)) &&
 			!r.Opts.Permissions.Allowed("bash("+cmd+")") {
 			if r.Approve == nil || !r.Approve(ctx, ApprovalRequest{Tool: "skill", Summary: "$ " + cmd,
 				Detail: "A command template the model invoked runs, in " + r.cwd() + ":\n\n  " + cmd}) {

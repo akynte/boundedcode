@@ -53,7 +53,7 @@ func startProxy(stateDir string, hosts []string, onNet func(NetEvent), _ bool) (
 		}
 		sock = filepath.Join(dir, "p.sock")
 	}
-	ln, err := net.Listen("unix", sock)
+	ln, err := (&net.ListenConfig{}).Listen(context.Background(), "unix", sock)
 	if err != nil {
 		_ = os.RemoveAll(dir)
 		return nil, err
@@ -143,7 +143,7 @@ func (p *proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		_, _ = client.Write([]byte("HTTP/1.1 200 Connection Established\r\n\r\n"))
 		if n := buf.Reader.Buffered(); n > 0 {
-			b, _ := buf.Reader.Peek(n)
+			b, _ := buf.Peek(n)
 			_, _ = conn.Write(b)
 		}
 		splice(client, conn)
@@ -195,7 +195,7 @@ func dialPublic(ctx context.Context, host, port string) (net.Conn, error) {
 	if err != nil {
 		return nil, fmt.Errorf("cannot resolve %s", host)
 	}
-	var lastErr error = errors.New("no public address")
+	lastErr := errors.New("no public address")
 	for _, ip := range ips {
 		if !publicIP(ip.IP) {
 			lastErr = fmt.Errorf("%s resolves to a local or private address", host)
@@ -212,8 +212,8 @@ func dialPublic(ctx context.Context, host, port string) (net.Conn, error) {
 }
 
 func publicIP(ip net.IP) bool {
-	return !(ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsUnspecified() ||
-		ip.IsMulticast() || ip.IsInterfaceLocalMulticast() || isCGNAT(ip))
+	return !ip.IsLoopback() && !ip.IsPrivate() && !ip.IsLinkLocalUnicast() && !ip.IsLinkLocalMulticast() && !ip.IsUnspecified() &&
+		!ip.IsMulticast() && !ip.IsInterfaceLocalMulticast() && !isCGNAT(ip)
 }
 
 func isCGNAT(ip net.IP) bool {

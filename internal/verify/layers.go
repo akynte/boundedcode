@@ -169,8 +169,8 @@ func Classify(in LayerInputs) Classification {
 		}
 	}
 	// Layer 6.
-	switch m := in.Mutation; {
-	case m == nil:
+	switch m := in.Mutation; m {
+	case nil:
 		add(6, "mutation", LayerSkipped, "not run", in.Require.Mutation)
 	default:
 		st := map[string]string{MutationEstablished: LayerEstablished, MutationWeak: LayerWeak, MutationInconclusive: LayerIncomplete,

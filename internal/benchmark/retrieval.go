@@ -174,7 +174,7 @@ func goldOf(root, patch string) (files, symbols []string) {
 			continue
 		}
 		l := lang.ForPath(f.file, "")
-		if l == nil || !(l.Kind == lang.KindProgramming || l.Kind == lang.KindInfra || l.ID == "protobuf" || l.ID == "graphql") {
+		if l == nil || (l.Kind != lang.KindProgramming && l.Kind != lang.KindInfra && l.ID != "protobuf" && l.ID != "graphql") {
 			continue
 		}
 		files = append(files, f.file)
@@ -312,7 +312,7 @@ func checkoutBase(ctx context.Context, root, base string) error {
 		c := exec.CommandContext(ctx, "git", append([]string{"-c", "core.hooksPath=/dev/null"}, args...)...)
 		c.Dir = root
 		if out, err := c.CombinedOutput(); err != nil {
-			return fmt.Errorf("git %s: %v: %s", args[0], err, strings.TrimSpace(string(out)))
+			return fmt.Errorf("git %s: %w: %s", args[0], err, strings.TrimSpace(string(out)))
 		}
 	}
 	return nil

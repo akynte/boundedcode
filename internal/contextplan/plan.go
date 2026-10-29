@@ -594,8 +594,6 @@ func oneLine(s string, n int) string {
 	return s
 }
 
-func atoi(s string) int { n, _ := strconv.Atoi(s); return n }
-
 // contractsSection lists cross-service links: first those touching files the
 // task changed (with the counterpart that may need updating), then the other
 // contracts of the task's repositories.

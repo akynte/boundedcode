@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"slices"
@@ -158,7 +159,7 @@ func (b *StructuredBench) instance(ctx context.Context, gw *inference.Gateway, t
 		var err error
 		contract, err = task.ParseContract(reply)
 		switch {
-		case err == task.ErrNothingRequired:
+		case errors.Is(err, task.ErrNothingRequired):
 			c.Failure, c.Detail = "nothing_required", ""
 		case err != nil:
 			c.Failure, c.Detail = parseFailure(reply), trunc1(err.Error(), 200)

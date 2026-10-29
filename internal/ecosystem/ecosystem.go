@@ -386,7 +386,7 @@ var buildSystems = []BuildSystem{
 	// Python code, not a docs or tooling directory.
 	{ID: "python", RunnerConfig: []string{"pytest.ini", "conftest.py", "tox.ini", "noxfile.py", ".coveragerc"}, Languages: []string{"python"}, Tools: []string{"pip", "pip3", "python", "python3", "uv", "poetry", "pipenv", "pdm"}, Registries: pypi,
 		detect: func(d *detector, di dirInfo) []*Project {
-			if !di.has("pyproject.toml", "setup.py", "setup.cfg", "Pipfile") && !(di.has("requirements.txt") && (di.rel == "." || di.anyExt(".py"))) {
+			if !di.has("pyproject.toml", "setup.py", "setup.cfg", "Pipfile") && (!di.has("requirements.txt") || (di.rel != "." && !di.anyExt(".py"))) {
 				return nil
 			}
 			p := &Project{Kind: "Python project"}

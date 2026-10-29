@@ -3,6 +3,7 @@ package ecosystem
 import (
 	"bytes"
 	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -83,7 +84,8 @@ func TestNativeToolchainsInSandboxImage(t *testing.T) {
 		cancel()
 		ran++
 		code := 0
-		if ee, ok := err.(*exec.ExitError); ok {
+		var ee *exec.ExitError
+		if errors.As(err, &ee) {
 			code = ee.ExitCode()
 		} else if err != nil {
 			t.Fatalf("%s: %v", p.Dir, err)

@@ -1,6 +1,8 @@
 package execbox
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -51,7 +53,7 @@ func fail(msg string) {
 // namespace, forwards each connection to the proxy's Unix socket, and runs
 // the command. Its exit status is the command's.
 func runBridge(socket, port string, argv []string) int {
-	ln, err := net.Listen("tcp", "127.0.0.1:"+port)
+	ln, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", "127.0.0.1:"+port)
 	if err != nil {
 		fail("bridge: " + err.Error())
 	}
@@ -63,7 +65,7 @@ func runBridge(socket, port string, argv []string) int {
 			}
 			go func() {
 				defer c.Close()
-				u, err := net.Dial("unix", socket)
+				u, err := (&net.Dialer{}).DialContext(context.Background(), "unix", socket)
 				if err != nil {
 					return
 				}
@@ -87,7 +89,8 @@ func runBridge(socket, port string, argv []string) int {
 		}
 	}()
 	err = cmd.Wait()
-	if ee, ok := err.(*exec.ExitError); ok {
+	var ee *exec.ExitError
+	if errors.As(err, &ee) {
 		return ee.ExitCode()
 	}
 	if err != nil {

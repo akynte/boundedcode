@@ -8,6 +8,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -277,7 +278,7 @@ func (r *repo) resolve(p, hint string) []string {
 		// com.acme.orders.Orders.total -> com/acme/orders/Orders.java
 		parts := strings.Split(strings.ReplaceAll(hint, "/", "."), ".")
 		if len(parts) > 2 {
-			want = append(parts[:len(parts)-2:len(parts)-2], base)
+			want = slices.Concat(parts[:len(parts)-2], []string{base})
 		}
 	}
 	best, bestN := []string(nil), 0
