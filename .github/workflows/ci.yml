@@ -19,9 +19,11 @@ jobs:
         run: go vet ./...
       - name: test (skipped and failed tests are listed in the job summary)
         shell: bash
-        run: go test -json ./... | go run ./scripts/gotestsummary
+        # internal/orchestrator takes 8-10 minutes on a hosted runner, past
+        # go test's default 10m timeout per package.
+        run: go test -timeout 30m -json ./... | go run ./scripts/gotestsummary
       - name: race
-        run: go test -race ./...
+        run: go test -timeout 60m -race ./...
       - name: license policy and notices
         run: go run ./scripts/licensecheck -check-notices THIRD_PARTY_NOTICES.md,docs/licensing/upstream-license-matrix.md
       - name: LICENSES/go up to date

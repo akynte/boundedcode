@@ -161,7 +161,7 @@ func TestSubprojectVerificationAndEvidence(t *testing.T) {
 		"contracts/a.json":  "{}\n",
 		"api/internal/x.go": "package internal\n",
 	})
-	e := &Engine{Sandbox: sandbox.None{}, CacheDir: t.TempDir()}
+	e := &Engine{Sandbox: sandbox.None{}, CacheDir: t.TempDir(), Gitleaks: fakeGitleaks(t)}
 	target := RepoTarget{Name: "shop", Worktree: repo, Base: base, TaskID: "t", Source: repo}
 
 	writeFiles(t, repo, map[string]string{
@@ -214,7 +214,7 @@ func TestGofmtJudgesChangedFiles(t *testing.T) {
 		"calc_test.go": oldTest,
 		"upstream.go":  "package calc\n\nfunc upstream() {}", // no final newline: gofmt would change it
 	})
-	e := &Engine{Sandbox: sandbox.None{}, CacheDir: t.TempDir()}
+	e := &Engine{Sandbox: sandbox.None{}, CacheDir: t.TempDir(), Gitleaks: fakeGitleaks(t)}
 	target := RepoTarget{Name: "calc", Worktree: repo, Base: base, TaskID: "t", Source: repo}
 	gofmtStatus := func() (string, string) {
 		t.Helper()
@@ -260,7 +260,7 @@ func TestEvidenceCustomGoTestStage(t *testing.T) {
 		"calc.go":      fixedGo,
 		"calc_test.go": oldTest + "\nfunc TestClampNegative(t *testing.T) {\n\tif Clamp(-1, 5) != 0 {\n\t\tt.Fatal(\"negative\")\n\t}\n}\n",
 	})
-	e := &Engine{Sandbox: sandbox.None{}, CacheDir: t.TempDir()}
+	e := &Engine{Sandbox: sandbox.None{}, CacheDir: t.TempDir(), Gitleaks: fakeGitleaks(t)}
 	ev, err := e.BehaviourEvidence(ctx, RepoTarget{Name: "calc", Worktree: repo, Base: base, TaskID: "t", Source: repo})
 	if err != nil {
 		t.Fatal(err)
@@ -283,7 +283,7 @@ func TestStageCauses(t *testing.T) {
 			"  - {name: slow, run: [sh, -c, 'sleep 5'], timeout: 1s}\n" +
 			"  - {name: ok, run: [sh, -c, 'true']}\n",
 	})
-	e := &Engine{Sandbox: sandbox.None{}, CacheDir: t.TempDir()}
+	e := &Engine{Sandbox: sandbox.None{}, CacheDir: t.TempDir(), Gitleaks: fakeGitleaks(t)}
 	res, err := e.Run(ctx, RepoTarget{Name: "r", Worktree: repo, Base: base, TaskID: "t", Source: repo}, Full)
 	if err != nil {
 		t.Fatal(err)
