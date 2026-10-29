@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"syscall"
 	"unsafe"
 
@@ -82,7 +83,15 @@ func (landlockBackend) wrap(b *Box, s Spec, _ *proxyHandle, tmp string) ([]strin
 
 // runLandlock is the helper: restrict this process, then become the
 // command.
+//
+// landlock_restrict_self and PR_SET_NO_NEW_PRIVS apply to the calling
+// thread only, and execve keeps the calling thread's restrictions. The
+// goroutine is locked to its thread so that the thread restricted is the
+// one that execs: unlocked, the scheduler could move it to an unrestricted
+// thread in between and the command would run unconfined (seen under the
+// race detector in CI).
 func runLandlock(argv []string) error {
+	runtime.LockOSThread()
 	var pol landlockPolicy
 	if err := json.Unmarshal([]byte(os.Getenv(landlockEnv)), &pol); err != nil {
 		return fmt.Errorf("landlock policy: %w", err)

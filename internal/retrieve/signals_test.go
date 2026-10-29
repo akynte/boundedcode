@@ -91,7 +91,7 @@ func TestHostileEvidence(t *testing.T) {
 		strings.Repeat("at junk (/nowhere/x.js:1:1)\n", 50000)
 	t0 := time.Now()
 	res := retrieveIn(t, root, Input{Request: "it crashed", Evidence: []string{ev}}, Options{})
-	if time.Since(t0) > 5*time.Second {
+	if time.Since(t0) > 5*time.Second && !raceEnabled {
 		t.Fatalf("took %s", time.Since(t0))
 	}
 	for _, it := range res.Items {
