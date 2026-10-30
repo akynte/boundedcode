@@ -119,6 +119,12 @@ Every task has evaluation metadata: a **group**, a **capability**, a
    environment, the task set (hash and split), the number of trials, and
    the scorecard's limitations.
 
+The [laboratory](../usage/lab.md) (`bcode lab run`) does steps 1 to 3 for a
+pre-registered experiment:
+- it runs every arm in isolation;
+- it decides task by task on the held-out tasks;
+- it writes a proposal for review.
+
 ## The regression policy
 
 `benchmarks/gate-policy.yaml` is the default policy. A rule calls a metric

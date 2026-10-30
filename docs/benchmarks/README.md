@@ -4,6 +4,8 @@
 the regression gate are in [evaluating a change](evaluation.md); coverage
 by language and capability in [coverage](coverage.md); the last full
 measurement in [cross-language evaluation](cross-language-2026-10.md).
+Changes to the harness are tested in the [laboratory](../usage/lab.md); its
+first record is the [laboratory record](lab-2026-10.md).
 
 BoundedCode has been evaluated on small samples of public engineering tasks,
 on one machine (Linux, RTX 4060 8 GB laptop, 64 GB RAM) with one local model

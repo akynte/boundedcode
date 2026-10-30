@@ -197,6 +197,83 @@ used on real work.
   verification counts) extends `ecosystem.IsTest` (what history notes
   count).
 
+### Harness laboratory: evidence before any change to the harness
+
+`bcode lab` ([usage](docs/usage/lab.md), [record](docs/benchmarks/lab-2026-10.md))
+tests changes to BoundedCode's own harness in controlled experiments and
+writes proposals. Nothing changes until a person approves and promotes one;
+code is never applied by it.
+
+- **Trajectory analysis** (`lab analyze`): reports joined with their
+  session transcripts. Deterministic detectors find nine patterns:
+  - context retrieval that missed the task's files;
+  - repeated calls with nothing changed;
+  - weak verification;
+  - tool misuse;
+  - excessive context;
+  - escalation that did not help;
+  - unnecessary retries;
+  - ineffective compaction;
+  - exhausted turn budgets.
+
+  Failures a pattern explains by definition are counted apart from its
+  association with failure. Held-out runs are left out unless asked for.
+- **Hypotheses** (`lab hypothesize`) from a fixed catalog of interventions.
+  Each has the metric it is decided on and the simpler alternative it must
+  beat, and draft experiments are written for review.
+- **Experiments** (`lab run`):
+  - every arm is built from a fresh worktree of HEAD and runs under its own
+    `BOUNDEDCODE_HOME`, with an allowlisted environment (no credential
+    files, no API keys);
+  - every arm's configuration must be identical outside the experiment
+    settings;
+  - trials are interleaved;
+  - reports, tasks and fixtures are hashed;
+  - `lab evaluate` checks that a decision reproduces byte for byte, and
+    with `--out` decides a recorded run again under changed rules,
+    leaving its decision as it was.
+- **What a candidate can change** is limited by construction:
+  - configuration candidates are `config.ExperimentSettings`, which has no
+    field for any security setting;
+  - code candidates are patches confined to retrieval, context, routing and
+    tool code. They may not touch policy, permissions, the sandbox, hooks,
+    MCP trust, post-change checks, the graders, tasks, verification,
+    configuration or the laboratory, nor the inside of protected functions,
+    nor existing tests;
+  - they may not name the benchmark's task ids, hidden files or answers;
+  - they are limited to one isolated change at a time;
+  - they must pass the security tests before running.
+- **Decisions**:
+  - made on held-out tasks, by an exact paired sign test over tasks;
+  - the regression gate applies, with per-language rules blocking;
+  - a candidate must beat its simpler alternatives and stay within cost;
+  - it is not accepted globally when its gain is one language's (it is
+    then proposed for that language alone) or when fewer than three
+    languages are covered;
+  - predictions of fixed and at-risk tasks are checked, including a
+    predicted fix that got worse;
+  - a paired test with too few tasks to decide is inconclusive, not
+    unchanged.
+- **Proposals, approval, promotion** (`lab approve`, `lab promote`):
+  - an approval is tied to the proposal's hash, and to evidence unchanged
+    since the decision;
+  - promotion writes an approved configuration change, keeping comments
+    and a backup, or adds a workload override.
+- **`direct.workloads`** sets tunables for projects in given languages. It
+  is empty by default, and production behaviour is unchanged without it.
+  Reports record any override applied.
+- `bench gate` counts consistent per-task gains as an improvement, like
+  consistent losses. Scorecards can be built over a subset of runs.
+- **First results** ([record](docs/benchmarks/lab-2026-10.md)):
+  - In 1,523 development runs, weak verification explains 103 failures.
+    Context excess and unchanged reruns are associated with failure.
+  - Re-read on their own data, five of seven earlier decisions are
+    inconclusive. MTP is rejected for 24% more processed tokens per
+    success, despite running 17% faster per task.
+  - The first prospective experiment found nothing to promote. Every arm
+    was inconclusive, and the loop-guard patch made its own target task
+    fail in both trials. Nothing in production changed.
+
 ### Evaluation: tasks across languages, graded independently; scorecards and a regression gate
 
 How to evaluate a change is in [evaluating a change](docs/benchmarks/evaluation.md);
