@@ -182,6 +182,10 @@ type DirectConfig struct {
 	VerifyFallback string `yaml:"verify_fallback,omitempty"`
 	// Sandbox contains the commands direct mode runs (internal/execbox).
 	Sandbox DirectSandboxConfig `yaml:"sandbox,omitempty"`
+	// Workloads set tunables for projects in particular languages (the
+	// first match applies; none by default). Only tunables can be set:
+	// see Tunables.
+	Workloads []WorkloadOverride `yaml:"workloads,omitempty"`
 }
 
 // WebConfig configures the web tools.
@@ -741,6 +745,7 @@ func (c Config) Validate() error {
 	if c.Direct.ParallelTools < 0 || c.Direct.ParallelTools > 16 {
 		errs = append(errs, fmt.Errorf("direct.parallel_tools: %d is not between 0 and 16", c.Direct.ParallelTools))
 	}
+	errs = append(errs, c.Direct.validateWorkloads()...)
 	if c.Direct.ObservationBytes < 0 {
 		errs = append(errs, fmt.Errorf("direct.observation_bytes: %d is negative", c.Direct.ObservationBytes))
 	}

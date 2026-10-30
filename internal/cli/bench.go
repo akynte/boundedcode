@@ -406,6 +406,9 @@ aside and recalled, summaries, broken edits caught by the check, and time.`,
 			if retrieval != "" {
 				dc.Retrieval = retrieval
 			}
+			// The run's flags are configuration, so that a workload
+			// override (direct.workloads) is applied over them as in a chat.
+			app.Config.Direct.WorkingSetTokens, app.Config.Direct.HistoryNotes, app.Config.Direct.Retrieval = dc.WorkingSetTokens, dc.HistoryNotes, dc.Retrieval
 			if dc.Retrieval == "" {
 				dc.Retrieval = "adaptive"
 			}
@@ -413,7 +416,8 @@ aside and recalled, summaries, broken edits caught by the check, and time.`,
 				Tokenize: ep.tokenize, Model: ep.pin, TaskDirs: dirs,
 				Settings: map[string]any{"approval": approval, "working_set_tokens": dc.WorkingSetTokens, "max_tool_output": dc.MaxToolOutput, "checks": dc.ChecksOn(), "seed_pack": dc.SeedPackOn(), "retrieval": dc.Retrieval, "history_notes": dc.HistoryNotesOn(), "context_tokens": ep.ctxSize, "provider": ep.provider,
 					"compaction": compactionSetting(dc.Compaction), "prune": dc.PruneOn(), "observation_bytes": dc.ObservationBytes, "parallel_tools": parallelSetting(dc.ParallelTools), "routing": routingSetting(dc.Routing), "timeout": timeout.String(), "max_turns": dc.MaxTurns, "speculative": speculativeSetting(app, modelName),
-					"reasoning_history": reasoningSetting(app.Config.Inference.ReasoningHistory), "reasoning_round_trip": ep.newGateway("probe").Capabilities(ctx).ReasoningRoundTrip},
+					"reasoning_history": reasoningSetting(app.Config.Inference.ReasoningHistory), "reasoning_round_trip": ep.newGateway("probe").Capabilities(ctx).ReasoningRoundTrip,
+					"workloads": workloadsSetting(dc.Workloads)},
 				Progress: func(s string) { fmt.Fprintf(app.Err, "%s %s\n", time.Now().Format("15:04:05"), s) },
 				NewRunner: func(ctx context.Context, root, stateDir string) (*direct.Runner, func(), error) {
 					sess, err := direct.NewSession(filepath.Join(stateDir, "sessions"), root, ep.provider, ep.model)
@@ -428,11 +432,6 @@ aside and recalled, summaries, broken edits caught by the check, and time.`,
 					opts.SkillDirs = opts.SkillDirs[:len(opts.SkillDirs)-1]
 					opts.AgentDirs = opts.AgentDirs[:len(opts.AgentDirs)-1]
 					opts.CheckpointDir = filepath.Join(stateDir, "checkpoints")
-					if workingSet > 0 {
-						opts.WorkingSetTokens = workingSet
-					}
-					opts.NoHistoryNotes = opts.NoHistoryNotes || noHistoryNotes
-					opts.Retrieval = dc.Retrieval
 					r := &direct.Runner{Gateway: ep.newGateway(sess.ID), Session: sess, Opts: opts}
 					return r, func() { r.Close() }, nil
 				}}
@@ -473,6 +472,19 @@ aside and recalled, summaries, broken edits caught by the check, and time.`,
 	f.StringVar(&routingPolicy, "routing", "", "off or adaptive for this run (direct.routing)")
 	f.StringVar(&speculative, "speculative", "", "speculative decoding for this run: off, or TYPE[,draft=FILE][,n_max=N][,ngl=N] (server.speculative)")
 	return cmd
+}
+
+// workloadsSetting is direct.workloads as a report shows it ("none"
+// without).
+func workloadsSetting(ws []config.WorkloadOverride) string {
+	if len(ws) == 0 {
+		return "none"
+	}
+	var out []string
+	for _, w := range ws {
+		out = append(out, strings.Join(w.Languages, ",")+": "+strings.Join(w.Set.Pairs(), " "))
+	}
+	return strings.Join(out, "; ")
 }
 
 // escalationSetting is escalation.policy as a report shows it.

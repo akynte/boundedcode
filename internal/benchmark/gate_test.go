@@ -2,6 +2,7 @@ package benchmark
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 )
 
@@ -83,6 +84,13 @@ func TestGate(t *testing.T) {
 	}
 	if g.Failed || !warned {
 		t.Fatalf("tokens: failed=%v verdicts %+v", g.Failed, g.Verdicts)
+	}
+
+	// Two tasks that always failed now always pass: an improvement, though
+	// the intervals overlap.
+	better := card("m1", []map[string]bool{trialsOf(40, 40, []string{"flaky"}, true), trialsOf(40, 40, []string{"flaky"}, true)}, 0, 1000)
+	if v := Judge(p.Rules[0], base, better); v.Outcome != "improved" || !strings.Contains(v.Why, "2 tasks failed in every baseline trial") {
+		t.Fatalf("gains: %+v", v)
 	}
 
 	// A run of fewer tasks (--only) is not comparable, although the

@@ -227,6 +227,9 @@ type Options struct {
 	// evidence collected so far; the default) or "basic" (the request's
 	// names looked up by grep).
 	Retrieval string
+	// Workload describes the workload override (direct.workloads) these
+	// options were built with, "" for none: recorded, never acted on.
+	Workload string
 	// NoSeedPack disables the lookup of the request's names that travels
 	// with the user message (direct.seed_pack).
 	NoSeedPack bool

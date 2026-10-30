@@ -135,6 +135,8 @@ type DirectResult struct {
 	// connections its proxy refused.
 	Sandbox    string `json:"sandbox,omitempty"`
 	NetRefused int    `json:"net_refused,omitempty"`
+	// Workload is the direct.workloads override the task ran with.
+	Workload string `json:"workload,omitempty"`
 	// HistoryNotes counts notes naming files the repository's history
 	// changes together with a changed file.
 	HistoryNotes int `json:"history_notes,omitempty"`
@@ -487,6 +489,7 @@ func (d *DirectRunner) runOne(ctx context.Context, model string, spec TaskSpec) 
 	if r.Session != nil {
 		res.SessionID = r.Session.ID
 	}
+	res.Workload = r.Opts.Workload
 	r.Opts.AllowRisky = true // the suite measures the everyday loop; hand-offs are counted, not run
 	if spec.MaxTurns > 0 {
 		r.Opts.MaxTurns = spec.MaxTurns

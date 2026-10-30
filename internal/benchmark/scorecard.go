@@ -222,6 +222,47 @@ func wilson90(k, n int) (float64, float64) {
 // scorecard. meta supplies a task's group, split and languages when an
 // older report lacks them (nil: none).
 func BuildScorecard(paths []string, meta map[string]CatalogEntry) (*Scorecard, error) {
+	return BuildScorecardWhere(paths, meta, nil)
+}
+
+// RunKey is what a scorecard filter sees of a task run.
+type RunKey struct {
+	Task, Group, Split string
+	Languages          []string
+}
+
+// RunValue is one task run's figures, for paired comparisons by task.
+type RunValue struct {
+	RunKey
+	Trial      int // the report's position in the list
+	Passed     bool
+	Tokens     float64
+	Seconds    float64
+	ModelCalls float64
+}
+
+// RunValues reads the task runs of reports (skipped runs left out).
+func RunValues(paths []string, meta map[string]CatalogEntry) ([]RunValue, error) {
+	var out []RunValue
+	for i, p := range paths {
+		rs, _, _, _, _, err := readRuns(p, meta)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", p, err)
+		}
+		for _, r := range rs {
+			if r.skipped {
+				continue
+			}
+			out = append(out, RunValue{RunKey: RunKey{Task: r.id, Group: r.group, Split: r.split, Languages: r.langs}, Trial: i,
+				Passed: r.passed, Tokens: r.tokens, Seconds: r.seconds, ModelCalls: r.modelCalls})
+		}
+	}
+	return out, nil
+}
+
+// BuildScorecardWhere is BuildScorecard over the task runs keep accepts
+// (nil: all), such as one split, or all but one language.
+func BuildScorecardWhere(paths []string, meta map[string]CatalogEntry, keep func(RunKey) bool) (*Scorecard, error) {
 	sc := &Scorecard{Schema: ScorecardSchema, Created: time.Now().UTC(), ByLanguage: map[string]Metrics{}, ByGroup: map[string]Metrics{},
 		BySplit: map[string]Metrics{}, Tasks: map[string]TaskTally{}}
 	var runs []run
@@ -248,6 +289,15 @@ func BuildScorecard(paths []string, meta map[string]CatalogEntry) (*Scorecard, e
 		}
 		if sc.Settings == nil {
 			sc.Settings = settings
+		}
+		if keep != nil {
+			kept := rs[:0:0]
+			for _, r := range rs {
+				if keep(RunKey{Task: r.id, Group: r.group, Split: r.split, Languages: r.langs}) {
+					kept = append(kept, r)
+				}
+			}
+			rs = kept
 		}
 		var trial Metrics
 		for _, r := range rs {

@@ -272,9 +272,9 @@ func judge(r GateRule, key string, b, c Metrics, base, cand *Scorecard) Verdict 
 		blo, bhi := wilson90(bk, bn)
 		clo, chi := wilson90(ck, cn)
 		separated := chi < blo || clo > bhi
-		flips := 0
+		flips, gains := 0, 0
 		if r.Metric == "success_rate" && key == "overall" {
-			flips = consistentFlips(base, cand, r.Better)
+			flips, gains = consistentFlips(base, cand, r.Better), consistentFlips(cand, base, r.Better)
 		}
 		switch {
 		case worse(delta) && math.Abs(delta) > r.Tolerance && separated:
@@ -283,6 +283,8 @@ func judge(r GateRule, key string, b, c Metrics, base, cand *Scorecard) Verdict 
 			v.Outcome, v.Why = "regressed", fmt.Sprintf("%d tasks passed in every baseline trial and failed in every candidate trial", flips)
 		case !worse(delta) && math.Abs(delta) > r.Tolerance && separated:
 			v.Outcome, v.Why = "improved", fmt.Sprintf("%.3f against %.3f, beyond chance", v.Cand, v.Baseline)
+		case r.MinFlips > 0 && gains >= r.MinFlips && !worse(delta):
+			v.Outcome, v.Why = "improved", fmt.Sprintf("%d tasks failed in every baseline trial and passed in every candidate trial", gains)
 		default:
 			v.Why = fmt.Sprintf("%.3f against %.3f: within tolerance %.2f or chance (intervals [%.2f, %.2f] and [%.2f, %.2f])", v.Cand, v.Baseline, r.Tolerance, clo, chi, blo, bhi)
 		}
@@ -304,6 +306,16 @@ func judge(r GateRule, key string, b, c Metrics, base, cand *Scorecard) Verdict 
 	}
 	return v
 }
+
+// Judge applies one rule to the overall figures of two scorecards, for
+// callers comparing arms of an experiment (internal/lab).
+func Judge(r GateRule, base, cand *Scorecard) Verdict {
+	return judge(r, "overall", base.Overall, cand.Overall, base, cand)
+}
+
+// Comparability lists why two scorecards cannot be compared under c (none:
+// they can).
+func Comparability(base, cand *Scorecard, c Comparable) []string { return comparability(base, cand, c) }
 
 // rateCounts and rateCounts2 are a rate's numerator and denominator.
 func rateCounts(metric string, m Metrics) int {

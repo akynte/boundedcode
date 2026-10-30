@@ -74,6 +74,7 @@ func newRoot(app *App) *cobra.Command {
 		newSetupCmd(app),
 		newProviderCmd(app),
 		newChatCmd(app),
+		newLabCmd(app),
 	)
 	return root
 }

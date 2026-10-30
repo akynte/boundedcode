@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -19,6 +20,7 @@ import (
 	"github.com/akynte/boundedcode/internal/buildinfo"
 	"github.com/akynte/boundedcode/internal/capability"
 	"github.com/akynte/boundedcode/internal/direct"
+	"github.com/akynte/boundedcode/internal/ecosystem"
 	"github.com/akynte/boundedcode/internal/execbox"
 	"github.com/akynte/boundedcode/internal/gitops"
 	"github.com/akynte/boundedcode/internal/inference"
@@ -169,6 +171,18 @@ func (a *App) directRunner(ctx context.Context, dir, sessionID, modelOverride, a
 // checkpoints.
 func (a *App) directOptions(root, dir, approval string, ep *directEndpoint) direct.Options {
 	dc := a.Config.Direct
+	workload := ""
+	if len(dc.Workloads) > 0 {
+		langs := projectLanguages(root)
+		if w, ok := dc.Workload(langs); ok {
+			w.Set.ApplyTo(&dc)
+			workload = fmt.Sprintf("languages %s: %s", strings.Join(w.Languages, ","), strings.Join(w.Set.Pairs(), " "))
+			if w.Source != "" {
+				workload += " (" + w.Source + ")"
+			}
+			a.Log.Info("direct.workloads override applied", "project_languages", langs, "override", workload)
+		}
+	}
 	opts := direct.Options{
 		Root: root, Dir: dir, Approval: approval, MaxTurns: dc.MaxTurns,
 		CommandTimeout: dc.CommandTimeout.D(), ContextTokens: ep.ctxSize,
@@ -184,6 +198,7 @@ func (a *App) directOptions(root, dir, approval string, ep *directEndpoint) dire
 			filepath.Join(a.Paths.Config, "skills")},
 		AgentDirs: []string{filepath.Join(root, ".boundedcode", "agents"), filepath.Join(root, ".claude", "agents"), filepath.Join(a.Paths.Config, "agents")},
 		UserDir:   a.Paths.Config,
+		Workload:  workload,
 	}
 	for _, h := range dc.Hooks {
 		opts.Hooks = append(opts.Hooks, direct.Hook{Event: h.Event, Matcher: h.Matcher, Command: h.Command, Timeout: h.Timeout.D()})
@@ -195,6 +210,20 @@ func (a *App) directOptions(root, dir, approval string, ep *directEndpoint) dire
 		opts.CheckpointDir = filepath.Join(a.sessionsDir(), ".checkpoints", direct.ProjectKey(root))
 	}
 	return opts
+}
+
+// projectLanguages are the languages of the projects detected under root
+// (internal/lang IDs), for direct.workloads.
+func projectLanguages(root string) []string {
+	var out []string
+	for _, p := range ecosystem.Detect(root, ecosystem.Options{}).Projects {
+		for _, l := range p.Languages {
+			if !slices.Contains(out, l) {
+				out = append(out, l)
+			}
+		}
+	}
+	return out
 }
 
 // sandboxBox is the containment for one session's commands, with its
