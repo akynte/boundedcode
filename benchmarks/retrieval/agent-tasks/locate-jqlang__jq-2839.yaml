@@ -12,3 +12,12 @@ request: "Calling jv_cmp() on two decNumber numbers can still cause a segfault\n
 expect:
   - "(?:src/jv\\.c)"
 timeout: 15m
+
+group: everyday
+capability: diagnosis
+split: heldout
+provenance:
+  kind: real
+  authored: 2026-10-28
+  upstream: "git:https://github.com/jqlang/jq@f86566b2631b777c0d0c9a4572eb21146a14829b"
+  issue_date: 2023-08-13

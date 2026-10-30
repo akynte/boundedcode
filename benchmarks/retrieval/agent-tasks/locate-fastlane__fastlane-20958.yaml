@@ -12,3 +12,12 @@ request: "[Regression] import_from_git fails to found Fastfile if no cache folde
 expect:
   - "(?:fastlane/lib/fastlane/fast_file\\.rb)"
 timeout: 15m
+
+group: everyday
+capability: diagnosis
+split: heldout
+provenance:
+  kind: real
+  authored: 2026-10-28
+  upstream: "git:https://github.com/fastlane/fastlane@6ff1c49bd90bdc29a94b6f99f568cf86fffc376d"
+  issue_date: 2022-12-30

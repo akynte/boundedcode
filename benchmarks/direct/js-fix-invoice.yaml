@@ -1,0 +1,42 @@
+id: js-fix-invoice
+category: small-fix
+language: javascript
+fixture: langs
+repos: [js-invoice]
+request: >-
+  In the invoice project, invoiceTotal([{ unitPrice: 9.1, quantity: 1 }], 0.1)
+  returns 10.010000000000002 instead of 10.01. Totals must be exact to the
+  cent, with the tax rounded half up to the cent. Fix invoiceTotal and run the
+  tests.
+hidden:
+  - repo: js-invoice
+    path: test/hidden.test.js
+    content: |
+      'use strict';
+      const test = require('node:test');
+      const assert = require('node:assert');
+      const { invoiceTotal } = require('../src/invoice');
+
+      test('cents are exact', () => {
+        assert.strictEqual(invoiceTotal([{ unitPrice: 9.1, quantity: 1 }], 0.1), 10.01);
+        assert.strictEqual(invoiceTotal([{ unitPrice: 0.1, quantity: 3 }], 0), 0.3);
+      });
+
+      test('tax rounds half up', () => {
+        assert.strictEqual(invoiceTotal([{ unitPrice: 1.05, quantity: 1 }], 0.5), 1.58);
+        assert.strictEqual(invoiceTotal([{ unitPrice: 0.99, quantity: 3 }, { unitPrice: 2.5, quantity: 2 }], 0.2), 9.56);
+      });
+checks:
+  - repo: js-invoice
+    run: [node, --test]
+timeout: 15m
+group: everyday
+capability: bug-fix
+split: heldout
+provenance:
+  kind: synthetic
+  authored: 2026-10-30
+reference:
+  - repo: js-invoice
+    file: src/invoice.js
+    new: "'use strict';\n\n// lineTotal is a line's amount: unit price times quantity.\nfunction lineTotal(line) {\n  return line.unitPrice * line.quantity;\n}\n\n// invoiceTotal is the invoice's total with tax: the lines' sum plus tax at\n// rate (0.2 for 20%). Amounts are in currency units (euros), and the total\n// must be exact to the cent: 10.01, never 10.010000000000002.\nfunction invoiceTotal(lines, rate) {\n  const net = lines.reduce((sum, l) => sum + Math.round(l.unitPrice * 100) * l.quantity, 0);\n  const tax = Math.floor(net * rate + 0.5 + 1e-9);\n  return (net + tax) / 100;\n}\n\nmodule.exports = { lineTotal, invoiceTotal };\n"

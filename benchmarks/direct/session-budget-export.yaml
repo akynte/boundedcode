@@ -1,0 +1,21 @@
+id: session-budget-export
+category: session
+language: go
+fixture: langs
+repos: [go-stock]
+max_turns: 4
+request: >-
+  In go-stock, add CSV, JSON and XML export of Book.Levels (ExportCSV,
+  ExportJSON and ExportXML, each writing to an io.Writer), each with tests,
+  and a command-line tool under cmd/stockexport that prints a book in a format
+  given by a flag.
+checks:
+  - repo: go-stock
+    run: [sh, -c, "go build ./... && go vet ./... && go test ./..."]
+timeout: 15m
+group: long-running
+capability: budget
+split: heldout
+provenance:
+  kind: synthetic
+  authored: 2026-10-30

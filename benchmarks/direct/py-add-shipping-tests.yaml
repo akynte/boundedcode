@@ -1,0 +1,74 @@
+id: py-add-shipping-tests
+category: add-test
+language: python
+fixture: langs
+repos: [py-orders]
+setup:
+  - repo: py-orders
+    file: orders/shipping.py
+    old: "import json\n"
+    new: "import json\nimport math\n"
+  - repo: py-orders
+    file: orders/shipping.py
+    old: "        if weight_kg < band[\"max_kg\"]:\n"
+    new: "        if weight_kg <= band[\"max_kg\"]:\n"
+  - repo: py-orders
+    file: orders/shipping.py
+    old: "int(extra)"
+    new: "math.ceil(extra)"
+request: >-
+  In the orders project, write unit tests for orders.shipping.shipping_cost in
+  tests/test_shipping.py: every band, the band limits, and the surcharge for
+  parcels above the last band. The tests read data/rates.json, which
+  `python3 tools/gen_rates.py` writes. Do not change orders/shipping.py.
+hidden:
+  - repo: py-orders
+    path: .hidden/mutants.py
+    content: |
+      # The agent's shipping tests must pass on the code as it is and fail
+      # on each mutant of it (a wrong band limit, a floored surcharge, a
+      # surcharge without the band's price).
+      import os
+      import subprocess
+      import sys
+
+      subprocess.run([sys.executable, "tools/gen_rates.py"], check=True, capture_output=True)
+      run = [sys.executable, "-m", "unittest", "discover", "-s", "tests", "-p", "test_shipping*.py"]
+      path = "orders/shipping.py"
+      orig = open(path).read()
+      r = subprocess.run(run, capture_output=True, text=True)
+      if r.returncode != 0 or "Ran 0 tests" in r.stderr:
+          print("the tests do not pass on the code as it is:\n" + r.stderr[-1500:])
+          sys.exit(1)
+      mutants = {
+          "band limit": ('weight_kg <= band["max_kg"]', 'weight_kg < band["max_kg"]'),
+          "floored surcharge": ("math.ceil(extra)", "int(extra)"),
+          "surcharge alone": ('return last["cents"] + ', "return "),
+      }
+      survived = []
+      try:
+          for name, (a, b) in mutants.items():
+              assert a in orig, name
+              open(path, "w").write(orig.replace(a, b))
+              if subprocess.run(run, capture_output=True, text=True).returncode == 0:
+                  survived.append(name)
+      finally:
+          open(path, "w").write(orig)
+      if survived:
+          print("mutants the tests do not catch: " + ", ".join(survived))
+          sys.exit(1)
+      print("every mutant caught")
+checks:
+  - repo: py-orders
+    run: [python3, .hidden/mutants.py]
+timeout: 15m
+group: everyday
+capability: test-creation
+split: heldout
+provenance:
+  kind: synthetic
+  authored: 2026-10-30
+reference:
+  - repo: py-orders
+    file: tests/test_shipping.py
+    new: "import unittest\n\nfrom orders.shipping import shipping_cost\n\n\nclass ShippingTest(unittest.TestCase):\n    def test_bands(self):\n        self.assertEqual(shipping_cost(0.5), 499)\n        self.assertEqual(shipping_cost(3), 899)\n        self.assertEqual(shipping_cost(10), 1999)\n\n    def test_limits(self):\n        self.assertEqual(shipping_cost(1), 499)\n        self.assertEqual(shipping_cost(5), 899)\n        self.assertEqual(shipping_cost(20), 1999)\n\n    def test_surcharge_per_started_kg(self):\n        self.assertEqual(shipping_cost(20.5), 1999 + 150)\n        self.assertEqual(shipping_cost(22), 1999 + 300)\n"

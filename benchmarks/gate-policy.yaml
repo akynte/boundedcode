@@ -1,0 +1,77 @@
+# Regression policy for `bcode bench gate` (internal/benchmark/gate.go).
+#
+# A rule calls a metric regressed only when it is worse beyond its
+# tolerance AND beyond the noise the data shows: rates by 90% Wilson
+# intervals that do not overlap (or, for task success, tasks that passed in
+# every baseline trial and failed in every candidate trial), figures by a
+# tolerance widened to the baseline trials' own spread, and counts by a
+# fixed allowance. Tasks such as fix-balance-query pass about half the time
+# on the same build, so a fixed threshold on the pass rate would fail
+# changes for noise.
+version: 1
+comparable:
+  # Another model file, task set or budget makes the numbers incomparable.
+  same_model: true
+  same_task_set: true
+  same_budgets: [timeout, max_turns, max_attempts, max_wall_clock, max_local_tokens, max_escalations, frontier]
+rules:
+  - metric: success_rate
+    better: higher
+    test: wilson
+    tolerance: 0.03
+    min_flips: 2
+    blocking: true
+  - metric: security_failures
+    better: lower
+    test: count
+    tolerance: 0
+    blocking: true
+  - metric: false_acceptance_rate
+    better: lower
+    test: wilson
+    tolerance: 0.05
+    blocking: true
+  - metric: false_rejection_rate
+    better: lower
+    test: wilson
+    tolerance: 0.05
+    blocking: false
+  - metric: success_rate
+    scope: language
+    min_runs: 6
+    better: higher
+    test: wilson
+    tolerance: 0.05
+    blocking: false
+  - metric: success_rate
+    scope: split
+    min_runs: 6
+    better: higher
+    test: wilson
+    tolerance: 0.05
+    blocking: false
+  - metric: tokens_per_success
+    better: lower
+    test: relative
+    tolerance: 0.15
+    blocking: false
+  - metric: median_seconds
+    better: lower
+    test: relative
+    tolerance: 0.15
+    blocking: false
+  - metric: p90_seconds
+    better: lower
+    test: relative
+    tolerance: 0.25
+    blocking: false
+  - metric: model_calls_per_run
+    better: lower
+    test: relative
+    tolerance: 0.15
+    blocking: false
+  - metric: peak_server_mib
+    better: lower
+    test: relative
+    tolerance: 0.10
+    blocking: false

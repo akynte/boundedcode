@@ -12,3 +12,12 @@ request: "Adding --replace to a --multiline search can expand what content is ma
 expect:
   - "(?:crates/printer/src/util\\.rs)"
 timeout: 15m
+
+group: everyday
+capability: diagnosis
+split: heldout
+provenance:
+  kind: real
+  authored: 2026-10-28
+  upstream: "git:https://github.com/burntsushi/ripgrep@4dc6c73c5a9203c5a8a89ce2161feca542329812"
+  issue_date: 2022-05-11

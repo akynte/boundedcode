@@ -35,3 +35,10 @@ checks:
   - repo: ledger-service
     run: [sh, -c, "git diff --quiet HEAD -- . && test -z \"$(git status --porcelain --untracked-files=all)\""]
 timeout: 15m
+
+group: everyday
+capability: diagnosis
+split: dev
+provenance:
+  kind: synthetic
+  authored: 2026-10-26

@@ -77,3 +77,10 @@ checks:
   - repo: ledger-service
     run: [sh, -c, "git diff --exit-code HEAD -- internal/ledger/ledger_test.go internal/consumer/consumer_test.go && test -f internal/ledger/regression_test.go"]
 timeout: 30m
+
+group: long-running
+capability: resume
+split: dev
+provenance:
+  kind: synthetic
+  authored: 2026-10-29

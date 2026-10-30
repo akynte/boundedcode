@@ -85,3 +85,11 @@ checks:
   - repo: x-tools
     run: [sh, -c, "grep -l 'Len()' go/ast/inspector/*_test.go | grep -qv hidden_"]
 timeout: 40m
+
+group: long-running
+capability: multi-turn
+split: dev
+provenance:
+  kind: synthetic
+  authored: 2026-10-26
+  upstream: "gomod:golang.org/x/tools@v0.50.0"

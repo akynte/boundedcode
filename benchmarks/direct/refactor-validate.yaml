@@ -32,3 +32,10 @@ checks:
   - repo: payment-service
     run: [sh, -c, "grep -q 'Validate()' internal/api/handler.go"]
 timeout: 20m
+
+group: everyday
+capability: refactoring
+split: dev
+provenance:
+  kind: synthetic
+  authored: 2026-10-03

@@ -85,3 +85,10 @@ checks:
   - repo: py-inventory
     run: [sh, -c, "git diff --exit-code HEAD -- tests/test_records.py tests/test_inventory.py"]
 timeout: 25m
+
+group: long-running
+capability: compaction
+split: dev
+provenance:
+  kind: synthetic
+  authored: 2026-10-29

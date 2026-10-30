@@ -1,0 +1,20 @@
+id: ruby-locate-ratio
+category: locate
+language: ruby
+fixture: langs
+repos: [ruby-money]
+read_only: true
+request: >-
+  In ruby-money, which method hands out the cents left over when an amount is
+  split by ratio, and in which file is it? Answer briefly; do not change any
+  files.
+expect:
+  - "allocate_by_ratio"
+  - "lib/money\\.rb"
+timeout: 10m
+group: everyday
+capability: symbol-discovery
+split: dev
+provenance:
+  kind: synthetic
+  authored: 2026-10-30

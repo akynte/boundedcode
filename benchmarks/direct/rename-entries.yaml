@@ -32,3 +32,10 @@ checks:
   - repo: ledger-service
     run: [sh, -c, "! grep -rq 'func (l \\*Ledger) Entries' internal/"]
 timeout: 20m
+
+group: everyday
+capability: multi-file
+split: dev
+provenance:
+  kind: synthetic
+  authored: 2026-10-26

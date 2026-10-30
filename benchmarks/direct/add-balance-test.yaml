@@ -16,3 +16,10 @@ checks:
   - repo: ledger-service
     run: [sh, -c, "git diff --exit-code HEAD -- internal/ledger/ledger.go internal/consumer"]
 timeout: 20m
+
+group: everyday
+capability: test-creation
+split: dev
+provenance:
+  kind: synthetic
+  authored: 2026-10-26

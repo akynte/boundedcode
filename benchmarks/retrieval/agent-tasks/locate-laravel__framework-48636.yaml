@@ -12,3 +12,12 @@ request: "[10.x] `Model::replicate()` doesn't take into account unique IDs\n### 
 expect:
   - "(?:src/Illuminate/Database/Eloquent/Model\\.php)"
 timeout: 15m
+
+group: everyday
+capability: diagnosis
+split: heldout
+provenance:
+  kind: real
+  authored: 2026-10-28
+  upstream: "git:https://github.com/laravel/framework@4a9ae49f3969c4648b5ee000e6692a449e34c2a8"
+  issue_date: 2023-10-05

@@ -12,3 +12,12 @@ request: "Custom validation rules break generated error MessageBag when custom m
 expect:
   - "(?:src/Illuminate/Validation/Concerns/FormatsMessages\\.php)"
 timeout: 15m
+
+group: everyday
+capability: diagnosis
+split: heldout
+provenance:
+  kind: real
+  authored: 2026-10-28
+  upstream: "git:https://github.com/laravel/framework@b8ca298a5475497d01b194ed5688441454d8ee34"
+  issue_date: 2024-08-11

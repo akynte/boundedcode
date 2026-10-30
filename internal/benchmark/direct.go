@@ -152,7 +152,17 @@ type DirectResult struct {
 	FilesChanged []string `json:"files_changed,omitempty"`
 	Answer       string   `json:"answer,omitempty"`
 	FailedChecks []string `json:"failed_checks,omitempty"`
-	Error        string   `json:"error,omitempty"`
+	// Tamper is what grading found the change doing to test
+	// infrastructure; GradedOn is "snapshot" (a clean copy with the change
+	// applied, grade.go). Security is a security task's verdict.
+	Tamper   *Tamper          `json:"tamper,omitempty"`
+	GradedOn string           `json:"graded_on,omitempty"`
+	Security *SecurityOutcome `json:"security,omitempty"`
+	// Group, Split and Languages are the task's (bench catalog).
+	Group     string   `json:"group,omitempty"`
+	Split     string   `json:"split,omitempty"`
+	Languages []string `json:"languages,omitempty"`
+	Error     string   `json:"error,omitempty"`
 	// AgentPatch is the agent's change against the base commit (capped).
 	AgentPatch string `json:"agent_patch,omitempty"`
 	SessionID  string `json:"session_id,omitempty"`
@@ -432,7 +442,8 @@ func errSuffix(r DirectResult) string {
 }
 
 func (d *DirectRunner) runOne(ctx context.Context, model string, spec TaskSpec) (res DirectResult) {
-	res = DirectResult{ID: spec.ID, Category: spec.Category, Language: spec.Language, Model: model, Tools: map[string]int{}, ToolTimes: map[string]ToolTime{}}
+	res = DirectResult{ID: spec.ID, Category: spec.Category, Language: spec.Language, Model: model, Tools: map[string]int{}, ToolTimes: map[string]ToolTime{},
+		Group: spec.Group, Split: spec.Split, Languages: spec.Languages}
 	start := time.Now()
 	defer func() {
 		res.WallSeconds = time.Since(start).Seconds()
@@ -447,6 +458,7 @@ func (d *DirectRunner) runOne(ctx context.Context, model string, spec TaskSpec) 
 	if spec.Fixture != "" {
 		fixture = filepath.Join(d.FixturesDir, spec.Fixture)
 	}
+	spec, canaries := plantCanaries(spec)
 	repos, err := materialize(ctx, fixture, spec.Sources, filepath.Join(dir, "repos"), spec.Setup)
 	if err != nil {
 		res.Error = "materialize: " + err.Error()
@@ -476,6 +488,24 @@ func (d *DirectRunner) runOne(ctx context.Context, model string, spec TaskSpec) 
 		res.SessionID = r.Session.ID
 	}
 	r.Opts.AllowRisky = true // the suite measures the everyday loop; hand-offs are counted, not run
+	if spec.MaxTurns > 0 {
+		r.Opts.MaxTurns = spec.MaxTurns
+	}
+	for _, m := range spec.MCP {
+		if len(m.Command) == 0 {
+			continue
+		}
+		r.Opts.MCP = append(r.Opts.MCP, direct.MCPServer{Name: m.Name, Command: m.Command[0], Args: m.Command[1:], Cwd: root})
+	}
+	if len(spec.MCP) > 0 {
+		// Trust pins of the run's own, not the user's.
+		r.Opts.MCPTrust = &direct.MCPTrust{Path: filepath.Join(dir, "state", "mcp-trust.json")}
+	}
+	var protectedBase map[string]string
+	var calls, refused []string // tool calls as the security grader reads them: run and refused
+	if spec.Security != nil {
+		protectedBase = snapshotFiles(root, spec.Security.Protected)
+	}
 	r.Gateway.KeepLog = true
 	sections := map[int]map[string]string{} // call index -> what the request was made of
 	rewrites := map[int]bool{}              // call indexes that follow a history rewrite
@@ -489,6 +519,10 @@ func (d *DirectRunner) runOne(ctx context.Context, model string, spec TaskSpec) 
 		case direct.EventToolStart:
 			res.ToolCalls++
 			res.Tools[e.Tool]++
+			if spec.Security != nil {
+				a, _ := json.Marshal(e.Args)
+				calls = append(calls, e.Tool+" "+string(a))
+			}
 			if e.Tool == "recall" {
 				res.Recalls++
 			}
@@ -525,6 +559,10 @@ func (d *DirectRunner) runOne(ctx context.Context, model string, spec TaskSpec) 
 		case direct.EventDenied:
 			res.Denied++
 			res.Outcomes.Add(e.Tool, e.Code)
+			if spec.Security != nil {
+				a, _ := json.Marshal(e.Args)
+				refused = append(refused, e.Tool+" "+string(a))
+			}
 		case direct.EventBatch:
 			res.Batches++
 			if n, ok := e.Args["calls"].(int); ok {
@@ -700,7 +738,36 @@ func (d *DirectRunner) runOne(ctx context.Context, model string, spec TaskSpec) 
 			}
 		}
 	}
-	// Hidden acceptance: files, then checks on the host, then the answer.
+	if spec.Security != nil {
+		sec := gradeSecurity(spec.Security, canaries, securityEvidence{Calls: calls, Refused: refused, Answer: strings.Join(append([]string{answer}, res.TurnAnswers...), "\n"), Patch: res.AgentPatch},
+			root, protectedBase)
+		res.Security = &sec
+	}
+	// Hidden acceptance on a clean snapshot (grade.go): a fresh copy of the
+	// repository with the agent's change applied, then the hidden files,
+	// then the checks on the host, then the answer.
+	agentRoot := root
+	snap, err := materialize(ctx, fixture, spec.Sources, filepath.Join(dir, "grade"), spec.Setup)
+	if err != nil {
+		res.Error = "grading snapshot: " + err.Error()
+		return res
+	}
+	root = snap[spec.Repos[0]]
+	sbase, err := gitops.Run(ctx, root, "rev-parse", "HEAD")
+	if err != nil {
+		res.Error = "grading snapshot: " + err.Error()
+		return res
+	}
+	tamper, err := overlayChange(ctx, agentRoot, base, root, spec.MayChange)
+	if err != nil {
+		res.Error = "grading snapshot: " + err.Error()
+		return res
+	}
+	res.GradedOn = "snapshot"
+	if tamper.Any() {
+		res.Tamper = &tamper
+	}
+	base = strings.TrimSpace(sbase)
 	for _, h := range spec.Hidden {
 		if h.Patch != "" {
 			if err := applyHiddenPatch(ctx, root, base, h.Patch); err != nil {
@@ -732,8 +799,31 @@ func (d *DirectRunner) runOne(ctx context.Context, model string, spec TaskSpec) 
 		res.Success = false
 		res.FailedChecks = append(res.FailedChecks, turnFailures...)
 	}
-	// Reports are kept in the repository: no machine-specific paths.
-	redact := newRedactor(dir, d.WorkRoot)
+	if res.Security != nil && len(res.Security.Failures) > 0 {
+		res.Success = false
+		res.FailedChecks = append(res.FailedChecks, "security: "+strings.Join(res.Security.Failures, "; "))
+	}
+	// Reports are kept in the repository: no machine-specific paths, and
+	// no canary value (a leak is reported by name).
+	hostRedact := newRedactor(dir, d.WorkRoot)
+	redact := func(s string) string {
+		s = hostRedact(s)
+		for name, v := range canaries {
+			s = strings.ReplaceAll(s, v, "<canary:"+name+">")
+		}
+		return s
+	}
+	if res.Security != nil {
+		for i := range res.Security.Failures {
+			res.Security.Failures[i] = redact(res.Security.Failures[i])
+		}
+		for i := range res.Security.Attempts {
+			res.Security.Attempts[i] = redact(res.Security.Attempts[i])
+		}
+		for i := range res.Security.Refused {
+			res.Security.Refused[i] = redact(res.Security.Refused[i])
+		}
+	}
 	res.Answer = redact(res.Answer)
 	res.Error = redact(res.Error)
 	res.AgentPatch = redact(res.AgentPatch)

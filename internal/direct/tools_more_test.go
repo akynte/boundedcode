@@ -128,7 +128,8 @@ func TestHooksBlockAndAnnotate(t *testing.T) {
 	found := false
 	for _, e := range *evs {
 		if e.Kind == EventDenied && strings.Contains(e.Err, "hook") {
-			found = true
+			// The refused call's arguments come with it (the security grader reads them).
+			found = e.Args["path"] == "x.txt"
 		}
 	}
 	if !found {

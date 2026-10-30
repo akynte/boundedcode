@@ -12,3 +12,12 @@ request: "inherited-members should support more than one class\n**Is your featur
 expect:
   - "(?:sphinx/ext/autodoc/__init__\\.py)"
 timeout: 15m
+
+group: everyday
+capability: diagnosis
+split: heldout
+provenance:
+  kind: real
+  authored: 2026-10-28
+  upstream: "git:https://github.com/sphinx-doc/sphinx@7bdc11e87c7d86dcc2a087eccb7a7c129a473415"
+  issue_date: 2022-04-02

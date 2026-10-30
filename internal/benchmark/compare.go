@@ -160,6 +160,9 @@ func suiteRun(r *SuiteReport) *Run {
 	var ttft []float64
 	var peak ResourcePeaks
 	for _, t := range r.Results {
+		if t.Skipped != "" {
+			continue
+		}
 		n++
 		run.Passed[t.ID] = t.Success
 		run.Task[t.ID] = map[string]float64{

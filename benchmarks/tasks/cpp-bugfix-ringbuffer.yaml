@@ -1,0 +1,55 @@
+id: cpp-bugfix-ringbuffer
+category: cpp-bugfix
+language: cpp
+fixture: langs
+repos: [cpp-ringbuffer]
+request: >-
+  In cpp-ringbuffer, RingBuffer::size() is wrong once the buffer has wrapped
+  around (it returns a huge number) and when the buffer is full (it returns 0).
+  Fix it and run the tests.
+criteria:
+  - size() is the number of values held, after any sequence of pushes and pops
+hidden:
+  - repo: cpp-ringbuffer
+    path: tests/test_hidden.cpp
+    content: |
+      #include <cstdio>
+
+      #include "ringbuffer.hpp"
+
+      static int failures;
+
+      static void expect(bool ok, const char *what) {
+          if (!ok) {
+              std::printf("FAIL %s\n", what);
+              failures++;
+          }
+      }
+
+      int main() {
+          RingBuffer<int, 3> rb;
+          expect(rb.push(1) && rb.push(2) && rb.push(3), "fill");
+          expect(rb.full() && rb.size() == 3, "full buffer has size 3");
+          expect(!rb.push(4), "push into a full buffer is refused");
+          expect(rb.pop() == 1 && rb.pop() == 2, "pop in order");
+          expect(rb.size() == 1, "size 1");
+          expect(rb.push(5) && rb.push(6), "wrap around");
+          expect(rb.size() == 3, "size after wrapping");
+          expect(rb.pop() == 3 && rb.pop() == 5 && rb.pop() == 6, "order after wrapping");
+          expect(rb.empty() && rb.size() == 0, "empty again");
+          return failures ? 1 : 0;
+      }
+checks:
+  - repo: cpp-ringbuffer
+    run: [sh, -c, "cmake -S . -B build-hidden -G Ninja >/dev/null && cmake --build build-hidden && ctest --test-dir build-hidden --output-on-failure"]
+timeout: 25m
+group: everyday
+capability: bug-fix
+split: heldout
+provenance:
+  kind: synthetic
+  authored: 2026-10-30
+reference:
+  - repo: cpp-ringbuffer
+    file: include/ringbuffer.hpp
+    new: "#pragma once\n\n#include <array>\n#include <cstddef>\n#include <optional>\n\n// RingBuffer is a FIFO queue holding at most N values. push refuses a value\n// when the buffer is full; pop returns the oldest value, or nothing when\n// the buffer is empty.\ntemplate <typename T, std::size_t N>\nclass RingBuffer {\n  public:\n    bool push(const T &v) {\n        if (full()) {\n            return false;\n        }\n        data_[tail_] = v;\n        tail_ = (tail_ + 1) % N;\n        if (tail_ == head_) {\n            full_ = true;\n        }\n        return true;\n    }\n\n    std::optional<T> pop() {\n        if (empty()) {\n            return std::nullopt;\n        }\n        T v = data_[head_];\n        head_ = (head_ + 1) % N;\n        full_ = false;\n        return v;\n    }\n\n    bool empty() const { return head_ == tail_ && !full_; }\n    bool full() const { return full_; }\n\n    // size is the number of values held.\n    std::size_t size() const {\n        if (full_) {\n            return N;\n        }\n        return (tail_ + N - head_) % N;\n    }\n\n    std::size_t capacity() const { return N; }\n\n  private:\n    std::array<T, N> data_{};\n    std::size_t head_ = 0;\n    std::size_t tail_ = 0;\n    bool full_ = false;\n};\n"

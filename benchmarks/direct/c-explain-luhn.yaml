@@ -1,0 +1,20 @@
+id: c-explain-luhn
+category: explain
+language: c
+fixture: langs
+repos: [c-checksum]
+read_only: true
+request: >-
+  In c-checksum, explain how luhn_valid decides whether a number is valid, and
+  say which numbers it gets wrong and why. Do not change any files.
+expect:
+  - "doubl"
+  - "odd|15|11"
+  - "(from|at) the (right|end)|rightmost|last digit|right-to-left|right to left"
+timeout: 10m
+group: everyday
+capability: explanation
+split: heldout
+provenance:
+  kind: synthetic
+  authored: 2026-10-30

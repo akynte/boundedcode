@@ -48,3 +48,10 @@ checks:
   - repo: payment-service
     run: [python3, .bench/check_values.py]
 timeout: 40m
+
+group: everyday
+capability: infrastructure
+split: dev
+provenance:
+  kind: synthetic
+  authored: 2026-10-03

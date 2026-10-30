@@ -38,3 +38,11 @@ checks:
   - repo: x-tools
     run: [sh, -c, "grep -q 'func TestLookup\\|Lookup(' txtar/archive_test.go"]
 timeout: 25m
+
+group: everyday
+capability: feature
+split: dev
+provenance:
+  kind: synthetic
+  authored: 2026-10-26
+  upstream: "gomod:golang.org/x/tools@v0.50.0"

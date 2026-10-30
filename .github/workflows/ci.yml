@@ -41,6 +41,23 @@ jobs:
         run: |
           go run ./scripts/sbom -version ci -binary bin/boundedcode -o "$RUNNER_TEMP/SBOM.spdx.json"
           python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); assert d["spdxVersion"]=="SPDX-2.3" and len(d["packages"])>1' "$RUNNER_TEMP/SBOM.spdx.json"
+  evaluation:
+    # The benchmark suites' integrity (metadata, pinned sources, hidden
+    # files out of the agent's reach, held-out tasks in every group) and the
+    # regression gate on committed scorecards (benchmarks/scorecards/<suite>/
+    # candidate.json against baseline.json; docs/benchmarks/evaluation.md).
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: benchmark catalog integrity
+        run: go run ./cmd/boundedcode bench catalog --check --markdown "$RUNNER_TEMP/coverage.md" && cat "$RUNNER_TEMP/coverage.md" >> "$GITHUB_STEP_SUMMARY"
+      - name: regression gate on committed scorecards
+        run: go run ./cmd/boundedcode bench gate --dir benchmarks/scorecards | tee -a "$GITHUB_STEP_SUMMARY"
   cross-build:
     # Every release target vets and builds (CGO disabled, as released).
     runs-on: ubuntu-latest

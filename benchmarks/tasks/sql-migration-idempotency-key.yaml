@@ -34,3 +34,10 @@ checks:
   - repo: payment-service
     run: [python3, .bench/check_migration.py]
 timeout: 30m
+
+group: polyglot
+capability: database-migration
+split: dev
+provenance:
+  kind: synthetic
+  authored: 2026-10-03

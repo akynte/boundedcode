@@ -12,3 +12,12 @@ request: "Faker::Internet.password method doesn't add numbers anymore\n## Descri
 expect:
   - "(?:lib/faker/default/internet\\.rb)"
 timeout: 15m
+
+group: everyday
+capability: diagnosis
+split: heldout
+provenance:
+  kind: real
+  authored: 2026-10-28
+  upstream: "git:https://github.com/faker-ruby/faker@4d52bc1e148d5290da10cb2775e244e0023778b0"
+  issue_date: 2023-02-10

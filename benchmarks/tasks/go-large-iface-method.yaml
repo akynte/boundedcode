@@ -66,3 +66,11 @@ checks:
   - repo: temporal-sdk
     run: [sh, -c, "git diff --quiet main -- converter/codec.go converter/composite_data_converter.go internal/workflow_deadlock.go internal/converter"]
 timeout: 60m
+
+group: everyday
+capability: multi-file
+split: dev
+provenance:
+  kind: synthetic
+  authored: 2026-10-04
+  upstream: "gomod:go.temporal.io/sdk@v1.49.0"

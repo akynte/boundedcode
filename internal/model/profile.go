@@ -61,6 +61,11 @@ type Source struct {
 	// Gated repositories need a Hugging Face token whose account accepted
 	// the model's terms on its page.
 	Gated bool `yaml:"gated"`
+	// Published is when the base model's weights were published
+	// (YYYY-MM-DD, the creation of its Hugging Face repository): an upper
+	// bound on what its training data can contain, for benchmark
+	// contamination (bench catalog).
+	Published string `yaml:"published,omitempty"`
 }
 
 // Architecture is coarse model metadata used for planning and reports.
@@ -436,6 +441,9 @@ func inheritCatalog(p *Profile, prev Profile) {
 	}
 	if src.LicenseNotice == "" {
 		src.LicenseNotice = prev.Source.LicenseNotice
+	}
+	if src.Published == "" {
+		src.Published = prev.Source.Published
 	}
 	src.Gated = src.Gated || prev.Source.Gated
 	if p.Status == "" {

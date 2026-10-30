@@ -31,7 +31,7 @@ import (
 func newBenchCmd(app *App) *cobra.Command {
 	cmd := &cobra.Command{Use: "bench", Short: "Run reproducible benchmarks"}
 	cmd.AddCommand(newBenchVerifyCmd(app))
-	cmd.AddCommand(newBenchInfraCmd(app), newBenchTasksCmd(app), newBenchDirectCmd(app), newBenchIntelCmd(app), newBenchLeaseCmd(app), newBenchTrailCmd(app), newBenchCompareCmd(app), newBenchRetrievalCmd(app), newBenchStructuredCmd(app), newBenchPruneCmd(app), newBenchMCPSearchCmd(app), newBenchModelsCmd(app), newBenchSpecCmd(app), newBenchRouterCmd(app), newBenchEscalationCmd(app), newBenchPacketsCmd(app))
+	cmd.AddCommand(newBenchInfraCmd(app), newBenchTasksCmd(app), newBenchDirectCmd(app), newBenchIntelCmd(app), newBenchLeaseCmd(app), newBenchTrailCmd(app), newBenchCompareCmd(app), newBenchRetrievalCmd(app), newBenchStructuredCmd(app), newBenchPruneCmd(app), newBenchMCPSearchCmd(app), newBenchModelsCmd(app), newBenchSpecCmd(app), newBenchRouterCmd(app), newBenchEscalationCmd(app), newBenchPacketsCmd(app), newBenchCatalogCmd(app), newBenchScorecardCmd(app), newBenchGateCmd(app))
 	return cmd
 }
 
@@ -224,8 +224,12 @@ func newBenchTasksCmd(app *App) *cobra.Command {
 			if out == "" {
 				out = filepath.Join("benchmarks", "reports", fmt.Sprintf("%s-tasks-%s.json", stamp, p.Name))
 			}
+			bud := app.Config.Budgets
 			sr := &benchmark.SuiteRunner{FixturesDir: fixtures, WorkRoot: work, Sandbox: sb,
 				Model: modelPin(p), ServerBinary: app.serverBinary(), TaskDirs: []string{dir},
+				Settings: map[string]any{"max_attempts": bud.MaxAttempts, "max_wall_clock": bud.MaxWallClock.D().String(), "max_local_tokens": bud.MaxLocalTokens,
+					"max_escalations": bud.MaxEscalations, "frontier": app.Config.Frontier.Enabled, "escalation_policy": escalationSetting(app.Config.Escalation.Policy),
+					"speculative": speculativeSetting(app, rf.model), "reasoning_history": reasoningSetting(app.Config.Inference.ReasoningHistory)},
 				Progress: func(s string) { fmt.Fprintf(app.Err, "%s %s\n", time.Now().Format("15:04:05"), s) },
 				NewRunner: func(ctx context.Context, stateDir string) (*orchestrator.Runner, func(), error) {
 					paths := config.Paths{Runtime: app.Paths.Runtime, Config: app.Paths.Config, Data: filepath.Join(stateDir, "data"), Cache: filepath.Join(stateDir, "cache"), State: filepath.Join(stateDir, "state")}
@@ -408,7 +412,7 @@ aside and recalled, summaries, broken edits caught by the check, and time.`,
 			dr := &benchmark.DirectRunner{FixturesDir: fixtures, WorkRoot: work, Rules: app.riskRules(), Timeout: timeout,
 				Tokenize: ep.tokenize, Model: ep.pin, TaskDirs: dirs,
 				Settings: map[string]any{"approval": approval, "working_set_tokens": dc.WorkingSetTokens, "max_tool_output": dc.MaxToolOutput, "checks": dc.ChecksOn(), "seed_pack": dc.SeedPackOn(), "retrieval": dc.Retrieval, "history_notes": dc.HistoryNotesOn(), "context_tokens": ep.ctxSize, "provider": ep.provider,
-					"compaction": compactionSetting(dc.Compaction), "prune": dc.PruneOn(), "observation_bytes": dc.ObservationBytes, "parallel_tools": parallelSetting(dc.ParallelTools), "routing": routingSetting(dc.Routing), "speculative": speculativeSetting(app, modelName),
+					"compaction": compactionSetting(dc.Compaction), "prune": dc.PruneOn(), "observation_bytes": dc.ObservationBytes, "parallel_tools": parallelSetting(dc.ParallelTools), "routing": routingSetting(dc.Routing), "timeout": timeout.String(), "max_turns": dc.MaxTurns, "speculative": speculativeSetting(app, modelName),
 					"reasoning_history": reasoningSetting(app.Config.Inference.ReasoningHistory), "reasoning_round_trip": ep.newGateway("probe").Capabilities(ctx).ReasoningRoundTrip},
 				Progress: func(s string) { fmt.Fprintf(app.Err, "%s %s\n", time.Now().Format("15:04:05"), s) },
 				NewRunner: func(ctx context.Context, root, stateDir string) (*direct.Runner, func(), error) {
@@ -469,6 +473,14 @@ aside and recalled, summaries, broken edits caught by the check, and time.`,
 	f.StringVar(&routingPolicy, "routing", "", "off or adaptive for this run (direct.routing)")
 	f.StringVar(&speculative, "speculative", "", "speculative decoding for this run: off, or TYPE[,draft=FILE][,n_max=N][,ngl=N] (server.speculative)")
 	return cmd
+}
+
+// escalationSetting is escalation.policy as a report shows it.
+func escalationSetting(v string) string {
+	if v == "" {
+		return "rules"
+	}
+	return v
 }
 
 // routingSetting is direct.routing as a report shows it.

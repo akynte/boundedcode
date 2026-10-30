@@ -1,0 +1,42 @@
+id: php-bugfix-slug
+category: php-bugfix
+language: php
+fixture: langs
+repos: [php-slug]
+request: >-
+  In php-slug, slugify leaves runs of hyphens and hyphens at the ends:
+  slugify('Hello,  World!') gives 'hello---world-'. Words must be separated by
+  single hyphens, with none at either end. Fix it and run the tests (make
+  test).
+criteria:
+  - Words are separated by single hyphens
+  - No hyphen at either end
+hidden:
+  - repo: php-slug
+    path: tests/HiddenTest.php
+    content: |
+      <?php
+
+      declare(strict_types=1);
+
+      function test_hidden_runs_and_ends(): void
+      {
+          assert_same('hello-world', slugify('Hello,  World!'));
+          assert_same('a-b-c', slugify('--a__b  c--'));
+          assert_same('cafe-au-lait', slugify('Café au lait?'));
+          assert_same('', slugify('!!!'));
+      }
+checks:
+  - repo: php-slug
+    run: [make, test]
+timeout: 20m
+group: everyday
+capability: bug-fix
+split: heldout
+provenance:
+  kind: synthetic
+  authored: 2026-10-30
+reference:
+  - repo: php-slug
+    file: src/Slug.php
+    new: "<?php\n\ndeclare(strict_types=1);\n\n/**\n * slugify turns a title into a URL slug: lower case ASCII letters and\n * digits, words separated by single hyphens, no hyphen at either end.\n * Accented Latin letters lose their accents (\"Caf\u00e9\" becomes \"cafe\").\n */\nfunction slugify(string $title): string\n{\n    $s = strtolower(strtr($title, [\n        '\u00e0' => 'a', '\u00e1' => 'a', '\u00e2' => 'a', '\u00e4' => 'a', '\u00e7' => 'c', '\u00e8' => 'e', '\u00e9' => 'e', '\u00ea' => 'e', '\u00eb' => 'e',\n        '\u00ec' => 'i', '\u00ed' => 'i', '\u00ee' => 'i', '\u00ef' => 'i', '\u00f1' => 'n', '\u00f2' => 'o', '\u00f3' => 'o', '\u00f4' => 'o', '\u00f6' => 'o',\n        '\u00f9' => 'u', '\u00fa' => 'u', '\u00fb' => 'u', '\u00fc' => 'u', '\u00c0' => 'a', '\u00c9' => 'e', '\u00d6' => 'o', '\u00dc' => 'u',\n    ]));\n    return trim(preg_replace('/[^a-z0-9]+/', '-', $s), '-');\n}\n"

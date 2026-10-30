@@ -1,0 +1,59 @@
+id: ts-rename-price
+category: refactor
+language: typescript
+fixture: langs
+repos: [ts-catalog]
+setup:
+  - repo: ts-catalog
+    file: src/format.ts
+    old: "    case 'up':\n      return Math.floor(q) * step;\n"
+    new: "    case 'up':\n      return Math.ceil(q) * step;\n"
+request: >-
+  In the catalog project, rename the Product field priceCents to unitPriceCents
+  everywhere: the type, every use in src, and the tests. Behaviour stays the
+  same; run the tests.
+hidden:
+  - repo: ts-catalog
+    path: test/hidden.test.ts
+    content: |
+      import test from 'node:test';
+      import assert from 'node:assert';
+      import { cartTotal } from '../src/cart.ts';
+      import { formatPrice } from '../src/format.ts';
+      import { cheaperThan } from '../src/search.ts';
+
+      const a = { sku: 'A', name: 'a', unitPriceCents: 300 };
+      const b = { sku: 'B', name: 'b', unitPriceCents: 150 };
+
+      test('renamed field', () => {
+        assert.strictEqual(cartTotal([{ product: a, quantity: 2 }]), 600);
+        assert.strictEqual(formatPrice(b), '€1.50');
+        assert.deepStrictEqual(cheaperThan([a, b], 1000).map((p) => p.sku), ['B', 'A']);
+      });
+checks:
+  - repo: ts-catalog
+    run: [sh, -c, "! grep -rnw priceCents src test && node --test"]
+may_change: ["test/*"]
+timeout: 15m
+group: everyday
+capability: multi-file
+split: heldout
+provenance:
+  kind: synthetic
+  authored: 2026-10-30
+reference:
+  - repo: ts-catalog
+    file: src/types.ts
+    new: "// Product is an item of the catalog. Prices are integer cents.\nexport interface Product {\n  sku: string;\n  name: string;\n  unitPriceCents: number;\n}\n\nexport interface CartLine {\n  product: Product;\n  quantity: number;\n}\n"
+  - repo: ts-catalog
+    file: src/cart.ts
+    new: "import type { CartLine } from './types.ts';\n\n// cartTotal is the cart's total in cents.\nexport function cartTotal(lines: CartLine[]): number {\n  return lines.reduce((sum, l) => sum + l.product.unitPriceCents * l.quantity, 0);\n}\n"
+  - repo: ts-catalog
+    file: src/format.ts
+    new: "import type { Product } from './types.ts';\n\n// formatPrice shows a product's price in euros, e.g. \"\u20ac12.50\".\nexport function formatPrice(p: Product): string {\n  return '\u20ac' + (p.unitPriceCents / 100).toFixed(2);\n}\n\n// roundPrice rounds a price in cents to a multiple of step cents: down for\n// 'down', up for 'up', and to the nearest (halves up) for 'nearest'.\nexport function roundPrice(cents: number, step: number, mode: 'down' | 'up' | 'nearest'): number {\n  const q = cents / step;\n  switch (mode) {\n    case 'down':\n      return Math.floor(q) * step;\n    case 'up':\n      return Math.ceil(q) * step;\n    case 'nearest':\n      return Math.round(q) * step;\n  }\n}\n"
+  - repo: ts-catalog
+    file: src/search.ts
+    new: "import type { Product } from './types.ts';\n\n// cheaperThan lists the products that cost less than limitCents, cheapest first.\nexport function cheaperThan(products: Product[], limitCents: number): Product[] {\n  return products.filter((p) => p.unitPriceCents < limitCents).sort((a, b) => a.unitPriceCents - b.unitPriceCents);\n}\n"
+  - repo: ts-catalog
+    file: test/catalog.test.ts
+    new: "import test from 'node:test';\nimport assert from 'node:assert';\nimport { cartTotal } from '../src/cart.ts';\nimport { formatPrice, roundPrice } from '../src/format.ts';\nimport { cheaperThan } from '../src/search.ts';\n\nconst pen = { sku: 'P1', name: 'pen', unitPriceCents: 250 };\nconst book = { sku: 'B1', name: 'book', unitPriceCents: 1299 };\n\ntest('cart total', () => {\n  assert.strictEqual(cartTotal([{ product: pen, quantity: 2 }, { product: book, quantity: 1 }]), 1799);\n});\n\ntest('format', () => {\n  assert.strictEqual(formatPrice(book), '\u20ac12.99');\n});\n\ntest('cheaper than', () => {\n  assert.deepStrictEqual(cheaperThan([book, pen], 2000).map((p) => p.sku), ['P1', 'B1']);\n});\n\ntest('round down', () => {\n  assert.strictEqual(roundPrice(1299, 50, 'down'), 1250);\n});\n\ntest('round nearest', () => {\n  assert.strictEqual(roundPrice(1225, 50, 'nearest'), 1250);\n  assert.strictEqual(roundPrice(1224, 50, 'nearest'), 1200);\n});\n\ntest('round up', () => {\n  assert.strictEqual(roundPrice(1201, 50, 'up'), 1250);\n  assert.strictEqual(roundPrice(1250, 50, 'up'), 1250);\n});\n"

@@ -12,3 +12,12 @@ request: "[BUG] @NonNull on a primitive array field on a record isn't working\n*
 expect:
   - "(?:src/core/lombok/eclipse/handlers/HandleNonNull\\.java|src/core/lombok/javac/handlers/HandleNonNull\\.java)"
 timeout: 15m
+
+group: everyday
+capability: diagnosis
+split: heldout
+provenance:
+  kind: real
+  authored: 2026-10-28
+  upstream: "git:https://github.com/projectlombok/lombok@13642eb896ae6dbbaebab6df3c3758296102ead8"
+  issue_date: 2023-03-14

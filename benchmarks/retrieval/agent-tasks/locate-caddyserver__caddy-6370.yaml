@@ -12,3 +12,12 @@ request: "Error: ambiguous config file format, config inside hidden folder\nSimi
 expect:
   - "(?:cmd/main\\.go)"
 timeout: 15m
+
+group: everyday
+capability: diagnosis
+split: heldout
+provenance:
+  kind: real
+  authored: 2026-10-28
+  upstream: "git:https://github.com/caddyserver/caddy@198f4385d2f72ccdd853825270f601bea7a7a190"
+  issue_date: 2024-06-04

@@ -64,3 +64,11 @@ checks:
   - repo: shop-mono
     run: [grep, -q, discount_cents, contracts/summary.schema.json]
 timeout: 45m
+
+group: polyglot
+capability: cross-language-api
+split: dev
+provenance:
+  kind: synthetic
+  authored: 2026-10-27
+languages: [go, typescript]

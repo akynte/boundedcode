@@ -12,3 +12,12 @@ request: "fuzz-tokenizer: Slice bounds out of range \u00b7 caddyfile.(*lexer).ne
 expect:
   - "(?:caddyconfig/caddyfile/lexer\\.go)"
 timeout: 15m
+
+group: everyday
+capability: diagnosis
+split: heldout
+provenance:
+  kind: real
+  authored: 2026-10-28
+  upstream: "git:https://github.com/caddyserver/caddy@960150bb034dc9a549ee7289b1a4eb4abafeb30a"
+  issue_date: 2023-02-26

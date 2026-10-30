@@ -73,3 +73,10 @@ checks:
   - repo: ledger-service
     run: [sh, -c, "grep -q 'func Test' internal/ledger/balance_test.go && grep -q 'Balance(' internal/ledger/balance_test.go"]
 timeout: 25m
+
+group: long-running
+capability: multi-turn
+split: dev
+provenance:
+  kind: synthetic
+  authored: 2026-10-26

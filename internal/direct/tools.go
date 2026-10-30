@@ -221,7 +221,7 @@ func (r *Runner) refuse(c *toolCall, code capability.Code, why, result string) *
 	if c.t != nil {
 		name = c.t.Name
 	}
-	r.emit(Event{Kind: EventDenied, Tool: name, CallID: c.call.ID, Summary: c.summary, Err: why, Code: code})
+	r.emit(Event{Kind: EventDenied, Tool: name, CallID: c.call.ID, Summary: c.summary, Err: why, Code: code, Args: c.args})
 	c.done, c.code, c.result = true, code, result
 	return c
 }

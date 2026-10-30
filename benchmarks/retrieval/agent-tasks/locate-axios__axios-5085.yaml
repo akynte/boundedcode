@@ -12,3 +12,12 @@ request: "AxiosHeaders get 'set-cookie' returns string instead of array\n#### De
 expect:
   - "(?:index\\.d\\.ts|lib/core/AxiosHeaders\\.js)"
 timeout: 15m
+
+group: everyday
+capability: diagnosis
+split: heldout
+provenance:
+  kind: real
+  authored: 2026-10-28
+  upstream: "git:https://github.com/axios/axios@85740c3e7a1fa48346dfcbd4497f463ccb1c1b05"
+  issue_date: 2022-10-10

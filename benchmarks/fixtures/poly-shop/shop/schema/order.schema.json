@@ -1,0 +1,23 @@
+{
+  "$id": "order",
+  "type": "object",
+  "required": [
+    "id",
+    "items",
+    "total_cents"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "items": {
+      "type": "array"
+    },
+    "total_cents": {
+      "type": "integer"
+    },
+    "note": {
+      "type": "string"
+    }
+  }
+}

@@ -69,3 +69,10 @@ checks:
   - repo: shared-protos
     run: [python3, .bench/check_proto.py]
 timeout: 45m
+
+group: polyglot
+capability: multi-service-contracts
+split: dev
+provenance:
+  kind: synthetic
+  authored: 2026-10-03

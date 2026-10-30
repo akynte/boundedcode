@@ -1,0 +1,55 @@
+id: c-bugfix-luhn
+category: c-bugfix
+language: c
+fixture: langs
+repos: [c-checksum]
+request: >-
+  In c-checksum, luhn_valid rejects valid numbers with an odd number of digits,
+  such as the 15-digit 378282246310005, and luhn_check_digit is wrong for
+  partial numbers with an even number of digits. Fix both and run the tests.
+criteria:
+  - luhn_valid accepts valid numbers of any length and rejects invalid ones
+  - luhn_check_digit returns the right digit for partial numbers of any length
+hidden:
+  - repo: c-checksum
+    path: tests/test_hidden.c
+    content: |
+      #include <stdio.h>
+
+      #include "checksum.h"
+
+      static int failures;
+
+      static void expect(int got, int want, const char *what) {
+          if (got != want) {
+              printf("FAIL %s: got %d, want %d\n", what, got, want);
+              failures++;
+          }
+      }
+
+      int main(void) {
+          expect(luhn_valid("378282246310005"), 1, "15-digit Amex");
+          expect(luhn_valid("79927398713"), 1, "11 digits");
+          expect(luhn_valid("79927398710"), 0, "11 digits, wrong check digit");
+          expect(luhn_valid("4539148803436467"), 1, "16 digits");
+          expect(luhn_valid("0"), 1, "a single zero");
+          expect(luhn_check_digit("7992739871"), 3, "check digit, 10 digits");
+          expect(luhn_check_digit("37828224631000"), 5, "check digit, 14 digits");
+          expect(luhn_check_digit("453914880343646"), 7, "check digit, 15 digits");
+          expect(luhn_check_digit("12x"), -1, "non-digit");
+          return failures ? 1 : 0;
+      }
+checks:
+  - repo: c-checksum
+    run: [sh, -c, "cmake -S . -B build-hidden -G Ninja >/dev/null && cmake --build build-hidden && ctest --test-dir build-hidden --output-on-failure"]
+timeout: 25m
+group: everyday
+capability: bug-fix
+split: heldout
+provenance:
+  kind: synthetic
+  authored: 2026-10-30
+reference:
+  - repo: c-checksum
+    file: src/checksum.c
+    new: "#include \"checksum.h\"\n\n#include <string.h>\n\n/* sum_digits adds the digits of s, doubling every second digit counted\n * from the right as the Luhn algorithm does (a doubled digit above 9 has 9\n * taken off). double_last says whether the last digit of s is one of the\n * doubled ones. Returns -1 on a non-digit. */\nstatic int sum_digits(const char *s, int double_last) {\n    int sum = 0;\n    size_t n = strlen(s);\n    for (size_t i = 0; i < n; i++) {\n        if (s[i] < '0' || s[i] > '9') {\n            return -1;\n        }\n        int d = s[i] - '0';\n        if (((n - 1 - i) % 2 == 0) == double_last) {\n            d *= 2;\n            if (d > 9) {\n                d -= 9;\n            }\n        }\n        sum += d;\n    }\n    return sum;\n}\n\nint luhn_valid(const char *digits) {\n    if (digits == NULL || digits[0] == '\\0') {\n        return 0;\n    }\n    int sum = sum_digits(digits, 0);\n    return sum >= 0 && sum % 10 == 0;\n}\n\nint luhn_check_digit(const char *partial) {\n    if (partial == NULL) {\n        return -1;\n    }\n    int sum = sum_digits(partial, 1);\n    if (sum < 0) {\n        return -1;\n    }\n    return (10 - sum % 10) % 10;\n}\n"

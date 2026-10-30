@@ -1,0 +1,20 @@
+id: js-locate-line-total
+category: locate
+language: javascript
+fixture: langs
+repos: [js-invoice]
+read_only: true
+request: >-
+  In the invoice project, which function computes the amount of a single
+  invoice line, and in which file is it? Answer briefly; do not change any
+  files.
+expect:
+  - "lineTotal"
+  - "src/invoice\\.js"
+timeout: 10m
+group: everyday
+capability: symbol-discovery
+split: heldout
+provenance:
+  kind: synthetic
+  authored: 2026-10-30

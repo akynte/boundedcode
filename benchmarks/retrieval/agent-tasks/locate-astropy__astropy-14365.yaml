@@ -12,3 +12,12 @@ request: "ascii.qdp Table format assumes QDP commands are upper case\n### Descri
 expect:
   - "(?:astropy/io/ascii/qdp\\.py)"
 timeout: 15m
+
+group: everyday
+capability: diagnosis
+split: heldout
+provenance:
+  kind: real
+  authored: 2026-10-28
+  upstream: "git:https://github.com/astropy/astropy@7269fa3e33e8d02485a647da91a5a2a60a06af61"
+  issue_date: 2023-02-06

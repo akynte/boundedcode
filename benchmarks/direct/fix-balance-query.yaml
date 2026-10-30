@@ -49,3 +49,10 @@ checks:
   - repo: ledger-service
     run: [sh, -c, "git diff --exit-code HEAD -- internal/ledger/ledger_test.go"]
 timeout: 20m
+
+group: everyday
+capability: bug-fix
+split: dev
+provenance:
+  kind: synthetic
+  authored: 2026-10-03

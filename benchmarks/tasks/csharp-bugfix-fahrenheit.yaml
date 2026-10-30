@@ -1,0 +1,40 @@
+id: csharp-bugfix-fahrenheit
+category: csharp-bugfix
+language: csharp
+fixture: langs
+repos: [csharp-temperature]
+requires: [dotnet]
+request: >-
+  In csharp-temperature, Converter.FahrenheitToCelsius(212) returns 195 instead
+  of 100. Fix it and run the tests (dotnet test).
+criteria:
+  - FahrenheitToCelsius is the inverse of CelsiusToFahrenheit
+hidden:
+  - repo: csharp-temperature
+    path: tests/Temperature.Tests/HiddenTests.cs
+    content: |
+      using Temperature;
+      using Xunit;
+
+      public class HiddenTests
+      {
+          [Theory]
+          [InlineData(212, 100)]
+          [InlineData(32, 0)]
+          [InlineData(-40, -40)]
+          public void FahrenheitToCelsius(double f, double c) => Assert.Equal(c, Converter.FahrenheitToCelsius(f), 6);
+      }
+checks:
+  - repo: csharp-temperature
+    run: [dotnet, test]
+timeout: 25m
+group: everyday
+capability: bug-fix
+split: heldout
+provenance:
+  kind: synthetic
+  authored: 2026-10-30
+reference:
+  - repo: csharp-temperature
+    file: src/Temperature/Converter.cs
+    new: "namespace Temperature;\n\n/// <summary>Conversions between Celsius, Fahrenheit and Kelvin.</summary>\npublic static class Converter\n{\n    /// <summary>Degrees Fahrenheit for degrees Celsius.</summary>\n    public static double CelsiusToFahrenheit(double c) => c * 9 / 5 + 32;\n\n    /// <summary>Degrees Celsius for degrees Fahrenheit.</summary>\n    public static double FahrenheitToCelsius(double f) => (f - 32) * 5 / 9;\n\n    /// <summary>Kelvin for degrees Celsius; below absolute zero is an error.</summary>\n    public static double CelsiusToKelvin(double c)\n    {\n        if (c < -273.15)\n        {\n            throw new ArgumentOutOfRangeException(nameof(c), \"below absolute zero\");\n        }\n        return c + 273.15;\n    }\n}\n"

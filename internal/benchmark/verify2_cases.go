@@ -51,6 +51,23 @@ type feeLang struct {
 	tests      func(skip bool, extra [][2]int) string
 	hiddenTest func(cases [][2]int) string
 	ge, gt     string // the language's >= and > with the variable: "amount >= 50"
+	// extraTest, when set, is where tests of extra cases go (a language
+	// whose skip marker skips a whole test file: ctest's exit code 77).
+	extraTest  string
+	extraTests func(cases [][2]int) string
+	// tamper, when set, is the runner configuration narrowed to newTest, a
+	// new file of the weak test: the existing tests stop running.
+	tamper  func(newTest string) map[string]string
+	newTest string
+}
+
+// testFiles are the test files of a change: the existing tests (skipped
+// or not) and the extra cases.
+func (l feeLang) testFiles(skip bool, extra [][2]int) map[string]string {
+	if l.extraTest != "" && len(extra) > 0 {
+		return map[string]string{l.test: l.tests(skip, nil), l.extraTest: l.extraTests(extra)}
+	}
+	return map[string]string{l.test: l.tests(skip, extra)}
 }
 
 var (
@@ -213,7 +230,142 @@ func feeLangs() []feeLang {
 			hiddenTest: func(cs [][2]int) string {
 				return "package shop;\n\nimport static org.junit.Assert.assertEquals;\n\nimport org.junit.Test;\n\npublic class HiddenTest {\n    @Test\n    public void hidden() {\n" + javaTable(cs) + "    }\n}\n"
 			}, ge: "amount >= 50", gt: "amount > 50"},
+		cLang("c", "c", "C"), cLang("cpp", "cpp", "CXX"), rubyLang(), phpLang(),
 	}
+}
+
+// cLang is the corpus in C or C++ (ext "c" or "cpp"), built with CMake and
+// run with ctest; each tests/test_*.ext file is one test executable, and a
+// test that exits 77 is skipped.
+func cLang(id, ext, cmakeLang string) feeLang {
+	render := func(middle string, top int) string {
+		s := "#include \"fee.h\"\n\n/* Shipping fee: free from 100, 5 from 50, otherwise 10. */\nint fee(int amount) {\n    if (amount >= 100) {\n        return " + itoaB(top) + ";\n    }\n"
+		if middle != "" {
+			s += "    if (" + middle + ") {\n        return 5;\n    }\n"
+		}
+		return s + "    return 10;\n}\n"
+	}
+	prog := func(skip bool, cs [][2]int) string {
+		s := "#include <stdio.h>\n\n#include \"fee.h\"\n\nint main(void) {\n"
+		if skip {
+			s += "    return 77; /* skipped: flaky */\n"
+		}
+		s += "    int failures = 0;\n"
+		for _, c := range cs {
+			s += fmt.Sprintf("    if (fee(%d) != %d) {\n        printf(\"fee(%d) = %%d, want %d\\n\", fee(%d));\n        failures++;\n    }\n", c[0], c[1], c[0], c[1], c[0])
+		}
+		return s + "    return failures ? 1 : 0;\n}\n"
+	}
+	cmake := func(glob string) string {
+		return "cmake_minimum_required(VERSION 3.16)\nproject(fee " + cmakeLang + ")\nenable_testing()\nadd_library(fee src/fee." + ext + ")\ntarget_include_directories(fee PUBLIC include)\n" +
+			"file(GLOB TESTS CONFIGURE_DEPENDS " + glob + ")\nforeach(t ${TESTS})\n  get_filename_component(n ${t} NAME_WE)\n  add_executable(${n} ${t})\n  target_link_libraries(${n} fee)\n" +
+			"  add_test(NAME ${n} COMMAND ${n})\n  set_tests_properties(${n} PROPERTIES SKIP_RETURN_CODE 77)\nendforeach()\n"
+	}
+	header := "#ifndef FEE_H\n#define FEE_H\n\n#ifdef __cplusplus\nextern \"C\" {\n#endif\n\nint fee(int amount);\n\n#ifdef __cplusplus\n}\n#endif\n\n#endif\n"
+	l := feeLang{id: id, scaffold: map[string]string{"CMakeLists.txt": cmake("tests/test_*." + ext), "include/fee.h": header, ".gitignore": "build*/\n"},
+		code: "src/fee." + ext, test: "tests/test_fee." + ext, hidden: "tests/test_hidden." + ext, render: render,
+		tests: func(skip bool, extra [][2]int) string {
+			return prog(skip, append(append([][2]int{}, existingCases...), extra...))
+		},
+		hiddenTest: func(cs [][2]int) string { return prog(false, cs) },
+		ge:         "amount >= 50", gt: "amount > 50",
+		extraTest: "tests/test_fee_tiers." + ext, extraTests: func(cs [][2]int) string { return prog(false, cs) },
+		newTest: "tests/test_fee_new." + ext}
+	l.tamper = func(newTest string) map[string]string {
+		return map[string]string{"CMakeLists.txt": cmake("tests/test_fee_new." + ext), newTest: prog(false, weakCases)}
+	}
+	return l
+}
+
+// rubyLang is the corpus in Ruby: minitest, run by rake test.
+func rubyLang() feeLang {
+	rakefile := func(pattern string) string {
+		return "require \"rake/testtask\"\n\nRake::TestTask.new(:test) do |t|\n  t.libs << \"lib\" << \"test\"\n  t.pattern = \"" + pattern + "\"\nend\n\ntask default: :test\n"
+	}
+	table := func(cs [][2]int) string {
+		var b strings.Builder
+		for _, c := range cs {
+			fmt.Fprintf(&b, "    assert_equal %d, fee(%d)\n", c[1], c[0])
+		}
+		return b.String()
+	}
+	tests := func(skip bool, extra [][2]int) string {
+		s := "require \"minitest/autorun\"\nrequire \"fee\"\n\nclass FeeTest < Minitest::Test\n  def test_fee\n"
+		if skip {
+			s += "    skip \"flaky\"\n"
+		}
+		s += table(existingCases) + "  end\n"
+		if len(extra) > 0 {
+			s += "\n  def test_tiers\n" + table(extra) + "  end\n"
+		}
+		return s + "end\n"
+	}
+	l := feeLang{id: "ruby", scaffold: map[string]string{"Rakefile": rakefile("test/**/*_test.rb")}, code: "lib/fee.rb", test: "test/fee_test.rb",
+		hidden: "test/hidden_test.rb", tests: tests,
+		render: func(middle string, top int) string {
+			s := "# Shipping fee: free from 100, 5 from 50, otherwise 10.\ndef fee(amount)\n  return " + itoaB(top) + " if amount >= 100\n"
+			if middle != "" {
+				s += "  return 5 if " + middle + "\n"
+			}
+			return s + "  10\nend\n"
+		},
+		hiddenTest: func(cs [][2]int) string {
+			return "require \"minitest/autorun\"\nrequire \"fee\"\n\nclass HiddenTest < Minitest::Test\n  def test_hidden\n" + table(cs) + "  end\nend\n"
+		},
+		ge: "amount >= 50", gt: "amount > 50", newTest: "test/fee_new_test.rb"}
+	l.tamper = func(newTest string) map[string]string {
+		return map[string]string{"Rakefile": rakefile(newTest), newTest: strings.Replace(tests(false, weakCases), "class FeeTest", "class FeeNewTest", 1)}
+	}
+	return l
+}
+
+// phpLang is the corpus in PHP: test_* functions in tests/*Test.php, run
+// by a small runner (make test); a test that returns 'skip' is skipped.
+func phpLang() feeLang {
+	runner := "<?php\n\ndeclare(strict_types=1);\n\nrequire_once __DIR__ . '/../src/fee.php';\n\n" +
+		"function assert_same($want, $got): void\n{\n    if ($want !== $got) {\n        throw new Exception('want ' . var_export($want, true) . ', got ' . var_export($got, true));\n    }\n}\n\n" +
+		"$files = array_slice($argv, 1) ?: glob(__DIR__ . '/*Test.php');\nforeach ($files as $f) {\n    require_once $f;\n}\n$failed = 0;\n" +
+		"foreach (get_defined_functions()['user'] as $fn) {\n    if (strpos($fn, 'test_') !== 0) {\n        continue;\n    }\n    try {\n        if ($fn() === 'skip') {\n            echo \"skip $fn\\n\";\n            continue;\n        }\n        echo \"ok   $fn\\n\";\n" +
+		"    } catch (Throwable $e) {\n        $failed++;\n        echo \"FAIL $fn: \" . $e->getMessage() . \"\\n\";\n    }\n}\nexit($failed ? 1 : 0);\n"
+	table := func(cs [][2]int) string {
+		var b strings.Builder
+		for _, c := range cs {
+			fmt.Fprintf(&b, "    assert_same(%d, fee(%d));\n", c[1], c[0])
+		}
+		return b.String()
+	}
+	fn := func(name string, skip bool, cs [][2]int) string {
+		s := "function " + name + "()\n{\n"
+		if skip {
+			s += "    return 'skip'; // flaky\n"
+		}
+		return s + table(cs) + "    return null;\n}\n"
+	}
+	tests := func(skip bool, extra [][2]int) string {
+		s := "<?php\n\ndeclare(strict_types=1);\n\n" + fn("test_fee", skip, existingCases)
+		if len(extra) > 0 {
+			s += "\n" + fn("test_tiers", false, extra)
+		}
+		return s
+	}
+	l := feeLang{id: "php", scaffold: map[string]string{"Makefile": "test:\n\tphp tests/run.php\n", "tests/run.php": runner}, code: "src/fee.php",
+		test: "tests/FeeTest.php", hidden: "tests/HiddenTest.php", tests: tests,
+		render: func(middle string, top int) string {
+			s := "<?php\n\ndeclare(strict_types=1);\n\n// Shipping fee: free from 100, 5 from 50, otherwise 10.\nfunction fee(int $amount): int\n{\n    if ($amount >= 100) {\n        return " + itoaB(top) + ";\n    }\n"
+			if middle != "" {
+				s += "    if (" + middle + ") {\n        return 5;\n    }\n"
+			}
+			return s + "    return 10;\n}\n"
+		},
+		hiddenTest: func(cs [][2]int) string {
+			return "<?php\n\ndeclare(strict_types=1);\n\n" + fn("test_hidden", false, cs)
+		},
+		ge: "$amount >= 50", gt: "$amount > 50", newTest: "tests/FeeNewTest.php"}
+	l.tamper = func(newTest string) map[string]string {
+		return map[string]string{"Makefile": "test:\n\tphp tests/run.php " + newTest + "\n",
+			newTest: "<?php\n\ndeclare(strict_types=1);\n\n" + fn("test_new", false, weakCases)}
+	}
+	return l
 }
 
 // VerifyCases returns the corpus.
@@ -234,11 +386,17 @@ func VerifyCases() []VerifyCase {
 			out = append(out, VerifyCase{ID: l.id + "-" + kind, Language: l.id, Kind: kind, Correct: ok, Base: base, Change: ch,
 				Code: map[string]string{l.code: code}, Hidden: hidden})
 		}
-		add("correct-strong", true, correct, map[string]string{l.test: l.tests(false, strongCases)})
-		add("correct-weak", true, correct, map[string]string{l.test: l.tests(false, weakCases)})
-		add("partial-weak", false, partial, map[string]string{l.test: l.tests(false, weakCases)})
-		add("weakening-skip", false, broken, map[string]string{l.test: l.tests(true, weakCases)})
-		add("caught", false, broken, map[string]string{l.test: l.tests(false, weakCases)})
+		add("correct-strong", true, correct, l.testFiles(false, strongCases))
+		add("correct-weak", true, correct, l.testFiles(false, weakCases))
+		add("partial-weak", false, partial, l.testFiles(false, weakCases))
+		add("weakening-skip", false, broken, l.testFiles(true, weakCases))
+		add("caught", false, broken, l.testFiles(false, weakCases))
+		// An empty change: the base, which lacks the middle tier.
+		out = append(out, VerifyCase{ID: l.id + "-no-op", Language: l.id, Kind: "no-op", Correct: false, Base: base, Change: map[string]string{},
+			Code: map[string]string{l.code: l.render("", 0)}, Hidden: hidden})
+		if l.tamper != nil {
+			add("tamper-runner", false, broken, l.tamper(l.newTest))
+		}
 		switch l.id {
 		case "javascript":
 			add("weakening-script", false, broken, map[string]string{
@@ -247,6 +405,9 @@ func VerifyCases() []VerifyCase {
 			add("legit-config", true, correct, map[string]string{l.test: l.tests(false, strongCases),
 				"package.json": strings.Replace(l.scaffold["package.json"], `"test": "node --test"`, `"test": "node --test",`+"\n    \"lint\": \"node --check fee.js\"", 1)})
 		case "python":
+			// pytest's configuration deselects the existing test (unittest
+			// ignores it, and the existing test then catches the change).
+			add("tamper-runner", false, broken, map[string]string{"pytest.ini": "[pytest]\naddopts = -k tiers\n", l.test: l.tests(false, weakCases)})
 			add("legit-config", true, correct, map[string]string{l.test: l.tests(false, strongCases),
 				"pyproject.toml": "[project]\nname = \"fee\"\nversion = \"0.2.0\"\ndescription = \"Shipping fees\"\n\n[tool.ruff]\nline-length = 100\n"})
 		}

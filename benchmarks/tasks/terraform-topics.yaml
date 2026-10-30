@@ -41,3 +41,10 @@ checks:
   - repo: infrastructure
     run: [python3, .bench/check_tf.py]
 timeout: 30m
+
+group: everyday
+capability: infrastructure
+split: dev
+provenance:
+  kind: synthetic
+  authored: 2026-10-03

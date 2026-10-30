@@ -1,0 +1,46 @@
+id: ruby-bugfix-allocate
+category: ruby-bugfix
+language: ruby
+fixture: langs
+repos: [ruby-money]
+request: >-
+  In ruby-money, Money.allocate drops the remainder: allocate(100, 3) gives
+  [33, 33, 33], which sums to 99. The parts must sum to the amount, differ by
+  at most one cent, and the first parts get the extra cents. Fix it and run
+  the tests (rake test).
+criteria:
+  - The parts sum to the amount
+  - The first parts get the extra cents
+hidden:
+  - repo: ruby-money
+    path: test/hidden_allocate_test.rb
+    content: |
+      require "minitest/autorun"
+      require "money"
+
+      class HiddenAllocateTest < Minitest::Test
+        def test_remainder_goes_first
+          assert_equal [34, 33, 33], Money.allocate(100, 3)
+          assert_equal [2, 2, 1, 1], Money.allocate(6, 4)
+          assert_equal [0, 0, 0], Money.allocate(0, 3)
+          assert_equal [5], Money.allocate(5, 1)
+        end
+
+        def test_ratio_unchanged
+          assert_equal [67, 33], Money.allocate_by_ratio(100, [2, 1])
+        end
+      end
+checks:
+  - repo: ruby-money
+    run: [rake, test]
+timeout: 20m
+group: everyday
+capability: bug-fix
+split: heldout
+provenance:
+  kind: synthetic
+  authored: 2026-10-30
+reference:
+  - repo: ruby-money
+    file: lib/money.rb
+    new: "# Money splits amounts held in integer cents.\nmodule Money\n  # allocate splits amount_cents into n parts that sum to amount_cents and\n  # differ by at most one cent; the first parts get the extra cents. n must\n  # be positive (ArgumentError otherwise).\n  def self.allocate(amount_cents, n)\n    raise ArgumentError, \"n must be positive\" unless n.is_a?(Integer) && n.positive?\n\n    base, extra = amount_cents.divmod(n)\n    Array.new(n) { |i| i < extra ? base + 1 : base }\n  end\n\n  # allocate_by_ratio splits amount_cents in proportion to ratios (positive\n  # integers), each part rounded down, the cents left over going to the\n  # first parts.\n  def self.allocate_by_ratio(amount_cents, ratios)\n    raise ArgumentError, \"ratios must be positive\" if ratios.empty? || ratios.any? { |r| r <= 0 }\n\n    total = ratios.sum\n    parts = ratios.map { |r| amount_cents * r / total }\n    (amount_cents - parts.sum).times { |i| parts[i % parts.size] += 1 }\n    parts\n  end\nend\n"

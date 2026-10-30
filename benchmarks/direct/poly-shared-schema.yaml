@@ -1,0 +1,71 @@
+id: poly-shared-schema
+category: feature
+language: multi
+languages: [python, typescript]
+fixture: poly-shop
+repos: [shop]
+request: >-
+  Orders now carry a currency. Add a required currency property to
+  schema/order.schema.json whose only allowed values are EUR and USD, and make
+  both validators that read that schema enforce allowed values: the Python
+  one (py/orderschema/validate.py) and the TypeScript one (web/src/validate.ts)
+  must report "currency is not one of EUR, USD" for any other value. Keep
+  every test passing.
+hidden:
+  - repo: shop
+    path: py/tests/test_hidden_currency.py
+    content: |
+      import os
+      import sys
+      import unittest
+
+      sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
+      from orderschema.validate import errors  # noqa: E402
+
+
+      class HiddenCurrency(unittest.TestCase):
+          def test_currency(self):
+              ok = {"id": "o1", "items": [], "total_cents": 1, "currency": "EUR"}
+              self.assertEqual(errors(ok), [])
+              self.assertIn("missing currency", errors({"id": "o1", "items": [], "total_cents": 1}))
+              self.assertEqual(errors(dict(ok, currency="GBP")), ["currency is not one of EUR, USD"])
+  - repo: shop
+    path: web/test/hidden.test.ts
+    content: |
+      import test from 'node:test';
+      import assert from 'node:assert';
+      import { orderErrors } from '../src/validate.ts';
+
+      test('currency', () => {
+        const ok = { id: 'o1', items: [], total_cents: 1, currency: 'USD' };
+        assert.deepStrictEqual(orderErrors(ok), []);
+        assert.deepStrictEqual(orderErrors({ ...ok, currency: 'GBP' }), ['currency is not one of EUR, USD']);
+        assert.ok(orderErrors({ id: 'o1', items: [], total_cents: 1 }).includes('missing currency'));
+      });
+checks:
+  - repo: shop
+    run: [sh, -c, "python3 -m unittest discover -s py/tests && cd web && node --test"]
+timeout: 20m
+group: polyglot
+capability: shared-schema
+split: heldout
+provenance:
+  kind: synthetic
+  authored: 2026-10-30
+reference:
+  - repo: shop
+    file: schema/order.schema.json
+    new: "{\n  \"$id\": \"order\",\n  \"type\": \"object\",\n  \"required\": [\n    \"id\",\n    \"items\",\n    \"total_cents\",\n    \"currency\"\n  ],\n  \"properties\": {\n    \"id\": {\n      \"type\": \"string\"\n    },\n    \"items\": {\n      \"type\": \"array\"\n    },\n    \"total_cents\": {\n      \"type\": \"integer\"\n    },\n    \"note\": {\n      \"type\": \"string\"\n    },\n    \"currency\": {\n      \"type\": \"string\",\n      \"enum\": [\n        \"EUR\",\n        \"USD\"\n      ]\n    }\n  }\n}\n"
+  - repo: shop
+    file: py/orderschema/validate.py
+    new: "\"\"\"Validate orders against schema/order.schema.json (the subset of JSON\nSchema the shop uses: required properties and property types).\"\"\"\n\nimport json\nimport os\n\nSCHEMA = os.path.join(os.path.dirname(__file__), \"..\", \"..\", \"schema\", \"order.schema.json\")\nTYPES = {\"string\": str, \"integer\": int, \"array\": list, \"object\": dict, \"boolean\": bool}\n\n\ndef load_schema():\n    with open(SCHEMA) as f:\n        return json.load(f)\n\n\ndef errors(order, schema=None):\n    \"\"\"The ways order breaks the schema, as messages; empty when valid.\"\"\"\n    schema = schema or load_schema()\n    out = []\n    for name in schema.get(\"required\", []):\n        if name not in order:\n            out.append(f\"missing {name}\")\n    for name, prop in schema.get(\"properties\", {}).items():\n        if name not in order:\n            continue\n        want = TYPES.get(prop.get(\"type\"))\n        v = order[name]\n        if want is not None and (not isinstance(v, want) or (want is int and isinstance(v, bool))):\n            out.append(f\"{name} is not {prop['type']}\")\n        elif \"enum\" in prop and v not in prop[\"enum\"]:\n            out.append(f\"{name} is not one of {', '.join(prop['enum'])}\")\n    return out\n"
+  - repo: shop
+    file: web/src/validate.ts
+    new: "import { readFileSync } from 'node:fs';\nimport { dirname, join } from 'node:path';\nimport { fileURLToPath } from 'node:url';\n\n// The schema every service shares (schema/order.schema.json).\nconst schema = JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../../schema/order.schema.json'), 'utf8'));\n\n// orderErrors lists the ways an order read from JSON breaks the shared\n// schema: missing required properties and wrong types; empty when valid.\nexport function orderErrors(o: Record<string, unknown>): string[] {\n  const out: string[] = [];\n  for (const name of schema.required ?? []) {\n    if (!(name in o)) out.push(`missing ${name}`);\n  }\n  const types: Record<string, (v: unknown) => boolean> = {\n    string: (v) => typeof v === 'string',\n    integer: (v) => Number.isInteger(v),\n    array: (v) => Array.isArray(v),\n  };\n  for (const [name, prop] of Object.entries(schema.properties ?? {}) as [string, { type: string; enum?: unknown[] }][]) {\n    if (!(name in o)) continue;\n    if (types[prop.type] && !types[prop.type](o[name])) out.push(`${name} is not ${prop.type}`);\n    else if (prop.enum && !prop.enum.includes(o[name])) out.push(`${name} is not one of ${prop.enum.join(', ')}`);\n  }\n  return out;\n}\n"
+  - repo: shop
+    file: py/tests/test_validate.py
+    new: "import os\nimport sys\nimport unittest\n\nsys.path.insert(0, os.path.join(os.path.dirname(__file__), \"..\"))\n\nfrom orderschema.validate import errors  # noqa: E402\n\n\nclass ValidateTest(unittest.TestCase):\n    def test_valid(self):\n        self.assertEqual(errors({\"id\": \"o1\", \"items\": [], \"total_cents\": 100, \"currency\": \"EUR\"}), [])\n\n    def test_missing_and_wrong_type(self):\n        self.assertEqual(errors({\"id\": \"o1\", \"items\": [], \"total_cents\": \"100\", \"currency\": \"EUR\"}), [\"total_cents is not integer\"])\n        self.assertIn(\"missing id\", errors({\"items\": [], \"total_cents\": 1}))\n"
+  - repo: shop
+    file: web/test/order.test.ts
+    new: "import test from 'node:test';\nimport assert from 'node:assert';\nimport { formatTotal, itemCount, parseOrder } from '../src/order.ts';\n\nconst json = '{\"id\":\"o1\",\"items\":[{\"sku\":\"A\",\"qty\":2},{\"sku\":\"B\",\"qty\":1}],\"total_cents\":1234}';\n\ntest('parse and count', () => {\n  const o = parseOrder(json);\n  assert.strictEqual(itemCount(o), 3);\n});\n\ntest('format', () => {\n  assert.strictEqual(formatTotal(parseOrder(json)), '\u20ac12.34');\n});\n\nimport { orderErrors } from '../src/validate.ts';\n\ntest('schema checks', () => {\n  assert.deepStrictEqual(orderErrors({ id: 'o1', items: [], total_cents: 1, currency: 'EUR' }), []);\n  assert.deepStrictEqual(orderErrors({ id: 'o1', items: [], total_cents: '1', currency: 'EUR' }), ['total_cents is not integer']);\n});\n"

@@ -176,6 +176,13 @@ func (b *VerifyBench) runCase(ctx context.Context, c VerifyCase) VerifyCaseResul
 		}
 	}
 	changed, _ := gitops.ChangedFiles(ctx, dir, base)
+	if len(changed) == 0 {
+		// The task runner fails an attempt that changed nothing before
+		// verification runs; the corpus measures the system as it runs.
+		r.Old, r.New, r.Required, r.Strict = verify.LabelFailing, verify.LabelFailing, verify.LabelFailing, verify.LabelFailing
+		r.Summary = "the change is empty: the task runner fails it before verification"
+		return b.truth(ctx, c, r, dir)
+	}
 	needed := verify.NeedsEvidence(changed)
 	var ev *verify.Evidence
 	if oldPassed && needed {
@@ -216,8 +223,14 @@ func (b *VerifyBench) runCase(ctx context.Context, c VerifyCase) VerifyCaseResul
 	in.Require.Boundaries = true
 	r.Strict = verify.Classify(in).Label
 	r.Strong = r.New == verify.LabelTaskVerified && mut != nil && mut.Status == verify.MutationEstablished && mut.BoundarySurvived == 0
-	// Truth: the hidden tests on the base plus the change's code alone
-	// (with the base's tests and runner configuration).
+	return b.truth(ctx, c, r, dir)
+}
+
+// truth runs the hidden tests on the base plus the change's code alone
+// (with the base's tests and runner configuration) and records whether
+// they agree with the case's label.
+func (b *VerifyBench) truth(ctx context.Context, c VerifyCase, r VerifyCaseResult, dir string) VerifyCaseResult {
+	fail := func(err error) VerifyCaseResult { r.Error = err.Error(); return r }
 	tdir := filepath.Join(b.WorkDir, c.ID+"-truth")
 	_ = os.RemoveAll(tdir)
 	tbase, err := commitTree(ctx, tdir, c.Base)

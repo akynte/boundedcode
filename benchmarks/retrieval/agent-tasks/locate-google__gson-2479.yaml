@@ -12,3 +12,12 @@ request: "`GsonBuilder` should throw exception when trying to register adapter f
 expect:
   - "(?:gson/src/main/java/com/google/gson/GsonBuilder\\.java)"
 timeout: 15m
+
+group: everyday
+capability: diagnosis
+split: heldout
+provenance:
+  kind: real
+  authored: 2026-10-28
+  upstream: "git:https://github.com/google/gson@4dfae77af3d543bea2782f85a154cc070290f086"
+  issue_date: 2023-08-25

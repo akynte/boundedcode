@@ -43,3 +43,10 @@ checks:
   - repo: ledger-service
     run: [go, test, ./...]
 timeout: 20m
+
+group: everyday
+capability: bug-fix
+split: dev
+provenance:
+  kind: synthetic
+  authored: 2026-10-03

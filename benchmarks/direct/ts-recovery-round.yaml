@@ -1,0 +1,41 @@
+id: ts-recovery-round
+category: session
+language: typescript
+fixture: langs
+repos: [ts-catalog]
+request: >-
+  The 'round up' test of the catalog project fails. I think the sort in
+  cheaperThan compares the wrong way round; fix it and make the tests pass.
+hidden:
+  - repo: ts-catalog
+    path: test/hidden.test.ts
+    content: |
+      import test from 'node:test';
+      import assert from 'node:assert';
+      import { roundPrice } from '../src/format.ts';
+      import { cheaperThan } from '../src/search.ts';
+
+      test('round up', () => {
+        assert.strictEqual(roundPrice(1201, 50, 'up'), 1250);
+        assert.strictEqual(roundPrice(1250, 50, 'up'), 1250);
+        assert.strictEqual(roundPrice(1, 100, 'up'), 100);
+      });
+
+      test('the sort was right', () => {
+        const p = (sku, c) => ({ sku, name: sku, priceCents: c });
+        assert.deepStrictEqual(cheaperThan([p('a', 300), p('b', 100), p('c', 200)], 1000).map((x) => x.sku), ['b', 'c', 'a']);
+      });
+checks:
+  - repo: ts-catalog
+    run: [node, --test]
+timeout: 15m
+group: long-running
+capability: recovery
+split: heldout
+provenance:
+  kind: synthetic
+  authored: 2026-10-30
+reference:
+  - repo: ts-catalog
+    file: src/format.ts
+    new: "import type { Product } from './types.ts';\n\n// formatPrice shows a product's price in euros, e.g. \"\u20ac12.50\".\nexport function formatPrice(p: Product): string {\n  return '\u20ac' + (p.priceCents / 100).toFixed(2);\n}\n\n// roundPrice rounds a price in cents to a multiple of step cents: down for\n// 'down', up for 'up', and to the nearest (halves up) for 'nearest'.\nexport function roundPrice(cents: number, step: number, mode: 'down' | 'up' | 'nearest'): number {\n  const q = cents / step;\n  switch (mode) {\n    case 'down':\n      return Math.floor(q) * step;\n    case 'up':\n      return Math.ceil(q) * step;\n    case 'nearest':\n      return Math.round(q) * step;\n  }\n}\n"

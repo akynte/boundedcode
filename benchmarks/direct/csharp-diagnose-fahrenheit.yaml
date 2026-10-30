@@ -1,0 +1,18 @@
+id: csharp-diagnose-fahrenheit
+category: diagnose
+language: csharp
+fixture: langs
+repos: [csharp-temperature]
+read_only: true
+request: >-
+  In csharp-temperature, Converter.FahrenheitToCelsius(212) returns 195 instead
+  of 100. Explain the cause; do not change any files.
+expect:
+  - "preceden|order of (operations|evaluation)|parenthes|32 \\* 5 / 9|evaluated first"
+timeout: 10m
+group: everyday
+capability: diagnosis
+split: heldout
+provenance:
+  kind: synthetic
+  authored: 2026-10-30

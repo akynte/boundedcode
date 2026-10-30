@@ -35,3 +35,10 @@ checks:
   - repo: payment-service
     run: [go, test, ./...]
 timeout: 20m
+
+group: everyday
+capability: feature
+split: dev
+provenance:
+  kind: synthetic
+  authored: 2026-10-03

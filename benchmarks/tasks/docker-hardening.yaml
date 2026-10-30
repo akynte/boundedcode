@@ -30,3 +30,10 @@ checks:
   - repo: payment-service
     run: [python3, .bench/check_docker.py]
 timeout: 30m
+
+group: everyday
+capability: infrastructure
+split: dev
+provenance:
+  kind: synthetic
+  authored: 2026-10-03

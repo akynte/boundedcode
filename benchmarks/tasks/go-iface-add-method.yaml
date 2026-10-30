@@ -50,3 +50,10 @@ checks:
   - repo: billing-service
     run: [sh, -c, "git diff --quiet main -- internal/audit internal/api cmd"]
 timeout: 40m
+
+group: everyday
+capability: multi-file
+split: dev
+provenance:
+  kind: synthetic
+  authored: 2026-10-04

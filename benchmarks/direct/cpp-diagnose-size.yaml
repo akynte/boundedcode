@@ -1,0 +1,20 @@
+id: cpp-diagnose-size
+category: diagnose
+language: cpp
+fixture: langs
+repos: [cpp-ringbuffer]
+read_only: true
+request: >-
+  In cpp-ringbuffer, RingBuffer::size() returns a huge number after the buffer
+  has wrapped around, and 0 when the buffer is full. Explain the cause; do not
+  change any files.
+expect:
+  - "unsigned|underflow|wrap|negative|size_t"
+  - "full"
+timeout: 10m
+group: everyday
+capability: diagnosis
+split: heldout
+provenance:
+  kind: synthetic
+  authored: 2026-10-30

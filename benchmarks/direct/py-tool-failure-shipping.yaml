@@ -1,0 +1,39 @@
+id: py-tool-failure-shipping
+category: session
+language: python
+fixture: langs
+repos: [py-orders]
+request: >-
+  Run the test suite of the orders project and fix what fails.
+hidden:
+  - repo: py-orders
+    path: tests/test_hidden_bands.py
+    content: |
+      import unittest
+
+      from orders.shipping import shipping_cost
+
+
+      class HiddenBands(unittest.TestCase):
+          def test_limits_are_inclusive(self):
+              self.assertEqual(shipping_cost(1), 499)
+              self.assertEqual(shipping_cost(5), 899)
+              self.assertEqual(shipping_cost(20), 1999)
+
+          def test_inside_bands(self):
+              self.assertEqual(shipping_cost(1.5), 899)
+              self.assertEqual(shipping_cost(19.9), 1999)
+checks:
+  - repo: py-orders
+    run: [sh, -c, "python3 tools/gen_rates.py >/dev/null && python3 -m unittest discover -s tests"]
+timeout: 15m
+group: long-running
+capability: tool-failure
+split: heldout
+provenance:
+  kind: synthetic
+  authored: 2026-10-30
+reference:
+  - repo: py-orders
+    file: orders/shipping.py
+    new: "\"\"\"Shipping costs.\"\"\"\n\nimport json\nimport os\n\nRATES = os.path.join(os.path.dirname(__file__), \"..\", \"data\", \"rates.json\")\n\n\ndef _rates():\n    with open(RATES) as f:\n        return json.load(f)\n\n\ndef shipping_cost(weight_kg):\n    \"\"\"Shipping in cents for a parcel of weight_kg: the price of the first\n    band (in rates.json, bands sorted by max_kg) whose max_kg is at least\n    the weight; parcels over every band pay the last band's price plus\n    surcharge_per_kg for each started kilogram above it.\"\"\"\n    r = _rates()\n    for band in r[\"bands\"]:\n        if weight_kg <= band[\"max_kg\"]:\n            return band[\"cents\"]\n    last = r[\"bands\"][-1]\n    extra = weight_kg - last[\"max_kg\"]\n    return last[\"cents\"] + int(extra) * r[\"surcharge_per_kg\"]\n"

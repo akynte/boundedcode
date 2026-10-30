@@ -63,3 +63,10 @@ checks:
   - repo: ledger-service
     run: [go, test, ./...]
 timeout: 40m
+
+group: polyglot
+capability: multi-service-contracts
+split: dev
+provenance:
+  kind: synthetic
+  authored: 2026-10-03

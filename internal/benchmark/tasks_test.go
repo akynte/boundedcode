@@ -54,6 +54,9 @@ func TestHiddenChecksFailOnBase(t *testing.T) {
 	sb := &sandbox.Container{Engine: "docker", Image: image, Network: "none", PIDs: 4096, UID: os.Getuid(), GID: os.Getgid()}
 	for _, spec := range tasks {
 		t.Run(spec.ID, func(t *testing.T) {
+			if missing := imageMissing(t, image, spec.Requires); len(missing) > 0 {
+				t.Skip("not in the image: " + strings.Join(missing, ", "))
+			}
 			ctx := context.Background()
 			fixture := ""
 			if spec.Fixture != "" {

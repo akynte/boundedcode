@@ -1,0 +1,46 @@
+id: session-js-invoice
+category: session
+language: javascript
+fixture: langs
+repos: [js-invoice]
+request: >-
+  In the invoice project, what does invoiceTotal return for an empty list of
+  lines, and why? Do not change anything yet.
+expect:
+  - "\\b0\\b|zero"
+turns:
+  - request: >-
+      Now add lineCount(lines), exported next to invoiceTotal: the number of
+      units on the invoice (the sum of the lines' quantities, 0 for no
+      lines), with a test.
+  - request: >-
+      Keep what you did, and tell me in one sentence which file you changed.
+    expect:
+      - "invoice\\.js"
+hidden:
+  - repo: js-invoice
+    path: test/hidden.test.js
+    content: |
+      'use strict';
+      const test = require('node:test');
+      const assert = require('node:assert');
+      const { lineCount } = require('../src/invoice');
+
+      test('line count', () => {
+        assert.strictEqual(lineCount([]), 0);
+        assert.strictEqual(lineCount([{ unitPrice: 1, quantity: 2 }, { unitPrice: 3, quantity: 5 }]), 7);
+      });
+checks:
+  - repo: js-invoice
+    run: [node, --test]
+timeout: 20m
+group: long-running
+capability: multi-turn
+split: heldout
+provenance:
+  kind: synthetic
+  authored: 2026-10-30
+reference:
+  - repo: js-invoice
+    file: src/invoice.js
+    new: "'use strict';\n\n// lineTotal is a line's amount: unit price times quantity.\nfunction lineTotal(line) {\n  return line.unitPrice * line.quantity;\n}\n\n// invoiceTotal is the invoice's total with tax: the lines' sum plus tax at\n// rate (0.2 for 20%). Amounts are in currency units (euros), and the total\n// must be exact to the cent: 10.01, never 10.010000000000002.\nfunction invoiceTotal(lines, rate) {\n  const net = lines.reduce((sum, l) => sum + lineTotal(l), 0);\n  return net + net * rate;\n}\n\n// lineCount is the number of units on the invoice.\nfunction lineCount(lines) {\n  return lines.reduce((n, l) => n + l.quantity, 0);\n}\n\nmodule.exports = { lineTotal, invoiceTotal, lineCount };\n"

@@ -1,0 +1,20 @@
+id: py-references-discount
+category: locate
+language: python
+fixture: langs
+repos: [py-orders]
+read_only: true
+request: >-
+  In the orders project, which functions call orders.pricing.apply_discount
+  (not counting tests)? List each as module.function. Do not change any files.
+expect:
+  - "checkout_total"
+  - "render_invoice"
+  - "best_offer"
+timeout: 10m
+group: everyday
+capability: reference-discovery
+split: heldout
+provenance:
+  kind: synthetic
+  authored: 2026-10-30

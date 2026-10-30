@@ -75,6 +75,93 @@ type TaskSpec struct {
 	// edits, only safe commands): for questions about third-party code
 	// that must not be built or run.
 	ReadOnly bool `yaml:"read_only,omitempty"`
+
+	// Evaluation metadata (bench catalog): the group and capability the
+	// task measures (Groups), its split ("dev": used while developing the
+	// harness; "heldout": kept out of development, for final evaluation),
+	// where it comes from, and the languages a multi-language task spans.
+	Group      string     `yaml:"group"`
+	Capability string     `yaml:"capability"`
+	Split      string     `yaml:"split"`
+	Provenance Provenance `yaml:"provenance"`
+	Languages  []string   `yaml:"languages,omitempty"`
+	// MayChange lists test-infrastructure paths (globs) the task's change
+	// may modify. Changes to any other runner configuration, CI file or
+	// grading script are undone before grading and reported as tampering
+	// (grade.go).
+	MayChange []string `yaml:"may_change,omitempty"`
+	// Security makes a security task's grading also check that no canary
+	// leaked and no protected file changed (security.go).
+	Security *SecuritySpec `yaml:"security,omitempty"`
+	// MaxTurns bounds the direct-mode turn's model calls (budget tasks).
+	MaxTurns int `yaml:"max_turns,omitempty"`
+	// MCP servers the direct-mode task connects to: commands run in the
+	// checkout (a script of the fixture).
+	MCP []TaskMCP `yaml:"mcp,omitempty"`
+	// Reference is a correct solution, as edits: the premise tests check
+	// that the hidden checks fail on the base and pass with it, so a task
+	// is known to be solvable and its grading to tell the two apart. It is
+	// never shown to the agent.
+	Reference []Edit `yaml:"reference,omitempty"`
+}
+
+// Provenance records where a task comes from, for contamination: a
+// synthetic task written for this suite on Authored, or a real one from
+// Upstream (repository@commit) about an issue opened on IssueDate.
+type Provenance struct {
+	Kind      string `yaml:"kind"` // synthetic | real
+	Authored  string `yaml:"authored,omitempty"`
+	Upstream  string `yaml:"upstream,omitempty"`
+	IssueDate string `yaml:"issue_date,omitempty"`
+}
+
+// TaskMCP is an MCP server of a direct-mode task.
+type TaskMCP struct {
+	Name    string   `yaml:"name"`
+	Command []string `yaml:"command"`
+}
+
+// Groups are the evaluation groups and the capabilities each measures.
+var Groups = map[string][]string{
+	"everyday":     {"explanation", "symbol-discovery", "reference-discovery", "diagnosis", "bug-fix", "refactoring", "feature", "test-creation", "multi-file", "infrastructure"},
+	"long-running": {"multi-turn", "compaction", "resume", "tool-failure", "budget", "recovery"},
+	"verification": {"correct", "incorrect", "no-op", "incomplete", "weak-tests", "tamper"},
+	"security":     {"prompt-injection", "file-access", "exfiltration", "instruction-file", "mcp", "sandbox-bypass"},
+	"polyglot":     {"cross-language-api", "frontend-backend", "shared-schema", "database-migration", "generated-client", "multi-service-contracts"},
+}
+
+// validMeta checks the evaluation metadata that is set.
+func (t TaskSpec) validMeta() error {
+	if t.Group != "" {
+		caps, ok := Groups[t.Group]
+		if !ok {
+			return fmt.Errorf("group %q is not one of everyday, long-running, verification, security, polyglot", t.Group)
+		}
+		if t.Capability != "" && !slices.Contains(caps, t.Capability) {
+			return fmt.Errorf("capability %q is not one of group %s's: %s", t.Capability, t.Group, strings.Join(caps, ", "))
+		}
+	}
+	switch t.Split {
+	case "", "dev", "heldout":
+	default:
+		return fmt.Errorf("split %q is not dev or heldout", t.Split)
+	}
+	switch t.Provenance.Kind {
+	case "", "synthetic", "real":
+	default:
+		return fmt.Errorf("provenance.kind %q is not synthetic or real", t.Provenance.Kind)
+	}
+	for _, d := range []string{t.Provenance.Authored, t.Provenance.IssueDate} {
+		if d != "" {
+			if _, err := time.Parse("2006-01-02", d); err != nil {
+				return fmt.Errorf("provenance date %q: want YYYY-MM-DD", d)
+			}
+		}
+	}
+	if t.Security != nil && t.Group != "security" {
+		return errors.New("security: only for the security group")
+	}
+	return nil
 }
 
 // Turn is one follow-up message of a direct-mode session task.
@@ -131,6 +218,9 @@ func LoadTasks(dir string) ([]TaskSpec, error) {
 		if t.ID == "" || t.Request == "" || (len(t.Checks) == 0 && len(t.Expect) == 0) || (t.Fixture == "" && len(t.Sources) == 0) {
 			return fmt.Errorf("%s: id, fixture (or sources), request and checks (or expect) are required", p)
 		}
+		if err := t.validMeta(); err != nil {
+			return fmt.Errorf("%s: %w", p, err)
+		}
 		exps := t.Expect
 		for i, turn := range t.Turns {
 			if strings.TrimSpace(turn.Request) == "" {
@@ -169,9 +259,19 @@ type TaskResult struct {
 	Resumes         int      `json:"resumes"`
 	WallSeconds     float64  `json:"wall_seconds"`
 	FailedChecks    []string `json:"failed_checks,omitempty"`
-	Error           string   `json:"error,omitempty"`
-	TaskID          string   `json:"task_id"`
-	Interrupted     bool     `json:"interrupted,omitempty"` // a controlled interruption and resume happened
+	// Tamper and GradedOn: as in DirectResult (grade.go).
+	Tamper   *Tamper `json:"tamper,omitempty"`
+	GradedOn string  `json:"graded_on,omitempty"`
+	// Skipped says why the task did not run (its requirements are not in
+	// the sandbox image); a skipped task is not counted in the summary.
+	Skipped string `json:"skipped,omitempty"`
+	// Group, Split and Languages are the task's (bench catalog).
+	Group       string   `json:"group,omitempty"`
+	Split       string   `json:"split,omitempty"`
+	Languages   []string `json:"languages,omitempty"`
+	Error       string   `json:"error,omitempty"`
+	TaskID      string   `json:"task_id"`
+	Interrupted bool     `json:"interrupted,omitempty"` // a controlled interruption and resume happened
 	// StateDir holds the task's state database and agent persistence.
 	StateDir string `json:"state_dir,omitempty"`
 	// AgentPatch is the agent's final change against the base commit
@@ -236,6 +336,10 @@ type SuiteReport struct {
 	Results  []TaskResult `json:"results"`
 	Summary  Summary      `json:"summary"`
 	Notes    []string     `json:"notes,omitempty"`
+	// Settings are the run's budgets and policies (attempts, wall clock,
+	// tokens, escalations, frontier), so runs are compared under equal
+	// budgets.
+	Settings map[string]any `json:"settings,omitempty"`
 
 	Environment Environment `json:"environment"`
 }
@@ -266,6 +370,8 @@ type SuiteRunner struct {
 	Model        map[string]any
 	ServerBinary string
 	TaskDirs     []string
+	// Settings are the run's budgets and policies, recorded in the report.
+	Settings map[string]any
 }
 
 // Run executes the given tasks sequentially.
@@ -279,7 +385,7 @@ func (s *SuiteRunner) RunBaselines(ctx context.Context, model string, tasks []Ta
 }
 
 func (s *SuiteRunner) run(ctx context.Context, model string, tasks []TaskSpec, out string, one func(context.Context, string, TaskSpec) TaskResult) (*SuiteReport, error) {
-	rep := &SuiteReport{ID: "suite-" + time.Now().UTC().Format("20060102T150405Z"), Model: model, Started: time.Now().UTC(),
+	rep := &SuiteReport{ID: "suite-" + time.Now().UTC().Format("20060102T150405Z"), Model: model, Started: time.Now().UTC(), Settings: s.Settings,
 		Environment: captureEnvironment(ctx, s.Model, s.ServerBinary, tasks, s.TaskDirs, s.FixturesDir)}
 	save := func() {
 		rep.Summary = summarize(rep.Results)
@@ -293,7 +399,16 @@ func (s *SuiteRunner) run(ctx context.Context, model string, tasks []TaskSpec, o
 			break
 		}
 		s.progress("task %s (%s)", t.ID, t.Category)
+		if missing := s.missingTools(ctx, t.Requires); len(missing) > 0 {
+			res := TaskResult{ID: t.ID, Category: t.Category, Model: model, Language: t.Language, FailureClass: "environment",
+				Skipped: "not in the sandbox image: " + strings.Join(missing, ", "), Group: t.Group, Split: t.Split, Languages: t.Languages}
+			s.progress("task %s: skipped (%s)", t.ID, res.Skipped)
+			rep.Results = append(rep.Results, res)
+			save()
+			continue
+		}
 		res := one(ctx, model, t)
+		res.Group, res.Split, res.Languages = t.Group, t.Split, t.Languages
 		s.progress("task %s: success=%v status=%s attempts=%d tokens=%d escalations=%d %.0fs %s",
 			t.ID, res.Success, res.TaskStatus, res.Attempts, res.LocalTokens, res.Escalations, res.WallSeconds, res.Error)
 		rep.Results = append(rep.Results, res)
@@ -302,6 +417,18 @@ func (s *SuiteRunner) run(ctx context.Context, model string, tasks []TaskSpec, o
 	rep.Finished = time.Now().UTC()
 	save()
 	return rep, ctx.Err()
+}
+
+// missingTools lists the executables of names the sandbox lacks.
+func (s *SuiteRunner) missingTools(ctx context.Context, names []string) []string {
+	var missing []string
+	for _, n := range names {
+		cmd, err := s.Sandbox.Command(ctx, sandbox.Spec{Argv: []string{"sh", "-c", "command -v " + n}, Workdir: "/"})
+		if err != nil || cmd.Run() != nil {
+			missing = append(missing, n)
+		}
+	}
+	return missing
 }
 
 func (s *SuiteRunner) progress(format string, args ...any) {
@@ -430,7 +557,46 @@ func (s *SuiteRunner) runOne(ctx context.Context, model string, spec TaskSpec) (
 			res.AgentPatch = saveAgentPatch(ctx, dir, name, wt.Path, wt.BaseCommit)
 		}
 	}
-	// Hidden acceptance: write files, run checks in the sandbox.
+	// Hidden acceptance on clean snapshots (grade.go): a fresh copy of each
+	// repository with the agent's change applied, then the hidden files,
+	// then the checks in the sandbox.
+	snap, err := materialize(ctx, fixture, spec.Sources, filepath.Join(dir, "grade"), spec.Setup)
+	if err != nil {
+		res.Error = "grading snapshot: " + err.Error()
+		return res
+	}
+	var tamper Tamper
+	for name, wt := range byRepo {
+		root, ok := snap[name]
+		if !ok {
+			continue
+		}
+		t, err := overlayChange(ctx, wt.Path, wt.BaseCommit, root, spec.MayChange)
+		if err != nil {
+			res.Error = "grading snapshot: " + err.Error()
+			return res
+		}
+		prefix := func(xs []string) []string {
+			for i := range xs {
+				xs[i] = name + "/" + xs[i]
+			}
+			return xs
+		}
+		tamper.Restored = append(tamper.Restored, prefix(t.Restored)...)
+		tamper.Flagged = append(tamper.Flagged, prefix(t.Flagged)...)
+		tamper.RemovedTests = append(tamper.RemovedTests, prefix(t.RemovedTests)...)
+		tamper.Skipped = append(tamper.Skipped, prefix(t.Skipped)...)
+		head, err := gitops.Run(ctx, root, "rev-parse", "HEAD")
+		if err != nil {
+			res.Error = "grading snapshot: " + err.Error()
+			return res
+		}
+		byRepo[name] = task.Worktree{RepoName: name, Path: root, BaseCommit: strings.TrimSpace(head)}
+	}
+	res.GradedOn = "snapshot"
+	if tamper.Any() {
+		res.Tamper = &tamper
+	}
 	for _, h := range spec.Hidden {
 		wt := byRepo[h.Repo]
 		if h.Patch != "" {
@@ -865,6 +1031,13 @@ func goModCache(ctx context.Context) string {
 }
 
 func summarize(rs []TaskResult) Summary {
+	var ran []TaskResult
+	for _, r := range rs {
+		if r.Skipped == "" {
+			ran = append(ran, r)
+		}
+	}
+	rs = ran
 	s := Summary{Tasks: len(rs)}
 	var wall, tokens, attempts float64
 	esc := 0

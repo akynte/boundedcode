@@ -16,3 +16,11 @@ expect:
   - "go/ast/inspector/inspector\\.go"
   - "before|pre-?order|depth-first"
 timeout: 15m
+
+group: everyday
+capability: symbol-discovery
+split: dev
+provenance:
+  kind: synthetic
+  authored: 2026-10-26
+  upstream: "gomod:golang.org/x/tools@v0.50.0"
