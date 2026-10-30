@@ -1,0 +1,491 @@
+{
+  "id": "suite-20261030T015417Z",
+  "model": "qwen3.6-35b-a3b",
+  "started": "2026-10-30T01:54:17.636295186Z",
+  "finished": "2026-10-30T02:31:08.114381541Z",
+  "results": [
+    {
+      "id": "c-bugfix-luhn",
+      "category": "c-bugfix",
+      "model": "qwen3.6-35b-a3b",
+      "success": false,
+      "task_status": "completed",
+      "self_verified": true,
+      "tests_green": true,
+      "attempts": 2,
+      "local_tokens": 31354,
+      "generated_tokens": 12374,
+      "cached_prompt_tokens": 342508,
+      "escalations": 0,
+      "local_only": false,
+      "condensations": 0,
+      "resumes": 0,
+      "wall_seconds": 422.603955585,
+      "failed_checks": [
+        "c-checksum: sh -c cmake -S . -B build-hidden -G Ninja \u003e/dev/null \u0026\u0026 cmake --build build-hidden \u0026\u0026 ctest --test-dir build-hidden --output-on-failure: …undedcode/bench-work/c-bugfix-luhn-1793325257734671869/grade/c-checksum/build-hidden\nTest project ~/.cache/boundedcode/bench-work/c-bugfix-luhn-1793325257734671869/grade/c-checksum/build-hidden\n    Start 1: test_checksum\n1/2 Test #1: test_checksum ....................   Passed    0.00 sec\n    Start 2: test_hidden\n2/2 Test #2: test_hidden ......................***Failed    0.00 sec\nFAIL check digit, 15 digits: got 8, want 7\n\n\n50% tests passed, 1 tests failed out of 2\n\nTotal Test time (real) =   0.00 sec\n\nThe following tests FAILED:\n\t  2 - test_hidden (Failed)\nErrors while running CTest\n"
+      ],
+      "graded_on": "snapshot",
+      "group": "everyday",
+      "split": "heldout",
+      "task_id": "t20261030-6ac4ae",
+      "state_dir": "~/.cache/boundedcode/bench-work/c-bugfix-luhn-1793325257734671869/state",
+      "agent_patch": "~/.cache/boundedcode/bench-work/c-bugfix-luhn-1793325257734671869/agent-c-checksum.patch",
+      "intel": {
+        "context_packs": 2,
+        "pack_tokens": 1870,
+        "code_tokens": 0,
+        "serena_calls": 0,
+        "serena_errors": 0,
+        "serena_ms": 0,
+        "graph_calls": 0,
+        "graph_ms": 0,
+        "serena_symbols": 0,
+        "graph_symbols": 0,
+        "fallbacks": 0,
+        "agent_tool_calls": 19,
+        "agent_tools": {
+          "file_editor": 11,
+          "finish": 1,
+          "terminal": 6,
+          "think": 1
+        }
+      },
+      "language": "c",
+      "calls": {
+        "calls": 18,
+        "inference_seconds": 392.06513279200016,
+        "prefill_seconds": 42.929026,
+        "decode_seconds": 347.86114799999996,
+        "reasoning_tokens": 0,
+        "cache_invalidations": 1,
+        "cache_invalidations_after_rewrite": 1,
+        "recomputed_prompt_tokens": 458,
+        "prompt_tokens": 361946,
+        "peak_call": 17,
+        "generated_tokens": 12587
+      },
+      "verify_seconds": 3.5229999999999997,
+      "verify_runs": [
+        {
+          "repo": "c-checksum",
+          "scope": "targeted",
+          "passed": true,
+          "seconds": 1.011
+        },
+        {
+          "repo": "c-checksum",
+          "scope": "full",
+          "passed": true,
+          "seconds": 0.835
+        },
+        {
+          "repo": "c-checksum",
+          "scope": "targeted",
+          "passed": true,
+          "seconds": 0.852
+        },
+        {
+          "repo": "c-checksum",
+          "scope": "full",
+          "passed": true,
+          "seconds": 0.825
+        }
+      ],
+      "failure_class": "verification_false_pass",
+      "resources": {
+        "harness_rss_mib": 35.74609375,
+        "model_server_rss_mib": 28997.19140625,
+        "gpu_mem_used_mib": 7155,
+        "sandbox_mem_mib": 288,
+        "samples": 422
+      }
+    },
+    {
+      "id": "cpp-bugfix-ringbuffer",
+      "category": "cpp-bugfix",
+      "model": "qwen3.6-35b-a3b",
+      "success": false,
+      "task_status": "active",
+      "self_verified": false,
+      "tests_green": false,
+      "attempts": 1,
+      "local_tokens": 183838,
+      "generated_tokens": 40106,
+      "cached_prompt_tokens": 2377379,
+      "escalations": 0,
+      "local_only": false,
+      "condensations": 3,
+      "resumes": 0,
+      "wall_seconds": 1523.696295211,
+      "failed_checks": [
+        "cpp-ringbuffer: sh -c cmake -S . -B build-hidden -G Ninja \u003e/dev/null \u0026\u0026 cmake --build build-hidden \u0026\u0026 ctest --test-dir build-hidden --output-on-failure: …25680343304792/grade/cpp-ringbuffer/build-hidden\nTest project ~/.cache/boundedcode/bench-work/cpp-bugfix-ringbuffer-1793325680343304792/grade/cpp-ringbuffer/build-hidden\n    Start 1: test_hidden\n1/2 Test #1: test_hidden ......................***Failed    0.00 sec\nFAIL full buffer has size 3\nFAIL size 1\nFAIL size after wrapping\n\n    Start 2: test_ringbuffer\n2/2 Test #2: test_ringbuffer ..................   Passed    0.00 sec\n\n50% tests passed, 1 tests failed out of 2\n\nTotal Test time (real) =   0.01 sec\n\nThe following tests FAILED:\n\t  1 - test_hidden (Failed)\nErrors while running CTest\n"
+      ],
+      "graded_on": "snapshot",
+      "group": "everyday",
+      "split": "heldout",
+      "task_id": "t20261030-3aa81a",
+      "state_dir": "~/.cache/boundedcode/bench-work/cpp-bugfix-ringbuffer-1793325680343304792/state",
+      "agent_patch": "~/.cache/boundedcode/bench-work/cpp-bugfix-ringbuffer-1793325680343304792/agent-cpp-ringbuffer.patch",
+      "intel": {
+        "context_packs": 1,
+        "pack_tokens": 1062,
+        "code_tokens": 617,
+        "serena_calls": 0,
+        "serena_errors": 0,
+        "serena_ms": 0,
+        "graph_calls": 4,
+        "graph_ms": 41.529,
+        "serena_symbols": 0,
+        "graph_symbols": 2,
+        "fallbacks": 0,
+        "agent_tool_calls": 85,
+        "agent_tools": {
+          "file_editor": 5,
+          "terminal": 78,
+          "think": 2
+        }
+      },
+      "language": "cpp",
+      "calls": {
+        "calls": 89,
+        "inference_seconds": 1457.772899178,
+        "prefill_seconds": 277.314193,
+        "decode_seconds": 1171.3442380000001,
+        "reasoning_tokens": 0,
+        "cache_invalidations": 6,
+        "cache_invalidations_after_rewrite": 6,
+        "recomputed_prompt_tokens": 27335,
+        "prompt_tokens": 2521547,
+        "peak_call": 84,
+        "generated_tokens": 40282
+      },
+      "verify_seconds": 0,
+      "stalls": [
+        "timeout"
+      ],
+      "failure_class": "timeout",
+      "resources": {
+        "harness_rss_mib": 38.17578125,
+        "model_server_rss_mib": 28997.19140625,
+        "gpu_mem_used_mib": 7155,
+        "sandbox_mem_mib": 298.7,
+        "samples": 1523
+      }
+    },
+    {
+      "id": "csharp-bugfix-fahrenheit",
+      "category": "csharp-bugfix",
+      "model": "qwen3.6-35b-a3b",
+      "success": false,
+      "task_status": "",
+      "self_verified": false,
+      "tests_green": false,
+      "attempts": 0,
+      "local_tokens": 0,
+      "generated_tokens": 0,
+      "cached_prompt_tokens": 0,
+      "escalations": 0,
+      "local_only": false,
+      "condensations": 0,
+      "resumes": 0,
+      "wall_seconds": 0,
+      "skipped": "not in the sandbox image: dotnet",
+      "group": "everyday",
+      "split": "heldout",
+      "task_id": "",
+      "intel": {
+        "context_packs": 0,
+        "pack_tokens": 0,
+        "code_tokens": 0,
+        "serena_calls": 0,
+        "serena_errors": 0,
+        "serena_ms": 0,
+        "graph_calls": 0,
+        "graph_ms": 0,
+        "serena_symbols": 0,
+        "graph_symbols": 0,
+        "fallbacks": 0,
+        "agent_tool_calls": 0
+      },
+      "language": "csharp",
+      "calls": {
+        "calls": 0,
+        "inference_seconds": 0,
+        "reasoning_tokens": 0,
+        "cache_invalidations": 0,
+        "cache_invalidations_after_rewrite": 0,
+        "recomputed_prompt_tokens": 0,
+        "peak_call": 0
+      },
+      "verify_seconds": 0,
+      "failure_class": "environment",
+      "resources": {
+        "harness_rss_mib": 0,
+        "samples": 0
+      }
+    },
+    {
+      "id": "php-bugfix-slug",
+      "category": "php-bugfix",
+      "model": "qwen3.6-35b-a3b",
+      "success": true,
+      "task_status": "completed",
+      "self_verified": true,
+      "tests_green": true,
+      "attempts": 2,
+      "local_tokens": 16183,
+      "generated_tokens": 2867,
+      "cached_prompt_tokens": 158283,
+      "escalations": 0,
+      "local_only": true,
+      "condensations": 0,
+      "resumes": 0,
+      "wall_seconds": 139.253556948,
+      "graded_on": "snapshot",
+      "group": "everyday",
+      "split": "heldout",
+      "task_id": "t20261030-52a1cc",
+      "state_dir": "~/.cache/boundedcode/bench-work/php-bugfix-slug-1793327204317231226/state",
+      "agent_patch": "~/.cache/boundedcode/bench-work/php-bugfix-slug-1793327204317231226/agent-php-slug.patch",
+      "intel": {
+        "context_packs": 2,
+        "pack_tokens": 1611,
+        "code_tokens": 0,
+        "serena_calls": 0,
+        "serena_errors": 0,
+        "serena_ms": 0,
+        "graph_calls": 0,
+        "graph_ms": 0,
+        "serena_symbols": 0,
+        "graph_symbols": 0,
+        "fallbacks": 0,
+        "agent_tool_calls": 18,
+        "agent_tools": {
+          "file_editor": 11,
+          "finish": 2,
+          "terminal": 3,
+          "think": 2
+        }
+      },
+      "language": "php",
+      "calls": {
+        "calls": 15,
+        "inference_seconds": 114.081331886,
+        "prefill_seconds": 33.040595999999994,
+        "decode_seconds": 80.25624,
+        "reasoning_tokens": 0,
+        "cache_invalidations": 1,
+        "cache_invalidations_after_rewrite": 1,
+        "recomputed_prompt_tokens": 455,
+        "prompt_tokens": 172054,
+        "peak_call": 14,
+        "generated_tokens": 3003
+      },
+      "verify_seconds": 2.4779999999999998,
+      "verify_runs": [
+        {
+          "repo": "php-slug",
+          "scope": "targeted",
+          "passed": true,
+          "seconds": 0.626
+        },
+        {
+          "repo": "php-slug",
+          "scope": "full",
+          "passed": true,
+          "seconds": 0.609
+        },
+        {
+          "repo": "php-slug",
+          "scope": "targeted",
+          "passed": true,
+          "seconds": 0.627
+        },
+        {
+          "repo": "php-slug",
+          "scope": "full",
+          "passed": true,
+          "seconds": 0.616
+        }
+      ],
+      "resources": {
+        "harness_rss_mib": 36.359375,
+        "model_server_rss_mib": 28218.6875,
+        "gpu_mem_used_mib": 7155,
+        "sandbox_mem_mib": 285.3,
+        "samples": 139
+      }
+    },
+    {
+      "id": "ruby-bugfix-allocate",
+      "category": "ruby-bugfix",
+      "model": "qwen3.6-35b-a3b",
+      "success": true,
+      "task_status": "completed",
+      "self_verified": true,
+      "tests_green": true,
+      "attempts": 2,
+      "local_tokens": 14544,
+      "generated_tokens": 2416,
+      "cached_prompt_tokens": 109826,
+      "escalations": 0,
+      "local_only": true,
+      "condensations": 0,
+      "resumes": 0,
+      "wall_seconds": 124.532966095,
+      "graded_on": "snapshot",
+      "group": "everyday",
+      "split": "heldout",
+      "task_id": "t20261030-e74932",
+      "state_dir": "~/.cache/boundedcode/bench-work/ruby-bugfix-allocate-1793327343576407048/state",
+      "agent_patch": "~/.cache/boundedcode/bench-work/ruby-bugfix-allocate-1793327343576407048/agent-ruby-money.patch",
+      "intel": {
+        "context_packs": 2,
+        "pack_tokens": 1594,
+        "code_tokens": 0,
+        "serena_calls": 0,
+        "serena_errors": 0,
+        "serena_ms": 0,
+        "graph_calls": 0,
+        "graph_ms": 0,
+        "serena_symbols": 0,
+        "graph_symbols": 0,
+        "fallbacks": 0,
+        "agent_tool_calls": 13,
+        "agent_tools": {
+          "file_editor": 7,
+          "finish": 2,
+          "terminal": 3,
+          "think": 1
+        }
+      },
+      "language": "ruby",
+      "calls": {
+        "calls": 12,
+        "inference_seconds": 98.97456123399999,
+        "prefill_seconds": 29.771981,
+        "decode_seconds": 68.033898,
+        "reasoning_tokens": 0,
+        "cache_invalidations": 1,
+        "cache_invalidations_after_rewrite": 1,
+        "recomputed_prompt_tokens": 465,
+        "prompt_tokens": 122419,
+        "peak_call": 11,
+        "generated_tokens": 2559
+      },
+      "verify_seconds": 2.967,
+      "verify_runs": [
+        {
+          "repo": "ruby-money",
+          "scope": "targeted",
+          "passed": true,
+          "seconds": 0.734
+        },
+        {
+          "repo": "ruby-money",
+          "scope": "full",
+          "passed": true,
+          "seconds": 0.744
+        },
+        {
+          "repo": "ruby-money",
+          "scope": "targeted",
+          "passed": true,
+          "seconds": 0.744
+        },
+        {
+          "repo": "ruby-money",
+          "scope": "full",
+          "passed": true,
+          "seconds": 0.745
+        }
+      ],
+      "resources": {
+        "harness_rss_mib": 37.2890625,
+        "model_server_rss_mib": 28218.6875,
+        "gpu_mem_used_mib": 7155,
+        "sandbox_mem_mib": 301.1,
+        "samples": 124
+      }
+    }
+  ],
+  "summary": {
+    "tasks": 4,
+    "verified": 2,
+    "success_rate": 0.5,
+    "local_only_completion_rate": 0.5,
+    "frontier_escalation_rate": 0,
+    "verified_tasks_per_hour": 3.2577906375564343,
+    "attempts_per_successful_task": 2,
+    "wall_seconds_per_task": 552.52169345975,
+    "local_tokens_per_task": 61479.75,
+    "self_verified_but_hidden_failed": 1
+  },
+  "settings": {
+    "escalation_policy": "rules",
+    "frontier": false,
+    "max_attempts": 6,
+    "max_escalations": 2,
+    "max_local_tokens": 4000000,
+    "max_wall_clock": "4h0m0s",
+    "reasoning_history": "auto",
+    "speculative": "off"
+  },
+  "environment": {
+    "build": "dev b409ab02d7b9-dirty",
+    "os": "linux/amd64",
+    "cpu": "13th Gen Intel(R) Core(TM) i7-13620H",
+    "cpus": 16,
+    "mem_mib": 62741,
+    "gpu": "NVIDIA GeForce RTX 4060 Laptop GPU, 8188 MiB, 595.99.02",
+    "model": {
+      "file": "Qwen3.6-35B-A3B-UD-Q4_K_M.gguf",
+      "profile": "qwen3.6-35b-a3b",
+      "provider": "local",
+      "repo": "unsloth/Qwen3.6-35B-A3B-GGUF",
+      "revision": "a483e9e6cbd595906af30beda3187c2663a1118c",
+      "sampling": {
+        "min_p": 0,
+        "presence_penalty": 0,
+        "repeat_penalty": 0,
+        "temperature": 0.6,
+        "top_k": 20,
+        "top_p": 0.95
+      },
+      "server": {
+        "batch_size": 2048,
+        "cache_reuse": 0,
+        "cache_type_k": "q8_0",
+        "cache_type_v": "q8_0",
+        "ctx_size": 131072,
+        "extra_args": [],
+        "flash_attn": "on",
+        "gpu_layers": 999,
+        "jinja": true,
+        "mlock": false,
+        "n_cpu_moe": 35,
+        "no_mmap": false,
+        "parallel": 1,
+        "reasoning": "",
+        "reasoning_budget": 0,
+        "reasoning_budget_message": "",
+        "threads": 8,
+        "ubatch_size": 2048
+      },
+      "sha256": "ac0e2c1189e055faa36eff361580e79c5bd6f8e76bffb4ce547f167d53e31a61",
+      "size_bytes": 22134528992
+    },
+    "server": "llama.cpp 0.5.0-dev (build 11146, commit 7fe450e19)",
+    "toolchains": {
+      "docker": "Docker version 29.9.1, build dfc520d",
+      "git": "git version 2.53.0",
+      "go": "go version go1.27.3 linux/amd64",
+      "node": "v24.22.0",
+      "python3": "Python 3.14.4"
+    },
+    "tasks_sha256": "ab9b01c719753acd",
+    "fixtures_sha256": {
+      "langs": "367e90db807225a7"
+    }
+  }
+}

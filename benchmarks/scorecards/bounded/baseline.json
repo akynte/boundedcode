@@ -1,0 +1,353 @@
+{
+  "schema": 1,
+  "suite": "bounded",
+  "created": "2026-10-30T02:33:26.221581121Z",
+  "model": {
+    "file": "Qwen3.6-35B-A3B-UD-Q4_K_M.gguf",
+    "profile": "qwen3.6-35b-a3b",
+    "provider": "local",
+    "repo": "unsloth/Qwen3.6-35B-A3B-GGUF",
+    "revision": "a483e9e6cbd595906af30beda3187c2663a1118c",
+    "sampling": {
+      "min_p": 0,
+      "presence_penalty": 0,
+      "repeat_penalty": 0,
+      "temperature": 0.6,
+      "top_k": 20,
+      "top_p": 0.95
+    },
+    "server": {
+      "batch_size": 2048,
+      "cache_reuse": 0,
+      "cache_type_k": "q8_0",
+      "cache_type_v": "q8_0",
+      "ctx_size": 131072,
+      "extra_args": [],
+      "flash_attn": "on",
+      "gpu_layers": 999,
+      "jinja": true,
+      "mlock": false,
+      "n_cpu_moe": 35,
+      "no_mmap": false,
+      "parallel": 1,
+      "reasoning": "",
+      "reasoning_budget": 0,
+      "reasoning_budget_message": "",
+      "threads": 8,
+      "ubatch_size": 2048
+    },
+    "sha256": "ac0e2c1189e055faa36eff361580e79c5bd6f8e76bffb4ce547f167d53e31a61",
+    "size_bytes": 22134528992
+  },
+  "server": "llama.cpp 0.5.0-dev (build 11146, commit 7fe450e19)",
+  "build": "dev b409ab02d7b9-dirty",
+  "task_set": "ab9b01c719753acd",
+  "machine": "13th Gen Intel(R) Core(TM) i7-13620H NVIDIA GeForce RTX 4060 Laptop GPU, 8188 MiB, 595.99.02",
+  "settings": {
+    "escalation_policy": "rules",
+    "frontier": false,
+    "max_attempts": 6,
+    "max_escalations": 2,
+    "max_local_tokens": 4000000,
+    "max_wall_clock": "4h0m0s",
+    "reasoning_history": "auto",
+    "speculative": "off"
+  },
+  "trials": 2,
+  "reports": [
+    "suite-20261030T013550Z",
+    "suite-20261030T015417Z"
+  ],
+  "overall": {
+    "runs": 8,
+    "passed": 6,
+    "success_rate": 0.75,
+    "success_ci90": [
+      0.46,
+      0.913
+    ],
+    "verified_claims": 7,
+    "verify_precision": 0.857,
+    "verify_recall": 1,
+    "false_acceptance": 1,
+    "false_acceptance_rate": 0.5,
+    "false_rejection": 0,
+    "false_rejection_rate": 0,
+    "tokens_per_success": 20070,
+    "tokens_per_failure": 107596,
+    "median_seconds": 139.3,
+    "p90_seconds": 1523.7,
+    "p95_seconds": 1523.7,
+    "model_calls_per_run": 25.625,
+    "tool_calls_per_run": 26.125,
+    "peak_harness_mib": 38.17578125,
+    "peak_server_mib": 28997.19140625,
+    "peak_gpu_mib": 7155,
+    "security_failures": 0,
+    "skipped": 2
+  },
+  "by_language": {
+    "c": {
+      "runs": 2,
+      "passed": 1,
+      "success_rate": 0.5,
+      "success_ci90": [
+        0.121,
+        0.879
+      ],
+      "verified_claims": 2,
+      "verify_precision": 0.5,
+      "verify_recall": 1,
+      "false_acceptance": 1,
+      "false_acceptance_rate": 1,
+      "false_rejection": 0,
+      "false_rejection_rate": 0,
+      "tokens_per_success": 44287,
+      "tokens_per_failure": 31354,
+      "median_seconds": 422.6,
+      "p90_seconds": 721.9,
+      "p95_seconds": 721.9,
+      "model_calls_per_run": 26.5,
+      "tool_calls_per_run": 28.5,
+      "peak_harness_mib": 36.6875,
+      "peak_server_mib": 28997.19140625,
+      "peak_gpu_mib": 7155,
+      "security_failures": 0
+    },
+    "cpp": {
+      "runs": 2,
+      "passed": 1,
+      "success_rate": 0.5,
+      "success_ci90": [
+        0.121,
+        0.879
+      ],
+      "verified_claims": 1,
+      "verify_precision": 1,
+      "verify_recall": 1,
+      "false_acceptance": 0,
+      "false_acceptance_rate": 0,
+      "false_rejection": 0,
+      "false_rejection_rate": 0,
+      "tokens_per_success": 17407,
+      "tokens_per_failure": 183838,
+      "median_seconds": 157.5,
+      "p90_seconds": 1523.7,
+      "p95_seconds": 1523.7,
+      "model_calls_per_run": 52,
+      "tool_calls_per_run": 49.5,
+      "peak_harness_mib": 38.17578125,
+      "peak_server_mib": 28997.19140625,
+      "peak_gpu_mib": 7155,
+      "security_failures": 0
+    },
+    "csharp": {
+      "runs": 0,
+      "passed": 0,
+      "success_rate": 0,
+      "success_ci90": [
+        0,
+        0
+      ],
+      "false_acceptance": 0,
+      "false_acceptance_rate": 0,
+      "false_rejection": 0,
+      "false_rejection_rate": 0,
+      "security_failures": 0,
+      "skipped": 2
+    },
+    "php": {
+      "runs": 2,
+      "passed": 2,
+      "success_rate": 1,
+      "success_ci90": [
+        0.425,
+        1
+      ],
+      "verified_claims": 2,
+      "verify_precision": 1,
+      "verify_recall": 1,
+      "false_acceptance": 0,
+      "false_acceptance_rate": 0,
+      "false_rejection": 0,
+      "false_rejection_rate": 0,
+      "tokens_per_success": 15189,
+      "median_seconds": 116.4,
+      "p90_seconds": 139.3,
+      "p95_seconds": 139.3,
+      "model_calls_per_run": 13,
+      "tool_calls_per_run": 15,
+      "peak_harness_mib": 36.359375,
+      "peak_server_mib": 28495.3828125,
+      "peak_gpu_mib": 7155,
+      "security_failures": 0
+    },
+    "ruby": {
+      "runs": 2,
+      "passed": 2,
+      "success_rate": 1,
+      "success_ci90": [
+        0.425,
+        1
+      ],
+      "verified_claims": 2,
+      "verify_precision": 1,
+      "verify_recall": 1,
+      "false_acceptance": 0,
+      "false_acceptance_rate": 0,
+      "false_rejection": 0,
+      "false_rejection_rate": 0,
+      "tokens_per_success": 14173,
+      "median_seconds": 111,
+      "p90_seconds": 124.5,
+      "p95_seconds": 124.5,
+      "model_calls_per_run": 11,
+      "tool_calls_per_run": 11.5,
+      "peak_harness_mib": 37.2890625,
+      "peak_server_mib": 28495.3828125,
+      "peak_gpu_mib": 7155,
+      "security_failures": 0
+    }
+  },
+  "by_group": {
+    "everyday": {
+      "runs": 8,
+      "passed": 6,
+      "success_rate": 0.75,
+      "success_ci90": [
+        0.46,
+        0.913
+      ],
+      "verified_claims": 7,
+      "verify_precision": 0.857,
+      "verify_recall": 1,
+      "false_acceptance": 1,
+      "false_acceptance_rate": 0.5,
+      "false_rejection": 0,
+      "false_rejection_rate": 0,
+      "tokens_per_success": 20070,
+      "tokens_per_failure": 107596,
+      "median_seconds": 139.3,
+      "p90_seconds": 1523.7,
+      "p95_seconds": 1523.7,
+      "model_calls_per_run": 25.625,
+      "tool_calls_per_run": 26.125,
+      "peak_harness_mib": 38.17578125,
+      "peak_server_mib": 28997.19140625,
+      "peak_gpu_mib": 7155,
+      "security_failures": 0,
+      "skipped": 2
+    }
+  },
+  "by_split": {
+    "heldout": {
+      "runs": 8,
+      "passed": 6,
+      "success_rate": 0.75,
+      "success_ci90": [
+        0.46,
+        0.913
+      ],
+      "verified_claims": 7,
+      "verify_precision": 0.857,
+      "verify_recall": 1,
+      "false_acceptance": 1,
+      "false_acceptance_rate": 0.5,
+      "false_rejection": 0,
+      "false_rejection_rate": 0,
+      "tokens_per_success": 20070,
+      "tokens_per_failure": 107596,
+      "median_seconds": 139.3,
+      "p90_seconds": 1523.7,
+      "p95_seconds": 1523.7,
+      "model_calls_per_run": 25.625,
+      "tool_calls_per_run": 26.125,
+      "peak_harness_mib": 38.17578125,
+      "peak_server_mib": 28997.19140625,
+      "peak_gpu_mib": 7155,
+      "security_failures": 0,
+      "skipped": 2
+    }
+  },
+  "tasks": {
+    "c-bugfix-luhn": {
+      "runs": 2,
+      "passed": 1
+    },
+    "cpp-bugfix-ringbuffer": {
+      "runs": 2,
+      "passed": 1
+    },
+    "php-bugfix-slug": {
+      "runs": 2,
+      "passed": 2
+    },
+    "ruby-bugfix-allocate": {
+      "runs": 2,
+      "passed": 2
+    }
+  },
+  "per_trial": [
+    {
+      "runs": 4,
+      "passed": 4,
+      "success_rate": 1,
+      "success_ci90": [
+        0.596,
+        1
+      ],
+      "verified_claims": 4,
+      "verify_precision": 1,
+      "verify_recall": 1,
+      "false_acceptance": 0,
+      "false_acceptance_rate": 0,
+      "false_rejection": 0,
+      "false_rejection_rate": 0,
+      "tokens_per_success": 22423,
+      "median_seconds": 116.4,
+      "p90_seconds": 721.9,
+      "p95_seconds": 721.9,
+      "model_calls_per_run": 17.75,
+      "tool_calls_per_run": 18.5,
+      "peak_harness_mib": 36.921875,
+      "peak_server_mib": 28495.3828125,
+      "peak_gpu_mib": 7155,
+      "security_failures": 0,
+      "skipped": 1
+    },
+    {
+      "runs": 4,
+      "passed": 2,
+      "success_rate": 0.5,
+      "success_ci90": [
+        0.182,
+        0.818
+      ],
+      "verified_claims": 3,
+      "verify_precision": 0.667,
+      "verify_recall": 1,
+      "false_acceptance": 1,
+      "false_acceptance_rate": 0.5,
+      "false_rejection": 0,
+      "false_rejection_rate": 0,
+      "tokens_per_success": 15364,
+      "tokens_per_failure": 107596,
+      "median_seconds": 139.3,
+      "p90_seconds": 1523.7,
+      "p95_seconds": 1523.7,
+      "model_calls_per_run": 33.5,
+      "tool_calls_per_run": 33.75,
+      "peak_harness_mib": 38.17578125,
+      "peak_server_mib": 28997.19140625,
+      "peak_gpu_mib": 7155,
+      "security_failures": 0,
+      "skipped": 1
+    }
+  ],
+  "limitations": [
+    "2 trial(s): fewer than three, so run-to-run noise is barely estimated",
+    "2 task(s) passed in some trials and failed in others",
+    "2 task run(s) skipped (a toolchain is missing)",
+    "one machine; the confidence intervals treat repeated runs of a task as independent"
+  ]
+}

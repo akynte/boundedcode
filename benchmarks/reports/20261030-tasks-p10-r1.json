@@ -1,0 +1,506 @@
+{
+  "id": "suite-20261030T013550Z",
+  "model": "qwen3.6-35b-a3b",
+  "started": "2026-10-30T01:35:50.563919337Z",
+  "finished": "2026-10-30T01:54:17.598537448Z",
+  "results": [
+    {
+      "id": "c-bugfix-luhn",
+      "category": "c-bugfix",
+      "model": "qwen3.6-35b-a3b",
+      "success": true,
+      "task_status": "completed",
+      "self_verified": true,
+      "tests_green": true,
+      "attempts": 2,
+      "local_tokens": 44287,
+      "generated_tokens": 21329,
+      "cached_prompt_tokens": 964627,
+      "escalations": 0,
+      "local_only": true,
+      "condensations": 0,
+      "resumes": 0,
+      "wall_seconds": 721.860093924,
+      "graded_on": "snapshot",
+      "group": "everyday",
+      "split": "heldout",
+      "task_id": "t20261030-be8cfc",
+      "state_dir": "~/.cache/boundedcode/bench-work/c-bugfix-luhn-1793324150659782592/state",
+      "agent_patch": "~/.cache/boundedcode/bench-work/c-bugfix-luhn-1793324150659782592/agent-c-checksum.patch",
+      "intel": {
+        "context_packs": 2,
+        "pack_tokens": 1712,
+        "code_tokens": 0,
+        "serena_calls": 0,
+        "serena_errors": 0,
+        "serena_ms": 0,
+        "graph_calls": 0,
+        "graph_ms": 0,
+        "serena_symbols": 0,
+        "graph_symbols": 0,
+        "fallbacks": 0,
+        "agent_tool_calls": 38,
+        "agent_tools": {
+          "file_editor": 16,
+          "finish": 2,
+          "terminal": 19,
+          "think": 1
+        }
+      },
+      "language": "c",
+      "calls": {
+        "calls": 35,
+        "inference_seconds": 686.0930366840001,
+        "prefill_seconds": 71.88397700000002,
+        "decode_seconds": 611.7108549999999,
+        "reasoning_tokens": 0,
+        "cache_invalidations": 1,
+        "cache_invalidations_after_rewrite": 1,
+        "recomputed_prompt_tokens": 458,
+        "prompt_tokens": 988043,
+        "peak_call": 34,
+        "generated_tokens": 21491
+      },
+      "verify_seconds": 3.5149999999999997,
+      "verify_runs": [
+        {
+          "repo": "c-checksum",
+          "scope": "targeted",
+          "passed": true,
+          "seconds": 1.025
+        },
+        {
+          "repo": "c-checksum",
+          "scope": "full",
+          "passed": true,
+          "seconds": 0.811
+        },
+        {
+          "repo": "c-checksum",
+          "scope": "targeted",
+          "passed": true,
+          "seconds": 0.863
+        },
+        {
+          "repo": "c-checksum",
+          "scope": "full",
+          "passed": true,
+          "seconds": 0.816
+        }
+      ],
+      "resources": {
+        "harness_rss_mib": 36.6875,
+        "model_server_rss_mib": 28007.69921875,
+        "gpu_mem_used_mib": 7155,
+        "sandbox_mem_mib": 290.8,
+        "samples": 722
+      }
+    },
+    {
+      "id": "cpp-bugfix-ringbuffer",
+      "category": "cpp-bugfix",
+      "model": "qwen3.6-35b-a3b",
+      "success": true,
+      "task_status": "completed",
+      "self_verified": true,
+      "tests_green": true,
+      "attempts": 2,
+      "local_tokens": 17407,
+      "generated_tokens": 3358,
+      "cached_prompt_tokens": 155281,
+      "escalations": 0,
+      "local_only": true,
+      "condensations": 0,
+      "resumes": 0,
+      "wall_seconds": 157.463540393,
+      "graded_on": "snapshot",
+      "group": "everyday",
+      "split": "heldout",
+      "task_id": "t20261030-7d40e6",
+      "state_dir": "~/.cache/boundedcode/bench-work/cpp-bugfix-ringbuffer-1793324872524659735/state",
+      "agent_patch": "~/.cache/boundedcode/bench-work/cpp-bugfix-ringbuffer-1793324872524659735/agent-cpp-ringbuffer.patch",
+      "intel": {
+        "context_packs": 2,
+        "pack_tokens": 2773,
+        "code_tokens": 1307,
+        "serena_calls": 0,
+        "serena_errors": 0,
+        "serena_ms": 0,
+        "graph_calls": 8,
+        "graph_ms": 89.013,
+        "serena_symbols": 0,
+        "graph_symbols": 4,
+        "fallbacks": 0,
+        "agent_tool_calls": 14,
+        "agent_tools": {
+          "file_editor": 5,
+          "finish": 2,
+          "terminal": 6,
+          "think": 1
+        }
+      },
+      "language": "cpp",
+      "calls": {
+        "calls": 15,
+        "inference_seconds": 129.170561853,
+        "prefill_seconds": 35.475733,
+        "decode_seconds": 92.27524900000002,
+        "reasoning_tokens": 0,
+        "cache_invalidations": 1,
+        "cache_invalidations_after_rewrite": 1,
+        "recomputed_prompt_tokens": 436,
+        "prompt_tokens": 169766,
+        "peak_call": 14,
+        "generated_tokens": 3436
+      },
+      "verify_seconds": 3.7,
+      "verify_runs": [
+        {
+          "repo": "cpp-ringbuffer",
+          "scope": "targeted",
+          "passed": true,
+          "seconds": 1.105
+        },
+        {
+          "repo": "cpp-ringbuffer",
+          "scope": "full",
+          "passed": true,
+          "seconds": 0.829
+        },
+        {
+          "repo": "cpp-ringbuffer",
+          "scope": "targeted",
+          "passed": true,
+          "seconds": 0.937
+        },
+        {
+          "repo": "cpp-ringbuffer",
+          "scope": "full",
+          "passed": true,
+          "seconds": 0.829
+        }
+      ],
+      "resources": {
+        "harness_rss_mib": 36.3203125,
+        "model_server_rss_mib": 28131.8203125,
+        "gpu_mem_used_mib": 7155,
+        "sandbox_mem_mib": 294.8,
+        "samples": 157
+      }
+    },
+    {
+      "id": "csharp-bugfix-fahrenheit",
+      "category": "csharp-bugfix",
+      "model": "qwen3.6-35b-a3b",
+      "success": false,
+      "task_status": "",
+      "self_verified": false,
+      "tests_green": false,
+      "attempts": 0,
+      "local_tokens": 0,
+      "generated_tokens": 0,
+      "cached_prompt_tokens": 0,
+      "escalations": 0,
+      "local_only": false,
+      "condensations": 0,
+      "resumes": 0,
+      "wall_seconds": 0,
+      "skipped": "not in the sandbox image: dotnet",
+      "group": "everyday",
+      "split": "heldout",
+      "task_id": "",
+      "intel": {
+        "context_packs": 0,
+        "pack_tokens": 0,
+        "code_tokens": 0,
+        "serena_calls": 0,
+        "serena_errors": 0,
+        "serena_ms": 0,
+        "graph_calls": 0,
+        "graph_ms": 0,
+        "serena_symbols": 0,
+        "graph_symbols": 0,
+        "fallbacks": 0,
+        "agent_tool_calls": 0
+      },
+      "language": "csharp",
+      "calls": {
+        "calls": 0,
+        "inference_seconds": 0,
+        "reasoning_tokens": 0,
+        "cache_invalidations": 0,
+        "cache_invalidations_after_rewrite": 0,
+        "recomputed_prompt_tokens": 0,
+        "peak_call": 0
+      },
+      "verify_seconds": 0,
+      "failure_class": "environment",
+      "resources": {
+        "harness_rss_mib": 0,
+        "samples": 0
+      }
+    },
+    {
+      "id": "php-bugfix-slug",
+      "category": "php-bugfix",
+      "model": "qwen3.6-35b-a3b",
+      "success": true,
+      "task_status": "completed",
+      "self_verified": true,
+      "tests_green": true,
+      "attempts": 2,
+      "local_tokens": 14195,
+      "generated_tokens": 2259,
+      "cached_prompt_tokens": 98763,
+      "escalations": 0,
+      "local_only": true,
+      "condensations": 0,
+      "resumes": 0,
+      "wall_seconds": 116.424528514,
+      "graded_on": "snapshot",
+      "group": "everyday",
+      "split": "heldout",
+      "task_id": "t20261030-94c00a",
+      "state_dir": "~/.cache/boundedcode/bench-work/php-bugfix-slug-1793325030204338855/state",
+      "agent_patch": "~/.cache/boundedcode/bench-work/php-bugfix-slug-1793325030204338855/agent-php-slug.patch",
+      "intel": {
+        "context_packs": 2,
+        "pack_tokens": 1678,
+        "code_tokens": 0,
+        "serena_calls": 0,
+        "serena_errors": 0,
+        "serena_ms": 0,
+        "graph_calls": 0,
+        "graph_ms": 0,
+        "serena_symbols": 0,
+        "graph_symbols": 0,
+        "fallbacks": 0,
+        "agent_tool_calls": 12,
+        "agent_tools": {
+          "file_editor": 6,
+          "finish": 2,
+          "terminal": 3,
+          "think": 1
+        }
+      },
+      "language": "php",
+      "calls": {
+        "calls": 11,
+        "inference_seconds": 92.45452299799999,
+        "prefill_seconds": 27.065170999999996,
+        "decode_seconds": 64.31903000000001,
+        "reasoning_tokens": 0,
+        "cache_invalidations": 1,
+        "cache_invalidations_after_rewrite": 1,
+        "recomputed_prompt_tokens": 455,
+        "prompt_tokens": 111154,
+        "peak_call": 10,
+        "generated_tokens": 2425
+      },
+      "verify_seconds": 2.2439999999999998,
+      "verify_runs": [
+        {
+          "repo": "php-slug",
+          "scope": "targeted",
+          "passed": true,
+          "seconds": 0.576
+        },
+        {
+          "repo": "php-slug",
+          "scope": "full",
+          "passed": true,
+          "seconds": 0.549
+        },
+        {
+          "repo": "php-slug",
+          "scope": "targeted",
+          "passed": true,
+          "seconds": 0.574
+        },
+        {
+          "repo": "php-slug",
+          "scope": "full",
+          "passed": true,
+          "seconds": 0.545
+        }
+      ],
+      "resources": {
+        "harness_rss_mib": 36.046875,
+        "model_server_rss_mib": 28495.3828125,
+        "gpu_mem_used_mib": 7155,
+        "sandbox_mem_mib": 285,
+        "samples": 116
+      }
+    },
+    {
+      "id": "ruby-bugfix-allocate",
+      "category": "ruby-bugfix",
+      "model": "qwen3.6-35b-a3b",
+      "success": true,
+      "task_status": "completed",
+      "self_verified": true,
+      "tests_green": true,
+      "attempts": 2,
+      "local_tokens": 13801,
+      "generated_tokens": 2002,
+      "cached_prompt_tokens": 85796,
+      "escalations": 0,
+      "local_only": true,
+      "condensations": 0,
+      "resumes": 0,
+      "wall_seconds": 110.959578204,
+      "graded_on": "snapshot",
+      "group": "everyday",
+      "split": "heldout",
+      "task_id": "t20261030-52a4ef",
+      "state_dir": "~/.cache/boundedcode/bench-work/ruby-bugfix-allocate-1793325146634479745/state",
+      "agent_patch": "~/.cache/boundedcode/bench-work/ruby-bugfix-allocate-1793325146634479745/agent-ruby-money.patch",
+      "intel": {
+        "context_packs": 2,
+        "pack_tokens": 1578,
+        "code_tokens": 0,
+        "serena_calls": 0,
+        "serena_errors": 0,
+        "serena_ms": 0,
+        "graph_calls": 0,
+        "graph_ms": 0,
+        "serena_symbols": 0,
+        "graph_symbols": 0,
+        "fallbacks": 0,
+        "agent_tool_calls": 10,
+        "agent_tools": {
+          "file_editor": 5,
+          "finish": 2,
+          "terminal": 3
+        }
+      },
+      "language": "ruby",
+      "calls": {
+        "calls": 10,
+        "inference_seconds": 85.64015481300001,
+        "prefill_seconds": 27.963647,
+        "decode_seconds": 56.758377,
+        "reasoning_tokens": 0,
+        "cache_invalidations": 1,
+        "cache_invalidations_after_rewrite": 1,
+        "recomputed_prompt_tokens": 465,
+        "prompt_tokens": 98060,
+        "peak_call": 9,
+        "generated_tokens": 2147
+      },
+      "verify_seconds": 3.0140000000000002,
+      "verify_runs": [
+        {
+          "repo": "ruby-money",
+          "scope": "targeted",
+          "passed": true,
+          "seconds": 0.762
+        },
+        {
+          "repo": "ruby-money",
+          "scope": "full",
+          "passed": true,
+          "seconds": 0.785
+        },
+        {
+          "repo": "ruby-money",
+          "scope": "targeted",
+          "passed": true,
+          "seconds": 0.746
+        },
+        {
+          "repo": "ruby-money",
+          "scope": "full",
+          "passed": true,
+          "seconds": 0.721
+        }
+      ],
+      "resources": {
+        "harness_rss_mib": 36.921875,
+        "model_server_rss_mib": 28495.3828125,
+        "gpu_mem_used_mib": 7155,
+        "sandbox_mem_mib": 284.3,
+        "samples": 111
+      }
+    }
+  ],
+  "summary": {
+    "tasks": 4,
+    "verified": 4,
+    "success_rate": 1,
+    "local_only_completion_rate": 1,
+    "frontier_escalation_rate": 0,
+    "verified_tasks_per_hour": 13.011565263411846,
+    "attempts_per_successful_task": 2,
+    "wall_seconds_per_task": 276.67693525875,
+    "local_tokens_per_task": 22422.5,
+    "self_verified_but_hidden_failed": 0
+  },
+  "settings": {
+    "escalation_policy": "rules",
+    "frontier": false,
+    "max_attempts": 6,
+    "max_escalations": 2,
+    "max_local_tokens": 4000000,
+    "max_wall_clock": "4h0m0s",
+    "reasoning_history": "auto",
+    "speculative": "off"
+  },
+  "environment": {
+    "build": "dev b409ab02d7b9-dirty",
+    "os": "linux/amd64",
+    "cpu": "13th Gen Intel(R) Core(TM) i7-13620H",
+    "cpus": 16,
+    "mem_mib": 62741,
+    "gpu": "NVIDIA GeForce RTX 4060 Laptop GPU, 8188 MiB, 595.99.02",
+    "model": {
+      "file": "Qwen3.6-35B-A3B-UD-Q4_K_M.gguf",
+      "profile": "qwen3.6-35b-a3b",
+      "provider": "local",
+      "repo": "unsloth/Qwen3.6-35B-A3B-GGUF",
+      "revision": "a483e9e6cbd595906af30beda3187c2663a1118c",
+      "sampling": {
+        "min_p": 0,
+        "presence_penalty": 0,
+        "repeat_penalty": 0,
+        "temperature": 0.6,
+        "top_k": 20,
+        "top_p": 0.95
+      },
+      "server": {
+        "batch_size": 2048,
+        "cache_reuse": 0,
+        "cache_type_k": "q8_0",
+        "cache_type_v": "q8_0",
+        "ctx_size": 131072,
+        "extra_args": [],
+        "flash_attn": "on",
+        "gpu_layers": 999,
+        "jinja": true,
+        "mlock": false,
+        "n_cpu_moe": 35,
+        "no_mmap": false,
+        "parallel": 1,
+        "reasoning": "",
+        "reasoning_budget": 0,
+        "reasoning_budget_message": "",
+        "threads": 8,
+        "ubatch_size": 2048
+      },
+      "sha256": "ac0e2c1189e055faa36eff361580e79c5bd6f8e76bffb4ce547f167d53e31a61",
+      "size_bytes": 22134528992
+    },
+    "server": "llama.cpp 0.5.0-dev (build 11146, commit 7fe450e19)",
+    "toolchains": {
+      "docker": "Docker version 29.9.1, build dfc520d",
+      "git": "git version 2.53.0",
+      "go": "go version go1.27.3 linux/amd64",
+      "node": "v24.22.0",
+      "python3": "Python 3.14.4"
+    },
+    "tasks_sha256": "ab9b01c719753acd",
+    "fixtures_sha256": {
+      "langs": "367e90db807225a7"
+    }
+  }
+}
