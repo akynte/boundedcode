@@ -1,0 +1,10 @@
+# Phase 07 (2026-10-29) adopted structured compaction and goal-aware
+# pruning: the suite passed 25 of 26 twice against 23 and 24.
+id: retro-p7-context
+hypothesis: Structured compaction and goal-aware pruning raise direct-mode task success.
+suite: direct
+decide_on: dev
+primary: {metric: success_rate, better: higher}
+arms:
+  - {name: before, role: baseline, reports: [benchmarks/reports/20261029-direct-p7-before-r1.json, benchmarks/reports/20261029-direct-p7-before-r2.json]}
+  - {name: after, role: candidate, reports: [benchmarks/reports/20261029-direct-p7-after-r1.json, benchmarks/reports/20261029-direct-p7-after-r2.json]}

@@ -1,0 +1,32 @@
+# Draft from bcode lab hypothesize: review the hypothesis, the tasks (the held-out
+# ones decide it) and the arms before running it with bcode lab run.
+arms:
+    - name: baseline
+      role: baseline
+    - name: max-turns-40
+      role: simpler
+      description: a lower turn limit bounds what a loop can waste, without any new code
+      set:
+        direct:
+            max_turns: 40
+    - name: loop-guard
+      role: candidate
+      description: 'Refuse a call identical to two earlier ones with no change between, and say why, instead of running it again. Write the patch with `bcode lab worktree loop-guard`: internal/direct: count identical calls since the last change; refuse the third with a message naming the earlier results.'
+      patch: loop-guard.patch
+      predicts:
+        fixes:
+            - session-stale-config
+            - session-x-tools
+hypothesis: |-
+    Refuse a call identical to two earlier ones with no change between, and say why, instead of running it again. This improves p90_seconds (lower is better) on held-out tasks without a regression in any language, and by more than the simpler max-turns-40.
+    Evidence: repeated_calls in 19 of 1351 eligible runs (2 tasks; identical-call ×20); fails 16% with, 7% without; 199 calls wasted
+id: loop-guard
+pattern: repeated_calls
+primary:
+    better: lower
+    metric: p90_seconds
+suite: direct
+tasks:
+    dirs:
+        - benchmarks/direct
+trials: 2

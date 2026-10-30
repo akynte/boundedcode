@@ -1,0 +1,35 @@
+# Draft from bcode lab hypothesize: review the hypothesis, the tasks (the held-out
+# ones decide it) and the arms before running it with bcode lab run.
+arms:
+    - name: baseline
+      role: baseline
+    - name: max-tool-output-8k
+      role: simpler
+      description: a plain cut of every tool result at 8 KB (the default is 16 KB), without pruning by relevance
+      set:
+        direct:
+            max_tool_output: 8192
+    - name: observation-budget
+      role: candidate
+      description: Prune command output to 4 KB instead of the local default of 8 KB.
+      set:
+        direct:
+            observation_bytes: 4096
+      predicts:
+        fixes:
+            - add-balance-test
+            - large-change-txtar
+            - session-x-tools
+hypothesis: |-
+    Prune command output to 4 KB instead of the local default of 8 KB. This improves tokens_per_success (lower is better) on held-out tasks without a regression in any language, and by more than the simpler max-tool-output-8k.
+    Evidence: context_excess in 26 of 1351 eligible runs (3 tasks; large-prompt ×23, re-read ×9); fails 19% with, 7% without; 183 calls wasted
+id: observation-budget
+pattern: context_excess
+primary:
+    better: lower
+    metric: tokens_per_success
+suite: direct
+tasks:
+    dirs:
+        - benchmarks/direct
+trials: 2

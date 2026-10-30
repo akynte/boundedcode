@@ -1,0 +1,31 @@
+# Draft from bcode lab hypothesize: review the hypothesis, the tasks (the held-out
+# ones decide it) and the arms before running it with bcode lab run.
+arms:
+    - name: baseline
+      role: baseline
+    - name: legacy-compaction
+      role: simpler
+      description: the older summary-only compaction
+      set:
+        direct:
+            compaction: legacy
+    - name: observation-masking
+      role: candidate
+      description: 'Replace old tool results with a placeholder instead of summarising the history when it fills. Write the patch with `bcode lab worktree observation-masking`: internal/direct: in the working set, mask tool results older than the last N turns with a fixed placeholder before compacting.'
+      patch: observation-masking.patch
+      predicts:
+        fixes:
+            - session-x-tools
+hypothesis: |-
+    Replace old tool results with a placeholder instead of summarising the history when it fills. This improves tokens_per_success (lower is better) on held-out tasks without a regression in any language, and by more than the simpler legacy-compaction.
+    Evidence: ineffective_compaction in 7 of 1351 eligible runs (1 tasks; re-read-after ×41); fails 43% with, 7% without; 84 calls wasted
+id: observation-masking
+pattern: ineffective_compaction
+primary:
+    better: lower
+    metric: tokens_per_success
+suite: direct
+tasks:
+    dirs:
+        - benchmarks/direct
+trials: 2

@@ -1,0 +1,29 @@
+# Draft from bcode lab hypothesize: review the hypothesis, the tasks (the held-out
+# ones decide it) and the arms before running it with bcode lab run.
+arms:
+    - name: baseline
+      role: baseline
+    - name: fewer-attempts
+      role: candidate
+      description: Give a bounded task 3 attempts instead of the configured number.
+      set:
+        budgets:
+            max_attempts: 3
+      predicts:
+        fixes:
+            - cross-service-idempotency
+            - go-debug-ledger-balance-query
+            - go-large-iface-method
+hypothesis: |-
+    Give a bounded task 3 attempts instead of the configured number. This improves tokens_per_success (lower is better) on held-out tasks without a regression in any language.
+    Evidence: unnecessary_retries in 21 of 1523 eligible runs (6 tasks; attempts-failed ×17, rerun-unchanged ×4); fails 50% with, 8% without; 27 calls wasted; explains 17 failed runs
+id: fewer-attempts
+pattern: unnecessary_retries
+primary:
+    better: lower
+    metric: tokens_per_success
+suite: bounded
+tasks:
+    dirs:
+        - benchmarks/tasks
+trials: 2

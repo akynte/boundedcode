@@ -1,0 +1,169 @@
+diff --git a/internal/direct/direct.go b/internal/direct/direct.go
+index e44ea8f..714bbdb 100644
+--- a/internal/direct/direct.go
++++ b/internal/direct/direct.go
+@@ -348,6 +348,10 @@ type Runner struct {
+ 	// a message.
+ 	lastFail string
+ 	failures int
++	// seenCalls counts identical calls (tool and arguments) since the last
++	// change; guarded counts calls refused for repeating, within a message.
++	seenCalls map[string]int
++	guarded   int
+ 	// turnCalls, turnEdited and turnFailed are what the message has done
+ 	// so far, from which routing gives the next model call its role:
+ 	// model calls made, a file changed, and a failure among the last
+@@ -512,6 +516,7 @@ func (r *Runner) Send(ctx context.Context, text string) (string, error) {
+ 	}()
+ 	nudged, emptyNudged := false, false
+ 	r.lastFail, r.failures = "", 0
++	r.seenCalls, r.guarded = nil, 0
+ 	r.turnCalls, r.turnEdited, r.turnFailed = 0, false, false
+ 	for turn := 0; turn < r.maxTurns(); turn++ {
+ 		if err := ctx.Err(); err != nil {
+@@ -576,16 +581,34 @@ func (r *Runner) Send(ctx context.Context, text string) (string, error) {
+ 			return final, nil
+ 		}
+ 		for i := 0; i < len(msg.ToolCalls); {
++			// A call that already ran twice with nothing changed since is
++			// not run again: its result is in the history.
++			if why := r.repeatRefusal(msg.ToolCalls[i]); why != "" {
++				r.guarded++
++				r.emit(Event{Kind: EventNote, Text: "Not repeating a call that already ran twice with nothing changed: " + msg.ToolCalls[i].Function.Name})
++				if err := r.recordResult(ctx, msg.ToolCalls[i], "error: "+why); err != nil {
++					return final, err
++				}
++				i++
++				continue
++			}
+ 			// Consecutive calls that change nothing run together; every
+ 			// other call runs alone, in order. Results are recorded in call
+ 			// order either way.
+ 			batch := r.batch(msg.ToolCalls[i:])
++			for k := 1; k < len(batch); k++ {
++				if r.repeatRefusal(batch[k]) != "" {
++					batch = batch[:k]
++					break
++				}
++			}
+ 			results := r.runCalls(ctx, batch)
+ 			last := i + len(batch) - 1
+ 			for k, call := range batch {
+ 				if err := r.recordResult(ctx, call, results[k]); err != nil {
+ 					return final, err
+ 				}
++				r.noteCall(call)
+ 			}
+ 			if r.handoff != nil {
+ 				h := r.handoff
+@@ -606,11 +629,45 @@ func (r *Runner) Send(ctx context.Context, text string) (string, error) {
+ 			}
+ 		}
+ 		r.pendingImages = nil
++		if r.guarded >= 3 {
++			r.guarded = -1 << 30 // once per message
++			r.emit(Event{Kind: EventNote, Text: "The model keeps repeating calls; asking it to answer."})
++			if err := r.Session.Append(Message{Role: "user", Content: "You keep repeating calls that already ran with nothing changed. Their results are above: answer my message now from what you have found.", Provenance: trusted(SourceRunner, "")}); err != nil {
++				return final, err
++			}
++		}
+ 	}
+ 	r.emit(Event{Kind: EventNote, Text: fmt.Sprintf("Stopped after %d model calls for this message (direct.max_turns). Send a message to continue.", r.maxTurns())})
+ 	return final, nil
+ }
+ 
++// repeatExempt are tools whose repeats are expected: polling a background
++// command for more output.
++var repeatExempt = map[string]bool{"bash_output": true}
++
++// repeatRefusal says why a call is not run again ("" when it may run): it
++// ran twice already with no change since.
++func (r *Runner) repeatRefusal(c ToolCall) string {
++	if repeatExempt[c.Function.Name] || r.seenCalls[c.Function.Name+"\x00"+c.Function.Arguments] < 2 {
++		return ""
++	}
++	return "not run: this exact call already ran twice with nothing changed since, and its result is above. Use that result, change the arguments, or answer from what you have."
++}
++
++// noteCall counts a call that ran. A call that can change files starts
++// the count again for every other call.
++func (r *Runner) noteCall(c ToolCall) {
++	key := c.Function.Name + "\x00" + c.Function.Arguments
++	if t := r.findTool(c.Function.Name); t != nil && t.Mutates {
++		n := r.seenCalls[key]
++		r.seenCalls = map[string]int{key: n}
++	}
++	if r.seenCalls == nil {
++		r.seenCalls = map[string]int{}
++	}
++	r.seenCalls[key]++
++}
++
+ // recordResult appends a tool call's result to the session, with its
+ // provenance and file stamps. A call that handed the turn off is recorded
+ // as the runner's.
+diff --git a/internal/direct/loopguard_test.go b/internal/direct/loopguard_test.go
+new file mode 100644
+index 0000000..3a9785f
+--- /dev/null
++++ b/internal/direct/loopguard_test.go
+@@ -0,0 +1,59 @@
++package direct
++
++import (
++	"context"
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++)
++
++// The third identical call with nothing changed since is not run, and after
++// three such refusals the model is asked for its answer. A change starts
++// the count again.
++func TestRepeatGuard(t *testing.T) {
++	rd := call{"read", map[string]any{"path": "a.txt"}}
++	up := &scripted{replies: []reply{
++		{calls: []call{rd}}, {calls: []call{rd}}, {calls: []call{rd}}, {calls: []call{rd}}, {calls: []call{rd}},
++		{text: "the answer"},
++	}}
++	r, root, _ := newRunner(t, up, ApprovalAuto)
++	if err := os.WriteFile(filepath.Join(root, "a.txt"), []byte("hello\n"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	out, err := r.Send(context.Background(), "read a.txt")
++	if err != nil {
++		t.Fatal(err)
++	}
++	if out != "the answer" {
++		t.Fatalf("answer %q", out)
++	}
++	var refused, asked int
++	for _, m := range r.Session.Messages {
++		if m.Role == "tool" && strings.Contains(m.Content, "already ran twice") {
++			refused++
++		}
++		if m.Role == "user" && strings.Contains(m.Content, "keep repeating calls") {
++			asked++
++		}
++	}
++	if refused != 3 || asked != 1 {
++		t.Fatalf("refused %d, asked %d", refused, asked)
++	}
++
++	// read, edit, read, read: the edit resets the count, so nothing is refused.
++	ed := call{"edit", map[string]any{"path": "a.txt", "old_string": "hello", "new_string": "bye"}}
++	up2 := &scripted{replies: []reply{{calls: []call{rd}}, {calls: []call{rd}}, {calls: []call{ed}}, {calls: []call{rd}}, {calls: []call{rd}}, {text: "ok"}}}
++	r2, root2, _ := newRunner(t, up2, ApprovalAuto)
++	if err := os.WriteFile(filepath.Join(root2, "a.txt"), []byte("hello\n"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	if _, err := r2.Send(context.Background(), "edit a.txt"); err != nil {
++		t.Fatal(err)
++	}
++	for _, m := range r2.Session.Messages {
++		if strings.Contains(m.Content, "already ran twice") {
++			t.Fatalf("refused after a change: %q", m.Content)
++		}
++	}
++}

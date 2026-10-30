@@ -1,0 +1,10 @@
+# Phase 05 (2026-10-28) adopted adaptive retrieval over basic. Re-read by the
+# laboratory from the recorded runs after the retrieval fixes.
+id: retro-retrieval-adaptive
+hypothesis: Adaptive retrieval raises direct-mode task success over basic grep lookup.
+suite: direct
+decide_on: dev
+primary: {metric: success_rate, better: higher}
+arms:
+  - {name: basic, role: baseline, reports: [benchmarks/reports/20261028-direct-retrieval-fix2-basic-r1.json, benchmarks/reports/20261028-direct-retrieval-fix2-basic-r2.json]}
+  - {name: adaptive, role: candidate, reports: [benchmarks/reports/20261028-direct-retrieval-fix2-adaptive-r1.json, benchmarks/reports/20261028-direct-retrieval-fix2-adaptive-r2.json]}

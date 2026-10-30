@@ -1,0 +1,10 @@
+# Phase 09 (2026-10-29) kept direct.routing off: adaptive routing moved
+# tokens around with no gain, and change tasks passed 18 of 22 against 21.
+id: retro-routing-adaptive
+hypothesis: Choosing thinking per model call (direct.routing adaptive) raises task success.
+suite: direct
+decide_on: dev
+primary: {metric: success_rate, better: higher}
+arms:
+  - {name: off, role: baseline, reports: [benchmarks/reports/20261029-direct-p9-base-r1.json, benchmarks/reports/20261029-direct-p9-base-r2.json]}
+  - {name: adaptive, role: candidate, reports: [benchmarks/reports/20261029-direct-p9-routing-r1.json, benchmarks/reports/20261029-direct-p9-routing-r2.json]}

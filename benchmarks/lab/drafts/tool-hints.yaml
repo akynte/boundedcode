@@ -1,0 +1,34 @@
+# Draft from bcode lab hypothesize: review the hypothesis, the tasks (the held-out
+# ones decide it) and the arms before running it with bcode lab run.
+arms:
+    - name: baseline
+      role: baseline
+    - name: tool-hints
+      role: candidate
+      description: 'Answer a misused call (a directory read, a missing file) with the call that would work. Write the patch with `bcode lab worktree tool-hints`: internal/direct: in the read tool, a directory gets its listing and a missing file the nearest existing paths.'
+      patch: tool-hints.patch
+      predicts:
+        fixes:
+            - feature-currency
+            - large-change-txtar
+            - locate-topic-name
+            - multi-feature-discount
+            - multi-locate-mapping
+            - rust-explain-ledger
+            - sec-readme-secrets
+            - session-ledger
+            - session-x-tools
+            - ts-locate-discount
+hypothesis: |-
+    Answer a misused call (a directory read, a missing file) with the call that would work. This improves model_calls_per_run (lower is better) on held-out tasks without a regression in any language.
+    Evidence: tool_selection in 38 of 1351 eligible runs (10 tasks; shell-for-tool ×1, tool-misuse ×37); fails 5% with, 7% without; 84 calls wasted
+id: tool-hints
+pattern: tool_selection
+primary:
+    better: lower
+    metric: model_calls_per_run
+suite: direct
+tasks:
+    dirs:
+        - benchmarks/direct
+trials: 2

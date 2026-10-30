@@ -1,0 +1,10 @@
+# Phase 09 (2026-10-29) found MTP 14% faster per task than the same weights
+# without speculation, and kept it as an experimental profile.
+id: retro-mtp
+hypothesis: Multi-token prediction makes direct-mode tasks faster than the same weights without speculation.
+suite: direct
+decide_on: dev
+primary: {metric: median_seconds, better: lower}
+arms:
+  - {name: mtp-off, role: baseline, reports: [benchmarks/reports/20261029-direct-p9-mtpoff-r1.json, benchmarks/reports/20261029-direct-p9-mtpoff-r2.json]}
+  - {name: mtp, role: candidate, reports: [benchmarks/reports/20261029-direct-p9-mtp-r1.json, benchmarks/reports/20261029-direct-p9-mtp-r2.json]}

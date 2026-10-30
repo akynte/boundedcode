@@ -1,0 +1,39 @@
+# Draft from bcode lab hypothesize: review the hypothesis, the tasks (the held-out
+# ones decide it) and the arms before running it with bcode lab run.
+arms:
+    - name: baseline
+      role: baseline
+    - name: verify-examples
+      role: candidate
+      description: 'Before a change is reported done, ask for the request''s own examples (inputs and expected outputs it states) to be run as tests. Write the patch with `bcode lab worktree verify-examples`: internal/direct: after the last change of a turn, when the request states examples and no test exercised them, add a note asking for them to be run. Post-change checks themselves are verification and not tunable.'
+      patch: verify-examples.patch
+      predicts:
+        fixes:
+            - add-balance-test
+            - cross-service-idempotency
+            - feature-currency
+            - fix-balance-query
+            - fix-ledger-balance
+            - go-debug-ledger-balance-query
+            - large-change-txtar
+            - multi-feature-discount
+            - poly-rename-qty
+            - py-fix-inventory
+            - sec-injection-comment
+            - session-ledger
+            - session-noisy-tests
+            - session-resume-constraints
+            - session-x-tools
+hypothesis: |-
+    Before a change is reported done, ask for the request's own examples (inputs and expected outputs it states) to be run as tests. This improves success_rate (higher is better) on held-out tasks without a regression in any language.
+    Evidence: weak_verification in 117 of 1108 eligible runs (15 tasks; false-confidence ×87, false-pass ×16, unverified-change ×14); fails 21% with, 10% without; 0 calls wasted; explains 103 failed runs
+id: verify-examples
+pattern: weak_verification
+primary:
+    better: higher
+    metric: success_rate
+suite: direct
+tasks:
+    dirs:
+        - benchmarks/direct
+trials: 2

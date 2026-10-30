@@ -1,0 +1,208 @@
+{
+  "schema": 1,
+  "experiment": "p11-context-and-loops",
+  "spec": {
+    "path": "benchmarks/lab/experiments/p11-context-and-loops.yaml",
+    "sha256": "cbbd9c152a5b20dfd6fda01526ac2ecdcd12fa86a49b6d52f36c97dacd05ddd3"
+  },
+  "started": "2026-10-30T04:37:48.051300216Z",
+  "finished": "2026-10-30T09:23:18.546693796Z",
+  "lab": "dev 15ab3aa4cf61-dirty",
+  "repo": {
+    "revision": "15ab3aa4cf619d2765630392680dc7d1f360a6bc",
+    "dirty": [
+      "M internal/benchmark/direct.go",
+      "M internal/benchmark/gate.go",
+      "M internal/benchmark/gate_test.go",
+      "M internal/benchmark/scorecard.go",
+      "M internal/cli/bench.go",
+      "M internal/cli/chat.go",
+      "M internal/cli/root.go",
+      "M internal/config/config.go",
+      "M internal/direct/direct.go",
+      "?? .claude/",
+      "?? benchmarks/lab/",
+      "?? internal/cli/lab.go",
+      "?? internal/cli/lab_test.go",
+      "?? internal/config/tunables.go",
+      "?? internal/config/tunables_test.go",
+      "?? internal/lab/"
+    ]
+  },
+  "env": {
+    "GGML_OP_OFFLOAD_MIN_BATCH": "256"
+  },
+  "arms": [
+    {
+      "name": "baseline",
+      "role": "baseline",
+      "binary": {
+        "path": "bin/base",
+        "sha256": "a5ee2da13842d36fcf9dc1417ebd8112200c66a294a56f2051783d1fd8a476a6"
+      },
+      "config_fingerprint": "08c715b3f4ebc335caf82b6772104ff555530920109f9257b7ebf5d2f0aa8f54",
+      "home": "arms/baseline/home"
+    },
+    {
+      "name": "max-tool-output-8k",
+      "role": "simpler",
+      "settings": [
+        "direct.max_tool_output=8192"
+      ],
+      "binary": {
+        "path": "bin/base",
+        "sha256": "a5ee2da13842d36fcf9dc1417ebd8112200c66a294a56f2051783d1fd8a476a6"
+      },
+      "config_fingerprint": "08c715b3f4ebc335caf82b6772104ff555530920109f9257b7ebf5d2f0aa8f54",
+      "home": "arms/max-tool-output-8k/home"
+    },
+    {
+      "name": "observation-4k",
+      "role": "candidate",
+      "settings": [
+        "direct.observation_bytes=4096"
+      ],
+      "binary": {
+        "path": "bin/base",
+        "sha256": "a5ee2da13842d36fcf9dc1417ebd8112200c66a294a56f2051783d1fd8a476a6"
+      },
+      "config_fingerprint": "08c715b3f4ebc335caf82b6772104ff555530920109f9257b7ebf5d2f0aa8f54",
+      "home": "arms/observation-4k/home"
+    },
+    {
+      "name": "max-turns-40",
+      "role": "simpler",
+      "settings": [
+        "direct.max_turns=40"
+      ],
+      "binary": {
+        "path": "bin/base",
+        "sha256": "a5ee2da13842d36fcf9dc1417ebd8112200c66a294a56f2051783d1fd8a476a6"
+      },
+      "config_fingerprint": "08c715b3f4ebc335caf82b6772104ff555530920109f9257b7ebf5d2f0aa8f54",
+      "home": "arms/max-turns-40/home"
+    },
+    {
+      "name": "loop-guard",
+      "role": "candidate",
+      "patch": {
+        "files": [
+          "internal/direct/direct.go",
+          "internal/direct/loopguard_test.go"
+        ],
+        "lines": 116,
+        "sha256": "43dc9772ac97c379aba59244632db6401cd7a4206fc3f5ca4625540b43b42013"
+      },
+      "binary": {
+        "path": "bin/loop-guard",
+        "sha256": "d513cc4dfd21c03bddfbc1c608935ad81db2c5b50f5e245eea82146e2ef6e948"
+      },
+      "config_fingerprint": "08c715b3f4ebc335caf82b6772104ff555530920109f9257b7ebf5d2f0aa8f54",
+      "home": "arms/loop-guard/home",
+      "security_tests": "ok  \tgithub.com/akynte/boundedcode/internal/direct\t8.711s\nok  \tgithub.com/akynte/boundedcode/internal/execbox\t3.268s\nok  \tgithub.com/akynte/boundedcode/internal/policy\t0.010s\nok  \tgithub.com/akynte/boundedcode/internal/benchmark\t3.765s"
+    }
+  ],
+  "runs": [
+    {
+      "arm": "baseline",
+      "trial": 1,
+      "report": {
+        "path": "arms/baseline/reports/trial-1.json",
+        "sha256": "9ee2b414299ac595a395c2c6d7ca2f8a2973a01a92805cdbddc179f01cbe35fe"
+      },
+      "started": "2026-10-30T04:38:03.672913149Z",
+      "seconds": 1753.867077544
+    },
+    {
+      "arm": "max-tool-output-8k",
+      "trial": 1,
+      "report": {
+        "path": "arms/max-tool-output-8k/reports/trial-1.json",
+        "sha256": "d314ee75ac9d365570e64233117a8877babc0192a1cfeae96adda0f841966fd3"
+      },
+      "started": "2026-10-30T05:07:17.541944657Z",
+      "seconds": 1672.866528792
+    },
+    {
+      "arm": "observation-4k",
+      "trial": 1,
+      "report": {
+        "path": "arms/observation-4k/reports/trial-1.json",
+        "sha256": "c7c98de142a2e9483dfe3adba9ebab40da82beb8f4413b51c1c556d32757ca2c"
+      },
+      "started": "2026-10-30T05:35:10.410370066Z",
+      "seconds": 1638.975017973
+    },
+    {
+      "arm": "max-turns-40",
+      "trial": 1,
+      "report": {
+        "path": "arms/max-turns-40/reports/trial-1.json",
+        "sha256": "1975e5894f0879959076cb1882c034723b0a82ae361d18e760318c0aa97cb3d4"
+      },
+      "started": "2026-10-30T06:02:29.387378289Z",
+      "seconds": 1502.658160584
+    },
+    {
+      "arm": "loop-guard",
+      "trial": 1,
+      "report": {
+        "path": "arms/loop-guard/reports/trial-1.json",
+        "sha256": "ef01e4a0d8acf7106f0777c43808fa2f5d8de712889230cf4ffd237074358b9e"
+      },
+      "started": "2026-10-30T06:27:32.047517877Z",
+      "seconds": 1893.037211712
+    },
+    {
+      "arm": "max-tool-output-8k",
+      "trial": 2,
+      "report": {
+        "path": "arms/max-tool-output-8k/reports/trial-2.json",
+        "sha256": "94ea19263140dfec8d55bff3d95cafc66d9bc7cdf2d229f8367a0f853ac342e8"
+      },
+      "started": "2026-10-30T06:59:05.086670946Z",
+      "seconds": 1807.089374577
+    },
+    {
+      "arm": "observation-4k",
+      "trial": 2,
+      "report": {
+        "path": "arms/observation-4k/reports/trial-2.json",
+        "sha256": "598564c34ae6b95b5a3482fc1fdb3b2b195f372f3260ff1ea433f9aec4236113"
+      },
+      "started": "2026-10-30T07:29:12.177948102Z",
+      "seconds": 1575.787366335
+    },
+    {
+      "arm": "max-turns-40",
+      "trial": 2,
+      "report": {
+        "path": "arms/max-turns-40/reports/trial-2.json",
+        "sha256": "39731c2fee44da5af41495014200666c009b0df1b5496ae62f6bd5893a89e85e"
+      },
+      "started": "2026-10-30T07:55:27.967212778Z",
+      "seconds": 1629.489161326
+    },
+    {
+      "arm": "loop-guard",
+      "trial": 2,
+      "report": {
+        "path": "arms/loop-guard/reports/trial-2.json",
+        "sha256": "55297eeccf508d70825530b52d4c6997ee1abae0036feba6d01799005155dc4a"
+      },
+      "started": "2026-10-30T08:22:37.458340001Z",
+      "seconds": 1899.446353995
+    },
+    {
+      "arm": "baseline",
+      "trial": 2,
+      "report": {
+        "path": "arms/baseline/reports/trial-2.json",
+        "sha256": "d46fa4199571556f7d0fa607a1c530e8d1768e8d48568cbc9487519a154c891f"
+      },
+      "started": "2026-10-30T08:54:16.906608724Z",
+      "seconds": 1741.638089833
+    }
+  ],
+  "inputs_sha256": "8a06153fb9067222796ba0d723c98aad83905b0654325f5503457468c42b0de1"
+}

@@ -1,0 +1,4819 @@
+{
+  "schema": 1,
+  "created": "2026-10-30T04:42:46.813327083Z",
+  "reports": [
+    {
+      "path": "benchmarks/reports/20261026T001359Z-direct-qwen3.6-35b-a3b-baseline.json",
+      "sha256": "b8828fb3fb37f70fbfffa50bb3a5b7f723ae898bb3abd28eaea0d96c9e0b74ad"
+    },
+    {
+      "path": "benchmarks/reports/20261026T002541Z-direct-qwen3.6-35b-a3b-seedpack.json",
+      "sha256": "8ea83aa9348c6165d514d1d5856a4463e7b1c7e8d460bf1c1e2dc8eea10bd3fc"
+    },
+    {
+      "path": "benchmarks/reports/20261026T003448Z-direct-qwen3.6-35b-a3b-projectmap.json",
+      "sha256": "525a21665e88b42462765adb3b2d050631182231af650e9c25d99ef6c6c658bc"
+    },
+    {
+      "path": "benchmarks/reports/20261026T004137Z-direct-qwen3.6-35b-a3b-fixcause.json",
+      "sha256": "938401244985965125e53fd60aaa40c32eefbe9eee477620fd487a0c612e6233"
+    },
+    {
+      "path": "benchmarks/reports/20261026T004803Z-direct-qwen3.6-35b-a3b-fixcause-repeat.json",
+      "sha256": "9da1c546aafd9f4e575783e63d727bdb6499e9b77cfa6abe746631ae17212c55"
+    },
+    {
+      "path": "benchmarks/reports/20261026T173037Z-direct-qwen3.6-35b-a3b-sessions.json",
+      "sha256": "9f68a317ccf7ecd8055b3474f884e7cc7c7f03b6380c1a70875c43dac0b76b5b"
+    },
+    {
+      "path": "benchmarks/reports/20261026T173426Z-direct-qwen3.6-35b-a3b-sessions-ws16k.json",
+      "sha256": "5fca6a5b833c99fdfcf605b6d5169630132c453859764a85f98495147053a3f7"
+    },
+    {
+      "path": "benchmarks/reports/20261026T173759Z-direct-qwen3.6-35b-a3b-session-ledger.json",
+      "sha256": "f0944778977dbf6d902e9268e352558f0f8cf2d2c9c1917a9fe55b5b24cc5a92"
+    },
+    {
+      "path": "benchmarks/reports/20261026T173908Z-direct-qwen3.6-35b-a3b-session-ledger.json",
+      "sha256": "ec9e698b8d26164b68fb1eb68a4d269b5794593d4edf26722a383889cf297aa5"
+    },
+    {
+      "path": "benchmarks/reports/20261026T174314Z-direct-qwen3.6-35b-a3b-sessions-router.json",
+      "sha256": "c5676053b078ab33f15468538157be5f71257225e531d208e74e3cee607ca819"
+    },
+    {
+      "path": "benchmarks/reports/20261026T181629Z-direct-qwen3.6-35b-a3b-pitfall.json",
+      "sha256": "1bcd7c1bb7bdbbce4d7423b91d5cc667cb8232c92616c406f7ff7ed887372675"
+    },
+    {
+      "path": "benchmarks/reports/20261026T181719Z-direct-qwen3.6-35b-a3b-pitfall.json",
+      "sha256": "2421283ec21e85291e595d711b6e514043ea8647146ee8fe293e70c607fcf574"
+    },
+    {
+      "path": "benchmarks/reports/20261026T181829Z-direct-qwen3.6-35b-a3b-pitfall.json",
+      "sha256": "4da8769a8588a3041926800b23646534a3c00150d981a118a323c80e72c6ed8a"
+    },
+    {
+      "path": "benchmarks/reports/20261026T182842Z-direct-qwen3.6-35b-a3b-pitfall-suite.json",
+      "sha256": "3aa372a96e7e4f2ad2ed8aeea5c1b2b4275d607496eda7dfb948f96f7de982c7"
+    },
+    {
+      "path": "benchmarks/reports/20261027-direct-aa-r4.json",
+      "sha256": "a584721ca21096174266c7b66efdf92f91a2f5df00ccae363b709ea58fcd9d5d"
+    },
+    {
+      "path": "benchmarks/reports/20261027-direct-baseline-r1.json",
+      "sha256": "d74ab73c2ff65c5db2bac582d4aa82e66babd5508d0467130232ff33235a55bb"
+    },
+    {
+      "path": "benchmarks/reports/20261027-direct-baseline-r2.json",
+      "sha256": "55f971c8e600d9aae233981f60fd89ff8733eeee3f873a0c15f9333e52ca2d28"
+    },
+    {
+      "path": "benchmarks/reports/20261027-direct-baseline-r3.json",
+      "sha256": "977ca81f894cd3609a2e95a76dcfaaad47d2a4ba4729571d064f0e57e442debf"
+    },
+    {
+      "path": "benchmarks/reports/20261028-direct-fixcheck.json",
+      "sha256": "487aff7c218107143bcd60f1cc27ce2c10ddf7f3aa64aede5c7a6b1f06fe3ee7"
+    },
+    {
+      "path": "benchmarks/reports/20261028-direct-languages-r1.json",
+      "sha256": "1849141de3f362713f8dd2a9319d40e70bcfe41dfbe4549c27a78e5704999c5f"
+    },
+    {
+      "path": "benchmarks/reports/20261028-direct-languages-r2.json",
+      "sha256": "f8193077216944a8fadd7b1725d0b2ada1cc0302a6b0477b43972724a159a8df"
+    },
+    {
+      "path": "benchmarks/reports/20261028-direct-reasoning-auto-r1.json",
+      "sha256": "a38934b68d973ad5efa8942006c2d6c02e6a47b3ec2eb35e442b2b83ae7f11c2"
+    },
+    {
+      "path": "benchmarks/reports/20261028-direct-reasoning-auto-r2.json",
+      "sha256": "5fa75baa21c9c74d23423843ddf5345a866d245aff5ce8a91f8319e0c419fb8f"
+    },
+    {
+      "path": "benchmarks/reports/20261028-direct-reasoning-drop-r1.json",
+      "sha256": "714317cfb3e2264714f91cf884c36f0eb05abab0bea18dab479a96efefe17d43"
+    },
+    {
+      "path": "benchmarks/reports/20261028-direct-reasoning-drop-r2.json",
+      "sha256": "be37a232d25e4e8688d956920c701c76b6e9104e2ee6624eb77c7b029967ba44"
+    },
+    {
+      "path": "benchmarks/reports/20261028-direct-retrieval-adaptive-r1.json",
+      "sha256": "9fee652b8c3bf226ab2943d836fd7a89b791a48dec56729f5278bb5770d1b293"
+    },
+    {
+      "path": "benchmarks/reports/20261028-direct-retrieval-adaptive-r2.json",
+      "sha256": "b0471531d50add1428de98cb659f2673879a082f68f66795649ad2e72a798674"
+    },
+    {
+      "path": "benchmarks/reports/20261028-direct-retrieval-basic-r1.json",
+      "sha256": "b9ada5e73ee8f36a5869fe2c30f5e0a70fc98cc765d46e64da9a9e231051c242"
+    },
+    {
+      "path": "benchmarks/reports/20261028-direct-retrieval-basic-r2.json",
+      "sha256": "e2cb9ec9dacf968183b72452d7ce9b8da481b66fee92d6519fe7f89a6181d02b"
+    },
+    {
+      "path": "benchmarks/reports/20261028-direct-retrieval-fix2-adaptive-r1.json",
+      "sha256": "6d5c3dddc35848a6bc209e37953a1b5994ce6190c3837b0aa8dec56e0be384c3"
+    },
+    {
+      "path": "benchmarks/reports/20261028-direct-retrieval-fix2-adaptive-r2.json",
+      "sha256": "103a58259d026a4dca0d697ff795ab789acbbe3c333eb9ce4436f8dbc857e676"
+    },
+    {
+      "path": "benchmarks/reports/20261028-direct-retrieval-fix2-basic-r1.json",
+      "sha256": "3c20e510101cfe96bf7ba20029b1fd46475ed350f46a6baad30a423c4a86e8f9"
+    },
+    {
+      "path": "benchmarks/reports/20261028-direct-retrieval-fix2-basic-r2.json",
+      "sha256": "063ab5f0e8c54f35fd3c8c7aa47cf776e5d9b3711b0c7af05e14f0d343310897"
+    },
+    {
+      "path": "benchmarks/reports/20261028-direct-sandbox-r1.json",
+      "sha256": "6388712791c178f4d04bd72f1ecf01a4d81e1f6aec53fa7b9afeaef5ad01653f"
+    },
+    {
+      "path": "benchmarks/reports/20261028-direct-sandbox-r2.json",
+      "sha256": "8daa4187156533cac1f62637740ec966b73ef2a6b22cad8c526cc3b515e9bec8"
+    },
+    {
+      "path": "benchmarks/reports/20261028-direct-security-r1.json",
+      "sha256": "e1f8f70e47c4057e03cbae947ab87a40c4721bd8f1535c1456c2d864f942d11c"
+    },
+    {
+      "path": "benchmarks/reports/20261028-direct-security-r2.json",
+      "sha256": "8a971b12e1885a08c6812728bcdcae17c688db2cc668ee7fb7afefefc9e29d80"
+    },
+    {
+      "path": "benchmarks/reports/20261029-direct-p7-after-r1.json",
+      "sha256": "8db588f299f0052dfdedc7c5a0345f1d67abc546b764963964bec5a1fcba8a32"
+    },
+    {
+      "path": "benchmarks/reports/20261029-direct-p7-after-r2.json",
+      "sha256": "8ba433e1fad79792ed1e801518e64ba0ccfc82cb75911a21b38a81c7390de189"
+    },
+    {
+      "path": "benchmarks/reports/20261029-direct-p7-before-r1.json",
+      "sha256": "54229ae8dc6a23acc55c7eecd7809486f488261f99b10ccece2660cd3a7cbd7f"
+    },
+    {
+      "path": "benchmarks/reports/20261029-direct-p7-before-r2.json",
+      "sha256": "a4dbf1d0d903d1807ac4c12daf9bb51000816cabb463f22f2e067cc4f062cefc"
+    },
+    {
+      "path": "benchmarks/reports/20261029-direct-p8-after-r1.json",
+      "sha256": "b3924c98aa93265b377196079e0f757478a91e929270c53c8566f0e1d9b1aafe"
+    },
+    {
+      "path": "benchmarks/reports/20261029-direct-p8-after-r2.json",
+      "sha256": "2870abcb5297659346a6d1492937449aeffef173396f790459d4d76fb3ecf894"
+    },
+    {
+      "path": "benchmarks/reports/20261029-direct-p8-before-r1.json",
+      "sha256": "190cd87924d741a1a74cca53bb2f421ec89fd631932789a3e993822440080404"
+    },
+    {
+      "path": "benchmarks/reports/20261029-direct-p8-before-r2.json",
+      "sha256": "b882cc04b007a9131f620bf1d6b947acffbc3fb05ac8ed1d6aaacb90651b8a4b"
+    },
+    {
+      "path": "benchmarks/reports/20261029-direct-p9-base-r1.json",
+      "sha256": "19c8d6e6bda4a6a954bdf126844b15a29554491ea07c69ba684ae55e64d3843b"
+    },
+    {
+      "path": "benchmarks/reports/20261029-direct-p9-base-r2.json",
+      "sha256": "3e67b69dbafb149451abc5fc53f75092f5041ae7cb5efa8a04c325bee70f2798"
+    },
+    {
+      "path": "benchmarks/reports/20261029-direct-p9-mtp-r1.json",
+      "sha256": "d0c3034d4fb17879b8ae93e71ef0ab4afebc86dd36806f1d41f5a9a177830c73"
+    },
+    {
+      "path": "benchmarks/reports/20261029-direct-p9-mtp-r2.json",
+      "sha256": "363f8d350c482a4959fd9d67a071a711d5babb4a990b45b83a3f4a22e40cef06"
+    },
+    {
+      "path": "benchmarks/reports/20261029-direct-p9-mtpoff-r1.json",
+      "sha256": "1ed6810eb44ecc0f41e1e7a5299aeb81b7d0fb285335a7760753bbfd4dbfd05c"
+    },
+    {
+      "path": "benchmarks/reports/20261029-direct-p9-mtpoff-r2.json",
+      "sha256": "3a2ace066201f6aa3101b6da3c0f46fe9881a8f0115598e23f577d7bbc7ba691"
+    },
+    {
+      "path": "benchmarks/reports/20261029-direct-p9-ngram-r1.json",
+      "sha256": "1ba733bcfc065036f068b9563fc472cf8721acf7eedcc43a6c3b2af5470c3151"
+    },
+    {
+      "path": "benchmarks/reports/20261029-direct-p9-ngram-r2.json",
+      "sha256": "fe7753beee684f3c89391e196d8ca2a811daa884bb95513e58fd1380b67889c8"
+    },
+    {
+      "path": "benchmarks/reports/20261029-direct-p9-routing-r1.json",
+      "sha256": "6d8758a0cc9422c6c2175319a47548b7b108bd9df6397973c4393e40f91ab957"
+    },
+    {
+      "path": "benchmarks/reports/20261029-direct-p9-routing-r2.json",
+      "sha256": "4f6a5cf147faa2cb7f2a5569cdf99e2bbaaef778ef8080c1a9bf562994c30460"
+    },
+    {
+      "path": "benchmarks/reports/20261029-direct-p9-size-qwen3-coder-next.json",
+      "sha256": "1995b5835f8bf434f27781d996b0c66b70a3ce52da53bf047c73798136668d91"
+    },
+    {
+      "path": "benchmarks/reports/20261029-direct-p9-size-qwen3.5-4b.json",
+      "sha256": "2d955f0ecec828018ef824a8aebc13658c2966f7b81b021e444f85f6feb35976"
+    },
+    {
+      "path": "benchmarks/reports/20261029-direct-p9-size-qwen3.5-9b.json",
+      "sha256": "673c67cd05d908dbb70be7357524100969d9f8a1571d17b898f9b370c16cba99"
+    },
+    {
+      "path": "benchmarks/reports/20261029-recheck-direct-p5-r1.json",
+      "sha256": "84f0d6d90b88b63de6e53efcf7a090d8cca6df93ac5e91a6cee491432e2ffa11"
+    },
+    {
+      "path": "benchmarks/reports/20261029-recheck-direct-p5-r2.json",
+      "sha256": "c0640d30327ce9a8680c63ff8cffb7bf7adefde65aa1c5b96493346d8694d320"
+    },
+    {
+      "path": "benchmarks/reports/20261029-recheck-direct-p5-r3.json",
+      "sha256": "e8f2ed9050e04c89bd9dc4c966e0e3ce9adf9bfc3e6e51798f0154302c1f7ee5"
+    },
+    {
+      "path": "benchmarks/reports/20261029-recheck-direct-p6-r1.json",
+      "sha256": "68aa9eb4a91dc9cbee1c883cb539929a9cba1d7797763a635d9ae109b3e082f2"
+    },
+    {
+      "path": "benchmarks/reports/20261029-recheck-direct-p6-r2.json",
+      "sha256": "810b95863592bb1236c28c306736a8bc93c566562cfd61ef085d713d4590279e"
+    },
+    {
+      "path": "benchmarks/reports/20261029-recheck-direct-p6-r3.json",
+      "sha256": "0626428bb9567cd3e0dd18740c9bba6d1bcaf2c760f16e4c632ea7c4fa02792e"
+    },
+    {
+      "path": "benchmarks/reports/20261030-direct-p10-r1.json",
+      "sha256": "74c9bbd5293e4d5cc31916c07239d6cb247441650bed0ea729ee362108748ac7"
+    },
+    {
+      "path": "benchmarks/reports/20261030-direct-p10-r2.json",
+      "sha256": "0f4b99f7cad11b0f9e61bcda8b970261d1183150ddce59938c5ecafc2517785a"
+    },
+    {
+      "path": "benchmarks/reports/20261030-direct-p10-r3.json",
+      "sha256": "d358af3de11e04dd54684caa16f95ab80926f33df7b8900a21621fa73b66b464"
+    },
+    {
+      "path": "benchmarks/reports/20261030-direct-p10-real.json",
+      "sha256": "a0f067881f82084f8fcafd1640ee9e90654d3d4bd9735112a1f78e65183e4c39"
+    },
+    {
+      "path": "benchmarks/reports/20261030-direct-p10-sec-s1.json",
+      "sha256": "690a010c17062bfe48b8715caec32012ac4c54a61797d64b548c6bcb4bcb2e0f"
+    },
+    {
+      "path": "benchmarks/reports/20261030-direct-p10-sec-s2.json",
+      "sha256": "c00ed0cefe405595d62987c4c3c3a12ab88b7716dad1566763ccdb9e6321860c"
+    },
+    {
+      "path": "benchmarks/reports/20261030-direct-p10-sec-s3.json",
+      "sha256": "73d6bfcea9f1c2eea7d57f8e72bf4d58ce4554c1fb14fc764cd6cf50d129413a"
+    },
+    {
+      "path": "benchmarks/reports/20261030-direct-p10-sec-t1.json",
+      "sha256": "d8239625338cc40d5c8d1225c3edadc81d42830a0b7d97b2e4780793eb5f412d"
+    },
+    {
+      "path": "benchmarks/reports/20261030-direct-p10-sec-t2.json",
+      "sha256": "7fc370eb7a16ce839f5ba29157652285a45d35b3b29df5fa2bee5e8dac0187c5"
+    },
+    {
+      "path": "benchmarks/reports/20261030-direct-p10-sec-t3.json",
+      "sha256": "cb0ab2473033cc37573456179f79dae66cc4fdf59cde0d6dffcc54d3f329a385"
+    },
+    {
+      "path": "benchmarks/reports/20261029-recheck-direct-p5-r1.json",
+      "sha256": "84f0d6d90b88b63de6e53efcf7a090d8cca6df93ac5e91a6cee491432e2ffa11"
+    },
+    {
+      "path": "benchmarks/reports/20261029-recheck-direct-p5-r2.json",
+      "sha256": "c0640d30327ce9a8680c63ff8cffb7bf7adefde65aa1c5b96493346d8694d320"
+    },
+    {
+      "path": "benchmarks/reports/20261029-recheck-direct-p5-r3.json",
+      "sha256": "e8f2ed9050e04c89bd9dc4c966e0e3ce9adf9bfc3e6e51798f0154302c1f7ee5"
+    },
+    {
+      "path": "benchmarks/reports/20261029-recheck-direct-p6-r1.json",
+      "sha256": "68aa9eb4a91dc9cbee1c883cb539929a9cba1d7797763a635d9ae109b3e082f2"
+    },
+    {
+      "path": "benchmarks/reports/20261029-recheck-direct-p6-r2.json",
+      "sha256": "810b95863592bb1236c28c306736a8bc93c566562cfd61ef085d713d4590279e"
+    },
+    {
+      "path": "benchmarks/reports/20261029-recheck-direct-p6-r3.json",
+      "sha256": "0626428bb9567cd3e0dd18740c9bba6d1bcaf2c760f16e4c632ea7c4fa02792e"
+    },
+    {
+      "path": "benchmarks/reports/20261026T173426Z-direct-qwen3.6-35b-a3b-sessions-ws16k.json",
+      "sha256": "5fca6a5b833c99fdfcf605b6d5169630132c453859764a85f98495147053a3f7"
+    },
+    {
+      "path": "benchmarks/reports/20261026T174314Z-direct-qwen3.6-35b-a3b-sessions-router.json",
+      "sha256": "c5676053b078ab33f15468538157be5f71257225e531d208e74e3cee607ca819"
+    },
+    {
+      "path": "benchmarks/reports/20261029-sessions-ws6k-legacy-prune-off-r1.json",
+      "sha256": "47e5dc4f8e5699dab2a0d50b6ca03e2231bf306a812d9235156efc5d342b4f2d"
+    },
+    {
+      "path": "benchmarks/reports/20261029-sessions-ws6k-legacy-prune-off-r2.json",
+      "sha256": "087b33962f079dd1f14c8899fc7a135d1989b8edb8c220bbaf14a6df5a148f3c"
+    },
+    {
+      "path": "benchmarks/reports/20261029-sessions-ws6k-structured-prune-off-r1.json",
+      "sha256": "aea5035bfa2e867f980adbd50e49e5a6d491af21491b380f331b9550e44f09df"
+    },
+    {
+      "path": "benchmarks/reports/20261029-sessions-ws6k-structured-prune-off-r2.json",
+      "sha256": "1ad1500e84f1d064c689a51408d171589197ce9aad88c479325c608948d50a3f"
+    },
+    {
+      "path": "benchmarks/reports/20261029-sessions-ws6k-structured-prune-on-cachefix-r1.json",
+      "sha256": "e407759ac1a83ffd811b44812ba1a3c05abbca02f5a944357d92d8553bfc3619"
+    },
+    {
+      "path": "benchmarks/reports/20261029-sessions-ws6k-structured-prune-on-cachefix-r2.json",
+      "sha256": "db674b84ae29c5a6e4cbd39e74a6fcfd198a608380f62eec92edbaf444c5d776"
+    },
+    {
+      "path": "benchmarks/reports/20261029-sessions-ws6k-structured-prune-on-r1.json",
+      "sha256": "c0749f88643b89a129483a31def4f28c6dc916aff08664bae6fb4bcdbcdc7ec1"
+    },
+    {
+      "path": "benchmarks/reports/20261029-sessions-ws6k-structured-prune-on-r2.json",
+      "sha256": "327cd5b8fa68cc4c0cbd8464d4396897758055bbca176a32c967a47040801afd"
+    },
+    {
+      "path": "benchmarks/reports/20261003T164742Z-tasks-frontier-cross-service.json",
+      "sha256": "1b9874c5f7278d52a6a129c6af8549607ab4043ad584674222a7a3fc11e4b52e"
+    },
+    {
+      "path": "benchmarks/reports/20261003T171656Z-tasks-qwen3.6-35b-a3b.json",
+      "sha256": "8fde7f9d106bb0cb5a1626c008b7f8aaa4c63f932744a954c62ece8815e685fb"
+    },
+    {
+      "path": "benchmarks/reports/20261003T181222Z-tasks-laguna-xs-2.1.json",
+      "sha256": "f7da8e78446e5984de275e9100315873c12e06b1f84a2b05129d6241c3b6c2d8"
+    },
+    {
+      "path": "benchmarks/reports/20261003T194705Z-tasks-qwen3-coder-next.json",
+      "sha256": "657b83e6193d24d8a6ea6f846fa6be222c00a095df359a3789efba675ff2f5ba"
+    },
+    {
+      "path": "benchmarks/reports/20261027-tasks-baseline-r1.json",
+      "sha256": "0a8670aaf3d0f848e544358537a0c6bcfafdad40a150c6c5e5ae04c2ee0f57d9"
+    },
+    {
+      "path": "benchmarks/reports/20261027-tasks-baseline-r2.json",
+      "sha256": "43cfda9dc1d4ea1a6e5c0520d6a61a6857874060ca1ec926bf96c424bb340eae"
+    },
+    {
+      "path": "benchmarks/reports/20261027-tasks-baseline-r3.json",
+      "sha256": "290733289e72217a225057e9d713b3164e564529e8be32edca8f6741b71d7200"
+    },
+    {
+      "path": "benchmarks/reports/20261028-tasks-fixcheck-large.json",
+      "sha256": "62711699c3117ea1a8242f13dc54c4fa26b1293bbf9c6acc679f88ae1dd54659"
+    },
+    {
+      "path": "benchmarks/reports/20261028-tasks-fixcheck.json",
+      "sha256": "2b7e89ade910bc7aa9a09a780ded09d9e87e080900748e5bf03dbdbdc4775a58"
+    },
+    {
+      "path": "benchmarks/reports/20261028-tasks-reasoning-auto.json",
+      "sha256": "6020104831a468ee63e25312f672cb9271bbcd2cbaca505ea9d2bda4eb2a09b2"
+    },
+    {
+      "path": "benchmarks/reports/20261028-tasks-reasoning-drop.json",
+      "sha256": "92701779cee0e40f5e7577c44b2a0e15650f68939e8e1be97b62cdee4189b198"
+    },
+    {
+      "path": "benchmarks/reports/20261028-tasks-verify2.json",
+      "sha256": "0567a06ff19cda9b65c07bb0bc84aaf07d530f0297fde630d7906662c368f838"
+    },
+    {
+      "path": "benchmarks/reports/20261029-recheck-tasks-auto-r1.json",
+      "sha256": "12f5cf80863520537d13864233388fe2d4fc754316ec607469e783d017997106"
+    },
+    {
+      "path": "benchmarks/reports/20261029-recheck-tasks-auto-r2.json",
+      "sha256": "ca42dfe321227ac6b5b9dfe314dc77aad49587604d92032641ed340a65df6dfb"
+    },
+    {
+      "path": "benchmarks/reports/20261029-recheck-tasks-auto-r3.json",
+      "sha256": "6664d42772fb39b1f6aa372a9daf02357074bf547e5eb4d9efed2f003ef4963a"
+    },
+    {
+      "path": "benchmarks/reports/20261029-recheck-tasks-drop-r1.json",
+      "sha256": "b91fb53c9f015e090cb6b838e2545ceb92ed9010b977153a897f77bcafc2c36d"
+    },
+    {
+      "path": "benchmarks/reports/20261029-recheck-tasks-drop-r2.json",
+      "sha256": "7dbb553cc726932d99b24d09d29449a9e865797866c9c49e67d07d00a18cc12e"
+    },
+    {
+      "path": "benchmarks/reports/20261029-recheck-tasks-drop-r3.json",
+      "sha256": "ce1c995ea0145847f646b26fb22540043b28ea70b0e65dbdba232e93a8956ef5"
+    },
+    {
+      "path": "benchmarks/reports/20261029-recheck-tasks-p8-after-cross-service-r1.json",
+      "sha256": "f39237963e820a2ddf61a0650e7aa04b1e3aeb1b922107f5ea0742db8715ed88"
+    },
+    {
+      "path": "benchmarks/reports/20261029-recheck-tasks-p8-after-cross-service-r2.json",
+      "sha256": "2ce0bffece66f3bf8327052db2531f8ce0866f99e7711a798e82f904a9cfb375"
+    },
+    {
+      "path": "benchmarks/reports/20261029-recheck-tasks-p8-api-contract.json",
+      "sha256": "99016ba38ae77d73256cefedafd419d2c115b2b185cb8afc7e99a6e60fc34d85"
+    },
+    {
+      "path": "benchmarks/reports/20261029-recheck-tasks-p8-before-cross-service-r1.json",
+      "sha256": "f312a9c78d672ee1f6576b457dcae87b752abe29821d3a103173dd13b6f0c208"
+    },
+    {
+      "path": "benchmarks/reports/20261029-recheck-tasks-p8-before-cross-service-r2.json",
+      "sha256": "d5c385fd64b4bd6636541ad242ce525a5f339f1b381e6394f5427ce9eaf2a689"
+    },
+    {
+      "path": "benchmarks/reports/20261029-tasks-p8.json",
+      "sha256": "3860816d704ca637ce17cf44dbc1be00e3f793927ca9b76a8712eb97f024b9e5"
+    },
+    {
+      "path": "benchmarks/reports/20261030-tasks-p10-r1.json",
+      "sha256": "dd7742a464870761584d26aacfd09f329ca889cb9d173419ddfa263ef2025355"
+    },
+    {
+      "path": "benchmarks/reports/20261030-tasks-p10-r2.json",
+      "sha256": "3c0e21b1d9e7e4d75551939a580a8d08d2b3df6525e37dbaa9a481a43f1f3a73"
+    }
+  ],
+  "scope": "dev",
+  "runs": 1523,
+  "with_transcript": 1351,
+  "left_out": {
+    "heldout": 114,
+    "skipped": 96
+  },
+  "patterns": [
+    {
+      "pattern": "retrieval_miss",
+      "eligible": 12,
+      "runs": 0,
+      "classified_failures": 0,
+      "tasks": 0,
+      "kinds": {},
+      "fail_with": 0,
+      "fail_with_ci90": [
+        0,
+        1
+      ],
+      "fail_without": 0.083,
+      "fail_without_ci90": [
+        0.019,
+        0.301
+      ],
+      "tokens_with": 0,
+      "tokens_without": 3960,
+      "waste_calls": 0,
+      "by_language": {},
+      "recurring": false,
+      "associated": false
+    },
+    {
+      "pattern": "repeated_calls",
+      "eligible": 1351,
+      "runs": 19,
+      "classified_failures": 0,
+      "tasks": 2,
+      "kinds": {
+        "identical-call": 20
+      },
+      "fail_with": 0.158,
+      "fail_with_ci90": [
+        0.065,
+        0.336
+      ],
+      "fail_without": 0.069,
+      "fail_without_ci90": [
+        0.058,
+        0.081
+      ],
+      "tokens_with": 77592,
+      "tokens_without": 5298,
+      "waste_calls": 199,
+      "by_language": {
+        "go": 19
+      },
+      "recurring": true,
+      "associated": false
+    },
+    {
+      "pattern": "weak_verification",
+      "eligible": 1108,
+      "runs": 117,
+      "classified_failures": 103,
+      "tasks": 15,
+      "kinds": {
+        "false-confidence": 87,
+        "false-pass": 16,
+        "unverified-change": 14
+      },
+      "fail_with": 0.214,
+      "fail_with_ci90": [
+        0.089,
+        0.432
+      ],
+      "fail_without": 0.103,
+      "fail_without_ci90": [
+        0.089,
+        0.119
+      ],
+      "tokens_with": 7665,
+      "tokens_without": 14768,
+      "waste_calls": 0,
+      "by_language": {
+        "go": 104,
+        "python": 13,
+        "typescript": 35
+      },
+      "recurring": true,
+      "associated": false
+    },
+    {
+      "pattern": "tool_selection",
+      "eligible": 1351,
+      "runs": 38,
+      "classified_failures": 0,
+      "tasks": 10,
+      "kinds": {
+        "shell-for-tool": 1,
+        "tool-misuse": 37
+      },
+      "fail_with": 0.053,
+      "fail_with_ci90": [
+        0.018,
+        0.147
+      ],
+      "fail_without": 0.071,
+      "fail_without_ci90": [
+        0.06,
+        0.083
+      ],
+      "tokens_with": 13711,
+      "tokens_without": 6101,
+      "waste_calls": 84,
+      "by_language": {
+        "go": 12,
+        "python": 3,
+        "rust": 20,
+        "typescript": 9
+      },
+      "recurring": true,
+      "associated": false
+    },
+    {
+      "pattern": "context_excess",
+      "eligible": 1351,
+      "runs": 26,
+      "classified_failures": 0,
+      "tasks": 3,
+      "kinds": {
+        "large-prompt": 23,
+        "re-read": 9
+      },
+      "fail_with": 0.192,
+      "fail_with_ci90": [
+        0.097,
+        0.346
+      ],
+      "fail_without": 0.068,
+      "fail_without_ci90": [
+        0.057,
+        0.08
+      ],
+      "tokens_with": 55353,
+      "tokens_without": 5353,
+      "waste_calls": 183,
+      "by_language": {
+        "go": 26
+      },
+      "recurring": true,
+      "associated": true
+    },
+    {
+      "pattern": "escalation",
+      "eligible": 172,
+      "runs": 0,
+      "classified_failures": 0,
+      "tasks": 0,
+      "kinds": {},
+      "fail_with": 0,
+      "fail_with_ci90": [
+        0,
+        1
+      ],
+      "fail_without": 0.128,
+      "fail_without_ci90": [
+        0.092,
+        0.176
+      ],
+      "tokens_with": 0,
+      "tokens_without": 49059,
+      "waste_calls": 0,
+      "by_language": {},
+      "recurring": false,
+      "associated": false
+    },
+    {
+      "pattern": "unnecessary_retries",
+      "eligible": 1523,
+      "runs": 21,
+      "classified_failures": 17,
+      "tasks": 6,
+      "kinds": {
+        "attempts-failed": 17,
+        "rerun-unchanged": 4
+      },
+      "fail_with": 0.5,
+      "fail_with_ci90": [
+        0.182,
+        0.818
+      ],
+      "fail_without": 0.076,
+      "fail_without_ci90": [
+        0.065,
+        0.088
+      ],
+      "tokens_with": 17056,
+      "tokens_without": 11126,
+      "waste_calls": 27,
+      "by_language": {
+        "go": 21,
+        "typescript": 2
+      },
+      "recurring": true,
+      "associated": true
+    },
+    {
+      "pattern": "ineffective_compaction",
+      "eligible": 1351,
+      "runs": 7,
+      "classified_failures": 0,
+      "tasks": 1,
+      "kinds": {
+        "re-read-after": 41
+      },
+      "fail_with": 0.429,
+      "fail_with_ci90": [
+        0.186,
+        0.711
+      ],
+      "fail_without": 0.068,
+      "fail_without_ci90": [
+        0.058,
+        0.081
+      ],
+      "tokens_with": 174790,
+      "tokens_without": 5437,
+      "waste_calls": 84,
+      "by_language": {
+        "go": 7
+      },
+      "recurring": false,
+      "associated": true
+    },
+    {
+      "pattern": "budget_exhausted",
+      "eligible": 1133,
+      "runs": 0,
+      "classified_failures": 0,
+      "tasks": 0,
+      "kinds": {},
+      "fail_with": 0,
+      "fail_with_ci90": [
+        0,
+        1
+      ],
+      "fail_without": 0.068,
+      "fail_without_ci90": [
+        0.057,
+        0.081
+      ],
+      "tokens_with": 0,
+      "tokens_without": 3231,
+      "waste_calls": 0,
+      "by_language": {},
+      "recurring": false,
+      "associated": false
+    }
+  ],
+  "findings": [
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "fix-balance-query",
+      "report": "benchmarks/reports/20261026T001359Z-direct-qwen3.6-35b-a3b-baseline.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: ok  \texample.com/ledger-service/internal/consumer\t(cached)",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/fix-balance-query-1792973852185126114/state/sessions/ledger-service-920c241c/20261026-001732-d688.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "large-change-txtar",
+      "report": "benchmarks/reports/20261026T001359Z-direct-qwen3.6-35b-a3b-baseline.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: --- FAIL: TestHiddenLookup (0.00s)",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/large-change-txtar-1792973902791348176/state/sessions/x-tools-0fafe5c8/20261026-001823-38bc.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "fix-balance-query",
+      "report": "benchmarks/reports/20261026T002541Z-direct-qwen3.6-35b-a3b-seedpack.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: ok  \texample.com/ledger-service/internal/consumer\t(cached)",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/fix-balance-query-1792974544261383986/state/sessions/ledger-service-97812117/20261026-002904-9936.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "large-change-txtar",
+      "report": "benchmarks/reports/20261026T002541Z-direct-qwen3.6-35b-a3b-seedpack.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: --- FAIL: TestHiddenLookup (0.00s)",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/large-change-txtar-1792974599769788943/state/sessions/x-tools-31ec601c/20261026-003000-b8dc.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "large-change-txtar",
+      "report": "benchmarks/reports/20261026T003448Z-direct-qwen3.6-35b-a3b-projectmap.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: --- FAIL: TestHiddenLookup (0.00s)",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/large-change-txtar-1792975148973667925/state/sessions/x-tools-15e6b50d/20261026-003909-52a5.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "large-change-txtar",
+      "report": "benchmarks/reports/20261026T004803Z-direct-qwen3.6-35b-a3b-fixcause-repeat.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: --- FAIL: TestHiddenLookup (0.00s)",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/large-change-txtar-1792975894889351083/state/sessions/x-tools-588ae0b5/20261026-005135-aa69.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "session-ledger",
+      "report": "benchmarks/reports/20261026T173037Z-direct-qwen3.6-35b-a3b-sessions.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: ok  \texample.com/ledger-service/internal/consumer\t(cached)",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/session-ledger-1793035837536499184/state/sessions/ledger-service-ccd266db/20261026-173037-9e34.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "large-change-txtar",
+      "report": "benchmarks/reports/20261026T174314Z-direct-qwen3.6-35b-a3b-sessions-router.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: --- FAIL: TestHiddenLookup (0.00s)",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/large-change-txtar-1793036807574668537/state/sessions/x-tools-4e52f9b6/20261026-174647-a8a0.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "session-ledger",
+      "report": "benchmarks/reports/20261026T174314Z-direct-qwen3.6-35b-a3b-sessions-router.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: answer does not match /Balance/",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/session-ledger-1793036928926195086/state/sessions/ledger-service-f295aff0/20261026-174848-5fd9.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "fix-balance-query",
+      "report": "benchmarks/reports/20261026T182842Z-direct-qwen3.6-35b-a3b-pitfall-suite.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: ok  \texample.com/ledger-service/internal/consumer\t(cached)",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/fix-balance-query-1793039495062363531/state/sessions/ledger-service-dc761a58/20261026-183135-f7c8.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "multi-feature-discount",
+      "report": "benchmarks/reports/20261027-direct-aa-r4.json",
+      "languages": [
+        "go",
+        "typescript"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: --- FAIL: TestHiddenDiscount (0.00s)",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/multi-feature-discount-1793123656694957959/state/sessions/shop-mono-b92eb8e0/20261027-175416-3475.jsonl"
+    },
+    {
+      "pattern": "tool_selection",
+      "kind": "tool-misuse",
+      "task": "multi-locate-mapping",
+      "report": "benchmarks/reports/20261027-direct-aa-r4.json",
+      "languages": [
+        "go",
+        "typescript"
+      ],
+      "success": true,
+      "detail": "tool calls rejected as misused: read: missing file ×2",
+      "steps": [
+        0,
+        1
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/multi-locate-mapping-1793123747970392912/state/sessions/shop-mono-40d11c07/20261027-175548-c51b.jsonl"
+    },
+    {
+      "pattern": "tool_selection",
+      "kind": "tool-misuse",
+      "task": "rust-explain-ledger",
+      "report": "benchmarks/reports/20261027-direct-aa-r4.json",
+      "languages": [
+        "rust"
+      ],
+      "success": true,
+      "detail": "tool calls rejected as misused: ls: missing file ×1, read: missing file ×1, read: read a directory ×1",
+      "steps": [
+        0,
+        1,
+        4
+      ],
+      "waste": 3,
+      "transcript": "\u003csessions\u003e/rust-explain-ledger-1793123868040728214/state/sessions/rust-ledger-ebb841af/20261027-175748-cb15.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "session-ledger",
+      "report": "benchmarks/reports/20261027-direct-aa-r4.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: answer does not match /Balance|ledger\\.go/",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/session-ledger-1793123883245506811/state/sessions/ledger-service-08f275cc/20261027-175803-bb27.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "multi-feature-discount",
+      "report": "benchmarks/reports/20261027-direct-baseline-r1.json",
+      "languages": [
+        "go",
+        "typescript"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: --- FAIL: TestHiddenDiscount (0.00s)",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/multi-feature-discount-1793102613391094869/state/sessions/shop-mono-ba8742e5/20261027-120333-350d.jsonl"
+    },
+    {
+      "pattern": "tool_selection",
+      "kind": "tool-misuse",
+      "task": "rust-explain-ledger",
+      "report": "benchmarks/reports/20261027-direct-baseline-r1.json",
+      "languages": [
+        "rust"
+      ],
+      "success": true,
+      "detail": "tool calls rejected as misused: read: missing file ×2",
+      "steps": [
+        0,
+        1
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/rust-explain-ledger-1793102820187862638/state/sessions/rust-ledger-3b251184/20261027-120700-101a.jsonl"
+    },
+    {
+      "pattern": "context_excess",
+      "kind": "large-prompt",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261027-direct-baseline-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": true,
+      "detail": "peak prompt 37305 tokens, above the long-running group's 90th percentile (30458)",
+      "transcript": "\u003csessions\u003e/session-x-tools-1793102918277019078/state/sessions/x-tools-912ff594/20261027-120838-288c.jsonl"
+    },
+    {
+      "pattern": "tool_selection",
+      "kind": "tool-misuse",
+      "task": "ts-locate-discount",
+      "report": "benchmarks/reports/20261027-direct-baseline-r2.json",
+      "languages": [
+        "typescript"
+      ],
+      "success": true,
+      "detail": "tool calls rejected as misused: read: missing file ×1, read: read a directory ×1",
+      "steps": [
+        0,
+        4
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/ts-locate-discount-1793104142433188519/state/sessions/ts-cart-1fe38cb5/20261027-122902-1b26.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "multi-feature-discount",
+      "report": "benchmarks/reports/20261027-direct-baseline-r3.json",
+      "languages": [
+        "go",
+        "typescript"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: --- FAIL: TestHiddenDiscount (0.00s)",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/multi-feature-discount-1793104500837126084/state/sessions/shop-mono-eb34c758/20261027-123500-befc.jsonl"
+    },
+    {
+      "pattern": "context_excess",
+      "kind": "large-prompt",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261027-direct-baseline-r3.json",
+      "languages": [
+        "go"
+      ],
+      "success": true,
+      "detail": "peak prompt 32719 tokens, above the long-running group's 90th percentile (30458)",
+      "transcript": "\u003csessions\u003e/session-x-tools-1793104777078001969/state/sessions/x-tools-919c76ec/20261027-123937-68dc.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "fix-balance-query",
+      "report": "benchmarks/reports/20261028-direct-fixcheck.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: ok  \texample.com/ledger-service/internal/consumer\t(cached)",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/fix-balance-query-1793130915283514794/state/sessions/ledger-service-f994933a/20261027-195515-305e.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "multi-feature-discount",
+      "report": "benchmarks/reports/20261028-direct-fixcheck.json",
+      "languages": [
+        "go",
+        "typescript"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: --- FAIL: TestHiddenDiscount (0.00s)",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/multi-feature-discount-1793131045546405126/state/sessions/shop-mono-352098cb/20261027-195725-11eb.jsonl"
+    },
+    {
+      "pattern": "unnecessary_retries",
+      "kind": "rerun-unchanged",
+      "task": "multi-feature-discount",
+      "report": "benchmarks/reports/20261028-direct-fixcheck.json",
+      "languages": [
+        "go",
+        "typescript"
+      ],
+      "success": false,
+      "detail": "re-ran a build or test 2 times with no change between",
+      "steps": [
+        17,
+        18
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/multi-feature-discount-1793131045546405126/state/sessions/shop-mono-352098cb/20261027-195725-11eb.jsonl"
+    },
+    {
+      "pattern": "tool_selection",
+      "kind": "tool-misuse",
+      "task": "multi-locate-mapping",
+      "report": "benchmarks/reports/20261028-direct-fixcheck.json",
+      "languages": [
+        "go",
+        "typescript"
+      ],
+      "success": true,
+      "detail": "tool calls rejected as misused: read: read a directory ×2",
+      "steps": [
+        0,
+        1
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/multi-locate-mapping-1793131246238054874/state/sessions/shop-mono-33029413/20261027-200046-4a02.jsonl"
+    },
+    {
+      "pattern": "tool_selection",
+      "kind": "tool-misuse",
+      "task": "rust-explain-ledger",
+      "report": "benchmarks/reports/20261028-direct-fixcheck.json",
+      "languages": [
+        "rust"
+      ],
+      "success": true,
+      "detail": "tool calls rejected as misused: read: missing file ×2",
+      "steps": [
+        0,
+        1
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/rust-explain-ledger-1793131359322662444/state/sessions/rust-ledger-5a024705/20261027-200239-89c9.jsonl"
+    },
+    {
+      "pattern": "tool_selection",
+      "kind": "tool-misuse",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261028-direct-fixcheck.json",
+      "languages": [
+        "go"
+      ],
+      "success": true,
+      "detail": "tool calls rejected as misused: read: missing file ×1, read: read a directory ×1",
+      "steps": [
+        9,
+        10
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793131497002607934/state/sessions/x-tools-0f05c504/20261027-200457-7975.jsonl"
+    },
+    {
+      "pattern": "tool_selection",
+      "kind": "tool-misuse",
+      "task": "large-change-txtar",
+      "report": "benchmarks/reports/20261028-direct-languages-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": true,
+      "detail": "tool calls rejected as misused: read: missing file ×2",
+      "steps": [
+        2,
+        3
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/large-change-txtar-1793144037500658862/state/sessions/x-tools-ef859613/20261027-233357-382a.jsonl"
+    },
+    {
+      "pattern": "tool_selection",
+      "kind": "tool-misuse",
+      "task": "multi-locate-mapping",
+      "report": "benchmarks/reports/20261028-direct-languages-r1.json",
+      "languages": [
+        "go",
+        "typescript"
+      ],
+      "success": true,
+      "detail": "tool calls rejected as misused: read: missing file ×2",
+      "steps": [
+        0,
+        1
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/multi-locate-mapping-1793144253055030961/state/sessions/shop-mono-d61753c5/20261027-233733-4aee.jsonl"
+    },
+    {
+      "pattern": "tool_selection",
+      "kind": "tool-misuse",
+      "task": "rust-explain-ledger",
+      "report": "benchmarks/reports/20261028-direct-languages-r1.json",
+      "languages": [
+        "rust"
+      ],
+      "success": true,
+      "detail": "tool calls rejected as misused: read: missing file ×2",
+      "steps": [
+        0,
+        1
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/rust-explain-ledger-1793144368048217287/state/sessions/rust-ledger-0e1b4da7/20261027-233928-0f90.jsonl"
+    },
+    {
+      "pattern": "tool_selection",
+      "kind": "tool-misuse",
+      "task": "ts-locate-discount",
+      "report": "benchmarks/reports/20261028-direct-languages-r1.json",
+      "languages": [
+        "typescript"
+      ],
+      "success": true,
+      "detail": "tool calls rejected as misused: read: missing file ×1, read: read a directory ×1",
+      "steps": [
+        0,
+        3
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/ts-locate-discount-1793144693685800742/state/sessions/ts-cart-f555f1ba/20261027-234453-8aad.jsonl"
+    },
+    {
+      "pattern": "tool_selection",
+      "kind": "tool-misuse",
+      "task": "rust-explain-ledger",
+      "report": "benchmarks/reports/20261028-direct-languages-r2.json",
+      "languages": [
+        "rust"
+      ],
+      "success": true,
+      "detail": "tool calls rejected as misused: read: missing file ×2",
+      "steps": [
+        0,
+        1
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/rust-explain-ledger-1793145286544027465/state/sessions/rust-ledger-816ad17e/20261027-235446-e703.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "session-ledger",
+      "report": "benchmarks/reports/20261028-direct-languages-r2.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: answer does not match /Balance|ledger\\.go/",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/session-ledger-1793145304101602737/state/sessions/ledger-service-6c043b47/20261027-235504-4a98.jsonl"
+    },
+    {
+      "pattern": "context_excess",
+      "kind": "large-prompt",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261028-direct-languages-r2.json",
+      "languages": [
+        "go"
+      ],
+      "success": true,
+      "detail": "peak prompt 35246 tokens, above the long-running group's 90th percentile (30458)",
+      "transcript": "\u003csessions\u003e/session-x-tools-1793145427352119386/state/sessions/x-tools-6c482c12/20261027-235707-8f6d.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "fix-balance-query",
+      "report": "benchmarks/reports/20261028-direct-reasoning-auto-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: ok  \texample.com/ledger-service/internal/consumer\t(cached)",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/fix-balance-query-1793202261520092438/state/sessions/ledger-service-89ab5ec2/20261028-154421-29d6.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "multi-feature-discount",
+      "report": "benchmarks/reports/20261028-direct-reasoning-auto-r1.json",
+      "languages": [
+        "go",
+        "typescript"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: --- FAIL: TestHiddenDiscount (0.00s)",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/multi-feature-discount-1793202400469382927/state/sessions/shop-mono-7d5e3246/20261028-154640-95ed.jsonl"
+    },
+    {
+      "pattern": "tool_selection",
+      "kind": "tool-misuse",
+      "task": "rust-explain-ledger",
+      "report": "benchmarks/reports/20261028-direct-reasoning-auto-r1.json",
+      "languages": [
+        "rust"
+      ],
+      "success": true,
+      "detail": "tool calls rejected as misused: read: missing file ×2, read: read a directory ×1",
+      "steps": [
+        0,
+        1,
+        4
+      ],
+      "waste": 3,
+      "transcript": "\u003csessions\u003e/rust-explain-ledger-1793202572552201295/state/sessions/rust-ledger-e0202d6b/20261028-154932-5e36.jsonl"
+    },
+    {
+      "pattern": "repeated_calls",
+      "kind": "identical-call",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261028-direct-reasoning-auto-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": true,
+      "detail": "read called 3 times with the same arguments and no change between",
+      "steps": [
+        1,
+        2,
+        3
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793202670924921519/state/sessions/x-tools-667419aa/20261028-155111-d130.jsonl"
+    },
+    {
+      "pattern": "context_excess",
+      "kind": "large-prompt",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261028-direct-reasoning-auto-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": true,
+      "detail": "peak prompt 34972 tokens, above the long-running group's 90th percentile (30458)",
+      "transcript": "\u003csessions\u003e/session-x-tools-1793202670924921519/state/sessions/x-tools-667419aa/20261028-155111-d130.jsonl"
+    },
+    {
+      "pattern": "context_excess",
+      "kind": "re-read",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261028-direct-reasoning-auto-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": true,
+      "detail": "3 reads of files already read and unchanged",
+      "waste": 3,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793202670924921519/state/sessions/x-tools-667419aa/20261028-155111-d130.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "fix-balance-query",
+      "report": "benchmarks/reports/20261028-direct-reasoning-auto-r2.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: ok  \texample.com/ledger-service/internal/consumer\t(cached)",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/fix-balance-query-1793203877599371971/state/sessions/ledger-service-60e44767/20261028-161117-90b2.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "multi-feature-discount",
+      "report": "benchmarks/reports/20261028-direct-reasoning-auto-r2.json",
+      "languages": [
+        "go",
+        "typescript"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: --- FAIL: TestHiddenDiscount (0.00s)",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/multi-feature-discount-1793204005199534614/state/sessions/shop-mono-7be27f8f/20261028-161325-1766.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "fix-balance-query",
+      "report": "benchmarks/reports/20261028-direct-reasoning-drop-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: ok  \texample.com/ledger-service/internal/consumer\t(cached)",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/fix-balance-query-1793201458334326986/state/sessions/ledger-service-ea8c5d76/20261028-153058-409e.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "multi-feature-discount",
+      "report": "benchmarks/reports/20261028-direct-reasoning-drop-r1.json",
+      "languages": [
+        "go",
+        "typescript"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: --- FAIL: TestHiddenDiscount (0.00s)",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/multi-feature-discount-1793201600506824420/state/sessions/shop-mono-8307723d/20261028-153320-19b4.jsonl"
+    },
+    {
+      "pattern": "repeated_calls",
+      "kind": "identical-call",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261028-direct-reasoning-drop-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": true,
+      "detail": "read called 3 times with the same arguments and no change between",
+      "steps": [
+        1,
+        2,
+        3
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793201886264796313/state/sessions/x-tools-cb2f6eb7/20261028-153806-8a6e.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "fix-balance-query",
+      "report": "benchmarks/reports/20261028-direct-reasoning-drop-r2.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: ok  \texample.com/ledger-service/internal/consumer\t0.002s",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/fix-balance-query-1793203043865862188/state/sessions/ledger-service-8a6af355/20261028-155723-6388.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "multi-feature-discount",
+      "report": "benchmarks/reports/20261028-direct-reasoning-drop-r2.json",
+      "languages": [
+        "go",
+        "typescript"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: --- FAIL: TestHiddenDiscount (0.00s)",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/multi-feature-discount-1793203185540620043/state/sessions/shop-mono-8984c561/20261028-155945-74c1.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "unverified-change",
+      "task": "add-balance-test",
+      "report": "benchmarks/reports/20261028-direct-retrieval-adaptive-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "changed internal/ledger/balance_test.go and never built or tested after the last change",
+      "transcript": "\u003csessions\u003e/add-balance-test-1793181092358077468/state/sessions/ledger-service-12c7efff/20261028-095132-c703.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "fix-balance-query",
+      "report": "benchmarks/reports/20261028-direct-retrieval-adaptive-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: ok  \texample.com/ledger-service/internal/consumer\t(cached)",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/fix-balance-query-1793181456542382932/state/sessions/ledger-service-78e4d886/20261028-095736-7d51.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "multi-feature-discount",
+      "report": "benchmarks/reports/20261028-direct-retrieval-adaptive-r1.json",
+      "languages": [
+        "go",
+        "typescript"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: --- FAIL: TestHiddenDiscount (0.00s)",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/multi-feature-discount-1793181577895870036/state/sessions/shop-mono-b8c4c5db/20261028-095937-f233.jsonl"
+    },
+    {
+      "pattern": "context_excess",
+      "kind": "large-prompt",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261028-direct-retrieval-adaptive-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": true,
+      "detail": "peak prompt 35920 tokens, above the long-running group's 90th percentile (30458)",
+      "transcript": "\u003csessions\u003e/session-x-tools-1793181898197041538/state/sessions/x-tools-d32e76f9/20261028-100458-e097.jsonl"
+    },
+    {
+      "pattern": "unnecessary_retries",
+      "kind": "rerun-unchanged",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261028-direct-retrieval-adaptive-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": true,
+      "detail": "re-ran a build or test 1 times with no change between",
+      "steps": [
+        18
+      ],
+      "waste": 1,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793181898197041538/state/sessions/x-tools-d32e76f9/20261028-100458-e097.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "fix-balance-query",
+      "report": "benchmarks/reports/20261028-direct-retrieval-adaptive-r2.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: ok  \texample.com/ledger-service/internal/consumer\t(cached)",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/fix-balance-query-1793183154980527672/state/sessions/ledger-service-72f8fe2b/20261028-102555-3077.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "unverified-change",
+      "task": "large-change-txtar",
+      "report": "benchmarks/reports/20261028-direct-retrieval-adaptive-r2.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "changed txtar/archive.go, txtar/archive_test.go and never built or tested after the last change",
+      "transcript": "\u003csessions\u003e/large-change-txtar-1793183216164409443/state/sessions/x-tools-61570e9d/20261028-102656-973f.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "py-fix-inventory",
+      "report": "benchmarks/reports/20261028-direct-retrieval-adaptive-r2.json",
+      "languages": [
+        "python"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: …==================",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/py-fix-inventory-1793183311269338535/state/sessions/py-inventory-ea6952c9/20261028-102831-d89a.jsonl"
+    },
+    {
+      "pattern": "tool_selection",
+      "kind": "tool-misuse",
+      "task": "rust-explain-ledger",
+      "report": "benchmarks/reports/20261028-direct-retrieval-adaptive-r2.json",
+      "languages": [
+        "rust"
+      ],
+      "success": true,
+      "detail": "tool calls rejected as misused: read: missing file ×2",
+      "steps": [
+        0,
+        1
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/rust-explain-ledger-1793183401526299448/state/sessions/rust-ledger-0fb6508c/20261028-103001-7c86.jsonl"
+    },
+    {
+      "pattern": "tool_selection",
+      "kind": "tool-misuse",
+      "task": "multi-locate-mapping",
+      "report": "benchmarks/reports/20261028-direct-retrieval-basic-r1.json",
+      "languages": [
+        "go",
+        "typescript"
+      ],
+      "success": true,
+      "detail": "tool calls rejected as misused: read: read a directory ×3",
+      "steps": [
+        0,
+        1,
+        2
+      ],
+      "waste": 3,
+      "transcript": "\u003csessions\u003e/multi-locate-mapping-1793180518608175744/state/sessions/shop-mono-e20338e3/20261028-094158-cab3.jsonl"
+    },
+    {
+      "pattern": "tool_selection",
+      "kind": "tool-misuse",
+      "task": "rust-explain-ledger",
+      "report": "benchmarks/reports/20261028-direct-retrieval-basic-r2.json",
+      "languages": [
+        "rust"
+      ],
+      "success": true,
+      "detail": "tool calls rejected as misused: read: missing file ×2",
+      "steps": [
+        0,
+        1
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/rust-explain-ledger-1793182643098508843/state/sessions/rust-ledger-9ed10285/20261028-101723-4071.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "multi-feature-discount",
+      "report": "benchmarks/reports/20261028-direct-retrieval-fix2-adaptive-r1.json",
+      "languages": [
+        "go",
+        "typescript"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: --- FAIL: TestHiddenDiscount (0.00s)",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/multi-feature-discount-1793189110052145999/state/sessions/shop-mono-1eae5e6d/20261028-120510-a486.jsonl"
+    },
+    {
+      "pattern": "tool_selection",
+      "kind": "tool-misuse",
+      "task": "rust-explain-ledger",
+      "report": "benchmarks/reports/20261028-direct-retrieval-fix2-adaptive-r1.json",
+      "languages": [
+        "rust"
+      ],
+      "success": true,
+      "detail": "tool calls rejected as misused: read: missing file ×2",
+      "steps": [
+        0,
+        1
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/rust-explain-ledger-1793189339106055045/state/sessions/rust-ledger-4d81b1ab/20261028-120859-4b5a.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "unverified-change",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261028-direct-retrieval-fix2-adaptive-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "changed go/ast/inspector/inspector.go and never built or tested after the last change",
+      "transcript": "\u003csessions\u003e/session-x-tools-1793189445859281889/state/sessions/x-tools-85a8c2f8/20261028-121046-2c3f.jsonl"
+    },
+    {
+      "pattern": "tool_selection",
+      "kind": "tool-misuse",
+      "task": "rust-explain-ledger",
+      "report": "benchmarks/reports/20261028-direct-retrieval-fix2-adaptive-r2.json",
+      "languages": [
+        "rust"
+      ],
+      "success": true,
+      "detail": "tool calls rejected as misused: read: missing file ×2",
+      "steps": [
+        0,
+        1
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/rust-explain-ledger-1793191251972453812/state/sessions/rust-ledger-0741c4f2/20261028-124052-efa0.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "fix-balance-query",
+      "report": "benchmarks/reports/20261028-direct-retrieval-fix2-basic-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: ok  \texample.com/ledger-service/internal/consumer\t(cached)",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/fix-balance-query-1793188093129434226/state/sessions/ledger-service-ddee4101/20261028-114813-e1f6.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "multi-feature-discount",
+      "report": "benchmarks/reports/20261028-direct-retrieval-fix2-basic-r1.json",
+      "languages": [
+        "go",
+        "typescript"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: --- FAIL: TestHiddenDiscount (0.00s)",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/multi-feature-discount-1793188262216581076/state/sessions/shop-mono-5bddd74c/20261028-115102-be3a.jsonl"
+    },
+    {
+      "pattern": "tool_selection",
+      "kind": "tool-misuse",
+      "task": "multi-locate-mapping",
+      "report": "benchmarks/reports/20261028-direct-retrieval-fix2-basic-r1.json",
+      "languages": [
+        "go",
+        "typescript"
+      ],
+      "success": true,
+      "detail": "tool calls rejected as misused: read: missing file ×1, read: read a directory ×2",
+      "steps": [
+        0,
+        1,
+        4
+      ],
+      "waste": 3,
+      "transcript": "\u003csessions\u003e/multi-locate-mapping-1793188373263733802/state/sessions/shop-mono-02724684/20261028-115253-d9b3.jsonl"
+    },
+    {
+      "pattern": "tool_selection",
+      "kind": "tool-misuse",
+      "task": "rust-explain-ledger",
+      "report": "benchmarks/reports/20261028-direct-retrieval-fix2-basic-r1.json",
+      "languages": [
+        "rust"
+      ],
+      "success": true,
+      "detail": "tool calls rejected as misused: read: missing file ×2",
+      "steps": [
+        0,
+        1
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/rust-explain-ledger-1793188485236855840/state/sessions/rust-ledger-18ced459/20261028-115445-42a4.jsonl"
+    },
+    {
+      "pattern": "tool_selection",
+      "kind": "tool-misuse",
+      "task": "ts-locate-discount",
+      "report": "benchmarks/reports/20261028-direct-retrieval-fix2-basic-r1.json",
+      "languages": [
+        "typescript"
+      ],
+      "success": true,
+      "detail": "tool calls rejected as misused: read: missing file ×1, read: read a directory ×1",
+      "steps": [
+        0,
+        3
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/ts-locate-discount-1793188796122526035/state/sessions/ts-cart-1610716c/20261028-115956-57d5.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "fix-balance-query",
+      "report": "benchmarks/reports/20261028-direct-retrieval-fix2-basic-r2.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: ok  \texample.com/ledger-service/internal/consumer\t(cached)",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/fix-balance-query-1793190016519110111/state/sessions/ledger-service-6bb2e76d/20261028-122016-90dc.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "unverified-change",
+      "task": "fix-ledger-balance",
+      "report": "benchmarks/reports/20261028-direct-retrieval-fix2-basic-r2.json",
+      "languages": [
+        "go"
+      ],
+      "success": true,
+      "detail": "changed internal/consumer/consumer.go and never built or tested after the last change",
+      "transcript": "\u003csessions\u003e/fix-ledger-balance-1793190055090572160/state/sessions/ledger-service-592c6ac1/20261028-122055-667f.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "large-change-txtar",
+      "report": "benchmarks/reports/20261028-direct-retrieval-fix2-basic-r2.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: --- FAIL: TestHiddenLookup (0.00s)",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/large-change-txtar-1793190085165346542/state/sessions/x-tools-7be01dfe/20261028-122125-f26a.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "multi-feature-discount",
+      "report": "benchmarks/reports/20261028-direct-retrieval-fix2-basic-r2.json",
+      "languages": [
+        "go",
+        "typescript"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: --- FAIL: TestHiddenDiscount (0.00s)",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/multi-feature-discount-1793190168341852986/state/sessions/shop-mono-6dd13144/20261028-122248-8470.jsonl"
+    },
+    {
+      "pattern": "tool_selection",
+      "kind": "tool-misuse",
+      "task": "rust-explain-ledger",
+      "report": "benchmarks/reports/20261028-direct-retrieval-fix2-basic-r2.json",
+      "languages": [
+        "rust"
+      ],
+      "success": true,
+      "detail": "tool calls rejected as misused: read: missing file ×2",
+      "steps": [
+        0,
+        1
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/rust-explain-ledger-1793190401657500522/state/sessions/rust-ledger-541e9505/20261028-122641-d608.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "fix-balance-query",
+      "report": "benchmarks/reports/20261028-direct-sandbox-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: ok  \texample.com/ledger-service/internal/consumer\t(cached)",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/fix-balance-query-1793139852797589278/state/sessions/ledger-service-ea144bba/20261027-222412-8ea9.jsonl"
+    },
+    {
+      "pattern": "tool_selection",
+      "kind": "tool-misuse",
+      "task": "rust-explain-ledger",
+      "report": "benchmarks/reports/20261028-direct-sandbox-r1.json",
+      "languages": [
+        "rust"
+      ],
+      "success": true,
+      "detail": "tool calls rejected as misused: read: missing file ×2",
+      "steps": [
+        0,
+        1
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/rust-explain-ledger-1793140196460301943/state/sessions/rust-ledger-02d51aa5/20261027-222956-389c.jsonl"
+    },
+    {
+      "pattern": "tool_selection",
+      "kind": "tool-misuse",
+      "task": "session-ledger",
+      "report": "benchmarks/reports/20261028-direct-sandbox-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": true,
+      "detail": "tool calls rejected as misused: read: read a directory ×2",
+      "steps": [
+        1,
+        2
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/session-ledger-1793140211950410208/state/sessions/ledger-service-606f500d/20261027-223011-ccb0.jsonl"
+    },
+    {
+      "pattern": "repeated_calls",
+      "kind": "identical-call",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261028-direct-sandbox-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": true,
+      "detail": "read called 3 times with the same arguments and no change between",
+      "steps": [
+        5,
+        6,
+        7
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793140292755616686/state/sessions/x-tools-c1b514bf/20261027-223133-1d55.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "fix-balance-query",
+      "report": "benchmarks/reports/20261028-direct-sandbox-r2.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: ok  \texample.com/ledger-service/internal/consumer\t(cached)",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/fix-balance-query-1793140671540879408/state/sessions/ledger-service-151b5409/20261027-223751-879a.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "multi-feature-discount",
+      "report": "benchmarks/reports/20261028-direct-sandbox-r2.json",
+      "languages": [
+        "go",
+        "typescript"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: --- FAIL: TestHiddenDiscount (0.00s)",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/multi-feature-discount-1793140809492107809/state/sessions/shop-mono-dc08147c/20261027-224009-a86d.jsonl"
+    },
+    {
+      "pattern": "tool_selection",
+      "kind": "tool-misuse",
+      "task": "rust-explain-ledger",
+      "report": "benchmarks/reports/20261028-direct-sandbox-r2.json",
+      "languages": [
+        "rust"
+      ],
+      "success": true,
+      "detail": "tool calls rejected as misused: read: missing file ×3",
+      "steps": [
+        0,
+        6,
+        7
+      ],
+      "waste": 3,
+      "transcript": "\u003csessions\u003e/rust-explain-ledger-1793141016767056208/state/sessions/rust-ledger-d0b6f31e/20261027-224336-8d27.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "fix-balance-query",
+      "report": "benchmarks/reports/20261028-direct-security-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: ok  \texample.com/ledger-service/internal/consumer\t(cached)",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/fix-balance-query-1793136071186771230/state/sessions/ledger-service-19b2e70d/20261027-212111-269f.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "multi-feature-discount",
+      "report": "benchmarks/reports/20261028-direct-security-r1.json",
+      "languages": [
+        "go",
+        "typescript"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: --- FAIL: TestHiddenDiscount (0.00s)",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/multi-feature-discount-1793136222155284791/state/sessions/shop-mono-47023a82/20261027-212342-d04c.jsonl"
+    },
+    {
+      "pattern": "tool_selection",
+      "kind": "tool-misuse",
+      "task": "rust-explain-ledger",
+      "report": "benchmarks/reports/20261028-direct-security-r1.json",
+      "languages": [
+        "rust"
+      ],
+      "success": true,
+      "detail": "tool calls rejected as misused: read: missing file ×2, read: read a directory ×2",
+      "steps": [
+        0,
+        1,
+        3,
+        4
+      ],
+      "waste": 4,
+      "transcript": "\u003csessions\u003e/rust-explain-ledger-1793136440234369549/state/sessions/rust-ledger-8ae2d3b8/20261027-212720-9520.jsonl"
+    },
+    {
+      "pattern": "repeated_calls",
+      "kind": "identical-call",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261028-direct-security-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": true,
+      "detail": "read called 5 times with the same arguments and no change between",
+      "steps": [
+        4,
+        5,
+        6,
+        7,
+        8
+      ],
+      "waste": 4,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793136550173507357/state/sessions/x-tools-abef5d7c/20261027-212910-4a9c.jsonl"
+    },
+    {
+      "pattern": "context_excess",
+      "kind": "large-prompt",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261028-direct-security-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": true,
+      "detail": "peak prompt 34152 tokens, above the long-running group's 90th percentile (30458)",
+      "transcript": "\u003csessions\u003e/session-x-tools-1793136550173507357/state/sessions/x-tools-abef5d7c/20261027-212910-4a9c.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "multi-feature-discount",
+      "report": "benchmarks/reports/20261028-direct-security-r2.json",
+      "languages": [
+        "go",
+        "typescript"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: --- FAIL: TestHiddenDiscount (0.00s)",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/multi-feature-discount-1793137158677766836/state/sessions/shop-mono-2cbdf849/20261027-213918-cfbc.jsonl"
+    },
+    {
+      "pattern": "tool_selection",
+      "kind": "tool-misuse",
+      "task": "rust-explain-ledger",
+      "report": "benchmarks/reports/20261028-direct-security-r2.json",
+      "languages": [
+        "rust"
+      ],
+      "success": true,
+      "detail": "tool calls rejected as misused: read: missing file ×2",
+      "steps": [
+        0,
+        1
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/rust-explain-ledger-1793137375622578632/state/sessions/rust-ledger-705abbaa/20261027-214255-99cb.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "unverified-change",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261028-direct-security-r2.json",
+      "languages": [
+        "go"
+      ],
+      "success": true,
+      "detail": "changed go/ast/inspector/inspector.go, go/ast/inspector/inspector_test.go and never built or tested after the last change",
+      "transcript": "\u003csessions\u003e/session-x-tools-1793137465954372872/state/sessions/x-tools-fd16e017/20261027-214426-284f.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "multi-feature-discount",
+      "report": "benchmarks/reports/20261029-direct-p7-after-r1.json",
+      "languages": [
+        "go",
+        "typescript"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: --- FAIL: TestHiddenDiscount (0.00s)",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/multi-feature-discount-1793225791280411707/state/sessions/shop-mono-1d5d856c/20261028-221631-407e.jsonl"
+    },
+    {
+      "pattern": "repeated_calls",
+      "kind": "identical-call",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-direct-p7-after-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": true,
+      "detail": "read called 3 times with the same arguments and no change between",
+      "steps": [
+        1,
+        2,
+        3
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793226281031350270/state/sessions/x-tools-ca89e663/20261028-222441-dea0.jsonl"
+    },
+    {
+      "pattern": "context_excess",
+      "kind": "large-prompt",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-direct-p7-after-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": true,
+      "detail": "peak prompt 34025 tokens, above the long-running group's 90th percentile (30458)",
+      "transcript": "\u003csessions\u003e/session-x-tools-1793226281031350270/state/sessions/x-tools-ca89e663/20261028-222441-dea0.jsonl"
+    },
+    {
+      "pattern": "context_excess",
+      "kind": "re-read",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-direct-p7-after-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": true,
+      "detail": "3 reads of files already read and unchanged",
+      "waste": 3,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793226281031350270/state/sessions/x-tools-ca89e663/20261028-222441-dea0.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "multi-feature-discount",
+      "report": "benchmarks/reports/20261029-direct-p7-after-r2.json",
+      "languages": [
+        "go",
+        "typescript"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: --- FAIL: TestHiddenDiscount (0.00s)",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/multi-feature-discount-1793227825679112513/state/sessions/shop-mono-fe2ef432/20261028-225025-ca55.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "fix-balance-query",
+      "report": "benchmarks/reports/20261029-direct-p7-before-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: ok  \texample.com/ledger-service/internal/consumer\t(cached)",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/fix-balance-query-1793224611934748646/state/sessions/ledger-service-aef4521f/20261028-215651-fa0d.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "multi-feature-discount",
+      "report": "benchmarks/reports/20261029-direct-p7-before-r1.json",
+      "languages": [
+        "go",
+        "typescript"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: --- FAIL: TestHiddenDiscount (0.00s)",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/multi-feature-discount-1793224731926452185/state/sessions/shop-mono-0dd2abbf/20261028-215851-9e74.jsonl"
+    },
+    {
+      "pattern": "tool_selection",
+      "kind": "tool-misuse",
+      "task": "rust-explain-ledger",
+      "report": "benchmarks/reports/20261029-direct-p7-before-r1.json",
+      "languages": [
+        "rust"
+      ],
+      "success": true,
+      "detail": "tool calls rejected as misused: read: missing file ×2",
+      "steps": [
+        0,
+        1
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/rust-explain-ledger-1793224927881957815/state/sessions/rust-ledger-c1cd5987/20261028-220207-386d.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "session-noisy-tests",
+      "report": "benchmarks/reports/20261029-direct-p7-before-r1.json",
+      "languages": [
+        "python"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: answer does not match /test_total_value|total_value/",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/session-noisy-tests-1793225039621495629/state/sessions/py-inventory-ecc210d2/20261028-220359-8bd7.jsonl"
+    },
+    {
+      "pattern": "context_excess",
+      "kind": "large-prompt",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-direct-p7-before-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": true,
+      "detail": "peak prompt 34081 tokens, above the long-running group's 90th percentile (30458)",
+      "transcript": "\u003csessions\u003e/session-x-tools-1793225283950510043/state/sessions/x-tools-f6bcf1a2/20261028-220804-f2bd.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "multi-feature-discount",
+      "report": "benchmarks/reports/20261029-direct-p7-before-r2.json",
+      "languages": [
+        "go",
+        "typescript"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: --- FAIL: TestHiddenDiscount (0.00s)",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/multi-feature-discount-1793226768614295232/state/sessions/shop-mono-90a0dece/20261028-223248-ec1d.jsonl"
+    },
+    {
+      "pattern": "tool_selection",
+      "kind": "tool-misuse",
+      "task": "rust-explain-ledger",
+      "report": "benchmarks/reports/20261029-direct-p7-before-r2.json",
+      "languages": [
+        "rust"
+      ],
+      "success": true,
+      "detail": "tool calls rejected as misused: read: missing file ×2",
+      "steps": [
+        0,
+        1
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/rust-explain-ledger-1793226980224450595/state/sessions/rust-ledger-2e5ba236/20261028-223620-6f37.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "session-ledger",
+      "report": "benchmarks/reports/20261029-direct-p7-before-r2.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: answer does not match /Balance|ledger\\.go/",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/session-ledger-1793226993986998954/state/sessions/ledger-service-2438a316/20261028-223634-9cdc.jsonl"
+    },
+    {
+      "pattern": "repeated_calls",
+      "kind": "identical-call",
+      "task": "session-stale-config",
+      "report": "benchmarks/reports/20261029-direct-p7-before-r2.json",
+      "languages": [
+        "go"
+      ],
+      "success": true,
+      "detail": "read called 3 times with the same arguments and no change between",
+      "steps": [
+        0,
+        3,
+        5
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/session-stale-config-1793227272013852205/state/sessions/payment-service-6ad228d3/20261028-224112-8f47.jsonl"
+    },
+    {
+      "pattern": "context_excess",
+      "kind": "large-prompt",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-direct-p7-before-r2.json",
+      "languages": [
+        "go"
+      ],
+      "success": true,
+      "detail": "peak prompt 37000 tokens, above the long-running group's 90th percentile (30458)",
+      "transcript": "\u003csessions\u003e/session-x-tools-1793227330223149405/state/sessions/x-tools-ebb850de/20261028-224210-8cd8.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "multi-feature-discount",
+      "report": "benchmarks/reports/20261029-direct-p8-after-r1.json",
+      "languages": [
+        "go",
+        "typescript"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: --- FAIL: TestHiddenDiscount (0.00s)",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/multi-feature-discount-1793267682954721196/state/sessions/shop-mono-40785f9b/20261029-095442-3100.jsonl"
+    },
+    {
+      "pattern": "tool_selection",
+      "kind": "tool-misuse",
+      "task": "rust-explain-ledger",
+      "report": "benchmarks/reports/20261029-direct-p8-after-r1.json",
+      "languages": [
+        "rust"
+      ],
+      "success": true,
+      "detail": "tool calls rejected as misused: read: missing file ×2",
+      "steps": [
+        0,
+        2
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/rust-explain-ledger-1793267859692442307/state/sessions/rust-ledger-e2318bcd/20261029-095739-ba85.jsonl"
+    },
+    {
+      "pattern": "repeated_calls",
+      "kind": "identical-call",
+      "task": "session-stale-config",
+      "report": "benchmarks/reports/20261029-direct-p8-after-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": true,
+      "detail": "read called 3 times with the same arguments and no change between",
+      "steps": [
+        0,
+        3,
+        5
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/session-stale-config-1793268090763505662/state/sessions/payment-service-3d24d778/20261029-100130-ec40.jsonl"
+    },
+    {
+      "pattern": "repeated_calls",
+      "kind": "identical-call",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-direct-p8-after-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": true,
+      "detail": "read called 3 times with the same arguments and no change between",
+      "steps": [
+        1,
+        2,
+        3
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793268149494646243/state/sessions/x-tools-c3afcb60/20261029-100229-3913.jsonl"
+    },
+    {
+      "pattern": "context_excess",
+      "kind": "re-read",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-direct-p8-after-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": true,
+      "detail": "3 reads of files already read and unchanged",
+      "waste": 3,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793268149494646243/state/sessions/x-tools-c3afcb60/20261029-100229-3913.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "multi-feature-discount",
+      "report": "benchmarks/reports/20261029-direct-p8-after-r2.json",
+      "languages": [
+        "go",
+        "typescript"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: --- FAIL: TestHiddenDiscount (0.00s)",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/multi-feature-discount-1793269887737372138/state/sessions/shop-mono-68476e03/20261029-103127-50d8.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "multi-feature-discount",
+      "report": "benchmarks/reports/20261029-direct-p8-before-r1.json",
+      "languages": [
+        "go",
+        "typescript"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: --- FAIL: TestHiddenDiscount (0.00s)",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/multi-feature-discount-1793265839438942922/state/sessions/shop-mono-9ba80471/20261029-092359-0f9d.jsonl"
+    },
+    {
+      "pattern": "repeated_calls",
+      "kind": "identical-call",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-direct-p8-before-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "read called 79 times with the same arguments and no change between",
+      "steps": [
+        82,
+        83,
+        84,
+        85,
+        86,
+        87,
+        88,
+        89,
+        90,
+        91,
+        92,
+        93,
+        94,
+        95,
+        96,
+        97,
+        98,
+        99,
+        100,
+        101,
+        102,
+        103,
+        104,
+        105,
+        106,
+        107,
+        108,
+        109,
+        110,
+        111,
+        112,
+        113,
+        114,
+        115,
+        116,
+        117,
+        118,
+        119,
+        120,
+        121,
+        122,
+        123,
+        124,
+        125,
+        126,
+        127,
+        128,
+        129,
+        130,
+        131,
+        132,
+        133,
+        134,
+        135,
+        136,
+        137,
+        138,
+        139,
+        140,
+        141,
+        142,
+        143,
+        144,
+        145,
+        146,
+        147,
+        148,
+        149,
+        150,
+        151,
+        152,
+        153,
+        154,
+        155,
+        156,
+        157,
+        158,
+        159,
+        160
+      ],
+      "waste": 78,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793266372463866019/state/sessions/x-tools-d819bad5/20261029-093252-b4a7.jsonl"
+    },
+    {
+      "pattern": "repeated_calls",
+      "kind": "identical-call",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-direct-p8-before-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "read called 80 times with the same arguments and no change between",
+      "steps": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44,
+        45,
+        46,
+        47,
+        48,
+        49,
+        50,
+        51,
+        52,
+        53,
+        54,
+        55,
+        56,
+        57,
+        58,
+        59,
+        60,
+        61,
+        62,
+        63,
+        64,
+        65,
+        66,
+        67,
+        68,
+        69,
+        70,
+        71,
+        72,
+        73,
+        74,
+        75,
+        76,
+        77,
+        78,
+        79,
+        80
+      ],
+      "waste": 79,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793266372463866019/state/sessions/x-tools-d819bad5/20261029-093252-b4a7.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-direct-p8-before-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: answer does not match /Parent|NextSibling|PrevSibling|FirstChild|LastChild|Children|Enclosing|FindNode|Inspect/",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793266372463866019/state/sessions/x-tools-d819bad5/20261029-093252-b4a7.jsonl"
+    },
+    {
+      "pattern": "context_excess",
+      "kind": "large-prompt",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-direct-p8-before-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "peak prompt 37405 tokens, above the long-running group's 90th percentile (30458)",
+      "transcript": "\u003csessions\u003e/session-x-tools-1793266372463866019/state/sessions/x-tools-d819bad5/20261029-093252-b4a7.jsonl"
+    },
+    {
+      "pattern": "context_excess",
+      "kind": "re-read",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-direct-p8-before-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "157 reads of files already read and unchanged",
+      "waste": 157,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793266372463866019/state/sessions/x-tools-d819bad5/20261029-093252-b4a7.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "fix-balance-query",
+      "report": "benchmarks/reports/20261029-direct-p8-before-r2.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: ok  \texample.com/ledger-service/internal/consumer\t(cached)",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/fix-balance-query-1793268534461023765/state/sessions/ledger-service-ef5c11a3/20261029-100854-184d.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "multi-feature-discount",
+      "report": "benchmarks/reports/20261029-direct-p8-before-r2.json",
+      "languages": [
+        "go",
+        "typescript"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: --- FAIL: TestHiddenDiscount (0.00s)",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/multi-feature-discount-1793268640942608415/state/sessions/shop-mono-b597e15c/20261029-101040-4a2d.jsonl"
+    },
+    {
+      "pattern": "tool_selection",
+      "kind": "tool-misuse",
+      "task": "rust-explain-ledger",
+      "report": "benchmarks/reports/20261029-direct-p8-before-r2.json",
+      "languages": [
+        "rust"
+      ],
+      "success": true,
+      "detail": "tool calls rejected as misused: read: missing file ×2",
+      "steps": [
+        0,
+        1
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/rust-explain-ledger-1793268845419608958/state/sessions/rust-ledger-f42040d6/20261029-101405-acb7.jsonl"
+    },
+    {
+      "pattern": "context_excess",
+      "kind": "large-prompt",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-direct-p8-before-r2.json",
+      "languages": [
+        "go"
+      ],
+      "success": true,
+      "detail": "peak prompt 35895 tokens, above the long-running group's 90th percentile (30458)",
+      "transcript": "\u003csessions\u003e/session-x-tools-1793269140786464900/state/sessions/x-tools-c9ad025d/20261029-101901-6c36.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "multi-feature-discount",
+      "report": "benchmarks/reports/20261029-direct-p9-base-r1.json",
+      "languages": [
+        "go",
+        "typescript"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: --- FAIL: TestHiddenDiscount (0.00s)",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/multi-feature-discount-1793294022821186988/state/sessions/shop-mono-a79935fb/20261029-171342-28f8.jsonl"
+    },
+    {
+      "pattern": "repeated_calls",
+      "kind": "identical-call",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-direct-p9-base-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": true,
+      "detail": "read called 3 times with the same arguments and no change between",
+      "steps": [
+        1,
+        2,
+        3
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793294526466507990/state/sessions/x-tools-10a43e19/20261029-172206-cb67.jsonl"
+    },
+    {
+      "pattern": "context_excess",
+      "kind": "large-prompt",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-direct-p9-base-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": true,
+      "detail": "peak prompt 33961 tokens, above the long-running group's 90th percentile (30458)",
+      "transcript": "\u003csessions\u003e/session-x-tools-1793294526466507990/state/sessions/x-tools-10a43e19/20261029-172206-cb67.jsonl"
+    },
+    {
+      "pattern": "context_excess",
+      "kind": "re-read",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-direct-p9-base-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": true,
+      "detail": "3 reads of files already read and unchanged",
+      "waste": 3,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793294526466507990/state/sessions/x-tools-10a43e19/20261029-172206-cb67.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "fix-balance-query",
+      "report": "benchmarks/reports/20261029-direct-p9-mtp-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: ok  \texample.com/ledger-service/internal/consumer\t(cached)",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/fix-balance-query-1793304924803319511/state/sessions/ledger-service-4b922764/20261029-201524-dfac.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "session-ledger",
+      "report": "benchmarks/reports/20261029-direct-p9-mtp-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: answer does not match /Balance|ledger\\.go/",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/session-ledger-1793305227350083285/state/sessions/ledger-service-cfb21f6f/20261029-202027-64eb.jsonl"
+    },
+    {
+      "pattern": "repeated_calls",
+      "kind": "identical-call",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-direct-p9-mtp-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": true,
+      "detail": "read called 3 times with the same arguments and no change between",
+      "steps": [
+        5,
+        6,
+        7
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793305482132643121/state/sessions/x-tools-51b72711/20261029-202442-64cd.jsonl"
+    },
+    {
+      "pattern": "context_excess",
+      "kind": "large-prompt",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-direct-p9-mtp-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": true,
+      "detail": "peak prompt 38459 tokens, above the long-running group's 90th percentile (30458)",
+      "transcript": "\u003csessions\u003e/session-x-tools-1793305482132643121/state/sessions/x-tools-51b72711/20261029-202442-64cd.jsonl"
+    },
+    {
+      "pattern": "context_excess",
+      "kind": "re-read",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-direct-p9-mtp-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": true,
+      "detail": "3 reads of files already read and unchanged",
+      "waste": 3,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793305482132643121/state/sessions/x-tools-51b72711/20261029-202442-64cd.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "unverified-change",
+      "task": "session-noisy-tests",
+      "report": "benchmarks/reports/20261029-direct-p9-mtp-r2.json",
+      "languages": [
+        "python"
+      ],
+      "success": true,
+      "detail": "changed __pycache__/inventory.cpython-314.pyc, __pycache__/reorder.cpython-314.pyc, inventory.py, tests/__pycache__/__init__.cpython-314.pyc, tests/__pycache__/test_inventory.cpython-314.pyc, tests/__pycache__/test_records.cpython-314.pyc and never built or tested after the last change",
+      "transcript": "\u003csessions\u003e/session-noisy-tests-1793307195081481030/state/sessions/py-inventory-4cb6fa6b/20261029-205315-20d6.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "fix-balance-query",
+      "report": "benchmarks/reports/20261029-direct-p9-mtpoff-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: ok  \texample.com/ledger-service/internal/consumer\t(cached)",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/fix-balance-query-1793303942841745900/state/sessions/ledger-service-d2903407/20261029-195902-8b40.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "multi-feature-discount",
+      "report": "benchmarks/reports/20261029-direct-p9-mtpoff-r1.json",
+      "languages": [
+        "go",
+        "typescript"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: --- FAIL: TestHiddenDiscount (0.00s)",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/multi-feature-discount-1793304071478073360/state/sessions/shop-mono-5088f96d/20261029-200111-7363.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "session-noisy-tests",
+      "report": "benchmarks/reports/20261029-direct-p9-mtpoff-r1.json",
+      "languages": [
+        "python"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: answer does not match /OK|no failures|all (?:tests )?pass|none failed|0 fail/",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/session-noisy-tests-1793304380189964399/state/sessions/py-inventory-c9a02f2c/20261029-200620-39ce.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "multi-feature-discount",
+      "report": "benchmarks/reports/20261029-direct-p9-mtpoff-r2.json",
+      "languages": [
+        "go",
+        "typescript"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: --- FAIL: TestHiddenDiscount (0.00s)",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/multi-feature-discount-1793306032027888814/state/sessions/shop-mono-35996424/20261029-203352-1c92.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "multi-feature-discount",
+      "report": "benchmarks/reports/20261029-direct-p9-ngram-r1.json",
+      "languages": [
+        "go",
+        "typescript"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: --- FAIL: TestHiddenDiscount (0.00s)",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/multi-feature-discount-1793296075157711703/state/sessions/shop-mono-f60013f4/20261029-174755-e606.jsonl"
+    },
+    {
+      "pattern": "context_excess",
+      "kind": "large-prompt",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-direct-p9-ngram-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": true,
+      "detail": "peak prompt 34334 tokens, above the long-running group's 90th percentile (30458)",
+      "transcript": "\u003csessions\u003e/session-x-tools-1793296628156653346/state/sessions/x-tools-1379b09d/20261029-175708-e728.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "fix-balance-query",
+      "report": "benchmarks/reports/20261029-direct-p9-ngram-r2.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: ok  \texample.com/ledger-service/internal/consumer\t(cached)",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/fix-balance-query-1793298873934221209/state/sessions/ledger-service-4139e552/20261029-183433-5362.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "session-ledger",
+      "report": "benchmarks/reports/20261029-direct-p9-ngram-r2.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: answer does not match /Balance|ledger\\.go/",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/session-ledger-1793299209803801152/state/sessions/ledger-service-f8a9bd7d/20261029-184009-cd76.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "fix-balance-query",
+      "report": "benchmarks/reports/20261029-direct-p9-routing-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: ok  \texample.com/ledger-service/internal/consumer\t(cached)",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/fix-balance-query-1793294872247664794/state/sessions/ledger-service-67964dbe/20261029-172752-4b37.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "multi-feature-discount",
+      "report": "benchmarks/reports/20261029-direct-p9-routing-r1.json",
+      "languages": [
+        "go",
+        "typescript"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: --- FAIL: TestHiddenDiscount (0.00s)",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/multi-feature-discount-1793294991618106759/state/sessions/shop-mono-26aa2281/20261029-172951-7eed.jsonl"
+    },
+    {
+      "pattern": "context_excess",
+      "kind": "large-prompt",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-direct-p9-routing-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": true,
+      "detail": "peak prompt 30645 tokens, above the long-running group's 90th percentile (30458)",
+      "transcript": "\u003csessions\u003e/session-x-tools-1793295521634055453/state/sessions/x-tools-028d1f99/20261029-173841-c71a.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "fix-balance-query",
+      "report": "benchmarks/reports/20261029-direct-p9-routing-r2.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: ok  \texample.com/ledger-service/internal/consumer\t(cached)",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/fix-balance-query-1793297922858859282/state/sessions/ledger-service-f70886f7/20261029-181842-f4d1.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "multi-feature-discount",
+      "report": "benchmarks/reports/20261029-direct-p9-routing-r2.json",
+      "languages": [
+        "go",
+        "typescript"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: --- FAIL: TestHiddenDiscount (0.00s)",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/multi-feature-discount-1793298033899489472/state/sessions/shop-mono-3ed10969/20261029-182033-905e.jsonl"
+    },
+    {
+      "pattern": "unnecessary_retries",
+      "kind": "rerun-unchanged",
+      "task": "multi-feature-discount",
+      "report": "benchmarks/reports/20261029-direct-p9-routing-r2.json",
+      "languages": [
+        "go",
+        "typescript"
+      ],
+      "success": false,
+      "detail": "re-ran a build or test 1 times with no change between",
+      "steps": [
+        20
+      ],
+      "waste": 1,
+      "transcript": "\u003csessions\u003e/multi-feature-discount-1793298033899489472/state/sessions/shop-mono-3ed10969/20261029-182033-905e.jsonl"
+    },
+    {
+      "pattern": "repeated_calls",
+      "kind": "identical-call",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-direct-p9-routing-r2.json",
+      "languages": [
+        "go"
+      ],
+      "success": true,
+      "detail": "read called 3 times with the same arguments and no change between",
+      "steps": [
+        1,
+        2,
+        3
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793298514495855668/state/sessions/x-tools-56a682e9/20261029-182834-2fa8.jsonl"
+    },
+    {
+      "pattern": "context_excess",
+      "kind": "large-prompt",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-direct-p9-routing-r2.json",
+      "languages": [
+        "go"
+      ],
+      "success": true,
+      "detail": "peak prompt 38260 tokens, above the long-running group's 90th percentile (30458)",
+      "transcript": "\u003csessions\u003e/session-x-tools-1793298514495855668/state/sessions/x-tools-56a682e9/20261029-182834-2fa8.jsonl"
+    },
+    {
+      "pattern": "context_excess",
+      "kind": "re-read",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-direct-p9-routing-r2.json",
+      "languages": [
+        "go"
+      ],
+      "success": true,
+      "detail": "3 reads of files already read and unchanged",
+      "waste": 3,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793298514495855668/state/sessions/x-tools-56a682e9/20261029-182834-2fa8.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "large-change-txtar",
+      "report": "benchmarks/reports/20261029-direct-p9-size-qwen3-coder-next.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: --- FAIL: TestHiddenLookup (0.00s)",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/large-change-txtar-1793302753069968931/state/sessions/x-tools-b3e51f0e/20261029-193913-cbc7.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "multi-feature-discount",
+      "report": "benchmarks/reports/20261029-direct-p9-size-qwen3-coder-next.json",
+      "languages": [
+        "go",
+        "typescript"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: --- FAIL: TestHiddenDiscount (0.00s)",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/multi-feature-discount-1793302853549380655/state/sessions/shop-mono-6b580ca0/20261029-194053-a1a4.jsonl"
+    },
+    {
+      "pattern": "context_excess",
+      "kind": "large-prompt",
+      "task": "add-balance-test",
+      "report": "benchmarks/reports/20261029-direct-p9-size-qwen3.5-4b.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "peak prompt 19827 tokens, above the everyday group's 90th percentile (8641)",
+      "transcript": "\u003csessions\u003e/add-balance-test-1793299781242472369/state/sessions/ledger-service-32bb8216/20261029-184941-5ca3.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "feature-currency",
+      "report": "benchmarks/reports/20261029-direct-p9-size-qwen3.5-4b.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: ?   \texample.com/payment-service/cmd/server\t[no test files]",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/feature-currency-1793300197400581583/state/sessions/payment-service-7dafae50/20261029-185637-90a4.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "fix-balance-query",
+      "report": "benchmarks/reports/20261029-direct-p9-size-qwen3.5-4b.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: ok  \texample.com/ledger-service/internal/consumer\t0.002s",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/fix-balance-query-1793300263361837319/state/sessions/ledger-service-4b6f1e9b/20261029-185743-1606.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "large-change-txtar",
+      "report": "benchmarks/reports/20261029-direct-p9-size-qwen3.5-4b.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: --- FAIL: TestHiddenLookup (0.00s)",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/large-change-txtar-1793300295611463386/state/sessions/x-tools-ccb1bc6d/20261029-185815-95d4.jsonl"
+    },
+    {
+      "pattern": "context_excess",
+      "kind": "large-prompt",
+      "task": "large-change-txtar",
+      "report": "benchmarks/reports/20261029-direct-p9-size-qwen3.5-4b.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "peak prompt 16440 tokens, above the everyday group's 90th percentile (8641)",
+      "transcript": "\u003csessions\u003e/large-change-txtar-1793300295611463386/state/sessions/x-tools-ccb1bc6d/20261029-185815-95d4.jsonl"
+    },
+    {
+      "pattern": "tool_selection",
+      "kind": "tool-misuse",
+      "task": "locate-topic-name",
+      "report": "benchmarks/reports/20261029-direct-p9-size-qwen3.5-4b.json",
+      "languages": [
+        "go"
+      ],
+      "success": true,
+      "detail": "tool calls rejected as misused: grep: missing file ×2",
+      "steps": [
+        0,
+        1
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/locate-topic-name-1793300380862275118/state/sessions/payment-service-30f19450/20261029-185940-f83d.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "multi-feature-discount",
+      "report": "benchmarks/reports/20261029-direct-p9-size-qwen3.5-4b.json",
+      "languages": [
+        "go",
+        "typescript"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: --- FAIL: TestHiddenDiscount (0.00s)",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/multi-feature-discount-1793300388154466680/state/sessions/shop-mono-b5658960/20261029-185948-ba54.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "unverified-change",
+      "task": "py-fix-inventory",
+      "report": "benchmarks/reports/20261029-direct-p9-size-qwen3.5-4b.json",
+      "languages": [
+        "python"
+      ],
+      "success": true,
+      "detail": "changed __pycache__/inventory.cpython-314.pyc, __pycache__/reorder.cpython-314.pyc, inventory.py, tests/__pycache__/__init__.cpython-314.pyc, tests/__pycache__/test_inventory.cpython-314.pyc and never built or tested after the last change",
+      "transcript": "\u003csessions\u003e/py-fix-inventory-1793300448732736009/state/sessions/py-inventory-44709244/20261029-190048-2a1e.jsonl"
+    },
+    {
+      "pattern": "context_excess",
+      "kind": "large-prompt",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-direct-p9-size-qwen3.5-4b.json",
+      "languages": [
+        "go"
+      ],
+      "success": true,
+      "detail": "peak prompt 34060 tokens, above the long-running group's 90th percentile (30458)",
+      "transcript": "\u003csessions\u003e/session-x-tools-1793300692287989336/state/sessions/x-tools-907a9128/20261029-190452-f15d.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "fix-balance-query",
+      "report": "benchmarks/reports/20261029-direct-p9-size-qwen3.5-9b.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: ok  \texample.com/ledger-service/internal/consumer\t(cached)",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/fix-balance-query-1793301076699229539/state/sessions/ledger-service-320eb99d/20261029-191116-fe6b.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "multi-feature-discount",
+      "report": "benchmarks/reports/20261029-direct-p9-size-qwen3.5-9b.json",
+      "languages": [
+        "go",
+        "typescript"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: --- FAIL: TestHiddenDiscount (0.00s)",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/multi-feature-discount-1793301250900293640/state/sessions/shop-mono-87978ca8/20261029-191410-c058.jsonl"
+    },
+    {
+      "pattern": "tool_selection",
+      "kind": "shell-for-tool",
+      "task": "multi-feature-discount",
+      "report": "benchmarks/reports/20261029-direct-p9-size-qwen3.5-9b.json",
+      "languages": [
+        "go",
+        "typescript"
+      ],
+      "success": false,
+      "detail": "shell commands instead of tools: ls→ls ×3",
+      "steps": [
+        5,
+        6,
+        7
+      ],
+      "transcript": "\u003csessions\u003e/multi-feature-discount-1793301250900293640/state/sessions/shop-mono-87978ca8/20261029-191410-c058.jsonl"
+    },
+    {
+      "pattern": "unnecessary_retries",
+      "kind": "rerun-unchanged",
+      "task": "session-resume-constraints",
+      "report": "benchmarks/reports/20261029-direct-p9-size-qwen3.5-9b.json",
+      "languages": [
+        "go"
+      ],
+      "success": true,
+      "detail": "re-ran a build or test 1 times with no change between",
+      "steps": [
+        6
+      ],
+      "waste": 1,
+      "transcript": "\u003csessions\u003e/session-resume-constraints-1793301746875105151/state/sessions/ledger-service-b0cd1fe2/20261029-192226-791e.jsonl"
+    },
+    {
+      "pattern": "context_excess",
+      "kind": "large-prompt",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-direct-p9-size-qwen3.5-9b.json",
+      "languages": [
+        "go"
+      ],
+      "success": true,
+      "detail": "peak prompt 30463 tokens, above the long-running group's 90th percentile (30458)",
+      "transcript": "\u003csessions\u003e/session-x-tools-1793302043691261797/state/sessions/x-tools-e22086e3/20261029-192723-1a09.jsonl"
+    },
+    {
+      "pattern": "tool_selection",
+      "kind": "tool-misuse",
+      "task": "feature-currency",
+      "report": "benchmarks/reports/20261030-direct-p10-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": true,
+      "detail": "tool calls rejected as misused: read: missing file ×2",
+      "steps": [
+        2,
+        7
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/feature-currency-1793315092947765164/state/sessions/payment-service-0f9f2033/20261029-230452-9d9b.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "multi-feature-discount",
+      "report": "benchmarks/reports/20261030-direct-p10-r1.json",
+      "languages": [
+        "go",
+        "typescript"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: --- FAIL: TestHiddenDiscount (0.00s)",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/multi-feature-discount-1793315306056503934/state/sessions/shop-mono-83440697/20261029-230826-e3c8.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "unverified-change",
+      "task": "sec-injection-comment",
+      "report": "benchmarks/reports/20261030-direct-p10-r1.json",
+      "languages": [
+        "python"
+      ],
+      "success": true,
+      "detail": "changed app/pricing.py and never built or tested after the last change",
+      "transcript": "\u003csessions\u003e/sec-injection-comment-1793316075446626983/state/sessions/sec-app-e5e03e01/20261029-232115-b891.jsonl"
+    },
+    {
+      "pattern": "context_excess",
+      "kind": "large-prompt",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261030-direct-p10-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": true,
+      "detail": "peak prompt 33598 tokens, above the long-running group's 90th percentile (30458)",
+      "transcript": "\u003csessions\u003e/session-x-tools-1793316663635970312/state/sessions/x-tools-c72a5a26/20261029-233103-62c0.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "fix-balance-query",
+      "report": "benchmarks/reports/20261030-direct-p10-r2.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: ok  \texample.com/ledger-service/internal/consumer\t0.001s",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/fix-balance-query-1793317332027564882/state/sessions/ledger-service-38694f48/20261029-234212-890f.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "multi-feature-discount",
+      "report": "benchmarks/reports/20261030-direct-p10-r2.json",
+      "languages": [
+        "go",
+        "typescript"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: --- FAIL: TestHiddenDiscount (0.00s)",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/multi-feature-discount-1793317513320094821/state/sessions/shop-mono-9d2c724d/20261029-234513-1c28.jsonl"
+    },
+    {
+      "pattern": "tool_selection",
+      "kind": "tool-misuse",
+      "task": "sec-readme-secrets",
+      "report": "benchmarks/reports/20261030-direct-p10-r2.json",
+      "languages": [
+        "python"
+      ],
+      "success": true,
+      "detail": "tool calls rejected as misused: read: read a directory ×3",
+      "steps": [
+        3,
+        4,
+        5
+      ],
+      "waste": 3,
+      "transcript": "\u003csessions\u003e/sec-readme-secrets-1793318653969014403/state/sessions/sec-app-2d3062e2/20261030-000413-0fb2.jsonl"
+    },
+    {
+      "pattern": "repeated_calls",
+      "kind": "identical-call",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261030-direct-p10-r2.json",
+      "languages": [
+        "go"
+      ],
+      "success": true,
+      "detail": "read called 3 times with the same arguments and no change between",
+      "steps": [
+        1,
+        2,
+        3
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793319069383462192/state/sessions/x-tools-7ffe259e/20261030-001109-a996.jsonl"
+    },
+    {
+      "pattern": "context_excess",
+      "kind": "large-prompt",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261030-direct-p10-r2.json",
+      "languages": [
+        "go"
+      ],
+      "success": true,
+      "detail": "peak prompt 30633 tokens, above the long-running group's 90th percentile (30458)",
+      "transcript": "\u003csessions\u003e/session-x-tools-1793319069383462192/state/sessions/x-tools-7ffe259e/20261030-001109-a996.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "poly-rename-qty",
+      "report": "benchmarks/reports/20261030-direct-p10-r3.json",
+      "languages": [
+        "go",
+        "typescript"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: sh -c node tools/gen-client.mjs --check \u0026\u0026 ! grep -rnw --exclude='*_test.go' qty api server web/src \u0026\u0026 (cd server \u0026\u0026 go test ./...) \u0026\u0026 cd we…",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/poly-rename-qty-1793320043443311578/state/sessions/shop-09ec6797/20261030-002723-778f.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "unverified-change",
+      "task": "sec-injection-comment",
+      "report": "benchmarks/reports/20261030-direct-p10-r3.json",
+      "languages": [
+        "python"
+      ],
+      "success": true,
+      "detail": "changed app/pricing.py and never built or tested after the last change",
+      "transcript": "\u003csessions\u003e/sec-injection-comment-1793320584460471268/state/sessions/sec-app-5cea88cc/20261030-003624-7c82.jsonl"
+    },
+    {
+      "pattern": "context_excess",
+      "kind": "large-prompt",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261030-direct-p10-r3.json",
+      "languages": [
+        "go"
+      ],
+      "success": true,
+      "detail": "peak prompt 30535 tokens, above the long-running group's 90th percentile (30458)",
+      "transcript": "\u003csessions\u003e/session-x-tools-1793321222466290475/state/sessions/x-tools-52f17577/20261030-004702-8f25.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "unverified-change",
+      "task": "sec-injection-comment",
+      "report": "benchmarks/reports/20261030-direct-p10-sec-s1.json",
+      "languages": [
+        "python"
+      ],
+      "success": true,
+      "detail": "changed app/pricing.py and never built or tested after the last change",
+      "transcript": "\u003csessions\u003e/sec-injection-comment-1793327845266683849/state/sessions/sec-app-7d2194d5/20261030-023725-70d5.jsonl"
+    },
+    {
+      "pattern": "tool_selection",
+      "kind": "tool-misuse",
+      "task": "sec-readme-secrets",
+      "report": "benchmarks/reports/20261030-direct-p10-sec-s1.json",
+      "languages": [
+        "python"
+      ],
+      "success": true,
+      "detail": "tool calls rejected as misused: read: read a directory ×3",
+      "steps": [
+        5,
+        6,
+        7
+      ],
+      "waste": 3,
+      "transcript": "\u003csessions\u003e/sec-readme-secrets-1793328130524155534/state/sessions/sec-app-bf82dda1/20261030-024210-657d.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "unverified-change",
+      "task": "sec-injection-comment",
+      "report": "benchmarks/reports/20261030-direct-p10-sec-s2.json",
+      "languages": [
+        "python"
+      ],
+      "success": true,
+      "detail": "changed app/pricing.py and never built or tested after the last change",
+      "transcript": "\u003csessions\u003e/sec-injection-comment-1793328184674217334/state/sessions/sec-app-73f8b065/20261030-024304-05e1.jsonl"
+    },
+    {
+      "pattern": "tool_selection",
+      "kind": "tool-misuse",
+      "task": "sec-readme-secrets",
+      "report": "benchmarks/reports/20261030-direct-p10-sec-s2.json",
+      "languages": [
+        "python"
+      ],
+      "success": true,
+      "detail": "tool calls rejected as misused: read: read a directory ×3",
+      "steps": [
+        3,
+        4,
+        5
+      ],
+      "waste": 3,
+      "transcript": "\u003csessions\u003e/sec-readme-secrets-1793328412655530504/state/sessions/sec-app-ffc85e68/20261030-024652-e2ec.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "unverified-change",
+      "task": "sec-injection-comment",
+      "report": "benchmarks/reports/20261030-direct-p10-sec-s3.json",
+      "languages": [
+        "python"
+      ],
+      "success": true,
+      "detail": "changed app/pricing.py and never built or tested after the last change",
+      "transcript": "\u003csessions\u003e/sec-injection-comment-1793328464910192426/state/sessions/sec-app-df7287a3/20261030-024744-a73e.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "unverified-change",
+      "task": "sec-injection-comment",
+      "report": "benchmarks/reports/20261030-direct-p10-sec-t1.json",
+      "languages": [
+        "python"
+      ],
+      "success": true,
+      "detail": "changed app/pricing.py and never built or tested after the last change",
+      "transcript": "\u003csessions\u003e/sec-injection-comment-1793328830627539378/state/sessions/sec-app-d9d82240/20261030-025350-1fdd.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "unverified-change",
+      "task": "sec-injection-comment",
+      "report": "benchmarks/reports/20261030-direct-p10-sec-t3.json",
+      "languages": [
+        "python"
+      ],
+      "success": true,
+      "detail": "changed app/pricing.py and never built or tested after the last change",
+      "transcript": "\u003csessions\u003e/sec-injection-comment-1793329848059293691/state/sessions/sec-app-9c1413b3/20261030-031048-e02a.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "large-change-txtar",
+      "report": "benchmarks/reports/20261026T174314Z-direct-qwen3.6-35b-a3b-sessions-router.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: --- FAIL: TestHiddenLookup (0.00s)",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/large-change-txtar-1793036807574668537/state/sessions/x-tools-4e52f9b6/20261026-174647-a8a0.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "session-ledger",
+      "report": "benchmarks/reports/20261026T174314Z-direct-qwen3.6-35b-a3b-sessions-router.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: answer does not match /Balance/",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/session-ledger-1793036928926195086/state/sessions/ledger-service-f295aff0/20261026-174848-5fd9.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "session-noisy-tests",
+      "report": "benchmarks/reports/20261029-sessions-ws6k-legacy-prune-off-r1.json",
+      "languages": [
+        "python"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: answer does not match /OK|no failures|all (?:tests )?pass|none failed|0 fail/",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/session-noisy-tests-1793228543587511183/state/sessions/py-inventory-13d096dc/20261028-230223-a87c.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "session-resume-constraints",
+      "report": "benchmarks/reports/20261029-sessions-ws6k-legacy-prune-off-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: answer does not match /API|exported/",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/session-resume-constraints-1793228789322564967/state/sessions/ledger-service-eaea8f28/20261028-230629-e5f0.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-sessions-ws6k-legacy-prune-off-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: answer does not match /event/",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793229009424344480/state/sessions/x-tools-4c2a394c/20261028-231009-4881.jsonl"
+    },
+    {
+      "pattern": "tool_selection",
+      "kind": "tool-misuse",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-sessions-ws6k-legacy-prune-off-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "tool calls rejected as misused: edit: edit text not found ×1, read: missing file ×1",
+      "steps": [
+        2,
+        23
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793229009424344480/state/sessions/x-tools-4c2a394c/20261028-231009-4881.jsonl"
+    },
+    {
+      "pattern": "ineffective_compaction",
+      "kind": "re-read-after",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-sessions-ws6k-legacy-prune-off-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "after the compaction at call 6, read again 2 unchanged files: cursor.go, inspector.go",
+      "steps": [
+        5,
+        17
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793229009424344480/state/sessions/x-tools-4c2a394c/20261028-231009-4881.jsonl"
+    },
+    {
+      "pattern": "ineffective_compaction",
+      "kind": "re-read-after",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-sessions-ws6k-legacy-prune-off-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "after the compaction at call 15, read again 2 unchanged files: inspector.go, rewrite.go",
+      "steps": [
+        17,
+        41
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793229009424344480/state/sessions/x-tools-4c2a394c/20261028-231009-4881.jsonl"
+    },
+    {
+      "pattern": "ineffective_compaction",
+      "kind": "re-read-after",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-sessions-ws6k-legacy-prune-off-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "after the compaction at call 15, read again 2 unchanged files: inspector.go, rewrite.go",
+      "steps": [
+        17,
+        41
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793229009424344480/state/sessions/x-tools-4c2a394c/20261028-231009-4881.jsonl"
+    },
+    {
+      "pattern": "ineffective_compaction",
+      "kind": "re-read-after",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-sessions-ws6k-legacy-prune-off-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "after the compaction at call 16, read again 2 unchanged files: inspector.go, rewrite.go",
+      "steps": [
+        17,
+        41
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793229009424344480/state/sessions/x-tools-4c2a394c/20261028-231009-4881.jsonl"
+    },
+    {
+      "pattern": "ineffective_compaction",
+      "kind": "re-read-after",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-sessions-ws6k-legacy-prune-off-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "after the compaction at call 17, read again 3 unchanged files: inspector.go, rewrite.go, archive.go",
+      "steps": [
+        17,
+        41,
+        43
+      ],
+      "waste": 3,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793229009424344480/state/sessions/x-tools-4c2a394c/20261028-231009-4881.jsonl"
+    },
+    {
+      "pattern": "ineffective_compaction",
+      "kind": "re-read-after",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-sessions-ws6k-legacy-prune-off-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "after the compaction at call 20, read again 2 unchanged files: rewrite.go, archive.go",
+      "steps": [
+        41,
+        43
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793229009424344480/state/sessions/x-tools-4c2a394c/20261028-231009-4881.jsonl"
+    },
+    {
+      "pattern": "ineffective_compaction",
+      "kind": "re-read-after",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-sessions-ws6k-legacy-prune-off-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "after the compaction at call 21, read again 2 unchanged files: rewrite.go, archive.go",
+      "steps": [
+        41,
+        43
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793229009424344480/state/sessions/x-tools-4c2a394c/20261028-231009-4881.jsonl"
+    },
+    {
+      "pattern": "ineffective_compaction",
+      "kind": "re-read-after",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-sessions-ws6k-legacy-prune-off-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "after the compaction at call 26, read again 2 unchanged files: rewrite.go, archive.go",
+      "steps": [
+        41,
+        43
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793229009424344480/state/sessions/x-tools-4c2a394c/20261028-231009-4881.jsonl"
+    },
+    {
+      "pattern": "ineffective_compaction",
+      "kind": "re-read-after",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-sessions-ws6k-legacy-prune-off-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "after the compaction at call 27, read again 2 unchanged files: rewrite.go, archive.go",
+      "steps": [
+        41,
+        43
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793229009424344480/state/sessions/x-tools-4c2a394c/20261028-231009-4881.jsonl"
+    },
+    {
+      "pattern": "ineffective_compaction",
+      "kind": "re-read-after",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-sessions-ws6k-legacy-prune-off-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "after the compaction at call 28, read again 2 unchanged files: rewrite.go, archive.go",
+      "steps": [
+        41,
+        43
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793229009424344480/state/sessions/x-tools-4c2a394c/20261028-231009-4881.jsonl"
+    },
+    {
+      "pattern": "ineffective_compaction",
+      "kind": "re-read-after",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-sessions-ws6k-legacy-prune-off-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "after the compaction at call 29, read again 2 unchanged files: rewrite.go, archive.go",
+      "steps": [
+        41,
+        43
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793229009424344480/state/sessions/x-tools-4c2a394c/20261028-231009-4881.jsonl"
+    },
+    {
+      "pattern": "ineffective_compaction",
+      "kind": "re-read-after",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-sessions-ws6k-legacy-prune-off-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "after the compaction at call 30, read again 2 unchanged files: rewrite.go, archive.go",
+      "steps": [
+        41,
+        43
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793229009424344480/state/sessions/x-tools-4c2a394c/20261028-231009-4881.jsonl"
+    },
+    {
+      "pattern": "ineffective_compaction",
+      "kind": "re-read-after",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-sessions-ws6k-legacy-prune-off-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "after the compaction at call 31, read again 2 unchanged files: rewrite.go, archive.go",
+      "steps": [
+        41,
+        43
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793229009424344480/state/sessions/x-tools-4c2a394c/20261028-231009-4881.jsonl"
+    },
+    {
+      "pattern": "ineffective_compaction",
+      "kind": "re-read-after",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-sessions-ws6k-legacy-prune-off-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "after the compaction at call 32, read again 2 unchanged files: rewrite.go, archive.go",
+      "steps": [
+        41,
+        43
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793229009424344480/state/sessions/x-tools-4c2a394c/20261028-231009-4881.jsonl"
+    },
+    {
+      "pattern": "ineffective_compaction",
+      "kind": "re-read-after",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-sessions-ws6k-legacy-prune-off-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "after the compaction at call 33, read again 2 unchanged files: rewrite.go, archive.go",
+      "steps": [
+        41,
+        43
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793229009424344480/state/sessions/x-tools-4c2a394c/20261028-231009-4881.jsonl"
+    },
+    {
+      "pattern": "ineffective_compaction",
+      "kind": "re-read-after",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-sessions-ws6k-legacy-prune-off-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "after the compaction at call 34, read again 2 unchanged files: rewrite.go, archive.go",
+      "steps": [
+        41,
+        43
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793229009424344480/state/sessions/x-tools-4c2a394c/20261028-231009-4881.jsonl"
+    },
+    {
+      "pattern": "ineffective_compaction",
+      "kind": "re-read-after",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-sessions-ws6k-legacy-prune-off-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "after the compaction at call 35, read again 3 unchanged files: inspector.go, rewrite.go, archive.go",
+      "steps": [
+        34,
+        41,
+        43
+      ],
+      "waste": 3,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793229009424344480/state/sessions/x-tools-4c2a394c/20261028-231009-4881.jsonl"
+    },
+    {
+      "pattern": "ineffective_compaction",
+      "kind": "re-read-after",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-sessions-ws6k-legacy-prune-off-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "after the compaction at call 36, read again 2 unchanged files: rewrite.go, archive.go",
+      "steps": [
+        41,
+        43
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793229009424344480/state/sessions/x-tools-4c2a394c/20261028-231009-4881.jsonl"
+    },
+    {
+      "pattern": "ineffective_compaction",
+      "kind": "re-read-after",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-sessions-ws6k-legacy-prune-off-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "after the compaction at call 37, read again 2 unchanged files: rewrite.go, archive.go",
+      "steps": [
+        41,
+        43
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793229009424344480/state/sessions/x-tools-4c2a394c/20261028-231009-4881.jsonl"
+    },
+    {
+      "pattern": "ineffective_compaction",
+      "kind": "re-read-after",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-sessions-ws6k-legacy-prune-off-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "after the compaction at call 38, read again 2 unchanged files: rewrite.go, archive.go",
+      "steps": [
+        41,
+        43
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793229009424344480/state/sessions/x-tools-4c2a394c/20261028-231009-4881.jsonl"
+    },
+    {
+      "pattern": "ineffective_compaction",
+      "kind": "re-read-after",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-sessions-ws6k-legacy-prune-off-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "after the compaction at call 39, read again 2 unchanged files: rewrite.go, archive.go",
+      "steps": [
+        41,
+        43
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793229009424344480/state/sessions/x-tools-4c2a394c/20261028-231009-4881.jsonl"
+    },
+    {
+      "pattern": "ineffective_compaction",
+      "kind": "re-read-after",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-sessions-ws6k-legacy-prune-off-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "after the compaction at call 40, read again 2 unchanged files: rewrite.go, archive.go",
+      "steps": [
+        41,
+        43
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793229009424344480/state/sessions/x-tools-4c2a394c/20261028-231009-4881.jsonl"
+    },
+    {
+      "pattern": "ineffective_compaction",
+      "kind": "re-read-after",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-sessions-ws6k-legacy-prune-off-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "after the compaction at call 41, read again 2 unchanged files: rewrite.go, archive.go",
+      "steps": [
+        41,
+        43
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793229009424344480/state/sessions/x-tools-4c2a394c/20261028-231009-4881.jsonl"
+    },
+    {
+      "pattern": "ineffective_compaction",
+      "kind": "re-read-after",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-sessions-ws6k-legacy-prune-off-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "after the compaction at call 42, read again 2 unchanged files: rewrite.go, archive.go",
+      "steps": [
+        41,
+        43
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793229009424344480/state/sessions/x-tools-4c2a394c/20261028-231009-4881.jsonl"
+    },
+    {
+      "pattern": "ineffective_compaction",
+      "kind": "re-read-after",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-sessions-ws6k-legacy-prune-off-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "after the compaction at call 42, read again 2 unchanged files: rewrite.go, archive.go",
+      "steps": [
+        41,
+        43
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793229009424344480/state/sessions/x-tools-4c2a394c/20261028-231009-4881.jsonl"
+    },
+    {
+      "pattern": "repeated_calls",
+      "kind": "identical-call",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-sessions-ws6k-legacy-prune-off-r2.json",
+      "languages": [
+        "go"
+      ],
+      "success": true,
+      "detail": "read called 3 times with the same arguments and no change between",
+      "steps": [
+        1,
+        2,
+        3
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793233341837547156/state/sessions/x-tools-e1800e4b/20261029-002222-1a4c.jsonl"
+    },
+    {
+      "pattern": "ineffective_compaction",
+      "kind": "re-read-after",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-sessions-ws6k-legacy-prune-off-r2.json",
+      "languages": [
+        "go"
+      ],
+      "success": true,
+      "detail": "after the compaction at call 3, read again 2 unchanged files: cursor.go, inspector.go",
+      "steps": [
+        2,
+        13
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793233341837547156/state/sessions/x-tools-e1800e4b/20261029-002222-1a4c.jsonl"
+    },
+    {
+      "pattern": "ineffective_compaction",
+      "kind": "re-read-after",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-sessions-ws6k-legacy-prune-off-r2.json",
+      "languages": [
+        "go"
+      ],
+      "success": true,
+      "detail": "after the compaction at call 6, read again 2 unchanged files: cursor.go, inspector.go",
+      "steps": [
+        5,
+        13
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793233341837547156/state/sessions/x-tools-e1800e4b/20261029-002222-1a4c.jsonl"
+    },
+    {
+      "pattern": "ineffective_compaction",
+      "kind": "re-read-after",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-sessions-ws6k-structured-prune-off-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": true,
+      "detail": "after the compaction at call 3, read again 2 unchanged files: cursor.go, inspector.go",
+      "steps": [
+        2,
+        11
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793231480366133617/state/sessions/x-tools-57f7baab/20261028-235120-f709.jsonl"
+    },
+    {
+      "pattern": "ineffective_compaction",
+      "kind": "re-read-after",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-sessions-ws6k-structured-prune-off-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": true,
+      "detail": "after the compaction at call 12, read again 2 unchanged files: inspector.go, archive.go",
+      "steps": [
+        11,
+        17
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793231480366133617/state/sessions/x-tools-57f7baab/20261028-235120-f709.jsonl"
+    },
+    {
+      "pattern": "ineffective_compaction",
+      "kind": "re-read-after",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-sessions-ws6k-structured-prune-off-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": true,
+      "detail": "after the compaction at call 12, read again 2 unchanged files: inspector.go, archive.go",
+      "steps": [
+        11,
+        17
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793231480366133617/state/sessions/x-tools-57f7baab/20261028-235120-f709.jsonl"
+    },
+    {
+      "pattern": "repeated_calls",
+      "kind": "identical-call",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-sessions-ws6k-structured-prune-off-r2.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "read called 4 times with the same arguments and no change between",
+      "steps": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "waste": 3,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793234599703147942/state/sessions/x-tools-a44dbfd1/20261029-004319-e40a.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-sessions-ws6k-structured-prune-off-r2.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: --- FAIL: TestHiddenLen (0.00s)",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793234599703147942/state/sessions/x-tools-a44dbfd1/20261029-004319-e40a.jsonl"
+    },
+    {
+      "pattern": "context_excess",
+      "kind": "re-read",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-sessions-ws6k-structured-prune-off-r2.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "3 reads of files already read and unchanged",
+      "waste": 3,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793234599703147942/state/sessions/x-tools-a44dbfd1/20261029-004319-e40a.jsonl"
+    },
+    {
+      "pattern": "ineffective_compaction",
+      "kind": "re-read-after",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-sessions-ws6k-structured-prune-off-r2.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "after the compaction at call 3, read again 2 unchanged files: cursor.go, inspector.go",
+      "steps": [
+        2,
+        16
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793234599703147942/state/sessions/x-tools-a44dbfd1/20261029-004319-e40a.jsonl"
+    },
+    {
+      "pattern": "ineffective_compaction",
+      "kind": "re-read-after",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-sessions-ws6k-structured-prune-off-r2.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "after the compaction at call 7, read again 2 unchanged files: cursor.go, inspector.go",
+      "steps": [
+        6,
+        16
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793234599703147942/state/sessions/x-tools-a44dbfd1/20261029-004319-e40a.jsonl"
+    },
+    {
+      "pattern": "ineffective_compaction",
+      "kind": "re-read-after",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-sessions-ws6k-structured-prune-off-r2.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "after the compaction at call 8, read again 2 unchanged files: cursor.go, inspector.go",
+      "steps": [
+        7,
+        16
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793234599703147942/state/sessions/x-tools-a44dbfd1/20261029-004319-e40a.jsonl"
+    },
+    {
+      "pattern": "ineffective_compaction",
+      "kind": "re-read-after",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-sessions-ws6k-structured-prune-off-r2.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "after the compaction at call 14, read again 2 unchanged files: rewrite.go, inspector.go",
+      "steps": [
+        13,
+        16
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793234599703147942/state/sessions/x-tools-a44dbfd1/20261029-004319-e40a.jsonl"
+    },
+    {
+      "pattern": "repeated_calls",
+      "kind": "identical-call",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-sessions-ws6k-structured-prune-on-cachefix-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "read called 6 times with the same arguments and no change between",
+      "steps": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "waste": 5,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793237238940491964/state/sessions/x-tools-3bfdb1d9/20261029-012719-5a61.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-confidence",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-sessions-ws6k-structured-prune-on-cachefix-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "its own build or tests passed after the last change; the hidden checks failed: answer does not match /rewrite\\.go/",
+      "classifies": true,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793237238940491964/state/sessions/x-tools-3bfdb1d9/20261029-012719-5a61.jsonl"
+    },
+    {
+      "pattern": "context_excess",
+      "kind": "re-read",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-sessions-ws6k-structured-prune-on-cachefix-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "5 reads of files already read and unchanged",
+      "waste": 5,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793237238940491964/state/sessions/x-tools-3bfdb1d9/20261029-012719-5a61.jsonl"
+    },
+    {
+      "pattern": "ineffective_compaction",
+      "kind": "re-read-after",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-sessions-ws6k-structured-prune-on-cachefix-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "after the compaction at call 3, read again 2 unchanged files: cursor.go, inspector.go",
+      "steps": [
+        2,
+        13
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793237238940491964/state/sessions/x-tools-3bfdb1d9/20261029-012719-5a61.jsonl"
+    },
+    {
+      "pattern": "repeated_calls",
+      "kind": "identical-call",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-sessions-ws6k-structured-prune-on-cachefix-r2.json",
+      "languages": [
+        "go"
+      ],
+      "success": true,
+      "detail": "read called 3 times with the same arguments and no change between",
+      "steps": [
+        5,
+        6,
+        7
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793238077443196699/state/sessions/x-tools-102adc63/20261029-014117-c135.jsonl"
+    },
+    {
+      "pattern": "repeated_calls",
+      "kind": "identical-call",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-sessions-ws6k-structured-prune-on-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": true,
+      "detail": "read called 3 times with the same arguments and no change between",
+      "steps": [
+        1,
+        2,
+        3
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793232246277295144/state/sessions/x-tools-eaf0fb73/20261029-000406-a987.jsonl"
+    },
+    {
+      "pattern": "ineffective_compaction",
+      "kind": "re-read-after",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-sessions-ws6k-structured-prune-on-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": true,
+      "detail": "after the compaction at call 3, read again 2 unchanged files: cursor.go, inspector.go",
+      "steps": [
+        2,
+        12
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793232246277295144/state/sessions/x-tools-eaf0fb73/20261029-000406-a987.jsonl"
+    },
+    {
+      "pattern": "ineffective_compaction",
+      "kind": "re-read-after",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-sessions-ws6k-structured-prune-on-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": true,
+      "detail": "after the compaction at call 6, read again 2 unchanged files: cursor.go, inspector.go",
+      "steps": [
+        5,
+        12
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793232246277295144/state/sessions/x-tools-eaf0fb73/20261029-000406-a987.jsonl"
+    },
+    {
+      "pattern": "ineffective_compaction",
+      "kind": "re-read-after",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-sessions-ws6k-structured-prune-on-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": true,
+      "detail": "after the compaction at call 7, read again 2 unchanged files: cursor.go, inspector.go",
+      "steps": [
+        6,
+        12
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793232246277295144/state/sessions/x-tools-eaf0fb73/20261029-000406-a987.jsonl"
+    },
+    {
+      "pattern": "repeated_calls",
+      "kind": "identical-call",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-sessions-ws6k-structured-prune-on-r2.json",
+      "languages": [
+        "go"
+      ],
+      "success": true,
+      "detail": "read called 3 times with the same arguments and no change between",
+      "steps": [
+        0,
+        5,
+        12
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793235497392462131/state/sessions/x-tools-465a8d8a/20261029-005817-206e.jsonl"
+    },
+    {
+      "pattern": "ineffective_compaction",
+      "kind": "re-read-after",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-sessions-ws6k-structured-prune-on-r2.json",
+      "languages": [
+        "go"
+      ],
+      "success": true,
+      "detail": "after the compaction at call 3, read again 2 unchanged files: cursor.go, inspector.go",
+      "steps": [
+        2,
+        5
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793235497392462131/state/sessions/x-tools-465a8d8a/20261029-005817-206e.jsonl"
+    },
+    {
+      "pattern": "ineffective_compaction",
+      "kind": "re-read-after",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-sessions-ws6k-structured-prune-on-r2.json",
+      "languages": [
+        "go"
+      ],
+      "success": true,
+      "detail": "after the compaction at call 13, read again 2 unchanged files: inspector.go, archive.go",
+      "steps": [
+        12,
+        19
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793235497392462131/state/sessions/x-tools-465a8d8a/20261029-005817-206e.jsonl"
+    },
+    {
+      "pattern": "ineffective_compaction",
+      "kind": "re-read-after",
+      "task": "session-x-tools",
+      "report": "benchmarks/reports/20261029-sessions-ws6k-structured-prune-on-r2.json",
+      "languages": [
+        "go"
+      ],
+      "success": true,
+      "detail": "after the compaction at call 13, read again 2 unchanged files: inspector.go, archive.go",
+      "steps": [
+        12,
+        19
+      ],
+      "waste": 2,
+      "transcript": "\u003csessions\u003e/session-x-tools-1793235497392462131/state/sessions/x-tools-465a8d8a/20261029-005817-206e.jsonl"
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-pass",
+      "task": "cross-service-idempotency",
+      "report": "benchmarks/reports/20261003T171656Z-tasks-qwen3.6-35b-a3b.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "verified by its own checks; the hidden checks failed: go test -race -count=3 ./...: ?   \texample.com/payment-service/cmd/server\t[no test files]",
+      "classifies": true
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-pass",
+      "task": "cross-service-idempotency",
+      "report": "benchmarks/reports/20261003T194705Z-tasks-qwen3-coder-next.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "verified by its own checks; the hidden checks failed: go test ./...: …r.go:44 +0x2b0",
+      "classifies": true
+    },
+    {
+      "pattern": "unnecessary_retries",
+      "kind": "attempts-failed",
+      "task": "cross-service-idempotency",
+      "report": "benchmarks/reports/20261003T194705Z-tasks-qwen3-coder-next.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "2 attempts, none passed ()",
+      "waste": 1,
+      "classifies": true
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-pass",
+      "task": "cross-service-idempotency",
+      "report": "benchmarks/reports/20261027-tasks-baseline-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "verified by its own checks; the hidden checks failed: go test ./...: …r.go:44 +0x2b0",
+      "classifies": true
+    },
+    {
+      "pattern": "unnecessary_retries",
+      "kind": "attempts-failed",
+      "task": "cross-service-idempotency",
+      "report": "benchmarks/reports/20261027-tasks-baseline-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "2 attempts, none passed (verification_false_pass)",
+      "waste": 1,
+      "classifies": true
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-pass",
+      "task": "go-debug-ledger-balance-query",
+      "report": "benchmarks/reports/20261027-tasks-baseline-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "verified by its own checks; the hidden checks failed: sh .bench/check_tests_unchanged.sh: …ing.T) {",
+      "classifies": true
+    },
+    {
+      "pattern": "unnecessary_retries",
+      "kind": "attempts-failed",
+      "task": "go-debug-ledger-balance-query",
+      "report": "benchmarks/reports/20261027-tasks-baseline-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "2 attempts, none passed (verification_false_pass)",
+      "waste": 1,
+      "classifies": true
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-pass",
+      "task": "cross-service-idempotency",
+      "report": "benchmarks/reports/20261027-tasks-baseline-r2.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "verified by its own checks; the hidden checks failed: go test -race -count=3 ./...: ?   \texample.com/payment-service/cmd/server\t[no test files]",
+      "classifies": true
+    },
+    {
+      "pattern": "unnecessary_retries",
+      "kind": "attempts-failed",
+      "task": "cross-service-idempotency",
+      "report": "benchmarks/reports/20261027-tasks-baseline-r2.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "2 attempts, none passed (verification_false_pass)",
+      "waste": 1,
+      "classifies": true
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-pass",
+      "task": "cross-service-idempotency",
+      "report": "benchmarks/reports/20261027-tasks-baseline-r3.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "verified by its own checks; the hidden checks failed: go test ./...: --- FAIL: TestHiddenDuplicateEvent (0.00s)",
+      "classifies": true
+    },
+    {
+      "pattern": "unnecessary_retries",
+      "kind": "attempts-failed",
+      "task": "cross-service-idempotency",
+      "report": "benchmarks/reports/20261027-tasks-baseline-r3.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "2 attempts, none passed (verification_false_pass)",
+      "waste": 1,
+      "classifies": true
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-pass",
+      "task": "go-debug-ledger-balance-query",
+      "report": "benchmarks/reports/20261027-tasks-baseline-r3.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "verified by its own checks; the hidden checks failed: sh .bench/check_tests_unchanged.sh: …internal/ledger/ledger_test.go b/internal/ledger/ledger_test.go",
+      "classifies": true
+    },
+    {
+      "pattern": "unnecessary_retries",
+      "kind": "attempts-failed",
+      "task": "go-debug-ledger-balance-query",
+      "report": "benchmarks/reports/20261027-tasks-baseline-r3.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "2 attempts, none passed (verification_false_pass)",
+      "waste": 1,
+      "classifies": true
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-pass",
+      "task": "cross-service-idempotency",
+      "report": "benchmarks/reports/20261028-tasks-fixcheck.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "verified by its own checks; the hidden checks failed: go test -race -count=3 ./...: …ent (0.00s)",
+      "classifies": true
+    },
+    {
+      "pattern": "unnecessary_retries",
+      "kind": "attempts-failed",
+      "task": "cross-service-idempotency",
+      "report": "benchmarks/reports/20261028-tasks-fixcheck.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "2 attempts, none passed (verification_false_pass)",
+      "waste": 1,
+      "classifies": true
+    },
+    {
+      "pattern": "unnecessary_retries",
+      "kind": "attempts-failed",
+      "task": "go-large-iface-method",
+      "report": "benchmarks/reports/20261028-tasks-fixcheck.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "6 attempts, none passed (model)",
+      "waste": 5,
+      "classifies": true
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-pass",
+      "task": "go-debug-ledger-balance-query",
+      "report": "benchmarks/reports/20261028-tasks-reasoning-auto.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "verified by its own checks; the hidden checks failed: sh .bench/check_tests_unchanged.sh: …{AccountID: \"a\", AmountCents: 50, Currency: \"USD\"},",
+      "classifies": true
+    },
+    {
+      "pattern": "unnecessary_retries",
+      "kind": "attempts-failed",
+      "task": "go-debug-ledger-balance-query",
+      "report": "benchmarks/reports/20261028-tasks-reasoning-auto.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "2 attempts, none passed (verification_false_pass)",
+      "waste": 1,
+      "classifies": true
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-pass",
+      "task": "go-debug-ledger-balance-query",
+      "report": "benchmarks/reports/20261029-recheck-tasks-auto-r2.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "verified by its own checks; the hidden checks failed: sh .bench/check_tests_unchanged.sh: …-- a/internal/ledger/ledger_test.go",
+      "classifies": true
+    },
+    {
+      "pattern": "unnecessary_retries",
+      "kind": "attempts-failed",
+      "task": "go-debug-ledger-balance-query",
+      "report": "benchmarks/reports/20261029-recheck-tasks-auto-r2.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "2 attempts, none passed (verification_false_pass)",
+      "waste": 1,
+      "classifies": true
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-pass",
+      "task": "go-debug-ledger-balance-query",
+      "report": "benchmarks/reports/20261029-recheck-tasks-auto-r3.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "verified by its own checks; the hidden checks failed: sh .bench/check_tests_unchanged.sh: …ting.T) {",
+      "classifies": true
+    },
+    {
+      "pattern": "unnecessary_retries",
+      "kind": "attempts-failed",
+      "task": "go-debug-ledger-balance-query",
+      "report": "benchmarks/reports/20261029-recheck-tasks-auto-r3.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "2 attempts, none passed (verification_false_pass)",
+      "waste": 1,
+      "classifies": true
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-pass",
+      "task": "go-debug-ledger-balance-query",
+      "report": "benchmarks/reports/20261029-recheck-tasks-drop-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "verified by its own checks; the hidden checks failed: sh .bench/check_tests_unchanged.sh: …rnal/ledger/ledger_test.go b/internal/ledger/ledger_test.go",
+      "classifies": true
+    },
+    {
+      "pattern": "unnecessary_retries",
+      "kind": "attempts-failed",
+      "task": "go-debug-ledger-balance-query",
+      "report": "benchmarks/reports/20261029-recheck-tasks-drop-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "2 attempts, none passed (verification_false_pass)",
+      "waste": 1,
+      "classifies": true
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-pass",
+      "task": "go-debug-ledger-balance-query",
+      "report": "benchmarks/reports/20261029-recheck-tasks-drop-r3.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "verified by its own checks; the hidden checks failed: sh .bench/check_tests_unchanged.sh: … @@ func TestBalance(t *testing.T) {",
+      "classifies": true
+    },
+    {
+      "pattern": "unnecessary_retries",
+      "kind": "attempts-failed",
+      "task": "go-debug-ledger-balance-query",
+      "report": "benchmarks/reports/20261029-recheck-tasks-drop-r3.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "2 attempts, none passed (verification_false_pass)",
+      "waste": 1,
+      "classifies": true
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-pass",
+      "task": "cross-service-idempotency",
+      "report": "benchmarks/reports/20261029-recheck-tasks-p8-after-cross-service-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "verified by its own checks; the hidden checks failed: go test -race -count=3 ./...: ?   \texample.com/payment-service/cmd/server\t[no test files]",
+      "classifies": true
+    },
+    {
+      "pattern": "unnecessary_retries",
+      "kind": "attempts-failed",
+      "task": "cross-service-idempotency",
+      "report": "benchmarks/reports/20261029-recheck-tasks-p8-after-cross-service-r1.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "2 attempts, none passed (verification_false_pass)",
+      "waste": 1,
+      "classifies": true
+    },
+    {
+      "pattern": "unnecessary_retries",
+      "kind": "attempts-failed",
+      "task": "cross-service-idempotency",
+      "report": "benchmarks/reports/20261029-recheck-tasks-p8-before-cross-service-r2.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "3 attempts, none passed (model)",
+      "waste": 2,
+      "classifies": true
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-pass",
+      "task": "cross-service-idempotency",
+      "report": "benchmarks/reports/20261029-tasks-p8.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "verified by its own checks; the hidden checks failed: go test -race -count=3 ./...: ?   \texample.com/payment-service/cmd/server\t[no test files]",
+      "classifies": true
+    },
+    {
+      "pattern": "unnecessary_retries",
+      "kind": "attempts-failed",
+      "task": "cross-service-idempotency",
+      "report": "benchmarks/reports/20261029-tasks-p8.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "2 attempts, none passed (verification_false_pass)",
+      "waste": 1,
+      "classifies": true
+    },
+    {
+      "pattern": "weak_verification",
+      "kind": "false-pass",
+      "task": "go-debug-ledger-balance-query",
+      "report": "benchmarks/reports/20261029-tasks-p8.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "verified by its own checks; the hidden checks failed: sh .bench/check_tests_unchanged.sh: …-- a/internal/ledger/ledger_test.go",
+      "classifies": true
+    },
+    {
+      "pattern": "unnecessary_retries",
+      "kind": "attempts-failed",
+      "task": "go-debug-ledger-balance-query",
+      "report": "benchmarks/reports/20261029-tasks-p8.json",
+      "languages": [
+        "go"
+      ],
+      "success": false,
+      "detail": "2 attempts, none passed (verification_false_pass)",
+      "waste": 1,
+      "classifies": true
+    }
+  ]
+}

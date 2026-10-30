@@ -1,0 +1,10 @@
+# Phase 08 (2026-10-29) adopted concurrent read-only calls on microbenchmark
+# grounds; in the agent loop no change was measurable.
+id: retro-p8-orchestration
+hypothesis: Running read-only calls concurrently makes direct-mode tasks faster.
+suite: direct
+decide_on: dev
+primary: {metric: median_seconds, better: lower}
+arms:
+  - {name: before, role: baseline, reports: [benchmarks/reports/20261029-direct-p8-before-r1.json, benchmarks/reports/20261029-direct-p8-before-r2.json]}
+  - {name: after, role: candidate, reports: [benchmarks/reports/20261029-direct-p8-after-r1.json, benchmarks/reports/20261029-direct-p8-after-r2.json]}

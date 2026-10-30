@@ -1,0 +1,10 @@
+# Phase 06 (2026-10-28) made inference.reasoning_history auto the default:
+# the same success, less prefill time.
+id: retro-reasoning-auto
+hypothesis: Keeping reasoning in the history (auto) makes direct-mode tasks faster than dropping it, at the same success.
+suite: direct
+decide_on: dev
+primary: {metric: median_seconds, better: lower}
+arms:
+  - {name: drop, role: baseline, reports: [benchmarks/reports/20261028-direct-reasoning-drop-r1.json, benchmarks/reports/20261028-direct-reasoning-drop-r2.json]}
+  - {name: auto, role: candidate, reports: [benchmarks/reports/20261028-direct-reasoning-auto-r1.json, benchmarks/reports/20261028-direct-reasoning-auto-r2.json]}

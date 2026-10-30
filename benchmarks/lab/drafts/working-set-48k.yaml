@@ -1,0 +1,33 @@
+# Draft from bcode lab hypothesize: review the hypothesis, the tasks (the held-out
+# ones decide it) and the arms before running it with bcode lab run.
+arms:
+    - name: baseline
+      role: baseline
+    - name: legacy-compaction
+      role: simpler
+      description: the older summary-only compaction, with no session state
+      set:
+        direct:
+            compaction: legacy
+    - name: working-set-48k
+      role: candidate
+      description: Raise the history budget to 48K tokens so long sessions compact less often.
+      set:
+        direct:
+            working_set_tokens: 48000
+      predicts:
+        fixes:
+            - session-x-tools
+hypothesis: |-
+    Raise the history budget to 48K tokens so long sessions compact less often. This improves success_rate (higher is better) on held-out tasks without a regression in any language, and by more than the simpler legacy-compaction.
+    Evidence: ineffective_compaction in 7 of 1351 eligible runs (1 tasks; re-read-after ×41); fails 43% with, 7% without; 84 calls wasted
+id: working-set-48k
+pattern: ineffective_compaction
+primary:
+    better: higher
+    metric: success_rate
+suite: direct
+tasks:
+    dirs:
+        - benchmarks/direct
+trials: 2

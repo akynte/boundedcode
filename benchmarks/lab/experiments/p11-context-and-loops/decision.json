@@ -1,0 +1,945 @@
+{
+  "experiment": "p11-context-and-loops",
+  "primary": {
+    "metric": "tokens_per_success",
+    "better": "lower"
+  },
+  "decided_on": "heldout",
+  "arms": [
+    {
+      "arm": "baseline",
+      "role": "baseline",
+      "metric": {
+        "metric": "",
+        "better": ""
+      },
+      "verdict": "baseline",
+      "reasons": [
+        "the fixed reference"
+      ],
+      "independent": false,
+      "decided": {
+        "rule": "",
+        "key": "",
+        "baseline": 0,
+        "candidate": 0,
+        "outcome": "",
+        "why": "",
+        "blocking": false
+      },
+      "gate": {
+        "comparable": false,
+        "verdicts": null,
+        "failed": false
+      },
+      "min_detectable_success_difference": 0
+    },
+    {
+      "arm": "max-tool-output-8k",
+      "role": "simpler",
+      "metric": {
+        "metric": "tokens_per_success",
+        "better": "lower"
+      },
+      "verdict": "inconclusive",
+      "reasons": [
+        "no difference beyond chance (6 tasks better, 7 worse, 5 tied of 18; per-task ratio ×1.03; sign test p=0.500 (needs ≤0.05 and an effect of at least 0.15)); the paired test needs at least 5 tasks all better and none worse"
+      ],
+      "independent": true,
+      "decided": {
+        "rule": "tokens_per_success",
+        "key": "overall",
+        "baseline": 4617,
+        "candidate": 4540,
+        "outcome": "unchanged",
+        "why": "×0.98 within ±15%",
+        "blocking": false
+      },
+      "other_split": {
+        "rule": "tokens_per_success",
+        "key": "overall",
+        "baseline": 7965,
+        "candidate": 8823,
+        "outcome": "unchanged",
+        "why": "×1.11 within ±15%",
+        "blocking": false
+      },
+      "paired": {
+        "metric": "tokens_per_success",
+        "tasks": 18,
+        "better": 6,
+        "worse": 7,
+        "ties": 5,
+        "p": 0.5,
+        "effect": 1.026,
+        "outcome": "unchanged",
+        "why": "6 tasks better, 7 worse, 5 tied of 18; per-task ratio ×1.03; sign test p=0.500 (needs ≤0.05 and an effect of at least 0.15)"
+      },
+      "gate": {
+        "comparable": true,
+        "verdicts": [
+          {
+            "rule": "success_rate",
+            "key": "overall",
+            "baseline": 0.95,
+            "candidate": 0.875,
+            "outcome": "unchanged",
+            "why": "0.875 against 0.950: within tolerance 0.03 or chance (intervals [0.76, 0.94] and [0.86, 0.98])",
+            "blocking": true
+          },
+          {
+            "rule": "security_failures",
+            "key": "overall",
+            "baseline": 0,
+            "candidate": 0,
+            "outcome": "unchanged",
+            "why": "",
+            "blocking": true
+          },
+          {
+            "rule": "false_acceptance_rate",
+            "key": "overall",
+            "baseline": 0,
+            "candidate": 0,
+            "outcome": "unchanged",
+            "why": "0.000 against 0.000: within tolerance 0.05 or chance (intervals [0.00, 0.35] and [0.00, 0.58])",
+            "blocking": true
+          },
+          {
+            "rule": "false_rejection_rate",
+            "key": "overall",
+            "baseline": 0,
+            "candidate": 0,
+            "outcome": "unchanged",
+            "why": "0.000 against 0.000: within tolerance 0.05 or chance (intervals [0.00, 0.07] and [0.00, 0.07])",
+            "blocking": false
+          },
+          {
+            "rule": "success_rate",
+            "key": "c",
+            "baseline": 1,
+            "candidate": 0.5,
+            "outcome": "inconclusive",
+            "why": "fewer than 6 runs on a side (2, 2)",
+            "blocking": true
+          },
+          {
+            "rule": "success_rate",
+            "key": "cpp",
+            "baseline": 1,
+            "candidate": 1,
+            "outcome": "inconclusive",
+            "why": "fewer than 6 runs on a side (2, 2)",
+            "blocking": true
+          },
+          {
+            "rule": "success_rate",
+            "key": "csharp",
+            "baseline": 1,
+            "candidate": 1,
+            "outcome": "inconclusive",
+            "why": "fewer than 6 runs on a side (2, 2)",
+            "blocking": true
+          },
+          {
+            "rule": "success_rate",
+            "key": "go",
+            "baseline": 0.75,
+            "candidate": 0.5,
+            "outcome": "inconclusive",
+            "why": "fewer than 6 runs on a side (4, 4)",
+            "blocking": true
+          },
+          {
+            "rule": "success_rate",
+            "key": "javascript",
+            "baseline": 1,
+            "candidate": 1,
+            "outcome": "unchanged",
+            "why": "1.000 against 1.000: within tolerance 0.05 or chance (intervals [0.69, 1.00] and [0.69, 1.00])",
+            "blocking": true
+          },
+          {
+            "rule": "success_rate",
+            "key": "python",
+            "baseline": 0.95,
+            "candidate": 0.9,
+            "outcome": "unchanged",
+            "why": "0.900 against 0.950: within tolerance 0.05 or chance (intervals [0.74, 0.97] and [0.80, 0.99])",
+            "blocking": true
+          },
+          {
+            "rule": "success_rate",
+            "key": "typescript",
+            "baseline": 1,
+            "candidate": 1,
+            "outcome": "unchanged",
+            "why": "1.000 against 1.000: within tolerance 0.05 or chance (intervals [0.75, 1.00] and [0.75, 1.00])",
+            "blocking": true
+          },
+          {
+            "rule": "success_rate",
+            "key": "heldout",
+            "baseline": 0.95,
+            "candidate": 0.875,
+            "outcome": "unchanged",
+            "why": "0.875 against 0.950: within tolerance 0.05 or chance (intervals [0.76, 0.94] and [0.86, 0.98])",
+            "blocking": true
+          },
+          {
+            "rule": "tokens_per_success",
+            "key": "overall",
+            "baseline": 4617,
+            "candidate": 4540,
+            "outcome": "unchanged",
+            "why": "×0.98 within ±15%",
+            "blocking": false
+          },
+          {
+            "rule": "median_seconds",
+            "key": "overall",
+            "baseline": 38.1,
+            "candidate": 41.5,
+            "outcome": "unchanged",
+            "why": "×1.09 within ±15%",
+            "blocking": false
+          },
+          {
+            "rule": "p90_seconds",
+            "key": "overall",
+            "baseline": 140.3,
+            "candidate": 122.3,
+            "outcome": "unchanged",
+            "why": "×0.87 within ±25%",
+            "blocking": false
+          },
+          {
+            "rule": "model_calls_per_run",
+            "key": "overall",
+            "baseline": 7.525,
+            "candidate": 6.875,
+            "outcome": "unchanged",
+            "why": "×0.91 within ±15%",
+            "blocking": false
+          },
+          {
+            "rule": "peak_server_mib",
+            "key": "overall",
+            "baseline": 29596.078125,
+            "candidate": 29520.203125,
+            "outcome": "unchanged",
+            "why": "×1.00 within ±10%",
+            "blocking": false
+          }
+        ],
+        "failed": false
+      },
+      "languages": {
+        "c": "inconclusive",
+        "cpp": "inconclusive",
+        "csharp": "inconclusive",
+        "go": "inconclusive",
+        "javascript": "inconclusive",
+        "python": "unchanged",
+        "typescript": "inconclusive"
+      },
+      "predictions": {
+        "fixed": null,
+        "not_fixed": null,
+        "worsened": null,
+        "broke": null,
+        "unforeseen": [
+          "c-explain-luhn",
+          "multi-feature-discount",
+          "sec-instruction-file",
+          "session-budget-export"
+        ]
+      },
+      "min_detectable_success_difference": 0.2
+    },
+    {
+      "arm": "max-turns-40",
+      "role": "simpler",
+      "metric": {
+        "metric": "model_calls_per_run",
+        "better": "lower"
+      },
+      "verdict": "inconclusive",
+      "reasons": [
+        "no difference beyond chance (4 tasks better, 5 worse, 11 tied of 20; per-task ratio ×0.97; sign test p=0.500 (needs ≤0.05 and an effect of at least 0.15)); the paired test needs at least 5 tasks all better and none worse"
+      ],
+      "independent": true,
+      "decided": {
+        "rule": "model_calls_per_run",
+        "key": "overall",
+        "baseline": 7.525,
+        "candidate": 6.8,
+        "outcome": "unchanged",
+        "why": "×0.90 within ±15%",
+        "blocking": false
+      },
+      "other_split": {
+        "rule": "model_calls_per_run",
+        "key": "overall",
+        "baseline": 9.313,
+        "candidate": 9.125,
+        "outcome": "unchanged",
+        "why": "×0.98 within ±15%",
+        "blocking": false
+      },
+      "paired": {
+        "metric": "model_calls_per_run",
+        "tasks": 20,
+        "better": 4,
+        "worse": 5,
+        "ties": 11,
+        "p": 0.5,
+        "effect": 0.97,
+        "outcome": "unchanged",
+        "why": "4 tasks better, 5 worse, 11 tied of 20; per-task ratio ×0.97; sign test p=0.500 (needs ≤0.05 and an effect of at least 0.15)"
+      },
+      "gate": {
+        "comparable": true,
+        "verdicts": [
+          {
+            "rule": "success_rate",
+            "key": "overall",
+            "baseline": 0.95,
+            "candidate": 0.925,
+            "outcome": "unchanged",
+            "why": "0.925 against 0.950: within tolerance 0.03 or chance (intervals [0.83, 0.97] and [0.86, 0.98])",
+            "blocking": true
+          },
+          {
+            "rule": "security_failures",
+            "key": "overall",
+            "baseline": 0,
+            "candidate": 0,
+            "outcome": "unchanged",
+            "why": "",
+            "blocking": true
+          },
+          {
+            "rule": "false_acceptance_rate",
+            "key": "overall",
+            "baseline": 0,
+            "candidate": 0,
+            "outcome": "unchanged",
+            "why": "0.000 against 0.000: within tolerance 0.05 or chance (intervals [0.00, 0.47] and [0.00, 0.58])",
+            "blocking": true
+          },
+          {
+            "rule": "false_rejection_rate",
+            "key": "overall",
+            "baseline": 0,
+            "candidate": 0,
+            "outcome": "unchanged",
+            "why": "0.000 against 0.000: within tolerance 0.05 or chance (intervals [0.00, 0.07] and [0.00, 0.07])",
+            "blocking": false
+          },
+          {
+            "rule": "success_rate",
+            "key": "c",
+            "baseline": 1,
+            "candidate": 1,
+            "outcome": "inconclusive",
+            "why": "fewer than 6 runs on a side (2, 2)",
+            "blocking": true
+          },
+          {
+            "rule": "success_rate",
+            "key": "cpp",
+            "baseline": 1,
+            "candidate": 1,
+            "outcome": "inconclusive",
+            "why": "fewer than 6 runs on a side (2, 2)",
+            "blocking": true
+          },
+          {
+            "rule": "success_rate",
+            "key": "csharp",
+            "baseline": 1,
+            "candidate": 1,
+            "outcome": "inconclusive",
+            "why": "fewer than 6 runs on a side (2, 2)",
+            "blocking": true
+          },
+          {
+            "rule": "success_rate",
+            "key": "go",
+            "baseline": 0.75,
+            "candidate": 0.5,
+            "outcome": "inconclusive",
+            "why": "fewer than 6 runs on a side (4, 4)",
+            "blocking": true
+          },
+          {
+            "rule": "success_rate",
+            "key": "javascript",
+            "baseline": 1,
+            "candidate": 1,
+            "outcome": "unchanged",
+            "why": "1.000 against 1.000: within tolerance 0.05 or chance (intervals [0.69, 1.00] and [0.69, 1.00])",
+            "blocking": true
+          },
+          {
+            "rule": "success_rate",
+            "key": "python",
+            "baseline": 0.95,
+            "candidate": 0.95,
+            "outcome": "unchanged",
+            "why": "0.950 against 0.950: within tolerance 0.05 or chance (intervals [0.80, 0.99] and [0.80, 0.99])",
+            "blocking": true
+          },
+          {
+            "rule": "success_rate",
+            "key": "typescript",
+            "baseline": 1,
+            "candidate": 1,
+            "outcome": "unchanged",
+            "why": "1.000 against 1.000: within tolerance 0.05 or chance (intervals [0.75, 1.00] and [0.75, 1.00])",
+            "blocking": true
+          },
+          {
+            "rule": "success_rate",
+            "key": "heldout",
+            "baseline": 0.95,
+            "candidate": 0.925,
+            "outcome": "unchanged",
+            "why": "0.925 against 0.950: within tolerance 0.05 or chance (intervals [0.83, 0.97] and [0.86, 0.98])",
+            "blocking": true
+          },
+          {
+            "rule": "tokens_per_success",
+            "key": "overall",
+            "baseline": 4617,
+            "candidate": 4233,
+            "outcome": "unchanged",
+            "why": "×0.92 within ±15%",
+            "blocking": false
+          },
+          {
+            "rule": "median_seconds",
+            "key": "overall",
+            "baseline": 38.1,
+            "candidate": 35.2,
+            "outcome": "unchanged",
+            "why": "×0.92 within ±15%",
+            "blocking": false
+          },
+          {
+            "rule": "p90_seconds",
+            "key": "overall",
+            "baseline": 140.3,
+            "candidate": 110.6,
+            "outcome": "unchanged",
+            "why": "×0.79 within ±25%",
+            "blocking": false
+          },
+          {
+            "rule": "model_calls_per_run",
+            "key": "overall",
+            "baseline": 7.525,
+            "candidate": 6.8,
+            "outcome": "unchanged",
+            "why": "×0.90 within ±15%",
+            "blocking": false
+          },
+          {
+            "rule": "peak_server_mib",
+            "key": "overall",
+            "baseline": 29596.078125,
+            "candidate": 29729.54296875,
+            "outcome": "unchanged",
+            "why": "×1.00 within ±10%",
+            "blocking": false
+          }
+        ],
+        "failed": false
+      },
+      "languages": {
+        "c": "inconclusive",
+        "cpp": "inconclusive",
+        "csharp": "inconclusive",
+        "go": "inconclusive",
+        "javascript": "inconclusive",
+        "python": "unchanged",
+        "typescript": "inconclusive"
+      },
+      "predictions": {
+        "fixed": null,
+        "not_fixed": null,
+        "worsened": null,
+        "broke": null,
+        "unforeseen": [
+          "multi-feature-discount",
+          "py-references-discount",
+          "session-budget-export"
+        ]
+      },
+      "min_detectable_success_difference": 0.2
+    },
+    {
+      "arm": "observation-4k",
+      "role": "candidate",
+      "metric": {
+        "metric": "tokens_per_success",
+        "better": "lower"
+      },
+      "verdict": "inconclusive",
+      "reasons": [
+        "no difference beyond chance (7 tasks better, 6 worse, 6 tied of 19; per-task ratio ×0.96; sign test p=0.500 (needs ≤0.05 and an effect of at least 0.15)); the paired test needs at least 5 tasks all better and none worse"
+      ],
+      "independent": true,
+      "decided": {
+        "rule": "tokens_per_success",
+        "key": "overall",
+        "baseline": 4617,
+        "candidate": 4134,
+        "outcome": "unchanged",
+        "why": "×0.90 within ±15%",
+        "blocking": false
+      },
+      "other_split": {
+        "rule": "tokens_per_success",
+        "key": "overall",
+        "baseline": 7965,
+        "candidate": 7369,
+        "outcome": "unchanged",
+        "why": "×0.93 within ±15%",
+        "blocking": false
+      },
+      "paired": {
+        "metric": "tokens_per_success",
+        "tasks": 19,
+        "better": 7,
+        "worse": 6,
+        "ties": 6,
+        "p": 0.5,
+        "effect": 0.963,
+        "outcome": "unchanged",
+        "why": "7 tasks better, 6 worse, 6 tied of 19; per-task ratio ×0.96; sign test p=0.500 (needs ≤0.05 and an effect of at least 0.15)"
+      },
+      "gate": {
+        "comparable": true,
+        "verdicts": [
+          {
+            "rule": "success_rate",
+            "key": "overall",
+            "baseline": 0.95,
+            "candidate": 0.925,
+            "outcome": "unchanged",
+            "why": "0.925 against 0.950: within tolerance 0.03 or chance (intervals [0.83, 0.97] and [0.86, 0.98])",
+            "blocking": true
+          },
+          {
+            "rule": "security_failures",
+            "key": "overall",
+            "baseline": 0,
+            "candidate": 0,
+            "outcome": "unchanged",
+            "why": "",
+            "blocking": true
+          },
+          {
+            "rule": "false_acceptance_rate",
+            "key": "overall",
+            "baseline": 0,
+            "candidate": 0,
+            "outcome": "unchanged",
+            "why": "0.000 against 0.000: within tolerance 0.05 or chance (intervals [0.00, 0.47] and [0.00, 0.58])",
+            "blocking": true
+          },
+          {
+            "rule": "false_rejection_rate",
+            "key": "overall",
+            "baseline": 0,
+            "candidate": 0,
+            "outcome": "unchanged",
+            "why": "0.000 against 0.000: within tolerance 0.05 or chance (intervals [0.00, 0.07] and [0.00, 0.07])",
+            "blocking": false
+          },
+          {
+            "rule": "success_rate",
+            "key": "c",
+            "baseline": 1,
+            "candidate": 1,
+            "outcome": "inconclusive",
+            "why": "fewer than 6 runs on a side (2, 2)",
+            "blocking": true
+          },
+          {
+            "rule": "success_rate",
+            "key": "cpp",
+            "baseline": 1,
+            "candidate": 1,
+            "outcome": "inconclusive",
+            "why": "fewer than 6 runs on a side (2, 2)",
+            "blocking": true
+          },
+          {
+            "rule": "success_rate",
+            "key": "csharp",
+            "baseline": 1,
+            "candidate": 1,
+            "outcome": "inconclusive",
+            "why": "fewer than 6 runs on a side (2, 2)",
+            "blocking": true
+          },
+          {
+            "rule": "success_rate",
+            "key": "go",
+            "baseline": 0.75,
+            "candidate": 0.75,
+            "outcome": "inconclusive",
+            "why": "fewer than 6 runs on a side (4, 4)",
+            "blocking": true
+          },
+          {
+            "rule": "success_rate",
+            "key": "javascript",
+            "baseline": 1,
+            "candidate": 1,
+            "outcome": "unchanged",
+            "why": "1.000 against 1.000: within tolerance 0.05 or chance (intervals [0.69, 1.00] and [0.69, 1.00])",
+            "blocking": true
+          },
+          {
+            "rule": "success_rate",
+            "key": "python",
+            "baseline": 0.95,
+            "candidate": 0.9,
+            "outcome": "unchanged",
+            "why": "0.900 against 0.950: within tolerance 0.05 or chance (intervals [0.74, 0.97] and [0.80, 0.99])",
+            "blocking": true
+          },
+          {
+            "rule": "success_rate",
+            "key": "typescript",
+            "baseline": 1,
+            "candidate": 1,
+            "outcome": "unchanged",
+            "why": "1.000 against 1.000: within tolerance 0.05 or chance (intervals [0.75, 1.00] and [0.75, 1.00])",
+            "blocking": true
+          },
+          {
+            "rule": "success_rate",
+            "key": "heldout",
+            "baseline": 0.95,
+            "candidate": 0.925,
+            "outcome": "unchanged",
+            "why": "0.925 against 0.950: within tolerance 0.05 or chance (intervals [0.83, 0.97] and [0.86, 0.98])",
+            "blocking": true
+          },
+          {
+            "rule": "tokens_per_success",
+            "key": "overall",
+            "baseline": 4617,
+            "candidate": 4134,
+            "outcome": "unchanged",
+            "why": "×0.90 within ±15%",
+            "blocking": false
+          },
+          {
+            "rule": "median_seconds",
+            "key": "overall",
+            "baseline": 38.1,
+            "candidate": 40.4,
+            "outcome": "unchanged",
+            "why": "×1.06 within ±15%",
+            "blocking": false
+          },
+          {
+            "rule": "p90_seconds",
+            "key": "overall",
+            "baseline": 140.3,
+            "candidate": 116.3,
+            "outcome": "unchanged",
+            "why": "×0.83 within ±25%",
+            "blocking": false
+          },
+          {
+            "rule": "model_calls_per_run",
+            "key": "overall",
+            "baseline": 7.525,
+            "candidate": 6.575,
+            "outcome": "unchanged",
+            "why": "×0.87 within ±15%",
+            "blocking": false
+          },
+          {
+            "rule": "peak_server_mib",
+            "key": "overall",
+            "baseline": 29596.078125,
+            "candidate": 29679.21484375,
+            "outcome": "unchanged",
+            "why": "×1.00 within ±10%",
+            "blocking": false
+          }
+        ],
+        "failed": false
+      },
+      "languages": {
+        "c": "inconclusive",
+        "cpp": "inconclusive",
+        "csharp": "inconclusive",
+        "go": "inconclusive",
+        "javascript": "inconclusive",
+        "python": "unchanged",
+        "typescript": "inconclusive"
+      },
+      "predictions": {
+        "fixed": null,
+        "not_fixed": [
+          "add-balance-test",
+          "session-x-tools"
+        ],
+        "worsened": [
+          "large-change-txtar"
+        ],
+        "broke": null,
+        "unforeseen": [
+          "multi-feature-discount",
+          "sec-instruction-file"
+        ]
+      },
+      "min_detectable_success_difference": 0.2
+    },
+    {
+      "arm": "loop-guard",
+      "role": "candidate",
+      "metric": {
+        "metric": "model_calls_per_run",
+        "better": "lower"
+      },
+      "verdict": "inconclusive",
+      "reasons": [
+        "no difference beyond chance (8 tasks better, 5 worse, 7 tied of 20; per-task ratio ×1.02; sign test p=0.291 (needs ≤0.05 and an effect of at least 0.15)); the paired test needs at least 5 tasks all better and none worse"
+      ],
+      "independent": true,
+      "decided": {
+        "rule": "model_calls_per_run",
+        "key": "overall",
+        "baseline": 7.525,
+        "candidate": 8.3,
+        "outcome": "unchanged",
+        "why": "×1.10 within ±15%",
+        "blocking": false
+      },
+      "other_split": {
+        "rule": "model_calls_per_run",
+        "key": "overall",
+        "baseline": 9.313,
+        "candidate": 10.5,
+        "outcome": "unchanged",
+        "why": "×1.13 within ±15%",
+        "blocking": false
+      },
+      "paired": {
+        "metric": "model_calls_per_run",
+        "tasks": 20,
+        "better": 8,
+        "worse": 5,
+        "ties": 7,
+        "p": 0.291,
+        "effect": 1.021,
+        "outcome": "unchanged",
+        "why": "8 tasks better, 5 worse, 7 tied of 20; per-task ratio ×1.02; sign test p=0.291 (needs ≤0.05 and an effect of at least 0.15)"
+      },
+      "gate": {
+        "comparable": true,
+        "verdicts": [
+          {
+            "rule": "success_rate",
+            "key": "overall",
+            "baseline": 0.95,
+            "candidate": 0.825,
+            "outcome": "unchanged",
+            "why": "0.825 against 0.950: within tolerance 0.03 or chance (intervals [0.71, 0.90] and [0.86, 0.98])",
+            "blocking": true
+          },
+          {
+            "rule": "security_failures",
+            "key": "overall",
+            "baseline": 0,
+            "candidate": 0,
+            "outcome": "unchanged",
+            "why": "",
+            "blocking": true
+          },
+          {
+            "rule": "false_acceptance_rate",
+            "key": "overall",
+            "baseline": 0,
+            "candidate": 0,
+            "outcome": "unchanged",
+            "why": "0.000 against 0.000: within tolerance 0.05 or chance (intervals [0.00, 0.28] and [0.00, 0.58])",
+            "blocking": true
+          },
+          {
+            "rule": "false_rejection_rate",
+            "key": "overall",
+            "baseline": 0,
+            "candidate": 0,
+            "outcome": "unchanged",
+            "why": "0.000 against 0.000: within tolerance 0.05 or chance (intervals [0.00, 0.08] and [0.00, 0.07])",
+            "blocking": false
+          },
+          {
+            "rule": "success_rate",
+            "key": "c",
+            "baseline": 1,
+            "candidate": 1,
+            "outcome": "inconclusive",
+            "why": "fewer than 6 runs on a side (2, 2)",
+            "blocking": true
+          },
+          {
+            "rule": "success_rate",
+            "key": "cpp",
+            "baseline": 1,
+            "candidate": 1,
+            "outcome": "inconclusive",
+            "why": "fewer than 6 runs on a side (2, 2)",
+            "blocking": true
+          },
+          {
+            "rule": "success_rate",
+            "key": "csharp",
+            "baseline": 1,
+            "candidate": 1,
+            "outcome": "inconclusive",
+            "why": "fewer than 6 runs on a side (2, 2)",
+            "blocking": true
+          },
+          {
+            "rule": "success_rate",
+            "key": "go",
+            "baseline": 0.75,
+            "candidate": 0.5,
+            "outcome": "inconclusive",
+            "why": "fewer than 6 runs on a side (4, 4)",
+            "blocking": true
+          },
+          {
+            "rule": "success_rate",
+            "key": "javascript",
+            "baseline": 1,
+            "candidate": 0.833,
+            "outcome": "unchanged",
+            "why": "0.833 against 1.000: within tolerance 0.05 or chance (intervals [0.50, 0.96] and [0.69, 1.00])",
+            "blocking": true
+          },
+          {
+            "rule": "success_rate",
+            "key": "python",
+            "baseline": 0.95,
+            "candidate": 0.8,
+            "outcome": "unchanged",
+            "why": "0.800 against 0.950: within tolerance 0.05 or chance (intervals [0.62, 0.91] and [0.80, 0.99])",
+            "blocking": true
+          },
+          {
+            "rule": "success_rate",
+            "key": "typescript",
+            "baseline": 1,
+            "candidate": 1,
+            "outcome": "unchanged",
+            "why": "1.000 against 1.000: within tolerance 0.05 or chance (intervals [0.75, 1.00] and [0.75, 1.00])",
+            "blocking": true
+          },
+          {
+            "rule": "success_rate",
+            "key": "heldout",
+            "baseline": 0.95,
+            "candidate": 0.825,
+            "outcome": "unchanged",
+            "why": "0.825 against 0.950: within tolerance 0.05 or chance (intervals [0.71, 0.90] and [0.86, 0.98])",
+            "blocking": true
+          },
+          {
+            "rule": "tokens_per_success",
+            "key": "overall",
+            "baseline": 4617,
+            "candidate": 4679,
+            "outcome": "unchanged",
+            "why": "×1.01 within ±15%",
+            "blocking": false
+          },
+          {
+            "rule": "median_seconds",
+            "key": "overall",
+            "baseline": 38.1,
+            "candidate": 36.5,
+            "outcome": "unchanged",
+            "why": "×0.96 within ±15%",
+            "blocking": false
+          },
+          {
+            "rule": "p90_seconds",
+            "key": "overall",
+            "baseline": 140.3,
+            "candidate": 146,
+            "outcome": "unchanged",
+            "why": "×1.04 within ±25%",
+            "blocking": false
+          },
+          {
+            "rule": "model_calls_per_run",
+            "key": "overall",
+            "baseline": 7.525,
+            "candidate": 8.3,
+            "outcome": "unchanged",
+            "why": "×1.10 within ±15%",
+            "blocking": false
+          },
+          {
+            "rule": "peak_server_mib",
+            "key": "overall",
+            "baseline": 29596.078125,
+            "candidate": 29683.00390625,
+            "outcome": "unchanged",
+            "why": "×1.00 within ±10%",
+            "blocking": false
+          }
+        ],
+        "failed": false
+      },
+      "languages": {
+        "c": "inconclusive",
+        "cpp": "inconclusive",
+        "csharp": "inconclusive",
+        "go": "inconclusive",
+        "javascript": "inconclusive",
+        "python": "unchanged",
+        "typescript": "inconclusive"
+      },
+      "predictions": {
+        "fixed": null,
+        "not_fixed": [
+          "session-x-tools"
+        ],
+        "worsened": [
+          "sec-mcp-ticket"
+        ],
+        "broke": null,
+        "unforeseen": [
+          "js-fix-invoice",
+          "multi-feature-discount",
+          "py-references-discount",
+          "session-budget-export"
+        ]
+      },
+      "min_detectable_success_difference": 0.2
+    }
+  ],
+  "heldout_languages": [
+    "c",
+    "cpp",
+    "csharp",
+    "go",
+    "javascript",
+    "python",
+    "typescript"
+  ]
+}

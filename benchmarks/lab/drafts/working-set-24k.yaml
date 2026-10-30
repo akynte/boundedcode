@@ -1,0 +1,29 @@
+# Draft from bcode lab hypothesize: review the hypothesis, the tasks (the held-out
+# ones decide it) and the arms before running it with bcode lab run.
+arms:
+    - name: baseline
+      role: baseline
+    - name: working-set-24k
+      role: candidate
+      description: 'Lower the history budget to 24K tokens: smaller prompts, more compaction.'
+      set:
+        direct:
+            working_set_tokens: 24000
+      predicts:
+        fixes:
+            - add-balance-test
+            - large-change-txtar
+            - session-x-tools
+hypothesis: |-
+    Lower the history budget to 24K tokens: smaller prompts, more compaction. This improves tokens_per_success (lower is better) on held-out tasks without a regression in any language.
+    Evidence: context_excess in 26 of 1351 eligible runs (3 tasks; large-prompt ×23, re-read ×9); fails 19% with, 7% without; 183 calls wasted
+id: working-set-24k
+pattern: context_excess
+primary:
+    better: lower
+    metric: tokens_per_success
+suite: direct
+tasks:
+    dirs:
+        - benchmarks/direct
+trials: 2

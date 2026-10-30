@@ -1,0 +1,630 @@
+[
+  {
+    "id": "verify-examples",
+    "intervention": {
+      "id": "verify-examples",
+      "pattern": "weak_verification",
+      "summary": "Before a change is reported done, ask for the request's own examples (inputs and expected outputs it states) to be run as tests.",
+      "settings": {
+        "Direct": {
+          "Retrieval": "",
+          "SeedPack": null,
+          "WorkingSetTokens": 0,
+          "MaxToolOutput": 0,
+          "ObservationBytes": 0,
+          "Prune": null,
+          "HistoryNotes": null,
+          "Compaction": "",
+          "ParallelTools": 0,
+          "MCPToolSearch": "",
+          "Routing": "",
+          "MaxTurns": 0
+        },
+        "Inference": {
+          "ReasoningHistory": ""
+        },
+        "Budgets": {
+          "MaxAttempts": 0,
+          "ContextPackTokens": 0
+        },
+        "Escalation": {
+          "Policy": "",
+          "FailedAttempts": 0
+        }
+      },
+      "code": "internal/direct: after the last change of a turn, when the request states examples and no test exercised them, add a note asking for them to be run. Post-change checks themselves are verification and not tunable.",
+      "primary": {
+        "metric": "success_rate",
+        "better": "higher"
+      }
+    },
+    "statement": "Before a change is reported done, ask for the request's own examples (inputs and expected outputs it states) to be run as tests. This improves success_rate (higher is better) on held-out tasks without a regression in any language.",
+    "evidence": "weak_verification in 117 of 1108 eligible runs (15 tasks; false-confidence ×87, false-pass ×16, unverified-change ×14); fails 21% with, 10% without; 0 calls wasted; explains 103 failed runs",
+    "tasks": [
+      "add-balance-test",
+      "cross-service-idempotency",
+      "feature-currency",
+      "fix-balance-query",
+      "fix-ledger-balance",
+      "go-debug-ledger-balance-query",
+      "large-change-txtar",
+      "multi-feature-discount",
+      "poly-rename-qty",
+      "py-fix-inventory",
+      "sec-injection-comment",
+      "session-ledger",
+      "session-noisy-tests",
+      "session-resume-constraints",
+      "session-x-tools"
+    ],
+    "languages": [
+      "go",
+      "python",
+      "typescript"
+    ],
+    "score": 220
+  },
+  {
+    "id": "observation-budget",
+    "intervention": {
+      "id": "observation-budget",
+      "pattern": "context_excess",
+      "kinds": [
+        "large-prompt",
+        "large-result"
+      ],
+      "summary": "Prune command output to 4 KB instead of the local default of 8 KB.",
+      "settings": {
+        "Direct": {
+          "Retrieval": "",
+          "SeedPack": null,
+          "WorkingSetTokens": 0,
+          "MaxToolOutput": 0,
+          "ObservationBytes": 4096,
+          "Prune": null,
+          "HistoryNotes": null,
+          "Compaction": "",
+          "ParallelTools": 0,
+          "MCPToolSearch": "",
+          "Routing": "",
+          "MaxTurns": 0
+        },
+        "Inference": {
+          "ReasoningHistory": ""
+        },
+        "Budgets": {
+          "MaxAttempts": 0,
+          "ContextPackTokens": 0
+        },
+        "Escalation": {
+          "Policy": "",
+          "FailedAttempts": 0
+        }
+      },
+      "simpler": [
+        {
+          "name": "max-tool-output-8k",
+          "settings": {
+            "Direct": {
+              "Retrieval": "",
+              "SeedPack": null,
+              "WorkingSetTokens": 0,
+              "MaxToolOutput": 8192,
+              "ObservationBytes": 0,
+              "Prune": null,
+              "HistoryNotes": null,
+              "Compaction": "",
+              "ParallelTools": 0,
+              "MCPToolSearch": "",
+              "Routing": "",
+              "MaxTurns": 0
+            },
+            "Inference": {
+              "ReasoningHistory": ""
+            },
+            "Budgets": {
+              "MaxAttempts": 0,
+              "ContextPackTokens": 0
+            },
+            "Escalation": {
+              "Policy": "",
+              "FailedAttempts": 0
+            }
+          },
+          "why": "a plain cut of every tool result at 8 KB (the default is 16 KB), without pruning by relevance"
+        }
+      ],
+      "primary": {
+        "metric": "tokens_per_success",
+        "better": "lower"
+      }
+    },
+    "statement": "Prune command output to 4 KB instead of the local default of 8 KB. This improves tokens_per_success (lower is better) on held-out tasks without a regression in any language, and by more than the simpler max-tool-output-8k.",
+    "evidence": "context_excess in 26 of 1351 eligible runs (3 tasks; large-prompt ×23, re-read ×9); fails 19% with, 7% without; 183 calls wasted",
+    "tasks": [
+      "add-balance-test",
+      "large-change-txtar",
+      "session-x-tools"
+    ],
+    "languages": [
+      "go"
+    ],
+    "score": 144.3
+  },
+  {
+    "id": "working-set-24k",
+    "intervention": {
+      "id": "working-set-24k",
+      "pattern": "context_excess",
+      "kinds": [
+        "large-prompt",
+        "re-read"
+      ],
+      "summary": "Lower the history budget to 24K tokens: smaller prompts, more compaction.",
+      "settings": {
+        "Direct": {
+          "Retrieval": "",
+          "SeedPack": null,
+          "WorkingSetTokens": 24000,
+          "MaxToolOutput": 0,
+          "ObservationBytes": 0,
+          "Prune": null,
+          "HistoryNotes": null,
+          "Compaction": "",
+          "ParallelTools": 0,
+          "MCPToolSearch": "",
+          "Routing": "",
+          "MaxTurns": 0
+        },
+        "Inference": {
+          "ReasoningHistory": ""
+        },
+        "Budgets": {
+          "MaxAttempts": 0,
+          "ContextPackTokens": 0
+        },
+        "Escalation": {
+          "Policy": "",
+          "FailedAttempts": 0
+        }
+      },
+      "primary": {
+        "metric": "tokens_per_success",
+        "better": "lower"
+      }
+    },
+    "statement": "Lower the history budget to 24K tokens: smaller prompts, more compaction. This improves tokens_per_success (lower is better) on held-out tasks without a regression in any language.",
+    "evidence": "context_excess in 26 of 1351 eligible runs (3 tasks; large-prompt ×23, re-read ×9); fails 19% with, 7% without; 183 calls wasted",
+    "tasks": [
+      "add-balance-test",
+      "large-change-txtar",
+      "session-x-tools"
+    ],
+    "languages": [
+      "go"
+    ],
+    "score": 144.3
+  },
+  {
+    "id": "rerun-note",
+    "intervention": {
+      "id": "rerun-note",
+      "pattern": "unnecessary_retries",
+      "kinds": [
+        "rerun-unchanged"
+      ],
+      "summary": "Note when a build or test is run again with nothing changed since its last run.",
+      "settings": {
+        "Direct": {
+          "Retrieval": "",
+          "SeedPack": null,
+          "WorkingSetTokens": 0,
+          "MaxToolOutput": 0,
+          "ObservationBytes": 0,
+          "Prune": null,
+          "HistoryNotes": null,
+          "Compaction": "",
+          "ParallelTools": 0,
+          "MCPToolSearch": "",
+          "Routing": "",
+          "MaxTurns": 0
+        },
+        "Inference": {
+          "ReasoningHistory": ""
+        },
+        "Budgets": {
+          "MaxAttempts": 0,
+          "ContextPackTokens": 0
+        },
+        "Escalation": {
+          "Policy": "",
+          "FailedAttempts": 0
+        }
+      },
+      "code": "internal/direct: remember the last result of each verification command and the change counter; on an unchanged rerun, say so.",
+      "primary": {
+        "metric": "model_calls_per_run",
+        "better": "lower"
+      }
+    },
+    "statement": "Note when a build or test is run again with nothing changed since its last run. This improves model_calls_per_run (lower is better) on held-out tasks without a regression in any language.",
+    "evidence": "unnecessary_retries in 21 of 1523 eligible runs (6 tasks; attempts-failed ×17, rerun-unchanged ×4); fails 50% with, 8% without; 27 calls wasted; explains 17 failed runs",
+    "tasks": [
+      "multi-feature-discount",
+      "session-resume-constraints",
+      "session-x-tools"
+    ],
+    "languages": [
+      "go",
+      "typescript"
+    ],
+    "score": 140.7
+  },
+  {
+    "id": "fewer-attempts",
+    "intervention": {
+      "id": "fewer-attempts",
+      "pattern": "unnecessary_retries",
+      "kinds": [
+        "attempts-failed"
+      ],
+      "summary": "Give a bounded task 3 attempts instead of the configured number.",
+      "settings": {
+        "Direct": {
+          "Retrieval": "",
+          "SeedPack": null,
+          "WorkingSetTokens": 0,
+          "MaxToolOutput": 0,
+          "ObservationBytes": 0,
+          "Prune": null,
+          "HistoryNotes": null,
+          "Compaction": "",
+          "ParallelTools": 0,
+          "MCPToolSearch": "",
+          "Routing": "",
+          "MaxTurns": 0
+        },
+        "Inference": {
+          "ReasoningHistory": ""
+        },
+        "Budgets": {
+          "MaxAttempts": 3,
+          "ContextPackTokens": 0
+        },
+        "Escalation": {
+          "Policy": "",
+          "FailedAttempts": 0
+        }
+      },
+      "primary": {
+        "metric": "tokens_per_success",
+        "better": "lower"
+      }
+    },
+    "statement": "Give a bounded task 3 attempts instead of the configured number. This improves tokens_per_success (lower is better) on held-out tasks without a regression in any language.",
+    "evidence": "unnecessary_retries in 21 of 1523 eligible runs (6 tasks; attempts-failed ×17, rerun-unchanged ×4); fails 50% with, 8% without; 27 calls wasted; explains 17 failed runs",
+    "tasks": [
+      "cross-service-idempotency",
+      "go-debug-ledger-balance-query",
+      "go-large-iface-method"
+    ],
+    "languages": [
+      "go"
+    ],
+    "score": 140.7
+  },
+  {
+    "id": "working-set-48k",
+    "intervention": {
+      "id": "working-set-48k",
+      "pattern": "ineffective_compaction",
+      "kinds": [
+        "re-read-after"
+      ],
+      "summary": "Raise the history budget to 48K tokens so long sessions compact less often.",
+      "settings": {
+        "Direct": {
+          "Retrieval": "",
+          "SeedPack": null,
+          "WorkingSetTokens": 48000,
+          "MaxToolOutput": 0,
+          "ObservationBytes": 0,
+          "Prune": null,
+          "HistoryNotes": null,
+          "Compaction": "",
+          "ParallelTools": 0,
+          "MCPToolSearch": "",
+          "Routing": "",
+          "MaxTurns": 0
+        },
+        "Inference": {
+          "ReasoningHistory": ""
+        },
+        "Budgets": {
+          "MaxAttempts": 0,
+          "ContextPackTokens": 0
+        },
+        "Escalation": {
+          "Policy": "",
+          "FailedAttempts": 0
+        }
+      },
+      "simpler": [
+        {
+          "name": "legacy-compaction",
+          "settings": {
+            "Direct": {
+              "Retrieval": "",
+              "SeedPack": null,
+              "WorkingSetTokens": 0,
+              "MaxToolOutput": 0,
+              "ObservationBytes": 0,
+              "Prune": null,
+              "HistoryNotes": null,
+              "Compaction": "legacy",
+              "ParallelTools": 0,
+              "MCPToolSearch": "",
+              "Routing": "",
+              "MaxTurns": 0
+            },
+            "Inference": {
+              "ReasoningHistory": ""
+            },
+            "Budgets": {
+              "MaxAttempts": 0,
+              "ContextPackTokens": 0
+            },
+            "Escalation": {
+              "Policy": "",
+              "FailedAttempts": 0
+            }
+          },
+          "why": "the older summary-only compaction, with no session state"
+        }
+      ],
+      "primary": {
+        "metric": "success_rate",
+        "better": "higher"
+      }
+    },
+    "statement": "Raise the history budget to 48K tokens so long sessions compact less often. This improves success_rate (higher is better) on held-out tasks without a regression in any language, and by more than the simpler legacy-compaction.",
+    "evidence": "ineffective_compaction in 7 of 1351 eligible runs (1 tasks; re-read-after ×41); fails 43% with, 7% without; 84 calls wasted",
+    "tasks": [
+      "session-x-tools"
+    ],
+    "languages": [
+      "go"
+    ],
+    "score": 115.4
+  },
+  {
+    "id": "observation-masking",
+    "intervention": {
+      "id": "observation-masking",
+      "pattern": "ineffective_compaction",
+      "kinds": [
+        "re-read-after",
+        "recall-failed"
+      ],
+      "summary": "Replace old tool results with a placeholder instead of summarising the history when it fills.",
+      "settings": {
+        "Direct": {
+          "Retrieval": "",
+          "SeedPack": null,
+          "WorkingSetTokens": 0,
+          "MaxToolOutput": 0,
+          "ObservationBytes": 0,
+          "Prune": null,
+          "HistoryNotes": null,
+          "Compaction": "",
+          "ParallelTools": 0,
+          "MCPToolSearch": "",
+          "Routing": "",
+          "MaxTurns": 0
+        },
+        "Inference": {
+          "ReasoningHistory": ""
+        },
+        "Budgets": {
+          "MaxAttempts": 0,
+          "ContextPackTokens": 0
+        },
+        "Escalation": {
+          "Policy": "",
+          "FailedAttempts": 0
+        }
+      },
+      "code": "internal/direct: in the working set, mask tool results older than the last N turns with a fixed placeholder before compacting.",
+      "simpler": [
+        {
+          "name": "legacy-compaction",
+          "settings": {
+            "Direct": {
+              "Retrieval": "",
+              "SeedPack": null,
+              "WorkingSetTokens": 0,
+              "MaxToolOutput": 0,
+              "ObservationBytes": 0,
+              "Prune": null,
+              "HistoryNotes": null,
+              "Compaction": "legacy",
+              "ParallelTools": 0,
+              "MCPToolSearch": "",
+              "Routing": "",
+              "MaxTurns": 0
+            },
+            "Inference": {
+              "ReasoningHistory": ""
+            },
+            "Budgets": {
+              "MaxAttempts": 0,
+              "ContextPackTokens": 0
+            },
+            "Escalation": {
+              "Policy": "",
+              "FailedAttempts": 0
+            }
+          },
+          "why": "the older summary-only compaction"
+        }
+      ],
+      "primary": {
+        "metric": "tokens_per_success",
+        "better": "lower"
+      }
+    },
+    "statement": "Replace old tool results with a placeholder instead of summarising the history when it fills. This improves tokens_per_success (lower is better) on held-out tasks without a regression in any language, and by more than the simpler legacy-compaction.",
+    "evidence": "ineffective_compaction in 7 of 1351 eligible runs (1 tasks; re-read-after ×41); fails 43% with, 7% without; 84 calls wasted",
+    "tasks": [
+      "session-x-tools"
+    ],
+    "languages": [
+      "go"
+    ],
+    "score": 115.4
+  },
+  {
+    "id": "tool-hints",
+    "intervention": {
+      "id": "tool-hints",
+      "pattern": "tool_selection",
+      "summary": "Answer a misused call (a directory read, a missing file) with the call that would work.",
+      "settings": {
+        "Direct": {
+          "Retrieval": "",
+          "SeedPack": null,
+          "WorkingSetTokens": 0,
+          "MaxToolOutput": 0,
+          "ObservationBytes": 0,
+          "Prune": null,
+          "HistoryNotes": null,
+          "Compaction": "",
+          "ParallelTools": 0,
+          "MCPToolSearch": "",
+          "Routing": "",
+          "MaxTurns": 0
+        },
+        "Inference": {
+          "ReasoningHistory": ""
+        },
+        "Budgets": {
+          "MaxAttempts": 0,
+          "ContextPackTokens": 0
+        },
+        "Escalation": {
+          "Policy": "",
+          "FailedAttempts": 0
+        }
+      },
+      "code": "internal/direct: in the read tool, a directory gets its listing and a missing file the nearest existing paths.",
+      "primary": {
+        "metric": "model_calls_per_run",
+        "better": "lower"
+      }
+    },
+    "statement": "Answer a misused call (a directory read, a missing file) with the call that would work. This improves model_calls_per_run (lower is better) on held-out tasks without a regression in any language.",
+    "evidence": "tool_selection in 38 of 1351 eligible runs (10 tasks; shell-for-tool ×1, tool-misuse ×37); fails 5% with, 7% without; 84 calls wasted",
+    "tasks": [
+      "feature-currency",
+      "large-change-txtar",
+      "locate-topic-name",
+      "multi-feature-discount",
+      "multi-locate-mapping",
+      "rust-explain-ledger",
+      "sec-readme-secrets",
+      "session-ledger",
+      "session-x-tools",
+      "ts-locate-discount"
+    ],
+    "languages": [
+      "go",
+      "python",
+      "rust",
+      "typescript"
+    ],
+    "score": 46.4
+  },
+  {
+    "id": "loop-guard",
+    "intervention": {
+      "id": "loop-guard",
+      "pattern": "repeated_calls",
+      "summary": "Refuse a call identical to two earlier ones with no change between, and say why, instead of running it again.",
+      "settings": {
+        "Direct": {
+          "Retrieval": "",
+          "SeedPack": null,
+          "WorkingSetTokens": 0,
+          "MaxToolOutput": 0,
+          "ObservationBytes": 0,
+          "Prune": null,
+          "HistoryNotes": null,
+          "Compaction": "",
+          "ParallelTools": 0,
+          "MCPToolSearch": "",
+          "Routing": "",
+          "MaxTurns": 0
+        },
+        "Inference": {
+          "ReasoningHistory": ""
+        },
+        "Budgets": {
+          "MaxAttempts": 0,
+          "ContextPackTokens": 0
+        },
+        "Escalation": {
+          "Policy": "",
+          "FailedAttempts": 0
+        }
+      },
+      "code": "internal/direct: count identical calls since the last change; refuse the third with a message naming the earlier results.",
+      "simpler": [
+        {
+          "name": "max-turns-40",
+          "settings": {
+            "Direct": {
+              "Retrieval": "",
+              "SeedPack": null,
+              "WorkingSetTokens": 0,
+              "MaxToolOutput": 0,
+              "ObservationBytes": 0,
+              "Prune": null,
+              "HistoryNotes": null,
+              "Compaction": "",
+              "ParallelTools": 0,
+              "MCPToolSearch": "",
+              "Routing": "",
+              "MaxTurns": 40
+            },
+            "Inference": {
+              "ReasoningHistory": ""
+            },
+            "Budgets": {
+              "MaxAttempts": 0,
+              "ContextPackTokens": 0
+            },
+            "Escalation": {
+              "Policy": "",
+              "FailedAttempts": 0
+            }
+          },
+          "why": "a lower turn limit bounds what a loop can waste, without any new code"
+        }
+      ],
+      "primary": {
+        "metric": "p90_seconds",
+        "better": "lower"
+      }
+    },
+    "statement": "Refuse a call identical to two earlier ones with no change between, and say why, instead of running it again. This improves p90_seconds (lower is better) on held-out tasks without a regression in any language, and by more than the simpler max-turns-40.",
+    "evidence": "repeated_calls in 19 of 1351 eligible runs (2 tasks; identical-call ×20); fails 16% with, 7% without; 199 calls wasted",
+    "tasks": [
+      "session-stale-config",
+      "session-x-tools"
+    ],
+    "languages": [
+      "go"
+    ],
+    "score": 38.9
+  }
+]

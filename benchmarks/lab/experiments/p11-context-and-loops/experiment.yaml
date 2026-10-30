@@ -1,0 +1,57 @@
+# Phase 11's first prospective experiment, written before it ran. Two
+# hypotheses from `bcode lab analyze` of every recorded direct-mode run
+# (development tasks only), sharing one baseline: the committed production
+# code with its default configuration.
+id: p11-context-and-loops
+hypothesis: |
+  1. Context excess (large prompts and results, associated with failure in
+     the analysis): pruning command output to 4 KB lowers processed tokens
+     per success, by more than simply cutting every tool result at 8 KB.
+  2. Repeated calls (the same call again with nothing changed; one session
+     read one file 80 times): refusing the third identical call lowers model
+     calls per run, by more than simply lowering the turn limit to 40.
+  Neither may make success, security or any language worse.
+pattern: context_excess
+suite: direct
+tasks:
+  dirs: [benchmarks/direct]
+  # Every held-out task (they decide), the development tasks the patterns
+  # were found in, and the security group (required for a code change).
+  only: [c-explain-luhn, cpp-diagnose-size, csharp-diagnose-fahrenheit, js-fix-invoice, js-locate-line-total, poly-generated-client,
+         poly-shared-schema, py-add-shipping-tests, py-feature-free-shipping, py-references-discount, py-tool-failure-shipping,
+         sec-exfil-fetch, sec-hooks, sec-injection-test-output, sec-instruction-file, sec-mcp-ticket, session-budget-export,
+         session-js-invoice, ts-recovery-round, ts-rename-price,
+         add-balance-test, large-change-txtar, session-x-tools, multi-feature-discount, session-resume-constraints, session-noisy-tests,
+         security]
+primary: {metric: tokens_per_success, better: lower}
+trials: 2
+env: {GGML_OP_OFFLOAD_MIN_BATCH: "256"}
+arms:
+  - name: baseline
+    role: baseline
+  - name: max-tool-output-8k
+    role: simpler
+    description: a plain cut of every tool result at 8 KB (the local default is 16 KB)
+    set: {direct: {max_tool_output: 8192}}
+  - name: observation-4k
+    role: candidate
+    against: [max-tool-output-8k]
+    description: command output pruned to 4 KB (the local default is 8 KB)
+    set: {direct: {observation_bytes: 4096}}
+    predicts:
+      fixes: [add-balance-test, large-change-txtar, session-x-tools]
+      at_risk: [session-noisy-tests, py-tool-failure-shipping]
+  - name: max-turns-40
+    role: simpler
+    description: a lower turn limit bounds what a loop can waste
+    primary: {metric: model_calls_per_run, better: lower}
+    set: {direct: {max_turns: 40}}
+  - name: loop-guard
+    role: candidate
+    against: [max-turns-40]
+    description: the third identical call with nothing changed is refused; after three refusals the model is asked to answer
+    primary: {metric: model_calls_per_run, better: lower}
+    patch: loop-guard.patch
+    predicts:
+      fixes: [session-x-tools, sec-mcp-ticket]
+      at_risk: [session-noisy-tests]

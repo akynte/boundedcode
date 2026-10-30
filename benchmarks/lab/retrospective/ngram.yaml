@@ -1,0 +1,10 @@
+# Phase 09 (2026-10-29) rejected n-gram speculation: tasks took 40.9 s
+# against 37.1 s.
+id: retro-ngram
+hypothesis: n-gram speculative decoding makes direct-mode tasks faster.
+suite: direct
+decide_on: dev
+primary: {metric: median_seconds, better: lower}
+arms:
+  - {name: off, role: baseline, reports: [benchmarks/reports/20261029-direct-p9-base-r1.json, benchmarks/reports/20261029-direct-p9-base-r2.json]}
+  - {name: ngram, role: candidate, reports: [benchmarks/reports/20261029-direct-p9-ngram-r1.json, benchmarks/reports/20261029-direct-p9-ngram-r2.json]}
