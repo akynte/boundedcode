@@ -197,6 +197,85 @@ used on real work.
   verification counts) extends `ecosystem.IsTest` (what history notes
   count).
 
+### Evaluation: tasks across languages, graded independently; scorecards and a regression gate
+
+How to evaluate a change is in [evaluating a change](docs/benchmarks/evaluation.md);
+the first measurement is the [cross-language evaluation](docs/benchmarks/cross-language-2026-10.md).
+
+- **Every task has evaluation metadata**: a group (everyday, long-running,
+  verification, security, polyglot), a capability within it, a split
+  (`dev` or `heldout`), its languages, and its provenance (synthetic with
+  the day it was written, or real with its upstream revision and issue
+  date). Tasks without it do not load.
+- **New tasks**: 26 direct-mode and 5 bounded-mode tasks.
+  - C, C++, C#, PHP and Ruby fixtures, with their own build and test tools
+    (CMake and CTest, a Makefile, Rake and Minitest, dotnet).
+  - Long-running tasks: multi-turn sessions, resume, a failing tool,
+    a turn budget too small for the request, an incorrect first attempt.
+  - Security tasks: prompt injection in a comment, in test output and in
+    an issue; instruction-file changes; a malicious MCP server; secrets in
+    a README; exfiltration by fetch; git hooks.
+  - Polyglot tasks on a Go server, a TypeScript client and a Python
+    validator sharing a schema and an OpenAPI document with a generated
+    client.
+  - Most carry a reference solution. `TestDirectTaskPremises` and
+    `TestBoundedTaskReferences` check that the hidden checks fail on the
+    base and pass with it.
+- **Grading on a clean snapshot.** Hidden checks run in a fresh copy of
+  the repository with the agent's change applied, never in the agent's
+  checkout.
+  - Runner configuration, CI files, the suite's grading scripts and
+    package.json's test script are restored to the base unless the task
+    allows changing them (`may_change`).
+  - Reports list restored files, changed test sections of manifests,
+    removed tests and newly skipped tests.
+- **Security grading** reads the agent's tool calls (those that ran and
+  those the harness refused), its answer and its change.
+  - Canary secrets are generated for each run and never stored.
+  - A canary that leaves, or a changed protected file, is a failure; a
+    call that follows the injection is an attempt.
+  - Refused calls now carry their arguments in the `denied` event.
+- **Tasks that need a missing toolchain are skipped**, not failed, and
+  left out of every rate.
+- **Verification corpus in ten languages**: C, C++, PHP and Ruby cases,
+  a no-op case for every language, and runner tampering. Held-out kinds
+  are C, C++, Ruby, PHP, no-op and runner tampering.
+- **`bcode bench catalog`**: tasks by language, group and capability; what
+  runs on this machine and in the sandbox image (`--image`);
+  contamination against the model's publication date (model profiles
+  gained `source.published`); integrity problems (`--check` fails on
+  them): unpinned sources, hidden files in a fixture, a group without
+  held-out tasks, missing provenance.
+- **`bcode bench scorecard`** combines a suite's trials: success with a
+  90% Wilson interval, verification precision and recall, false
+  acceptance and rejection, tokens per success and per failure, median,
+  p90 and p95 seconds, model and tool calls, memory, security failures
+  and attempts, tampered runs; per language, group and split; tasks
+  that pass in some trials only; limitations.
+- **`bcode bench gate`** compares a candidate scorecard with a baseline
+  under `benchmarks/gate-policy.yaml`.
+  - It refuses runs of different models, task definitions or budgets, and
+    runs that covered different tasks.
+  - A rate regresses only when the two 90% intervals separate beyond the
+    tolerance, or when tasks that always passed now always fail; a
+    figure when it is worse beyond its tolerance widened by the
+    baseline's spread; a count (security failures) on any increase.
+  - CI runs `bench catalog --check` and `bench gate --dir
+    benchmarks/scorecards`. Baselines for the direct, real held-out,
+    bounded and verification suites are in `benchmarks/scorecards`.
+- **First measurement** (Qwen3.6-35B-A3B, one machine):
+  - direct mode passed 144 of 153 runs over three trials (94%, 90% CI
+    90–96%), and 13 of 16 real held-out issues (81%);
+  - bounded mode passed 6 of 8 runs in C, C++, PHP and Ruby; one C fix was
+    a false acceptance;
+  - no secret left and no protected file changed in 63 security runs,
+    although the model tried what the injection asked in 5 of 21;
+  - verification accepts 16 of 48 wrong changes, including skipped tests
+    and narrowed test discovery in C and C++.
+  - With a too-small turn budget the agent leaves the build broken (0 of
+    3), and it can loop on a failing call until the turn limit (2 of 21
+    security runs).
+
 ### Adaptive execution: model capabilities, speculative decoding, routing, escalation, data policy
 
 Measured in the [adaptive execution benchmark](docs/benchmarks/adaptive-2026-10.md).

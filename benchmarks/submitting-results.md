@@ -20,7 +20,9 @@ plays no part.
    section and are applied only after the run. Say how your setup ensures
    this if you used anything else.
 4. **The raw output.** Attach the JSON and Markdown that
-   `boundedcode bench tasks --out FILE.json` writes. Do not attach
+   `boundedcode bench tasks --out FILE.json` (or `bench direct`) writes,
+   and the scorecard `bench scorecard` makes of them
+   ([evaluating a change](../docs/benchmarks/evaluation.md)). Do not attach
    summaries you computed by hand without the files they came from.
 5. **The environment:**
    - `boundedcode version`;
